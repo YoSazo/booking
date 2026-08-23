@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 import Capacitor
 import WebKit
 import Contacts
@@ -368,13 +369,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             title: "Front Desk Assistant",
             image: UIImage(systemName: "message.badge")
         ) { [weak self] _ in
-            self?.sendWebAction("assistant")
+            self?.presentNativeAssistant()
         }
         let supportAction = UIAction(
             title: "Message Marketel",
             image: UIImage(systemName: "questionmark.bubble")
         ) { [weak self] _ in
-            self?.sendWebAction("support")
+            self?.presentNativeSupportMessages()
         }
         let tourAction = UIAction(
             title: "Replay app tour",
@@ -506,7 +507,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func openAssistantFromPill() {
-        sendWebAction("assistant")
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        presentNativeAssistant()
     }
 
     // Driven by the same `state` message that already reports the selected tab,
@@ -880,7 +882,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             blue: 91 / 255,
             alpha: 1
         )
-        present(navigationController, animated: true)
+        // The Assistant itself is a native sheet. Present the contact editor
+        // from whichever controller is currently visible instead of asking the
+        // bridge controller to present over an existing modal.
+        let presenter = presentedViewController ?? self
+        presenter.present(navigationController, animated: true)
     }
 
     func contactViewController(
@@ -941,6 +947,94 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         present(browser, animated: true)
     }
 
+    private func requireNativeMessagingSession() -> Bool {
+        guard !nativeAuthToken.isEmpty, !activeHotelId.isEmpty else {
+            let alert = UIAlertController(
+                title: "Front Desk is reconnecting",
+                message: "Wait a moment for this property to finish loading, then try again.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return false
+        }
+        return true
+    }
+
+    private func presentNativeGuestMessages() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let messages = MarketelNativeGuestMessagesView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken
+        ) { [weak self] in
+            self?.sendWebAction("refresh")
+        }
+        let controller = UIHostingController(rootView: messages)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true)
+    }
+
+    private func presentNativeSupportMessages() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let messages = MarketelNativeSupportView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken
+        ) { [weak self] in
+            self?.sendWebAction("refresh")
+        }
+        let controller = UIHostingController(rootView: messages)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true)
+    }
+
+    private func presentNativeAssistant() {
+        guard requireNativeMessagingSession(), presentedViewController == nil else { return }
+        let assistant = MarketelNativeAssistantView(
+            origin: backendOrigin,
+            hotelId: activeHotelId,
+            authToken: nativeAuthToken,
+            onClose: { [weak self] in
+                self?.sendWebAction("refresh")
+            },
+            onSaveContact: { [weak self] phone in
+                self?.presentMarketelContact(phone: phone)
+            }
+        )
+        let controller = UIHostingController(rootView: assistant)
+        controller.view.backgroundColor = UIColor(
+            red: 244 / 255,
+            green: 247 / 255,
+            blue: 245 / 255,
+            alpha: 1
+        )
+        controller.modalPresentationStyle = .pageSheet
+        if let sheet = controller.sheetPresentationController {
+            // Open as the compact surface suggested by the Front Desk pill.
+            // The owner can pull the same surface to full height without
+            // leaving Assistant or losing their place.
+            sheet.detents = [.medium(), .large()]
+            sheet.selectedDetentIdentifier = .medium
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+            sheet.preferredCornerRadius = 28
+        }
+        present(controller, animated: true)
+    }
+
     func userContentController(
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
@@ -971,6 +1065,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":
             presentInAppBrowser(payload["url"] as? String ?? "")
+        case "openGuestMessages":
+            presentNativeGuestMessages()
+        case "openSupport":
+            presentNativeSupportMessages()
+        case "openAssistant":
+            presentNativeAssistant()
         case "tourMode":
             nativeTourActive = payload["active"] as? Bool ?? false
             setShellVisible(shellVisible, animated: false)

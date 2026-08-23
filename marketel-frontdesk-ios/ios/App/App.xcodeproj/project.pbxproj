@@ -11,6 +11,8 @@
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
+		A11E01212E00000100000001 /* NativeMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E01202E00000100000001 /* NativeMessages.swift */; };
+		A11E01232E00000100000001 /* NativeAssistant.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E01222E00000100000001 /* NativeAssistant.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -44,6 +46,8 @@
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A11E01202E00000100000001 /* NativeMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMessages.swift; sourceTree = "<group>"; };
+		A11E01222E00000100000001 /* NativeAssistant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAssistant.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -106,6 +110,8 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				A11E01202E00000100000001 /* NativeMessages.swift */,
+				A11E01222E00000100000001 /* NativeAssistant.swift */,
 				A11E01102E00000100000001 /* LiveActivityPlugin.swift */,
 				A11E01112E00000100000001 /* LiveActivityPlugin.m */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -258,6 +264,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				A11E01212E00000100000001 /* NativeMessages.swift in Sources */,
+				A11E01232E00000100000001 /* NativeAssistant.swift in Sources */,
 				A11E01182E00000100000001 /* LiveActivityPlugin.swift in Sources */,
 				A11E01192E00000100000001 /* LiveActivityPlugin.m in Sources */,
 				A11E01172E00000100000001 /* BookingDecisionAttributes.swift in Sources */,
@@ -438,7 +446,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.26;
+				MARKETING_VERSION = 3.27;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.bookmarketel.frontdesk;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -465,7 +473,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.26;
+				MARKETING_VERSION = 3.27;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bookmarketel.frontdesk;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
@@ -491,7 +499,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.26;
+				MARKETING_VERSION = 3.27;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bookmarketel.frontdesk.MarketelActivityWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -524,7 +532,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 3.26;
+				MARKETING_VERSION = 3.27;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bookmarketel.frontdesk.MarketelActivityWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

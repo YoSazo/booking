@@ -6,6 +6,7 @@ import SwiftUI
 struct HotelsView: View {
     @Environment(GuestStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedHotel: Hotel?
     @State private var info = Info()
     @State private var sheetDetent: PresentationDetent = .large
@@ -45,6 +46,7 @@ struct HotelsView: View {
                 .padding(.top, 12)
             }
             .scrollIndicators(.hidden)
+            .refreshable { await refreshHotelCards() }
             .safeAreaPadding(15)
             .scrollDisabled(isSelected)
             .navigationTitle(navigationTitleHidden ? "" : "Your hotels")
@@ -79,25 +81,33 @@ struct HotelsView: View {
                 }
             }
             .task {
-                await store.refreshHotels()
-                ImagePrefetch.warm(hotels: store.hotels)
+                await refreshHotelCards()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                // A property owner can change this card from Marketel while the
+                // guest keeps Guestel installed. Refresh when Guestel returns to
+                // the foreground so the Wallet never remains stuck on a room
+                // photo merely because this tab was already alive.
+                guard phase == .active else { return }
+                Task { await refreshHotelCards() }
             }
             .sheet(isPresented: $showingAdd) {
                 AddHotelView().presentationDetents([.medium])
             }
         }
-        .sheet(item: $selectedHotel) { hotel in
+        .sheet(item: animatedHotelSelection) { hotel in
             HotelSheet(
                 hotel: hotel,
                 maxDetent: .height(maxSheetHeight),
                 detent: $sheetDetent,
-                onBooked: { result, checkin, checkout in
+                onBooked: { result, checkin, checkout, roomName in
                     store.addReservation(
                         code: result.reservationCode,
                         hotelId: hotel.hotelId,
                         checkin: checkin,
                         checkout: checkout,
                         status: result.pending ? "pending" : "confirmed",
+                        roomName: roomName,
                         accessToken: result.reservationToken
                     )
                     withAnimation(animation) { selectedHotel = nil }
@@ -152,6 +162,24 @@ struct HotelsView: View {
     private var navigationTitleHidden: Bool { info.scrollOffset > 1 || isSelected }
 
     private var animation: Animation { .interactiveSpring(response: 0.55, dampingFraction: 0.8) }
+
+    // SwiftUI clears a sheet's item binding when an interactive swipe finishes.
+    // Route that system mutation through the same spring used by the close and
+    // background-tap paths, so the pinned Wallet card never snaps back abruptly.
+    private var animatedHotelSelection: Binding<Hotel?> {
+        Binding(
+            get: { selectedHotel },
+            set: { value in
+                withAnimation(animation) { selectedHotel = value }
+            }
+        )
+    }
+
+    @MainActor
+    private func refreshHotelCards() async {
+        await store.refreshHotels()
+        ImagePrefetch.warm(hotels: store.hotels)
+    }
 
     private var emptyWallet: some View {
         VStack(spacing: 14) {
@@ -232,9 +260,13 @@ struct WalletCard: View {
                             image.resizable().scaledToFill()
                         }
                     }
+                    // Covers belong to each property, so brightness is
+                    // unpredictable. A light uniform shade preserves the photo
+                    // while giving the white Wallet text a reliable baseline.
+                    Color.black.opacity(0.10)
                 }
                 LinearGradient(
-                    colors: [.black.opacity(0.60), .black.opacity(0.12), .clear],
+                    colors: [.black.opacity(0.66), .black.opacity(0.18), .clear],
                     startPoint: .top,
                     endPoint: .center
                 )

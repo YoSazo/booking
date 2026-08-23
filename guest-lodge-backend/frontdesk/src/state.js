@@ -41,6 +41,8 @@ export const crm = {
   activeHotelId: '',
   activeHotelName: '',
   activeHotelAppIcon: '',
+  guestelWalletImageUrl: '',
+  guestelWalletSubtitle: '',
   appsViewPlatform: 'ios',
   activeHotelDomain: '',
   activeHotelContext: null,
@@ -81,6 +83,7 @@ export const crm = {
   messagesExpanded: false,
   messagesThreadPickerOpen: false,
   selectedMessageThread: '',
+  messagesWorkspaceThreadOpen: false,
   bookingsVirtualList: [],
   bookingsVirtualRaf: 0,
 };

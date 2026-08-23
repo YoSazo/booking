@@ -2991,6 +2991,94 @@
   font-size: 14px;
   font-weight: 600;
 }
+.guest-messages-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.guest-messages-empty > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.guest-messages-empty strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+.guest-messages-empty small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.guest-messages-native-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.guest-messages-native-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+}
+.guest-messages-native-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+.guest-messages-native-line strong {
+  overflow: hidden;
+  flex: 1;
+  font-size: 15px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guest-messages-native-line time {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+.guest-messages-native-preview,
+.guest-messages-native-copy small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guest-messages-native-copy small { font-size: 10px; }
+.guest-messages-native-chevron {
+  flex: 0 0 auto;
+  color: #a2ada7;
+  font-size: 24px;
+  font-weight: 400;
+}
+.guest-messages-all {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  background: #fbfcfb;
+  color: var(--green);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
 .guest-messages-card-header {
   display: flex;
   align-items: center;
@@ -3320,7 +3408,7 @@
   max-height: min(46vh, 380px);
   overflow-y: auto;
   padding: 15px 13px 7px;
-  background: linear-gradient(180deg, #f7faf8, #fbfcfb);
+  background: var(--bg);
   overscroll-behavior: contain;
 }
 .message-row {
@@ -3336,7 +3424,6 @@
   font-size: 9px;
   font-weight: 800;
   letter-spacing: .04em;
-  text-transform: uppercase;
 }
 .message-row.from-hotel .message-meta { color: var(--green); }
 .message-bubble {
@@ -3344,7 +3431,8 @@
   padding: 10px 13px;
   border-radius: 16px 16px 16px 4px;
   background: var(--white);
-  box-shadow: 0 2px 10px rgba(20, 45, 31, .07);
+  border: 1px solid rgba(35, 72, 49, .06);
+  box-shadow: none;
   color: var(--text);
   font-size: 13px;
   line-height: 1.48;
@@ -3378,7 +3466,9 @@
   align-items: center;
   gap: 8px;
   padding: 12px;
-  background: var(--white);
+  background: rgba(255, 255, 255, .82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 .message-composer input {
   width: 100%;
@@ -3386,10 +3476,10 @@
   min-height: 42px;
   flex: 1;
   padding: 9px 14px;
-  border: 1.5px solid var(--border);
+  border: 0;
   border-radius: 999px;
   outline: 0;
-  background: var(--bg);
+  background: var(--white);
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
@@ -3423,7 +3513,7 @@
 }
 .messages-workspace-header {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 58px;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
   align-items: center;
   gap: 10px;
   min-height: 72px;
@@ -3434,18 +3524,22 @@
   -webkit-backdrop-filter: blur(18px);
 }
 .messages-workspace-close {
-  width: 42px;
+  width: auto;
   height: 42px;
-  padding: 0 0 4px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--white);
-  color: var(--text);
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--green);
   font-family: inherit;
-  font-size: 32px;
+  font-size: 14px;
+  font-weight: 750;
   line-height: 1;
+  text-align: left;
   cursor: pointer;
 }
+.messages-workspace.is-thread-open .messages-workspace-close { font-size: 30px;font-weight: 400; }
+.messages-workspace-heading { min-width: 0; }
 .messages-workspace-title {
   color: var(--text);
   font-size: 17px;
@@ -3527,7 +3621,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 12px 13px;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--white);
@@ -3537,7 +3631,7 @@
   cursor: pointer;
 }
 .messages-workspace-thread:last-child { border-bottom: 0; }
-.messages-workspace-thread.active { background: var(--green-pale); }
+.messages-workspace-thread.active { background: #f0f7f3; }
 .messages-workspace-thread-copy {
   min-width: 0;
   display: grid;
@@ -3556,6 +3650,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.messages-workspace-thread-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+.messages-workspace-thread-line time {
+  flex: 0 0 auto;
+  color: #929c96;
+  font-size: 9.5px;
+  font-weight: 600;
+}
 .messages-workspace-thread-name i {
   width: 7px;
   height: 7px;
@@ -3572,6 +3678,20 @@
   white-space: nowrap;
 }
 .messages-workspace-thread-context { color: #929c96; font-size: 9.5px; }
+.messages-workspace-thread-badge {
+  min-width: 21px;
+  height: 21px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+.messages-workspace-thread-chevron { color:#a2ada7;font-size:22px; }
 .messages-workspace-chat {
   display: flex;
   flex-direction: column;
@@ -3725,8 +3845,7 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
 
 @media (max-width: 700px) {
   .messages-workspace-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: block;
     gap: 0;
     padding: 0;
   }
@@ -3736,34 +3855,37 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
     border-radius: 0;
   }
   .messages-workspace-sidebar {
-    border-bottom: 1px solid var(--border);
+    display: flex;
+    height: 100%;
+    border-bottom: 0;
   }
+  .messages-workspace-chat { display: none; height: 100%; }
+  .messages-workspace.is-thread-open .messages-workspace-sidebar { display: none; }
+  .messages-workspace.is-thread-open .messages-workspace-chat { display: flex; }
   .messages-workspace-sidebar-heading { display: none; }
   .messages-workspace-thread-list {
-    display: flex;
-    flex: 0 0 auto;
-    gap: 8px;
-    padding: 8px 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
+    display: block;
+    flex: 1;
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .messages-workspace-thread-list::-webkit-scrollbar { display: none; }
   .messages-workspace-thread {
-    width: min(235px, 76vw);
-    min-width: min(235px, 76vw);
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 10px;
+    padding: 15px;
+    border: 0;
+    border-radius: 18px;
+    box-shadow: 0 5px 18px rgba(24,52,36,.04);
   }
-  .messages-workspace-thread.active { border-color: #b8d8c5; }
   .messages-workspace-thread .message-avatar.small {
-    width: 30px;
-    height: 30px;
-    flex-basis: 30px;
-    font-size: 12px;
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+    font-size: 16px;
   }
-  .messages-workspace-thread-context { display: none; }
   .messages-workspace .message-thread-heading { flex: 0 0 auto; }
   .messages-workspace .message-conversation { padding-bottom: 14px; }
 }
@@ -3848,30 +3970,6 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
     .marketel-removing {
       animation: marketel-collapse var(--dur-fast) var(--ease-in-out) forwards;
       pointer-events: none;
-    }
-
-    /* Sections measure their own height in JS; these are the curves it uses. */
-    /* Height is the only property that can expand to fit unknown content, and
-       it costs a layout pass every frame. Two things make that affordable:
-       contain scopes the layout and paint to this subtree instead of the
-       document, and the motion the eye actually reads is carried by the inner
-       transform and opacity, which run on the compositor. */
-    .accordion-body.is-animating {
-      overflow: hidden;
-      contain: layout paint;
-      will-change: height;
-      transition: height var(--dur-base) var(--ease-out);
-    }
-    /* Only on the way in. Closing is the height alone: a child fading on a
-       different clock than the box, while sliding up as the box clips down,
-       reads as two separate stops rather than one collapse. */
-    .accordion-body.is-opening > * {
-      transition: transform var(--dur-base) var(--ease-out),
-                  opacity var(--dur-base) var(--ease-out);
-    }
-    .accordion-body.is-collapsed > * {
-      transform: translateY(-6px);
-      opacity: 0;
     }
 
     /* Pressable feedback. A tap that does not acknowledge itself reads as a

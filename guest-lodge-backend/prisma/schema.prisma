@@ -52,7 +52,7 @@ model Booking {
   // property keeps its business record, while the guest no longer downloads
   // messages at or before this point. A later reply starts the thread again.
   guestMessagesHiddenBefore DateTime?
-  guestAccessRevokedAt       DateTime?
+  guestAccessRevokedAt      DateTime?
 
   // Owner approval window. While status='pending' the room stays held. The
   // unanswered action is copied onto the booking so changing the property
@@ -318,16 +318,16 @@ model GuestNativePushDevice {
 // it may receive property updates/direct offers, but it grants no reservation
 // or message-thread access.
 model GuestelPropertyDevice {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lastSeenAt  DateTime @default(now())
-  deviceToken String
-  environment String   @default("production")
-  hotelId     String
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastSeenAt     DateTime @default(now())
+  deviceToken    String
+  environment    String   @default("production")
+  hotelId        String
   guestEmailHash String?
-  updates     Boolean  @default(true)
-  active      Boolean  @default(true)
+  updates        Boolean  @default(true)
+  active         Boolean  @default(true)
 
   @@unique([deviceToken, hotelId])
   @@index([hotelId, active, updates])
@@ -384,6 +384,14 @@ model HotelConfig {
   // Onboarding
   setupToken                   String?   @unique
   setupComplete                Boolean   @default(false)
+  // Server-owned recovery state. Browser storage makes the normal path fast,
+  // while these fields let an authenticated email link resume on any device.
+  setupProgressStep            Int       @default(1)
+  revealProgressStep           Int       @default(0)
+  setupResumeEmailSentAt       DateTime?
+  previewReadyEmailSentAt      DateTime?
+  checkoutStartedAt            DateTime?
+  checkoutRecoveryEmailSentAt  DateTime?
   subscribed                   Boolean   @default(false)
   stripeAccountId              String?
   marketelStripeCustomerId     String?   @unique
@@ -394,15 +402,17 @@ model HotelConfig {
   ownerPhone                   String?
 
   // Hotel details (editable by owner)
-  phone              String?
-  address            String?
-  subtitle           String?
-  theme              String? @default("light")
-  appIconUrl         String?
-  checkInTime        String? @default("15:00")
-  checkOutTime       String? @default("11:00")
-  cancellationPolicy String?
-  growthChecklist    Json? // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
+  phone                 String?
+  address               String?
+  subtitle              String?
+  theme                 String? @default("light")
+  appIconUrl            String?
+  guestelWalletImageUrl String?
+  guestelWalletSubtitle String?
+  checkInTime           String? @default("15:00")
+  checkOutTime          String? @default("11:00")
+  cancellationPolicy    String?
+  growthChecklist       Json? // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
 
   // Owner approval: hold new bookings briefly so the owner can catch a room
   // they already sold on an OTA. Useless without push, so it stays off until

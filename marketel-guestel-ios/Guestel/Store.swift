@@ -130,9 +130,10 @@ final class GuestStore {
         GuestPaymentAccess.clear()
     }
 
-    func addReservation(code: String, hotelId: String, checkin: String, checkout: String, status: String? = nil, accessToken: String? = nil) {
+    func addReservation(code: String, hotelId: String, checkin: String, checkout: String, status: String? = nil, roomName: String? = nil, accessToken: String? = nil) {
         var item: [String: Any] = ["code": code, "hotelId": hotelId, "checkin": checkin, "checkout": checkout]
         if let status { item["status"] = status }
+        if let roomName, !roomName.isEmpty { item["roomName"] = roomName }
         if let accessToken, !accessToken.isEmpty { item["accessToken"] = accessToken }
         ingest([item])
         Task { @MainActor in await GuestPushManager.sync(store: self) }
@@ -167,15 +168,15 @@ final class GuestStore {
 
     /// Refreshes display data from the backend without replacing the guest's
     /// wallet ordering or locally retained stay history.
+    @MainActor
     func refreshHotels() async {
         let identifiers = hotels.map(\.hotelId)
         for hotelId in identifiers {
             guard let data = try? await BookingAPI.hotel(hotelId),
                   let index = hotels.firstIndex(where: { $0.hotelId == hotelId }) else { continue }
             hotels[index].name = data.name
-            if let image = data.rooms.lazy.compactMap(\.image).first {
-                hotels[index].imageURL = image
-            }
+            hotels[index].location = data.guestelWalletSubtitle ?? hotels[index].location
+            hotels[index].imageURL = data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
         }
         persistHotels()
     }

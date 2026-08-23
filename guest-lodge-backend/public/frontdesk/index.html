@@ -89,9 +89,9 @@
     }, 15000);
   })();
   </script>
-  <script type="module" crossorigin src="/frontdesk/assets/index-CBcHryGi.js"></script>
-  <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-DkZp3vyS.js">
-  <link rel="stylesheet" crossorigin href="/frontdesk/assets/index-CDKY-6lL.css">
+  <script type="module" crossorigin src="/frontdesk/assets/index-ByfknVfp.js"></script>
+  <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-BjIgv-Fo.js">
+  <link rel="stylesheet" crossorigin href="/frontdesk/assets/index-C9R4syib.css">
 </head>
 <body>
 
@@ -168,17 +168,19 @@
       <img src="/marketellogo.svg" alt="" class="login-logo-icon">
       <img src="/marketel.svg" alt="Marketel" class="login-logo-text">
     </div>
-    <p>Front Desk — Enter your PIN to continue</p>
-    <input class="login-input login-pin-input" type="password" id="pinInput" placeholder="Enter PIN" maxlength="20" autocomplete="current-password" enterkeyhint="go">
-    <button type="button" class="login-btn" id="signInBtn">Sign In</button>
-    <div class="login-error" id="loginError"></div>
+    <p id="webLoginPrompt">Front Desk — continue securely by email</p>
+    <div id="magicLinkForm">
+      <input class="login-input" type="email" id="magicLinkEmail" placeholder="Email used during setup" autocomplete="email" inputmode="email" style="margin-bottom:10px;">
+      <button type="button" class="login-btn" id="magicLinkSendBtn">Email me a login link</button>
+      <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
+    </div>
+    <div id="webPinLoginForm" style="display:none;">
+      <input class="login-input login-pin-input" type="password" id="pinInput" placeholder="Front Desk PIN" maxlength="20" autocomplete="current-password" enterkeyhint="go">
+      <button type="button" class="login-btn" id="signInBtn">Sign In</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
     <div id="forgotPinSection" style="margin-top:14px;text-align:center;">
-      <a href="#" onclick="showMagicLinkForm(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Email me a login link</a>
-      <div id="magicLinkForm" style="display:none;margin-top:12px;">
-        <input class="login-input" type="email" id="magicLinkEmail" placeholder="Your email address" style="margin-bottom:10px;">
-        <button type="button" class="login-btn" id="magicLinkSendBtn" style="background:#2E7D5B;">Send Login Link</button>
-        <div id="magicLinkMsg" style="font-size:13px;margin-top:8px;color:var(--text-muted);min-height:20px;"></div>
-      </div>
+      <a href="#" id="webLoginMethodToggle" onclick="toggleWebLoginMethod(event)" style="font-size:13px;color:var(--green);text-decoration:none;">Use Front Desk PIN instead</a>
     </div>
   </div>
 </div>

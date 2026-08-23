@@ -24,7 +24,7 @@ struct BookingWebView: UIViewRepresentable {
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
-        webView.load(URLRequest(url: url))
+        webView.load(URLRequest(url: Self.nativeBookingURL(url)))
         return webView
     }
 
@@ -33,6 +33,10 @@ struct BookingWebView: UIViewRepresentable {
     // Polls the booking engine's stored stays and posts them to native when they change.
     private static let reader = """
     (function () {
+      // The native app deliberately opts out of the website's advertising and
+      // analytics pipeline. Keep this runtime marker as a second line of
+      // defense if client-side navigation later removes the URL parameter.
+      window.__GUESTEL_NATIVE__ = true;
       var last = '';
       function readStays() {
         try {
@@ -57,6 +61,16 @@ struct BookingWebView: UIViewRepresentable {
       tick();
     })();
     """
+
+    private static func nativeBookingURL(_ url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = components.queryItems ?? []
+        if !items.contains(where: { $0.name == "guestelNative" }) {
+            items.append(URLQueryItem(name: "guestelNative", value: "1"))
+        }
+        components.queryItems = items
+        return components.url ?? url
+    }
 
     final class Coordinator: NSObject, WKScriptMessageHandler {
         let store: GuestStore

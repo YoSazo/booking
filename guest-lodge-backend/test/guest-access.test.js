@@ -34,19 +34,25 @@ test('reservation capability is scoped to one persisted booking', () => {
     assert.equal(readReservationToken(token, { secret: `${secret}x`, nowMs }), null);
 });
 
-test('Guestel native checkout uses the pay-later contract and fails closed on availability', () => {
+test('Guestel native checkout uses server-owned quote, pay-later, and fails closed on availability', () => {
     const root = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
     const api = fs.readFileSync(path.join(root, 'BookingAPI.swift'), 'utf8');
     const hotelSheet = fs.readFileSync(path.join(root, 'HotelSheet.swift'), 'utf8');
     const rebook = fs.readFileSync(path.join(root, 'RebookView.swift'), 'utf8');
     assert.match(api, /api\/complete-pay-later-booking/);
+    assert.match(api, /api\/booking-quote/);
     assert.doesNotMatch(api, /static func book[\s\S]{0,200}api\/book/);
-    for (const source of [hotelSheet, rebook]) {
-        assert.match(source, /guard let match = available\.first/);
-        assert.match(source, /details\["roomTypeID"\] = match\.roomTypeID/);
-        assert.match(source, /details\["rateID"\] = match\.rateID/);
-        assert.match(source, /BookingAPI\.completePayLater/);
-    }
+    assert.match(hotelSheet, /guard let match = available\.first/);
+    assert.match(hotelSheet, /"roomTypeID": match\.roomTypeID/);
+    assert.match(hotelSheet, /"rateID": match\.rateID/);
+    assert.match(hotelSheet, /let freshQuote = try await BookingAPI\.quote/);
+    assert.match(hotelSheet, /BookingAPI\.completePayLater/);
+    // The older full-screen rebook surface remains fail-closed while the
+    // Wallet sheet is the primary native return-booking path.
+    assert.match(rebook, /guard let match = available\.first/);
+    assert.match(rebook, /details\["roomTypeID"\] = match\.roomTypeID/);
+    assert.match(rebook, /details\["rateID"\] = match\.rateID/);
+    assert.match(rebook, /BookingAPI\.completePayLater/);
 });
 
 test('saved-card sessions require the signed customer capability', () => {

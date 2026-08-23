@@ -432,7 +432,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       <div class="final-panel fade-stagger" id="finalReadyPanel" hidden>
         <div class="final-check">✓</div>
         <h2>Your Marketel is ready</h2>
-        <p>Guests use your direct booking page and can save your property to their Home Screen. You use the Marketel Front Desk app to manage bookings and availability.</p>
+        <p>Guests book on your direct page and keep your property in Guestel. You manage bookings and availability in the Marketel Front Desk app.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="successDomain"></div>
@@ -468,6 +468,7 @@ let pendingPhotoUpload = null;
 let qualifiedLeadTracked = false;
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
+let setupCompleteData = null;
 
 window.MarketelJourney?.init({
   surface: 'setup',
@@ -486,6 +487,82 @@ function showToast(msg, isError) {
   setTimeout(() => t.className = 'toast', 3000);
 }
 function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
+
+function setupHandoffUrl(data) {
+  const returnToken = String(data?.frontdeskReturnToken || '').trim();
+  const legacyPin = String(data?.crmPin || '').trim();
+  const params = new URLSearchParams({
+    hotelId: String(hotelData.id || data?.hotelId || ''),
+    reveal: 'step-0',
+  });
+  const fragment = new URLSearchParams();
+  if (returnToken) fragment.set('returnToken', returnToken);
+  else if (legacyPin) fragment.set('pin', legacyPin);
+  return window.location.origin + '/frontdesk-return?' + params.toString()
+    + (fragment.toString() ? '#' + fragment.toString() : '');
+}
+
+function configureReadyHandoff(data, bookingDomain) {
+  setupCompleteData = { ...(setupCompleteData || {}), ...(data || {}) };
+  const domain = String(bookingDomain || setupCompleteData.bookingUrl || '').replace(/^https?:\/\//, '');
+  if (domain) document.getElementById('successDomain').textContent = domain;
+  window._dashboardUrl = setupHandoffUrl(setupCompleteData);
+  const successLink = document.getElementById('successLink');
+  successLink.href = window._dashboardUrl;
+  window._siteReady = true;
+  updateFinalStepState(false);
+  if (successLink.dataset.bound === '1') return;
+  successLink.dataset.bound = '1';
+  successLink.addEventListener('click', async function(ev) {
+    ev.preventDefault();
+    if (successLink.dataset.opening === '1') return;
+    setSuccessLinkLoading(true);
+    window.MarketelJourney?.track('JourneyHandoffStarted', {
+      from: 'setup',
+      to: 'frontdesk-reveal',
+    }, { durationMs: Date.now() - setupStepStartedAt });
+    if (pendingPhotoUpload) {
+      await Promise.race([
+        pendingPhotoUpload,
+        new Promise((resolve) => setTimeout(resolve, 6000)),
+      ]);
+    }
+    if (!successLink.dataset.finalized) {
+      try {
+        const finalResponse = await fetch(API + '/api/setup/' + TOKEN + '/finalize', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({ email: '', phone: '', pin: setupCompleteData?.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
+        });
+        if (!finalResponse.ok) throw new Error('finalize-failed');
+        successLink.dataset.finalized = '1';
+      } catch (_) {
+        // Completion already sent the recovery email and the scoped handoff
+        // remains valid. Never trap the owner because an optional finalization
+        // retry lost its network connection.
+      }
+    }
+    window.MarketelJourney?.track('JourneyHandoffCompleted', {
+      from: 'setup',
+      to: 'frontdesk-reveal',
+    }, { immediate: true, keepalive: true });
+    window.location.href = window._dashboardUrl || successLink.href;
+  });
+}
+
+function showSetupRecoveryError(message) {
+  const firstStep = document.getElementById('step-1');
+  if (!firstStep) return;
+  document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
+  firstStep.classList.add('active');
+  firstStep.innerHTML = '<div class="form-card fade-stagger" style="text-align:center;">'
+    + '<h2>Let’s get you back in</h2>'
+    + '<p style="color:#6b7280;line-height:1.55;margin:10px 0 18px;">'
+    + (message || 'This setup link is no longer available. Enter the same email on Marketel and we’ll send a fresh secure link.')
+    + '</p><a class="btn btn-primary" href="/landing" style="display:block;text-decoration:none;">Email me a secure link →</a>'
+    + '<a href="mailto:support@bookmarketel.com" style="display:inline-block;margin-top:14px;color:#2E7D5B;font-size:13px;">Contact support</a></div>';
+  animateVisibleStep(firstStep);
+}
 
 function restartFadeUp(root) {
   if (!root) return;
@@ -571,13 +648,19 @@ function answerQualityQ(answer) {
 
 // Load existing data
 async function loadSetup() {
-  if (!TOKEN) return;
+  if (!TOKEN) {
+    showSetupRecoveryError('This setup link is incomplete. Enter your email again and we’ll send the correct secure link.');
+    return;
+  }
   const requestStartedAt = Date.now();
   window.MarketelJourney?.track('JourneyRequestStarted', { request: 'load-setup' });
   try {
     const res = await fetch(API + '/api/setup/' + TOKEN);
     if (!res.ok) {
       window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', status: res.status }, { durationMs: Date.now() - requestStartedAt });
+      showSetupRecoveryError(res.status === 404
+        ? 'That setup link has expired. Enter the same email again and we’ll return you to your saved Marketel.'
+        : 'We could not load your saved setup. Try the secure link again or request a fresh one.');
       return;
     }
     const data = await res.json();
@@ -599,8 +682,29 @@ async function loadSetup() {
       existingRooms: rooms.length,
       propertyAlreadyNamed: !!hotelData.name,
     }, { durationMs: Date.now() - requestStartedAt });
+    const resumeStep = Math.max(1, Math.min(4, Number(data.resumeStep) || 1));
+    if (hotelData.setupComplete) {
+      configureReadyHandoff({
+        hotelId: hotelData.id,
+        bookingUrl: data.domain ? 'https://' + data.domain : '',
+        frontdeskReturnToken: data.frontdeskReturnToken || '',
+      }, data.domain || '');
+      const completedResumeStep = Math.max(3, resumeStep);
+      if (completedResumeStep !== currentSetupStep) goToStep(completedResumeStep);
+      window.MarketelJourney?.track('JourneySetupResumed', {
+        step: completedResumeStep,
+        setupComplete: true,
+      });
+    } else if (resumeStep > 1) {
+      goToStep(Math.min(2, resumeStep));
+      window.MarketelJourney?.track('JourneySetupResumed', {
+        step: Math.min(2, resumeStep),
+        setupComplete: false,
+      });
+    }
   } catch (e) {
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', reason: 'network-or-parse' }, { durationMs: Date.now() - requestStartedAt });
+    showSetupRecoveryError('We could not connect to your saved setup. Try again, or request a fresh secure link from the landing page.');
   }
 }
 
@@ -794,13 +898,7 @@ async function addRoomAndFinish() {
     // Show success
     console.log('Complete response:', completeData);
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-property').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
-    document.getElementById('successDomain').textContent = domain.replace('https://', '');
-    
-    // Front Desk lives on the stable Marketel origin; the property domain is
-    // reserved for guests. The hotel id scopes this one-time PIN login.
-    var dashboardUrl = window.location.origin + '/frontdesk-return?hotelId=' + encodeURIComponent(hotelData.id || '') + '&reveal=1#pin=' + encodeURIComponent(completeData.crmPin || '');
-    window._dashboardUrl = dashboardUrl;
-    document.getElementById('successLink').href = dashboardUrl;
+    configureReadyHandoff(completeData, domain);
     window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });
 
     // The reveal can open immediately on Marketel while the guest-facing domain
@@ -822,44 +920,6 @@ async function addRoomAndFinish() {
     }, { durationMs: Date.now() - buildStartedAt });
     window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'build-marketel' }, { durationMs: Date.now() - buildStartedAt });
 
-    // Finalize the owner handoff as they enter the personalized reveal.
-    var successLink = document.getElementById('successLink');
-    successLink.addEventListener('click', async function(ev) {
-      ev.preventDefault();
-      if (successLink.dataset.opening === '1') return;
-      setSuccessLinkLoading(true);
-      window.MarketelJourney?.track('JourneyHandoffStarted', {
-        from: 'setup',
-        to: 'frontdesk-reveal',
-      }, { durationMs: Date.now() - setupStepStartedAt });
-      // The photo has been uploading since the build started, so this normally
-      // resolves instantly. It has to settle before /finalize, which retires
-      // this setup token and would reject an upload still in flight. The cap
-      // keeps a stalled upload from trapping the owner on the success step —
-      // the photo can always be added in Front Desk.
-      if (pendingPhotoUpload) {
-        await Promise.race([
-          pendingPhotoUpload,
-          new Promise((resolve) => setTimeout(resolve, 6000)),
-        ]);
-      }
-      if (!successLink.dataset.finalized) {
-        successLink.dataset.finalized = '1';
-        try {
-          await fetch(API + '/api/setup/' + TOKEN + '/finalize', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          keepalive: true,
-          body: JSON.stringify({ email: '', phone: '', pin: completeData.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
-          });
-        } catch (_) { /* Front Desk remains available even if email delivery fails. */ }
-      }
-      window.MarketelJourney?.track('JourneyHandoffCompleted', {
-        from: 'setup',
-        to: 'frontdesk-reveal',
-      }, { immediate: true, keepalive: true });
-      window.location.href = window._dashboardUrl || successLink.href;
-    });
-
     goToStep(3);
   } catch (e) {
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'build-marketel', reason: 'request-failed' }, { durationMs: Date.now() - buildStartedAt });
@@ -868,7 +928,7 @@ async function addRoomAndFinish() {
   showLoading(false);
 }
 
-window._siteReady = true;
+window._siteReady = false;
 
 function updateFinalStepState(animate) {
   var preparing = document.getElementById('finalPreparingPanel');

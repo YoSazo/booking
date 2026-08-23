@@ -60,8 +60,17 @@ expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
   'AppDelegate does not keep booking-page previews inside the app');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
-expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}sendWebAction\("assistant"\)/,
-  'Native menu does not expose Front Desk Assistant');
+expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}presentNativeAssistant\(\)/,
+  'Native menu does not expose the native Front Desk Assistant');
+expect(delegate, /case "openAssistant":[\s\S]{0,120}presentNativeAssistant\(\)/,
+  'Web fallback cannot open the native Front Desk Assistant');
+expect(delegate, /sheet\.detents = \[\.medium\(\), \.large\(\)\][\s\S]{0,120}sheet\.selectedDetentIdentifier = \.medium/,
+  'Native Front Desk Assistant must open at half height and expand to full height');
+expect(project, /NativeAssistant\.swift in Sources/,
+  'Xcode target does not compile NativeAssistant.swift');
+const nativeAssistant = read('ios/App/App/NativeAssistant.swift');
+expect(nativeAssistant, /navigationBarItems\(trailing: Button\("Done"\)/,
+  'Native Front Desk Assistant must keep Done in the top-right');
 expect(delegate, /title: "Replay app tour"[\s\S]{0,220}sendWebAction\("tour"\)/,
   'Native menu does not expose tour replay clearly');
 expect(capacitor, /"appId":\s*"com\.bookmarketel\.frontdesk"/,

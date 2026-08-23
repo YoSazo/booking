@@ -1,3 +1,5 @@
+import { isNativeGuestelContext } from './nativeGuestelContext.js';
+
 // Track which events have fired this session
 const DEFAULT_SESSION_EVENTS = {
   PageView: false,
@@ -53,7 +55,9 @@ const saveSessionEvent = (eventName) => {
 
 const isOwnerPreview = () => {
   if (typeof window === 'undefined') return false;
-  return new URLSearchParams(window.location.search).has('preview') || window !== window.parent;
+  return isNativeGuestelContext()
+    || new URLSearchParams(window.location.search).has('preview')
+    || window !== window.parent;
 };
 
 const shouldFireEvent = (eventName) => {

@@ -10,6 +10,7 @@ import LoadingScreen from './LoadingScreen.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import getHotelId from './utils/getHotelId';
+import { isNativeGuestelContext } from './nativeGuestelContext.js';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // Strategy 3: preload Stripe JS early (on checkout entry) but avoid mounting heavy payment UI until Step 4.
@@ -179,6 +180,7 @@ function GuestInfoPage({ hotel, bookingDetails, onBack, onComplete, apiBaseUrl, 
 
     const blockedBeaconSent = useRef(false);
     useEffect(() => {
+        if (isNativeGuestelContext()) return;
         const gated = !isPreviewMode && hotel && hotel.subscribed === false && currentStep === 4;
         if (!gated || blockedBeaconSent.current) return;
         blockedBeaconSent.current = true;

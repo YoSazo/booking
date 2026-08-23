@@ -64,6 +64,16 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .cta-sub {
   margin-top: 10px; font-size: 12px; color: var(--muted); text-align: center;
 }
+.cta-status {
+  display: none; margin-top: 12px; padding: 14px 16px; border-radius: 12px;
+  background: var(--green-lt); color: var(--green-dark); font-size: 13px;
+  line-height: 1.5; text-align: left; border: 1px solid rgba(46,125,91,.16);
+}
+.cta-status.show { display: block; }
+.bottom-cta { max-width: 620px; margin: 0 auto 72px; padding: 0 24px; text-align: center; }
+.bottom-cta h2 { font-size: clamp(23px,4vw,32px); margin-bottom: 10px; }
+.bottom-cta p { color: var(--muted); line-height: 1.55; margin-bottom: 18px; }
+.bottom-cta .cta-btn { max-width: 400px; }
 
 /* DEMO */
 .demo-section {
@@ -134,8 +144,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <p id="heroCopy">Build your property&apos;s direct booking engine in under 3 minutes.</p>
   <div class="cta-box">
     <input type="email" id="setupEmail" placeholder="Your email" autocomplete="email">
-    <button class="cta-btn" data-journey="landing-build-preview" onclick="startFreeSetup()">Build My Free Preview &rarr;</button>
+    <button class="cta-btn" id="startSetupBtn" data-journey="landing-build-preview" onclick="startFreeSetup()">Build My Free Preview &rarr;</button>
     <div class="cta-sub">Free to build and preview. <strong>$199/month</strong> only when you activate, with a <strong>7-day money-back guarantee</strong>. Cancel anytime.<br><span style="display:inline-block;margin-top:4px;">For hotels, inns, B&amp;Bs, cabins, and vacation rentals.</span></div>
+    <div class="cta-status" id="setupRecoveryStatus" role="status" aria-live="polite"></div>
   </div>
 </section>
 
@@ -156,6 +167,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   </div>
 </section>
 
+<section class="bottom-cta">
+  <h2>See yours before you decide.</h2>
+  <p>Build the booking page, Guestel experience, and Front Desk preview around your property.</p>
+  <button class="cta-btn" data-journey="landing-bottom-build-preview" onclick="focusSetupEmail()">Build My Free Preview &rarr;</button>
+</section>
+
 <script src="/marketel-journey.js"></script>
 <script>
 const requestedAngle = new URLSearchParams(window.location.search).get('angle') || 'direct';
@@ -163,7 +180,7 @@ const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requeste
 const angleCopy = {
   guest_app: {
     title: 'Put your property on your guests\' <span class="green">Home Screen</span>.',
-    copy: 'Guests save your property from its booking page—no App Store. You can then reach their phone from Marketel Front Desk.',
+    copy: 'Guests add your property from its booking page, keep it in Guestel, and can hear from your Front Desk on their phone.',
   },
   assistant: {
     title: 'Add direct bookings without losing track of <span class="green">walk-ins</span>.',
@@ -190,8 +207,13 @@ fetch('/api/funnel/onboarding', {
   body: JSON.stringify({ eventName: 'LandingPageView', contentName: ACQUISITION_ANGLE, ...journeyLinkage() }),
 }).catch(() => {});
 
-function startFreeSetup() {
-  const email = document.getElementById('setupEmail').value.trim();
+function focusSetupEmail() {
+  document.querySelector('.hero')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => document.getElementById('setupEmail')?.focus(), 350);
+}
+
+async function startFreeSetup() {
+  const email = document.getElementById('setupEmail').value.trim().toLowerCase();
   if (!email || !email.includes('@')) {
     window.MarketelJourney?.track('JourneyValidationFailed', { form: 'landing-email', reason: 'invalid-email' });
     const input = document.getElementById('setupEmail');
@@ -201,15 +223,22 @@ function startFreeSetup() {
     setTimeout(() => { input.classList.remove('shake'); input.style.borderColor = ''; }, 600);
     return;
   }
-  const btn = document.querySelector('.cta-btn');
+  const btn = document.getElementById('startSetupBtn');
+  const status = document.getElementById('setupRecoveryStatus');
+  status.classList.remove('show');
+  status.textContent = '';
   btn.textContent = 'Setting up...'; btn.disabled = true;
   const API = '';
   const requestStartedAt = Date.now();
   window.MarketelJourney?.track('JourneyRequestStarted', { request: 'setup-start', acquisitionAngle: ACQUISITION_ANGLE });
-  fetch(API + '/api/setup/start', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, acquisitionAngle: ACQUISITION_ANGLE }),
-  }).then(r => r.json()).then(data => {
+  try {
+    try { localStorage.setItem('marketelOwnerEmail', email); } catch (_) {}
+    const response = await fetch(API + '/api/setup/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, acquisitionAngle: ACQUISITION_ANGLE, ...journeyLinkage() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.error || 'Could not start setup');
     if (data.setupUrl) {
       window.MarketelJourney?.configure({ setupToken: data.token || '', hotelId: data.hotelId || '' });
       window.MarketelJourney?.track('JourneyRequestCompleted', {
@@ -228,16 +257,38 @@ function startFreeSetup() {
         acquisitionAngle: ACQUISITION_ANGLE,
       }, { immediate: true, keepalive: true });
       window.location.href = API + data.setupUrl;
+      return;
     }
-    else { throw new Error(); }
-  }).catch(() => {
+    if (data.resumeUrl) {
+      window.MarketelJourney?.track('JourneyHandoffStarted', {
+        from: 'landing',
+        to: 'saved-frontdesk-stage',
+      }, { immediate: true, keepalive: true });
+      window.location.href = data.resumeUrl;
+      return;
+    }
+    if (data.existing) {
+      window.MarketelJourney?.track('JourneyRecoveryEmailRequested', {
+        delivered: !!data.resumeEmailSent,
+      }, { durationMs: Date.now() - requestStartedAt });
+      status.innerHTML = '<strong>Your work is saved.</strong><br>'
+        + (data.message || 'Check your email for a secure link that opens the exact place you left off.')
+        + '<br><span style="color:var(--muted);font-size:12px;">You can close this page. The secure link does not require a PIN.</span>';
+      status.classList.add('show');
+      btn.textContent = 'Send the link again';
+      btn.disabled = false;
+      return;
+    }
+    throw new Error('No setup destination returned');
+  } catch (error) {
     window.MarketelJourney?.track('JourneyRequestFailed', {
       request: 'setup-start',
       outcome: 'failed',
     }, { durationMs: Date.now() - requestStartedAt, immediate: true });
-    alert('Something went wrong. Try again.');
+    status.textContent = 'We could not start the preview. Please try again, or email support@bookmarketel.com.';
+    status.classList.add('show');
     btn.textContent = 'Build My Free Preview \u2192'; btn.disabled = false;
-  });
+  }
 }
 
 function switchDemo(which) {

@@ -1,5 +1,6 @@
 import { crm } from './state.js';
 import QRCode from 'qrcode';
+import guestelAppIconUrl from './assets/guestel-app-icon.png';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 import { bindChatKeyboardViewport } from './chatKeyboard.js';
@@ -143,6 +144,9 @@ export function loadSupportModule() {
 }
 
 function openMarketelSupport() {
+  if (isNativeFrontdeskApp() && nativeShellPost({ type: 'openSupport' })) {
+    return Promise.resolve();
+  }
   return loadSupportModule()
     .then((module) => module.openSupportConversation())
     .catch((error) => {
@@ -421,14 +425,21 @@ try {
     fetch('/api/auth/verify-magic?token=' + encodeURIComponent(_magicToken))
       .then(r => r.json())
       .then(data => {
-        if (data.success && data.pin) {
-          crm.token = data.pin;
+        if (data.success && data.token) {
+          crm.token = data.token;
           localStorage.setItem('crmToken', crm.token);
           if (isNativeFrontdeskApp() && data.hotelId) {
             localStorage.setItem(NATIVE_SELECTED_HOTEL_KEY, String(data.hotelId));
           }
           const _cleanUrl = new URL(window.location);
           _cleanUrl.searchParams.delete('magic');
+          _cleanUrl.searchParams.delete('reveal');
+          _cleanUrl.searchParams.delete('welcome');
+          if (!data.subscribed) {
+            const revealStep = Math.max(0, Math.min(3, Number(data.revealStep) || 0));
+            _cleanUrl.searchParams.set('welcome', '1');
+            _cleanUrl.searchParams.set('reveal', revealStep === 3 ? 'checkout' : `step-${revealStep}`);
+          }
           window.history.replaceState({}, '', _cleanUrl);
           // Reload to trigger normal boot with the new token
           window.location.reload();
@@ -437,10 +448,22 @@ try {
           alert('Login link expired or invalid. Please request a new one.');
           const _cleanUrl = new URL(window.location);
           _cleanUrl.searchParams.delete('magic');
+          _cleanUrl.searchParams.delete('reveal');
+          _cleanUrl.searchParams.delete('welcome');
           window.history.replaceState({}, '', _cleanUrl);
+          bootCrmApp();
         }
       })
-      .catch(() => { crm._magicLoginPending = false; });
+      .catch(() => {
+        crm._magicLoginPending = false;
+        const _cleanUrl = new URL(window.location);
+        _cleanUrl.searchParams.delete('magic');
+        _cleanUrl.searchParams.delete('reveal');
+        _cleanUrl.searchParams.delete('welcome');
+        window.history.replaceState({}, '', _cleanUrl);
+        alert('We could not open that login link. Please request a new one.');
+        bootCrmApp();
+      });
   }
 } catch(e) {}
 
@@ -850,20 +873,23 @@ function marketelNativeAction(action) {
   else if (action === 'refresh') refreshCurrentView({ force: true, visibleOnly: false });
   else if (action === 'tour') replayWalkthrough();
   else if (action === 'assistant') {
-    // Dismiss native chrome before the lazy Assistant chunk is fetched. This
-    // keeps the tab bar and header from ever covering its modal.
-    setNativeShellVisible(false);
-    loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
-      setNativeShellVisible(true);
-      toast('Could not open Front Desk Assistant.', 'error');
-    });
+    if (!nativeShellPost({ type: 'openAssistant' })) {
+      // Older installed shells retain the web modal fallback.
+      setNativeShellVisible(false);
+      loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
+        setNativeShellVisible(true);
+        toast('Could not open Front Desk Assistant.', 'error');
+      });
+    }
   }
   else if (action === 'support') {
-    setNativeShellVisible(false);
-    loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
-      setNativeShellVisible(true);
-      toast('Could not open support. Email support@bookmarketel.com.', 'error');
-    });
+    if (!nativeShellPost({ type: 'openSupport' })) {
+      setNativeShellVisible(false);
+      loadSupportModule().then((module) => module.openSupportConversation()).catch(() => {
+        setNativeShellVisible(true);
+        toast('Could not open support. Email support@bookmarketel.com.', 'error');
+      });
+    }
   }
   else if (action === 'properties') showNativePropertyPicker();
   else if (action === 'account') {
@@ -1099,6 +1125,8 @@ function applyHotelContextData(data = {}) {
   }
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
+  crm.guestelWalletImageUrl = String(config.guestelWalletImageUrl || '').trim();
+  crm.guestelWalletSubtitle = String(config.guestelWalletSubtitle || '').trim();
   const nativeStoredProperty = isNativeFrontdeskApp()
     ? getNativeProperties().find(property => property.id === crm.activeHotelId)
     : null;
@@ -1999,6 +2027,9 @@ function setBookingsSubview(view) {
   }
   if (view === 'revenue' && !crm.revenueEnabled) view = 'bookings';
   crm.bookingsSubview = ['bookings', 'revenue'].includes(view) ? view : 'bookings';
+  // Native chrome is outside the web view. Hide the assistant pill before the
+  // Revenue paint starts so it cannot linger for a frame and disappear later.
+  syncNativeShellState();
   renderBookingsSubtabs();
   applyBookingsSubview();
   if (crm.bookingsSubview === 'revenue') loadRevenueData();
@@ -2396,6 +2427,16 @@ async function startCrmApp(verification, options = {}) {
   cleanFrontdeskReturnAuthParams();
 
   const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('checkoutCancelled') === '1') {
+    window.MarketelJourney?.track('JourneyCheckoutCancelled', {
+      hotelId: crm.activeHotelId || verification?.hotelId || '',
+      returnedTo: 'activation',
+    }, { immediate: true });
+    const cancelledUrl = new URL(window.location);
+    cancelledUrl.searchParams.delete('checkoutCancelled');
+    window.history.replaceState({}, '', cancelledUrl);
+    setTimeout(() => toast('No charge was made. Your Marketel is still saved here.'), 500);
+  }
   const isEmbeddedEditorPreview = urlParams.get('previewEditor') === '1';
   document.documentElement.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
   document.body.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
@@ -2406,17 +2447,21 @@ async function startCrmApp(verification, options = {}) {
   }
   const isFirstWelcome = urlParams.has('welcome');
   const revealRequest = urlParams.get('reveal');
+  const revealStepMatch = /^step-([0-2])$/.exec(String(revealRequest || ''));
   let hasPendingValueReveal = false;
   try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
   const shouldResumeValueReveal = !(verification && verification.subscribed) && hasPendingValueReveal;
   const shouldShowValueReveal = !isEmbeddedEditorPreview && (
     revealRequest === '1'
       || revealRequest === 'checkout'
+      || !!revealStepMatch
       || shouldResumeValueReveal
   );
   const revealStartAt = revealRequest === 'checkout'
     ? 3
-    : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined);
+    : (revealStepMatch
+        ? Number(revealStepMatch[1])
+        : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined));
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -2483,6 +2528,12 @@ async function startCrmApp(verification, options = {}) {
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
   crm.frontdeskAppStoreUrl = String(verification?.frontdeskAppStoreUrl || '').trim();
+  crm.guestelWalletImageUrl = String(
+    verification?.guestelWalletImageUrl || crm.guestelWalletImageUrl || ''
+  ).trim();
+  crm.guestelWalletSubtitle = String(
+    verification?.guestelWalletSubtitle || verification?.hotelAddress || crm.guestelWalletSubtitle || ''
+  ).trim();
   if (crm.hotelSubscribed) {
     try {
       localStorage.removeItem('marketelValueRevealPendingV1');
@@ -2711,16 +2762,39 @@ function showMagicLinkForm(e) {
   e.target.style.display = 'none';
 }
 
+function toggleWebLoginMethod(e) {
+  if (e) e.preventDefault();
+  const emailForm = document.getElementById('magicLinkForm');
+  const pinForm = document.getElementById('webPinLoginForm');
+  const prompt = document.getElementById('webLoginPrompt');
+  const toggle = document.getElementById('webLoginMethodToggle');
+  if (!emailForm || !pinForm || !toggle) return;
+  const showingPin = pinForm.style.display !== 'none';
+  emailForm.style.display = showingPin ? 'block' : 'none';
+  pinForm.style.display = showingPin ? 'none' : 'block';
+  toggle.textContent = showingPin ? 'Use Front Desk PIN instead' : 'Use email instead';
+  if (prompt) {
+    prompt.textContent = showingPin
+      ? 'Front Desk — continue securely by email'
+      : 'Front Desk — enter your property PIN';
+  }
+  const focusTarget = showingPin
+    ? document.getElementById('magicLinkEmail')
+    : document.getElementById('pinInput');
+  setTimeout(() => focusTarget?.focus(), 0);
+}
+
 async function sendMagicLink() {
   const email = document.getElementById('magicLinkEmail').value.trim();
   const msg = document.getElementById('magicLinkMsg');
   if (!email) { msg.textContent = 'Please enter your email'; return; }
+  try { localStorage.setItem('marketelOwnerEmail', email.toLowerCase()); } catch (_) {}
   msg.textContent = 'Sending…';
   try {
     const res = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, hotelId: crm.activeHotelId || '' }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -2786,6 +2860,19 @@ function showLogin() {
   setNativeShellVisible(false);
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
+  const emailForm = document.getElementById('magicLinkForm');
+  const pinForm = document.getElementById('webPinLoginForm');
+  const prompt = document.getElementById('webLoginPrompt');
+  const toggle = document.getElementById('webLoginMethodToggle');
+  if (emailForm) emailForm.style.display = 'block';
+  if (pinForm) pinForm.style.display = 'none';
+  if (prompt) prompt.textContent = 'Front Desk — continue securely by email';
+  if (toggle) toggle.textContent = 'Use Front Desk PIN instead';
+  try {
+    const savedEmail = localStorage.getItem('marketelOwnerEmail') || '';
+    const emailInput = document.getElementById('magicLinkEmail');
+    if (emailInput && !emailInput.value) emailInput.value = savedEmail;
+  } catch (_) {}
   crm.token = '';
   crm.isMasterPin = false;
   crm.currentHotelPms = '';
@@ -2868,6 +2955,20 @@ async function bootCrmApp() {
     ]),
     showRetry: false,
   });
+
+  // Magic-link verification owns startup until it has exchanged the emailed
+  // credential. Holding here prevents a PIN screen flash and avoids a second
+  // context request racing the secure return.
+  if (crm._magicLoginPending) {
+    showBootState({
+      title: 'Opening your saved Marketel...',
+      message: 'Returning you to the exact place you left off.',
+      debug: '',
+      showRetry: false,
+    });
+    crm.bootInFlight = false;
+    return;
+  }
 
   if (isNativeFrontdeskApp() && !getRequestedHotelId()) {
     showNativePropertyScreen({ choose: getNativeProperties().length > 0, allowCancel: false });
@@ -3203,9 +3304,9 @@ function renderMessageThreadDetail(thread) {
       ${hasUnread ? '<button type="button" class="message-mark-read" onclick="markActiveMessageThreadRead()">Mark conversation read</button>' : ''}
       ${thread.code ? `
       <div class="message-composer">
-        <input id="${replyInputId}" type="text" placeholder="Reply to ${esc(thread.guestName || 'guest')}…" maxlength="2000" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
+        <input id="${replyInputId}" type="text" placeholder="Message ${esc(thread.guestName || 'guest')}" maxlength="2000" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();replyToThread('${esc(thread.code)}','${replyInputId}')}" />
         <button type="button" onclick="replyToThread('${esc(thread.code)}','${replyInputId}')" aria-label="Send reply">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
         </button>
       </div>` : ''}
     </section>`;
@@ -3256,29 +3357,64 @@ function renderMessageThreadList(threadList, activeThread) {
     ${threadList.map(thread => {
       const summary = threadSummary(thread);
       const isActive = thread.key === activeThread.key;
-      return `<button type="button" role="listitem" class="messages-workspace-thread${isActive ? ' active' : ''}${summary.hasUnread ? ' unread' : ''}" onclick="pickMessageThread('${jsStr(thread.key)}')" aria-current="${isActive ? 'true' : 'false'}">
+      return `<button type="button" role="listitem" class="messages-workspace-thread${isActive ? ' active' : ''}${summary.hasUnread ? ' unread' : ''}" onclick="openMessagesWorkspaceThread('${jsStr(thread.key)}')" aria-current="${isActive ? 'true' : 'false'}">
         <span class="message-avatar small">${esc(messageGuestInitial(thread.guestName))}</span>
         <span class="messages-workspace-thread-copy">
-          <span class="messages-workspace-thread-name">${summary.hasUnread ? '<i></i>' : ''}${esc(thread.guestName || 'Guest')}</span>
+          <span class="messages-workspace-thread-line"><span class="messages-workspace-thread-name">${summary.hasUnread ? '<i></i>' : ''}${esc(thread.guestName || 'Guest')}</span><time>${esc(timeAgo(summary.latest?.createdAt))}</time></span>
           <span class="messages-workspace-thread-preview">${esc(summary.preview)}</span>
-          <span class="messages-workspace-thread-context">${esc(timeAgo(summary.latest?.createdAt))}${thread.roomName ? ` · ${esc(thread.roomName)}` : ''}</span>
+          <span class="messages-workspace-thread-context">${thread.roomName ? esc(thread.roomName) : 'Booked guest'}${thread.checkin ? ` · ${esc(formatMessageStayDates(thread.checkin, thread.checkout))}` : ''}</span>
         </span>
+        ${summary.hasUnread ? `<span class="messages-workspace-thread-badge">${Math.min(99, thread.msgs.filter(m => !m.read && (m.sender || 'guest') === 'guest').length)}</span>` : '<span class="messages-workspace-thread-chevron">›</span>'}
       </button>`;
     }).join('')}
   </div>`;
 }
 
+function formatMessageStayDates(checkin, checkout) {
+  const start = new Date(checkin);
+  const end = new Date(checkout);
+  if (!Number.isFinite(start.getTime())) return '';
+  const fmt = { month: 'short', day: 'numeric' };
+  return Number.isFinite(end.getTime())
+    ? `${start.toLocaleDateString([], fmt)}–${end.toLocaleDateString([], fmt)}`
+    : start.toLocaleDateString([], fmt);
+}
+
+function openMessagesWorkspaceThread(key) {
+  crm.selectedMessageThread = key || crm.selectedMessageThread;
+  crm.messagesWorkspaceThreadOpen = true;
+  crm.messagesThreadPickerOpen = false;
+  renderMessages();
+  markActiveMessageThreadRead();
+}
+
+function handleMessagesWorkspaceBack() {
+  if (window.matchMedia?.('(max-width: 700px)').matches && crm.messagesWorkspaceThreadOpen) {
+    crm.messagesWorkspaceThreadOpen = false;
+    renderMessages();
+    return;
+  }
+  closeMessagesWorkspace();
+}
+
 function openMessagesWorkspace() {
+  if (isNativeFrontdeskApp() && nativeShellPost({ type: 'openGuestMessages' })) return;
   crm.messagesExpanded = true;
   crm.messagesInboxOpen = true;
+  // Guestel opens on its native conversation list on a phone. A desktop has
+  // room for both panes, so the conversation represented by the tapped card is
+  // immediately active there.
+  crm.messagesWorkspaceThreadOpen = !window.matchMedia?.('(max-width: 700px)').matches;
   crm.messagesThreadPickerOpen = false;
   if (!crm.selectedMessageThread) crm.selectedMessageThread = pickDefaultMessageThread(buildMessageThreads());
   setNativeModalOpen('guest-messages', true);
   renderMessages();
+  if (crm.messagesWorkspaceThreadOpen) markActiveMessageThreadRead();
 }
 
 function closeMessagesWorkspace() {
   crm.messagesExpanded = false;
+  crm.messagesWorkspaceThreadOpen = false;
   crm.messagesThreadPickerOpen = false;
   messagesKeyboardCleanup?.();
   messagesKeyboardCleanup = null;
@@ -3299,14 +3435,16 @@ function renderMessagesWorkspace(threadList, activeThread, unreadCount) {
       scrollSelector: '.message-conversation',
     });
   }
+  workspace.classList.toggle('is-thread-open', !!crm.messagesWorkspaceThreadOpen);
+  const showingThread = !!crm.messagesWorkspaceThreadOpen;
   workspace.innerHTML = `
     <header class="messages-workspace-header">
-      <button type="button" class="messages-workspace-close" onclick="closeMessagesWorkspace()" aria-label="Close guest messages">‹</button>
-      <div>
-        <div class="messages-workspace-title">Guest messages</div>
-        <div class="messages-workspace-subtitle">${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</div>
+      <button type="button" class="messages-workspace-close" onclick="handleMessagesWorkspaceBack()" aria-label="${showingThread ? 'Back to conversations' : 'Close guest messages'}">${showingThread ? '‹' : 'Done'}</button>
+      <div class="messages-workspace-heading">
+        <div class="messages-workspace-title">${showingThread ? esc(activeThread.guestName || 'Guest') : 'Messages'}</div>
+        <div class="messages-workspace-subtitle">${showingThread ? `${esc(activeThread.roomName || 'Booked guest')}${activeThread.checkin ? ` · ${esc(formatMessageStayDates(activeThread.checkin, activeThread.checkout))}` : ''}` : `${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}`}</div>
       </div>
-      ${unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
+      ${!showingThread && unreadCount > 0 ? `<button type="button" class="messages-workspace-read" onclick="markAllMessagesRead()">Read all</button>` : '<span></span>'}
     </header>
     <main class="messages-workspace-body">
       <aside class="messages-workspace-sidebar">
@@ -3342,7 +3480,13 @@ function renderMessages() {
       <div class="guest-messages-card loading">
         <div class="logo-sprite-bounce" style="width:22px;height:22px;flex-shrink:0;"></div>
         <div>Loading guest messages…</div>
-      </div>` : '');
+      </div>` : `
+      <section class="guest-messages-card guest-messages-empty">
+        <span class="guest-messages-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+        </span>
+        <span><strong>No guest conversations yet</strong><small>After someone books, messages and replies stay with that reservation.</small></span>
+      </section>`);
     if (pending && crm.currentFilter === 'apps') loadMessages();
     return;
   }
@@ -3362,35 +3506,20 @@ function renderMessages() {
     document.getElementById('messagesWorkspace')?.remove();
   }
 
-  const inboxBody = crm.messagesInboxOpen && !crm.messagesExpanded ? `
-    <div class="guest-messages-inline-body">
-      <div class="guest-messages-inline-tools">
-        ${renderMessageThreadPicker(threadList, activeThread)}
-        ${unreadCount > 0 ? `<button type="button" onclick="markAllMessagesRead()" class="message-mark-all">Mark all read</button>` : ''}
-      </div>
-      ${renderMessageThreadDetail(activeThread)}
-    </div>` : '';
+  const summary = threadSummary(activeThread);
 
   panel.innerHTML = `
     <section class="guest-messages-card">
-      <div class="guest-messages-card-header">
-        <button type="button" onclick="toggleMessagesInbox()" class="guest-messages-toggle">
-          <span class="guest-messages-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
-          </span>
-          <span class="guest-messages-heading">
-            <strong>Guest messages</strong>
-            <span>${threadList.length} booking conversation${threadList.length === 1 ? '' : 's'}</span>
-          </span>
-          ${unreadCount > 0 ? `<span class="guest-messages-unread">${unreadCount} new</span>` : ''}
-          <span class="guest-messages-disclosure${crm.messagesInboxOpen ? ' open' : ''}">›</span>
-        </button>
-        <button type="button" onclick="openMessagesWorkspace()" class="guest-messages-expand" aria-label="Expand guest messages">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
-          <span>Expand</span>
-        </button>
-      </div>
-      ${inboxBody}
+      <button type="button" onclick="openMessagesWorkspace()" class="guest-messages-native-row">
+        <span class="message-avatar">${esc(messageGuestInitial(activeThread.guestName))}</span>
+        <span class="guest-messages-native-copy">
+          <span class="guest-messages-native-line"><strong>${esc(activeThread.guestName || 'Guest')}</strong><time>${esc(timeAgo(summary.latest?.createdAt))}</time></span>
+          <span class="guest-messages-native-preview">${esc(summary.preview)}</span>
+          <small>${esc(activeThread.roomName || 'Booked guest')}${activeThread.checkin ? ` · ${esc(formatMessageStayDates(activeThread.checkin, activeThread.checkout))}` : ''}</small>
+        </span>
+        ${unreadCount > 0 ? `<span class="guest-messages-unread">${Math.min(99, unreadCount)}</span>` : '<span class="guest-messages-native-chevron">›</span>'}
+      </button>
+      ${threadList.length > 1 ? `<button type="button" class="guest-messages-all" onclick="openMessagesWorkspace()">View all ${threadList.length} conversations</button>` : ''}
     </section>`;
   // Messages load after the tab is already on screen, so the card replaces a
   // loading row rather than arriving with the page. Rise it in so the swap
@@ -4164,9 +4293,10 @@ function guestBroadcastCardHtml(options = {}) {
   const rawName = crm.activeHotelName || 'Your Property';
   const hName = esc(rawName);
   const hNameAttr = hName;
-  const appIcon = crm.activeHotelAppIcon
-    ? `<img src="${esc(crm.activeHotelAppIcon)}" alt="">`
-    : `<span>${esc(rawName.trim().charAt(0).toUpperCase() || 'M')}</span>`;
+  // Native iOS notifications always carry the sending app's fixed icon.
+  // Property branding belongs in the notification title and Guestel card;
+  // pretending iOS swaps the app icon per hotel makes this preview dishonest.
+  const appIcon = `<img src="${esc(guestelAppIconUrl)}" alt="Guestel">`;
   const demoItems = JSON.stringify([{
     type: 'video',
     src: GUEST_BROADCAST_DEMO_VIDEO,
@@ -4185,7 +4315,7 @@ function guestBroadcastCardHtml(options = {}) {
       <div class="guest-notification-shell">
         <div class="guest-notification-meta">
           <span class="guest-notification-icon">${appIcon}</span>
-          <strong>${hName}</strong>
+          <strong>Guestel</strong>
           <span>now</span>
         </div>
         <div id="guest-broadcast-preview-title" class="guest-notification-title">${hName}</div>
@@ -6280,6 +6410,7 @@ exposeToWindow({
   isIosDevice,
   isNativeFrontdeskApp,
   marketelNativeNotificationState,
+  nativeShellPost,
   openNativeNotificationSettings,
   isPwaSimulated,
   isStandaloneApp,
@@ -6359,6 +6490,8 @@ exposeToWindow({
   setGrowthChecklistItem,
   setGrowthPeriod,
   setMessageThread,
+  openMessagesWorkspaceThread,
+  handleMessagesWorkspaceBack,
   setNativeModalOpen,
   setNativeShellVisible,
   setNotificationButtonState,
@@ -6380,6 +6513,7 @@ exposeToWindow({
   timeAgo,
   toIsoDate,
   toast,
+  toggleWebLoginMethod,
   toggleAppNotifications,
   toggleAvailabilityDayClosed,
   toggleMessageThreadPicker,

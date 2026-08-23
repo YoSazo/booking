@@ -130,6 +130,73 @@ test('App Clip handoff is one-use and becomes a verified native stay', () => {
     assert.match(guestel, /BookingAPI\.claimHandoff\(handoff\)/);
 });
 
+test('Guestel booking webviews opt out of website advertising analytics', () => {
+    const root = path.join(__dirname, '..', '..');
+    const fullApp = fs.readFileSync(
+        path.join(root, 'marketel-guestel-ios', 'Guestel', 'BookingWebView.swift'),
+        'utf8'
+    );
+    const clip = fs.readFileSync(
+        path.join(root, 'marketel-guestel-ios', 'GuestelClip', 'ClipWebView.swift'),
+        'utf8'
+    );
+    const tracking = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'trackingService.js'),
+        'utf8'
+    );
+    const nativeContext = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'nativeGuestelContext.js'),
+        'utf8'
+    );
+    const main = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'main.jsx'),
+        'utf8'
+    );
+    const installTracking = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'src', 'guestInstallTracking.js'),
+        'utf8'
+    );
+    const bookingHtml = fs.readFileSync(
+        path.join(root, 'hotel-booking-app', 'index.html'),
+        'utf8'
+    );
+
+    for (const webview of [fullApp, clip]) {
+        assert.match(webview, /URLQueryItem\(name: "guestelNative", value: "1"\)/);
+        assert.match(webview, /window\.__GUESTEL_NATIVE__ = true/);
+    }
+    assert.match(nativeContext, /params\.get\('guestelNative'\) === '1'/);
+    assert.match(nativeContext, /window\.__GUESTEL_NATIVE__ === true/);
+    assert.match(tracking, /isNativeGuestelContext\(\)/);
+    assert.match(main, /!isNativeGuestelContext\(\)/);
+    assert.match(installTracking, /if \(isNativeGuestelContext\(\)\) return;/);
+    assert.match(bookingHtml, /if \(isNativeGuestel\) return;/);
+    assert.doesNotMatch(bookingHtml, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/);
+});
+
+test('Guestel privacy manifest matches native booking and Stripe data', () => {
+    const manifest = fs.readFileSync(
+        path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel', 'PrivacyInfo.xcprivacy'),
+        'utf8'
+    );
+    for (const type of [
+        'Name',
+        'EmailAddress',
+        'PhoneNumber',
+        'PhysicalAddress',
+        'PaymentInfo',
+        'PurchaseHistory',
+        'UserID',
+        'DeviceID',
+        'EmailsOrTextMessages',
+        'ProductInteraction',
+    ]) {
+        assert.match(manifest, new RegExp(`NSPrivacyCollectedDataType${type}`));
+    }
+    assert.match(manifest, /NSPrivacyCollectedDataTypePurposeAnalytics/);
+    assert.match(manifest, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
+});
+
 test('Guestel messaging is a first-class native inbox', () => {
     const guestelRoot = path.join(__dirname, '..', '..', 'marketel-guestel-ios', 'Guestel');
     const rootView = fs.readFileSync(path.join(guestelRoot, 'RootView.swift'), 'utf8');
@@ -178,4 +245,65 @@ test('Guestel offers in-app account deletion without cancelling hotel records', 
     assert.match(api, /static func deleteAccount/);
     assert.match(account, /Delete Guestel account/);
     assert.match(account, /It does not cancel your hotel reservations/);
+});
+
+test('Front Desk edits the same property card Guestel renders', () => {
+    const root = path.join(__dirname, '..', '..');
+    const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+    const apps = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'src', 'apps.js'), 'utf8');
+    const api = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'BookingAPI.swift'), 'utf8');
+    const store = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'Store.swift'), 'utf8');
+    const hotelsView = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'Guestel', 'HotelsView.swift'), 'utf8');
+
+    assert.match(schema, /guestelWalletImageUrl\s+String\?/);
+    assert.match(schema, /guestelWalletSubtitle\s+String\?/);
+    assert.match(server, /app\.post\('\/api\/crm\/guestel-wallet-card'/);
+    assert.match(server, /app\.post\('\/api\/crm\/guestel-wallet-image'/);
+    assert.match(server, /app\.delete\('\/api\/crm\/guestel-wallet-image'/);
+    assert.match(server, /location: hotel\.guestelWalletSubtitle \|\| hotel\.address/);
+    assert.match(server, /imageURL: hotel\.guestelWalletImageUrl \|\| hotel\.rooms/);
+    assert.match(apps, /Save Guestel card/);
+    assert.doesNotMatch(apps, /Your Guestel icon/);
+    assert.doesNotMatch(apps, /Guestel uses this square image for your conversation and notification identity/);
+    assert.match(api, /let guestelWalletImageUrl: String\?/);
+    assert.match(api, /let guestelWalletSubtitle: String\?/);
+    assert.match(store, /hotels\[index\]\.location = data\.guestelWalletSubtitle/);
+    assert.match(store, /hotels\[index\]\.imageURL = data\.walletImage/);
+    assert.match(hotelsView, /\.refreshable \{ await refreshHotelCards\(\) \}/);
+    assert.match(hotelsView, /phase == \.active[\s\S]{0,120}refreshHotelCards\(\)/);
+});
+
+test('shared booking links never expose the retired client identity', () => {
+    const root = path.join(__dirname, '..', '..');
+    const engineHTML = fs.readFileSync(path.join(root, 'hotel-booking-app', 'index.html'), 'utf8');
+    const engineApp = fs.readFileSync(path.join(root, 'hotel-booking-app', 'src', 'App.jsx'), 'utf8');
+
+    assert.doesNotMatch(engineHTML, /logo\.jpg|Click Hospitality/i);
+    assert.match(engineHTML, /rel="icon"[^>]+marketellogo\.svg/);
+    assert.match(engineApp, /favicon\.href = guestIconUrl/);
+    assert.equal(fs.existsSync(path.join(root, 'hotel-booking-app', 'public', 'logo.jpg')), false);
+    assert.equal(fs.existsSync(path.join(root, 'guest-lodge-backend', 'public', 'logo.jpg')), false);
+});
+
+test('Marketel opens real native SwiftUI message surfaces on iPhone', () => {
+    const root = path.join(__dirname, '..', '..');
+    const nativeMessages = fs.readFileSync(
+        path.join(root, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'NativeMessages.swift'),
+        'utf8'
+    );
+    const appDelegate = fs.readFileSync(
+        path.join(root, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
+    const core = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'src', 'core.js'), 'utf8');
+
+    assert.match(appDelegate, /UIHostingController\(rootView: messages\)/);
+    assert.match(appDelegate, /case "openGuestMessages"/);
+    assert.match(appDelegate, /case "openSupport"/);
+    assert.match(core, /nativeShellPost\(\{ type: 'openGuestMessages' \}\)/);
+    assert.match(core, /nativeShellPost\(\{ type: 'openSupport' \}\)/);
+    assert.match(nativeMessages, /struct MarketelNativeGuestMessagesView: View/);
+    assert.match(nativeMessages, /struct MarketelNativeSupportView: View/);
+    assert.match(nativeMessages, /safeAreaInset\(edge: \.bottom/);
+    assert.match(nativeMessages, /Task\.sleep\(nanoseconds: 15_000_000_000\)/);
 });

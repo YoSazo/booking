@@ -146,6 +146,9 @@ function InstallAppBanner({
   // `preview=1` only keeps an owner's visit out of guest analytics. It must
   // not disable a paid property's real install experience.
   const buttonLocked = hotelSubscribed !== true;
+  // In the Front Desk reveal the owner walks their own (locked) engine, so the
+  // banner must always tell the Guestel story here — never the old PWA one.
+  const showGuestelCopy = nativeGuestel || ownerPreview;
 
   return (
     <>
@@ -157,20 +160,20 @@ function InstallAppBanner({
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={44} style={{ boxShadow: 'none' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.25 }}>
-              {nativeGuestel
+              {showGuestelCopy
                 ? `Keep ${hotelName || 'this property'} in Guestel`
                 : guidedBookingInstall
                   ? `Save ${hotelName || 'this property'} to your Home Screen`
                   : `Add ${hotelName || 'us'} to your Home Screen`}
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
-              {buttonLocked
-                ? 'Available once this property finishes setup.'
-                : nativeGuestel
-                  ? 'Book direct, message the Front Desk, and return anytime.'
+              {showGuestelCopy
+                ? 'Book direct, keep your stay, and message the front desk.'
+                : buttonLocked
+                  ? 'Available once this property finishes setup.'
                   : guidedBookingInstall
-                  ? 'Return to this booking page in one tap. No App Store.'
-                  : 'Book direct in one tap next time.'}
+                    ? 'Return to this booking page in one tap. No App Store.'
+                    : 'Book direct in one tap next time.'}
             </div>
           </div>
           <button
@@ -235,10 +238,10 @@ function InstallAppBanner({
               id="owner-install-preview-title"
               style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}
             >
-              Home Screen access isn&apos;t live yet.
+              Guestel isn&apos;t live for your property yet.
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              Once the property activates, guests can save <strong>{hotelName || 'this property'}</strong> to their Home Screen directly from this booking page. No App Store is involved.
+              Once you activate, guests tap <strong>Add</strong> and Guestel opens instantly through Apple — they book direct, keep <strong>{hotelName || 'this property'}</strong>, and message your front desk. No App Store hunting, no OTA.
             </p>
             <button
               type="button"

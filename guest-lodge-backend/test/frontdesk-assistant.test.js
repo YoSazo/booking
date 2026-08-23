@@ -5,6 +5,7 @@ const {
     classifyDeterministicIntent,
     deterministicSocialReply,
     sanitizeAssistantSocialReply,
+    sanitizeFrontDeskAnswer,
     bookingDateContext,
     buildNewBookingAlertMessage,
     formatRecentBookingStatus,
@@ -299,14 +300,22 @@ test('friendly wording never hides an operational inventory update', () => {
 });
 
 test('social responses feel personal without pretending an operation occurred', () => {
-    assert.equal(
-        deterministicSocialReply({ socialKind: 'wellbeing' }, { name: 'Salah' }),
-        'Doing well, Salah. Glad to be here when you need me.'
-    );
-    assert.equal(
-        deterministicSocialReply({ socialKind: 'identity' }, { name: 'Salah' }),
-        'I am Marketel Front Desk. I can check availability, record walk-ins, protect bookings, and undo recent availability changes.'
-    );
+    const mutationClaim = /\b(?:i|we)\s+(?:blocked|removed|cancelled|canceled|released|confirmed|changed|updated|closed|opened|booked|charged|refunded|emailed|notified)\b/i;
+    const kinds = ['wellbeing', 'greeting', 'thanks', 'praise', 'farewell', 'apology', 'identity', 'empathy'];
+    for (const socialKind of kinds) {
+        // Replies vary, so exercise every variant many times.
+        for (let i = 0; i < 40; i++) {
+            const reply = deterministicSocialReply({ socialKind }, { name: 'Salah' });
+            assert.ok(reply.length > 0 && reply.length <= 160, `${socialKind} within SMS length`);
+            assert.match(reply, /Salah/, `${socialKind} addresses the owner by name`);
+            assert.doesNotMatch(reply, mutationClaim, `${socialKind} never claims an operation happened`);
+            assert.doesNotMatch(reply, /https?:\/\//, `${socialKind} has no link`);
+        }
+    }
+    // Identity still explains what the front desk can actually do.
+    const identity = deterministicSocialReply({ socialKind: 'identity' }, { name: 'Salah' });
+    assert.match(identity, /front desk/i);
+    assert.match(identity, /availability|bookings|walk-ins|rooms/i);
 });
 
 test('generated social replies cannot claim a real Front Desk mutation', () => {
@@ -328,4 +337,25 @@ test('generated social replies cannot claim a real Front Desk mutation', () => {
         "I'm doing well - thanks for asking."
     );
     assert.ok(sanitizeAssistantSocialReply('a'.repeat(300), fallback).length <= 160);
+});
+
+test('front desk answers stay grounded and never claim an operation', () => {
+    const fallback = 'Here is where the property stands.';
+    // A normal, data-grounded answer passes through (longer than a social reply).
+    assert.equal(
+        sanitizeFrontDeskAnswer('You have 3 rooms open tonight and 2 pending requests.', fallback),
+        'You have 3 rooms open tonight and 2 pending requests.'
+    );
+    // Claiming an operation happened is rejected.
+    assert.equal(
+        sanitizeFrontDeskAnswer('I blocked the Queen for tonight.', fallback),
+        fallback
+    );
+    // Links / secrets are rejected.
+    assert.equal(
+        sanitizeFrontDeskAnswer('Check https://example.com for details.', fallback),
+        fallback
+    );
+    // Long output is capped.
+    assert.ok(sanitizeFrontDeskAnswer('a'.repeat(1000), fallback).length <= 700);
 });

@@ -89,10 +89,10 @@ struct AddHotelView: View {
                     hotelId: hotelId,
                     domain: domain,
                     name: data.name,
-                    location: "Direct booking",
+                    location: data.guestelWalletSubtitle ?? "Direct booking",
                     stays: 0,
                     lastStayed: "—",
-                    imageURL: data.rooms.lazy.compactMap(\.image).first
+                    imageURL: data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
                 )
                 await MainActor.run {
                     store.add(hotel)
