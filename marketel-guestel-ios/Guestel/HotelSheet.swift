@@ -37,6 +37,22 @@ struct HotelSheet: View {
     @State private var paymentSheet: PaymentSheet?
     @State private var messageStay: Reservation?
 
+    init(
+        hotel: Hotel,
+        preloadedData: BookingAPI.HotelPublic?,
+        maxDetent: PresentationDetent,
+        detent: Binding<PresentationDetent>,
+        onBooked: @escaping (_ result: BookingAPI.BookingResult, _ checkin: String, _ checkout: String, _ roomName: String) -> Void
+    ) {
+        self.hotel = hotel
+        self.maxDetent = maxDetent
+        self._detent = detent
+        self.onBooked = onBooked
+        self._hotelData = State(initialValue: preloadedData)
+        self._rooms = State(initialValue: preloadedData?.rooms ?? [])
+        self._rates = State(initialValue: preloadedData?.rates)
+    }
+
     private var nights: Int {
         max(0, Calendar.current.dateComponents([.day], from: checkin, to: checkout).day ?? 0)
     }
@@ -58,13 +74,23 @@ struct HotelSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .task {
             guest = store.guest
+            if let cached = store.details(for: hotel.hotelId) {
+                hotelData = cached
+                rooms = cached.rooms
+                rates = cached.rates
+            }
             do {
                 let data = try await BookingAPI.hotel(hotel.hotelId)
-                hotelData = data
-                rooms = data.rooms
-                rates = data.rates
+                await MainActor.run {
+                    store.cacheHotelDetails(data)
+                    hotelData = data
+                    rooms = data.rooms
+                    rates = data.rates
+                }
             } catch {
-                errorMessage = "This property's rooms couldn't load. Pull down or try again in a moment."
+                if rooms.isEmpty {
+                    errorMessage = "This property's rooms couldn't load. Pull down or try again in a moment."
+                }
             }
         }
         .sheet(item: $messageStay) { stay in
@@ -77,18 +103,26 @@ struct HotelSheet: View {
     private var actions: some View {
         VStack(spacing: 12) {
             Button { beginBooking(preferred: nil) } label: { primaryLabel("Book another stay") }
+                .buttonStyle(GuestelPressButtonStyle())
             HStack(spacing: 12) {
-                Button { messageStay = store.reservation(for: hotel.hotelId) } label: {
-                    secondaryLabel("Message", "bubble.left")
+                Button { messageStay = currentStay } label: {
+                    secondaryLabel(currentStay == nil ? "After booking" : "Message", currentStay == nil ? "lock.fill" : "bubble.left")
                 }
-                .disabled(store.reservation(for: hotel.hotelId) == nil)
-                .opacity(store.reservation(for: hotel.hotelId) == nil ? 0.45 : 1)
+                .disabled(currentStay == nil)
+                .opacity(currentStay == nil ? 0.58 : 1)
 
                 ShareLink(item: hotel.bookingURL,
                           subject: Text(hotel.name),
                           message: Text("Book \(hotel.name) direct")) {
                     secondaryLabel("Share", "square.and.arrow.up")
                 }
+            }
+
+            if currentStay == nil {
+                Text("Messaging opens after your first booking, so the conversation stays securely attached to your stay.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.inkSoft)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let errorMessage {
@@ -147,12 +181,9 @@ struct HotelSheet: View {
             if let errorMessage { notice(errorMessage, symbol: "exclamationmark.circle.fill", color: .red) }
 
             Button(action: searchAvailability) {
-                if isLoading {
-                    ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
-                } else {
-                    primaryLabel("See available rooms")
-                }
+                primaryLabel(isLoading ? "Checking rooms…" : "See available rooms", loading: isLoading)
             }
+            .buttonStyle(GuestelPressButtonStyle())
             .disabled(isLoading || nights < 1)
             .opacity(nights < 1 ? 0.5 : 1)
         }
@@ -309,12 +340,9 @@ struct HotelSheet: View {
             if let errorMessage { notice(errorMessage, symbol: "exclamationmark.circle.fill", color: .red) }
 
             Button(action: confirmAndPay) {
-                if isSubmitting {
-                    ProgressView().tint(.white).frame(maxWidth: .infinity).padding(.vertical, 16)
-                } else {
-                    primaryLabel("Verify card & send request")
-                }
+                primaryLabel(isSubmitting ? "Opening secure payment…" : "Verify card & send request", loading: isSubmitting)
             }
+            .buttonStyle(GuestelPressButtonStyle())
             .disabled(isSubmitting || !guest.isComplete || quote == nil)
             .opacity(guest.isComplete && quote != nil ? 1 : 0.5)
 
@@ -340,7 +368,7 @@ struct HotelSheet: View {
 
             if let policy = hotelData?.cancellationPolicy?.trimmingCharacters(in: .whitespacesAndNewlines), !policy.isEmpty {
                 Divider()
-                Text("Cancellation policy")
+                Text("Good to know")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.ink)
                 Text(policy)
@@ -451,6 +479,10 @@ struct HotelSheet: View {
         }
     }
 
+    private var currentStay: Reservation? {
+        store.reservation(for: hotel.hotelId)
+    }
+
     private func present(
         hold: BookingAPI.Hold,
         details: [String: Any],
@@ -515,8 +547,11 @@ struct HotelSheet: View {
         return availability.name.caseInsensitiveCompare(catalog.name) == .orderedSame
     }
 
-    private func primaryLabel(_ title: String) -> some View {
-        Text(title)
+    private func primaryLabel(_ title: String, loading: Bool = false) -> some View {
+        HStack(spacing: 9) {
+            if loading { ProgressView().tint(.white) }
+            Text(title)
+        }
             .font(.system(size: 17, weight: .bold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
@@ -708,12 +743,10 @@ private struct RoomCard: View {
         } else {
             TabView {
                 ForEach(room.images, id: \.absoluteString) { url in
-                    AsyncImage(url: url) { phase in
-                        if case let .success(image) = phase {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            Theme.green.opacity(0.10)
-                        }
+                    CachedRemoteImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Theme.green.opacity(0.10)
                     }
                 }
             }

@@ -107,7 +107,7 @@ struct MessagesView: View {
                 ZStack {
                     Circle().fill(Theme.green.opacity(0.12))
                     if let imageURL = hotel.imageURL {
-                        AsyncImage(url: imageURL) { image in
+                        CachedRemoteImage(url: imageURL) { image in
                             image.resizable().scaledToFill()
                         } placeholder: { propertyInitial(hotel.name) }
                         .clipShape(Circle())

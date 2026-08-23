@@ -88,6 +88,7 @@ struct GuestelWelcomeView: View {
                         .padding(.vertical, 16)
                         .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                .buttonStyle(GuestelPressButtonStyle())
 
                 Button("Not now", action: onDone)
                     .font(.system(size: 14, weight: .semibold))
@@ -104,7 +105,7 @@ struct GuestelWelcomeView: View {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .fill(Theme.green.opacity(0.12))
             if let url = arrival.hotel.imageURL {
-                AsyncImage(url: url) { image in
+                CachedRemoteImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { initial }
                 .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))

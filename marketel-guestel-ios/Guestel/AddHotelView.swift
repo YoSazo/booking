@@ -61,6 +61,7 @@ struct AddHotelView: View {
                 .padding(.vertical, 16)
                 .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
+            .buttonStyle(GuestelPressButtonStyle())
             .disabled(isAdding || normalizedDomain == nil)
             .opacity(normalizedDomain == nil ? 0.5 : 1)
             .padding(.horizontal, 20)
@@ -95,6 +96,7 @@ struct AddHotelView: View {
                     imageURL: data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
                 )
                 await MainActor.run {
+                    store.cacheHotelDetails(data)
                     store.add(hotel)
                     isAdding = false
                     dismiss()

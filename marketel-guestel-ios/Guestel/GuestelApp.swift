@@ -60,6 +60,7 @@ struct GuestelApp: App {
             lastStayed: "—",
             imageURL: data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
         )
+        store.cacheHotelDetails(data)
         store.add(hotel)
         var transferredStay: Reservation?
         if let handoff = target.handoffToken, !handoff.isEmpty {
