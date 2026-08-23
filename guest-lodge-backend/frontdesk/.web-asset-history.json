@@ -2,6 +2,18 @@
   "current": [
     "assets/apps-Bh3S_xFH.js",
     "assets/assistant-CJXqVx8n.js",
+    "assets/index-BOl8WPx_.js",
+    "assets/index-C9R4syib.css",
+    "assets/live-activity-DcUl0IIS.js",
+    "assets/native-onboarding-DzFqhUpE.js",
+    "assets/reveal-BwGlI8S_.css",
+    "assets/reveal-CGYE8Dba.js",
+    "assets/settings-BjIgv-Fo.js",
+    "assets/support-CHsoVKck.js"
+  ],
+  "previous": [
+    "assets/apps-Bh3S_xFH.js",
+    "assets/assistant-CJXqVx8n.js",
     "assets/index-C9R4syib.css",
     "assets/index-DYVPaF6V.js",
     "assets/live-activity-DcUl0IIS.js",
@@ -10,17 +22,5 @@
     "assets/reveal-BwGlI8S_.css",
     "assets/settings-BjIgv-Fo.js",
     "assets/support-CxeeZgt6.js"
-  ],
-  "previous": [
-    "assets/apps-Bh3S_xFH.js",
-    "assets/assistant-DfR-ubbM.js",
-    "assets/index-C9R4syib.css",
-    "assets/index-4vT_c9XS.js",
-    "assets/live-activity-DcUl0IIS.js",
-    "assets/native-onboarding-DzFqhUpE.js",
-    "assets/reveal-W7XhYxUT.js",
-    "assets/reveal-BwGlI8S_.css",
-    "assets/settings-BjIgv-Fo.js",
-    "assets/support-DufAA_Xl.js"
   ]
 }

@@ -625,7 +625,7 @@ function assistantBeats() {
   return [
     {
       title: 'It texts you the moment a request lands.',
-      body: 'Reply naturally — a walk-in took it, you’re full, whatever changed.',
+      body: 'That editor was one corner of Front Desk — it also runs your bookings and availability. Reply naturally when a request lands: a walk-in took it, you’re full, whatever changed.',
       next: 'See how you answer',
       event: 'AssistantTextProofViewed',
       proof: {
@@ -760,7 +760,7 @@ function assistantFallbackHtml() {
 function assistantRevealHtml() {
   return beatStageHtml(
     'mvr-stage-assistant',
-    '3 · Your Front Desk Assistant',
+    '3 · The rest of Front Desk',
     assistantBeats(),
     stageBeatIndex[2] || 0
   );
@@ -914,7 +914,7 @@ function showExpandedPreview() {
   <div class="mvr-live-actions" id="mvrLiveActions" hidden>
     <button type="button" class="mvr-live-back" id="mvrLiveBack" hidden>← Back</button>
     <button type="button" class="mvr-live-forward" id="mvrLiveForward">
-      <span data-live-forward-long>See how to edit your booking page</span>
+      <span data-live-forward-long>See how you edit it in Front Desk</span>
       <b aria-hidden="true">→</b>
     </button>
     <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Guestel experience</button>
