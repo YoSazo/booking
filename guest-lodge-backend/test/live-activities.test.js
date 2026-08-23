@@ -153,6 +153,23 @@ test('the native Live Activity stays focused on the Front Desk decision', () => 
   assert.ok(widget.includes('Is \\(context.attributes.roomName) still free?'));
   assert.match(widget, /Label\("Confirm", systemImage: "checkmark"\)/);
   assert.match(widget, /Label\("Release", systemImage: "xmark"\)/);
-  assert.match(widget, /No answer keeps the booking/);
-  assert.match(widget, /No answer releases the request/);
+  assert.match(widget, /No reply: keep/);
+  assert.match(widget, /No reply: release/);
+  // Apple's Lock Screen presentation tops out at 160pt. Interval timers and
+  // roomy stacked labels previously pushed the decision below that budget.
+  assert.doesNotMatch(widget, /Text\(timerInterval:/);
+  assert.match(widget, /controlSize\(\.mini\)/);
+});
+
+test('Live Activity intents are compiled into the app as well as the widget', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const project = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj'),
+    'utf8'
+  );
+  // LiveActivityIntent executes in the app process. Targeting only the widget
+  // renders the buttons but leaves the system with no app-side implementation.
+  const sourceMemberships = project.match(/BookingDecisionIntents\.swift in Sources \*\//g) || [];
+  assert.ok(sourceMemberships.length >= 4, 'intent source must appear in both target source phases');
 });

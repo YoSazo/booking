@@ -79,16 +79,19 @@ private struct LockScreenView: View {
     let context: ActivityViewContext<BookingDecisionAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        // Apple caps the Lock Screen presentation at 160pt. Keep the pending
+        // card deliberately below that limit (about 136pt including padding),
+        // so iOS never preserves the header while truncating the decision.
+        VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
-                MarketelActivityMark(size: 29)
+                MarketelActivityMark(size: 24)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("FRONT DESK")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 8, weight: .heavy))
                         .tracking(0.7)
                         .foregroundStyle(marketelGreen)
                     Text(context.attributes.propertyName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(marketelInk)
                         .lineLimit(1)
                 }
@@ -103,37 +106,50 @@ private struct LockScreenView: View {
             }
 
             if context.state.isPending {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Is \(context.attributes.roomName) still free?")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(marketelInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                    Text(detailLine)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(marketelInk.opacity(0.65))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    Label(fallbackLabel, systemImage: "clock")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(marketelInk.opacity(0.58))
-                        .lineLimit(1)
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Is \(context.attributes.roomName) still free?")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(marketelInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                        Text(detailLine)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(marketelInk.opacity(0.68))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
+                    Spacer(minLength: 4)
+                    Text(context.state.noResponseAction == "release" ? "No reply: release" : "No reply: keep")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(marketelInk.opacity(0.62))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(marketelInk.opacity(0.06), in: Capsule())
+                        .fixedSize()
                 }
                 DecisionButtons(bookingId: context.attributes.bookingId)
             } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(context.state.headline)
-                        .font(.system(size: 18, weight: .bold))
+                HStack(spacing: 9) {
+                    Image(systemName: statusIcon(context.state))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(context.state.isKept ? marketelGreen : marketelRed)
-                    Text("\(context.attributes.guestName) · \(context.attributes.roomName) · \(context.attributes.stayLabel)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(marketelInk.opacity(0.65))
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(context.state.headline)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(context.state.isKept ? marketelGreen : marketelRed)
+                            .lineLimit(1)
+                        Text("\(context.attributes.guestName) · \(context.attributes.roomName) · \(context.attributes.stayLabel)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(marketelInk.opacity(0.65))
+                            .lineLimit(1)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .environment(\.colorScheme, .light)
     }
 
@@ -143,12 +159,6 @@ private struct LockScreenView: View {
             context.attributes.stayLabel,
             context.attributes.amountLabel,
         ].filter { !$0.isEmpty }.joined(separator: " · ")
-    }
-
-    private var fallbackLabel: String {
-        context.state.noResponseAction == "release"
-            ? "No answer releases the request"
-            : "No answer keeps the booking"
     }
 }
 
@@ -184,22 +194,18 @@ private struct CountdownLabel: View {
     var body: some View {
         Group {
             if let deadline = state.deadlineDate, state.isPending {
-                // A native timer keeps ticking with no further pushes, which is
-                // what makes a five-minute window feel live rather than stale.
-                //
-                // fixedSize is what stops it eating the card: the view reserves
-                // width for the widest time it could ever show, and without
-                // this it keeps that reservation while rendering "4:17" — space
-                // taken from the stay dates beside it and then left blank.
-                Text(timerInterval: Date()...max(deadline, Date().addingTimeInterval(1)), countsDown: true)
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                // Date-style timers are the compact ActivityKit-native form;
+                // they don't reserve the wide interval layout that caused the
+                // previous header to collide with the mark.
+                Text(max(deadline, Date()), style: .timer)
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundStyle(marketelAmber)
                     .monospacedDigit()
                     .lineLimit(1)
                     .fixedSize()
             } else {
                 Image(systemName: statusIcon(state))
-                    .font(.system(size: 15))
+                    .font(.system(size: 14))
                     .foregroundStyle(state.isKept ? marketelGreen : .secondary)
             }
         }
@@ -213,11 +219,11 @@ private struct CountdownPill: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "clock.fill")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
             CountdownLabel(state: state)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
         .foregroundStyle(marketelAmber)
         .background(marketelAmber.opacity(0.12), in: Capsule())
     }
@@ -248,11 +254,12 @@ private struct CompactCountdown: View {
 
     var body: some View {
         if let deadline = state.deadlineDate, state.isPending {
-            Text(timerInterval: Date()...max(deadline, Date().addingTimeInterval(1)), countsDown: true)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
+            Text(max(deadline, Date()), style: .timer)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .foregroundStyle(marketelAmber)
                 .monospacedDigit()
-                .frame(maxWidth: 44)
+                .lineLimit(1)
+                .fixedSize()
         } else {
             EmptyView()
         }
@@ -270,21 +277,21 @@ private struct DecisionButtons: View {
             HStack(spacing: 8) {
                 Button(intent: KeepBookingIntent(bookingId: bookingId)) {
                     Label("Confirm", systemImage: "checkmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .frame(maxWidth: .infinity)
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(maxWidth: .infinity, minHeight: 30)
                 }
                 .tint(marketelGreen)
 
                 Button(intent: ReleaseBookingIntent(bookingId: bookingId)) {
                     Label("Release", systemImage: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .frame(maxWidth: .infinity)
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(maxWidth: .infinity, minHeight: 30)
                 }
                 .tint(marketelRed.opacity(0.13))
                 .foregroundStyle(marketelRed)
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            .controlSize(.mini)
         } else {
             Text("Open Marketel to decide")
                 .font(.system(size: 12, weight: .semibold))

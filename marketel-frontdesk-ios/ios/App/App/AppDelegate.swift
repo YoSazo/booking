@@ -1242,9 +1242,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         let action: String?
         switch response.actionIdentifier {
-        case "MARKETEL_CONFIRM_BOOKING":
+        case "MARKETEL_CONFIRM_BOOKING", "confirm":
             action = "confirm"
-        case "MARKETEL_RELEASE_BOOKING":
+        case "MARKETEL_RELEASE_BOOKING", "release":
             action = "release"
         default:
             action = nil

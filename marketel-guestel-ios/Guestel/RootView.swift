@@ -64,7 +64,10 @@ struct RootView: View {
         ) {
             if let arrival = store.arrival {
                 GuestelWelcomeView(arrival: arrival) { store.arrival = nil }
-                    .presentationDetents([.medium, .large])
+                    // This is a one-time, contextual permission explanation.
+                    // A full-height sheet prevents the primary action from
+                    // landing below the medium detent on smaller iPhones.
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
         }

@@ -76,7 +76,11 @@ struct GuestelApp: App {
                 return message.contains("expired") || message.contains("already used")
             }
         }
-        store.arrival = GuestelArrival(hotel: hotel, stay: transferredStay)
+        if await GuestPushManager.shouldShowPermissionContext() {
+            store.arrival = GuestelArrival(hotel: hotel, stay: transferredStay)
+        } else {
+            await GuestPushManager.registerIfAuthorized(store: store)
+        }
         return true
     }
 

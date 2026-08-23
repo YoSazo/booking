@@ -118,10 +118,16 @@ struct HotelsView: View {
                     // sheet has finished dismissing, so confirmations and Front
                     // Desk replies can actually reach this iPhone.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-                        let stay = store.reservations.first {
-                            $0.hotelId == hotel.hotelId && $0.code == result.reservationCode
+                        Task { @MainActor in
+                            let stay = store.reservations.first {
+                                $0.hotelId == hotel.hotelId && $0.code == result.reservationCode
+                            }
+                            if await GuestPushManager.shouldShowPermissionContext() {
+                                store.arrival = GuestelArrival(hotel: hotel, stay: stay)
+                            } else {
+                                await GuestPushManager.registerIfAuthorized(store: store)
+                            }
                         }
-                        store.arrival = GuestelArrival(hotel: hotel, stay: stay)
                     }
                 }
             )

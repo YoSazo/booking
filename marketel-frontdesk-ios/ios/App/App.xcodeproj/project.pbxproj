@@ -24,6 +24,7 @@
 		A11E01172E00000100000001 /* BookingDecisionAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E010F2E00000100000001 /* BookingDecisionAttributes.swift */; };
 		A11E01182E00000100000001 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E01102E00000100000001 /* LiveActivityPlugin.swift */; };
 		A11E01192E00000100000001 /* LiveActivityPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = A11E01112E00000100000001 /* LiveActivityPlugin.m */; };
+		A11E01252E00000100000001 /* BookingDecisionIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11E010E2E00000100000001 /* BookingDecisionIntents.swift */; };
 		A11E011A2E00000100000001 /* MarketelActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A11E01012E00000100000001 /* MarketelActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -268,6 +269,7 @@
 				A11E01232E00000100000001 /* NativeAssistant.swift in Sources */,
 				A11E01182E00000100000001 /* LiveActivityPlugin.swift in Sources */,
 				A11E01192E00000100000001 /* LiveActivityPlugin.m in Sources */,
+				A11E01252E00000100000001 /* BookingDecisionIntents.swift in Sources */,
 				A11E01172E00000100000001 /* BookingDecisionAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

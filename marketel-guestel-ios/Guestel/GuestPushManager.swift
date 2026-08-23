@@ -198,17 +198,37 @@ enum GuestMessageRoute {
 enum GuestPushManager {
     static let deviceTokenKey = "guestel.apns.deviceToken"
 
+    static func authorizationStatus() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    static func isAuthorized(_ status: UNAuthorizationStatus) -> Bool {
+        status == .authorized || status == .provisional || status == .ephemeral
+    }
+
+    static func shouldShowPermissionContext() async -> Bool {
+        !isAuthorized(await authorizationStatus())
+    }
+
     static func requestAuthorization() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+        Task {
+            let status = await authorizationStatus()
+            if isAuthorized(status) {
+                await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+                return
+            }
+            guard status == .notDetermined else { return }
+            let granted = (try? await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .badge, .sound])) == true
             guard granted else { return }
-            DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+            await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
         }
     }
 
     @MainActor
     static func registerIfAuthorized(store: GuestStore) async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+        guard isAuthorized(settings.authorizationStatus) else { return }
         UIApplication.shared.registerForRemoteNotifications()
         await sync(store: store)
     }
