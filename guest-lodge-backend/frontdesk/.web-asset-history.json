@@ -2,6 +2,18 @@
   "current": [
     "assets/apps-Bh3S_xFH.js",
     "assets/assistant-CJXqVx8n.js",
+    "assets/index-ByfknVfp.js",
+    "assets/index-C9R4syib.css",
+    "assets/live-activity-DcUl0IIS.js",
+    "assets/native-onboarding-DzFqhUpE.js",
+    "assets/reveal-BwGlI8S_.css",
+    "assets/reveal-DPP6a8Ph.js",
+    "assets/settings-BjIgv-Fo.js",
+    "assets/support-Cg9EbUwz.js"
+  ],
+  "previous": [
+    "assets/apps-Bh3S_xFH.js",
+    "assets/assistant-CJXqVx8n.js",
     "assets/index-BOl8WPx_.js",
     "assets/index-C9R4syib.css",
     "assets/live-activity-DcUl0IIS.js",
@@ -10,17 +22,5 @@
     "assets/reveal-CGYE8Dba.js",
     "assets/settings-BjIgv-Fo.js",
     "assets/support-CHsoVKck.js"
-  ],
-  "previous": [
-    "assets/apps-Bh3S_xFH.js",
-    "assets/assistant-CJXqVx8n.js",
-    "assets/index-C9R4syib.css",
-    "assets/index-DYVPaF6V.js",
-    "assets/live-activity-DcUl0IIS.js",
-    "assets/native-onboarding-DzFqhUpE.js",
-    "assets/reveal-BXO_vM00.js",
-    "assets/reveal-BwGlI8S_.css",
-    "assets/settings-BjIgv-Fo.js",
-    "assets/support-CxeeZgt6.js"
   ]
 }

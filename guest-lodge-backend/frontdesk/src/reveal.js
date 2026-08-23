@@ -624,8 +624,8 @@ function guestAppBeats() {
 function assistantBeats() {
   return [
     {
-      title: 'It texts you the moment a request lands.',
-      body: 'That editor was one corner of Front Desk — it also runs your bookings and availability. Reply naturally when a request lands: a walk-in took it, you’re full, whatever changed.',
+      title: 'Front Desk does more than edit your booking page.',
+      body: 'It also runs your bookings and availability. When a request arrives, it texts you — reply naturally with whatever changed.',
       next: 'See how you answer',
       event: 'AssistantTextProofViewed',
       proof: {
@@ -760,7 +760,7 @@ function assistantFallbackHtml() {
 function assistantRevealHtml() {
   return beatStageHtml(
     'mvr-stage-assistant',
-    '3 · The rest of Front Desk',
+    '3 · Marketel Front Desk',
     assistantBeats(),
     stageBeatIndex[2] || 0
   );
