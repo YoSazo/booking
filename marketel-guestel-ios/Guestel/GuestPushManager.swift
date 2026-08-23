@@ -51,7 +51,7 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         )
         // Keep the useful banner and sound while Guestel is visible, but don't
         // leave a red badge for an alert the guest is already looking at.
-        [.banner, .sound]
+        return [.banner, .sound]
     }
 
     func userNotificationCenter(
