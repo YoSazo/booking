@@ -799,6 +799,7 @@ function finaleHtml() {
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
           <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
+          <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
           ${directBookingValueHtml()}
@@ -1162,6 +1163,9 @@ async function activateMarketel(button) {
 }
 
 function bindRevealEvents() {
+  document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
+    window.openMarketelSupport?.();
+  });
   document.getElementById('mvrNext')?.addEventListener('click', () => {
     const beats = stageBeats();
     const beatIndex = stageBeatIndex[currentStep] || 0;

@@ -131,7 +131,8 @@ test('the purge cannot delete a row that something else depends on', () => {
     // is asserted here and not left to the comment above the set.
     const protectedRows = [
         ['ActivationEmailSent', /if \(existing\?\.eventName === 'ActivationEmailSent'\) return;/],
-        ['PreviewReadyEmailSent', /eventName: 'PreviewReadyEmailSent'[\s\S]{0,200}if \(!existingEmail\)/],
+        ['PreviewReadyEmailSent', /eventName: \{ in: \['PreviewReadyEmailSending', 'PreviewReadyEmailSent'\] \}[\s\S]{0,300}existing\?\.eventName === 'PreviewReadyEmailSent'/],
+        ['CheckoutRecoveryEmailSent', /checkoutRecoveryEmailSentAt: null[\s\S]{0,900}eventName: 'CheckoutRecoveryEmailSending'/],
         ['BlockedBookingAttempt', /eventName: 'BlockedBookingAttempt', createdAt/],
     ];
     for (const [name, usage] of protectedRows) {

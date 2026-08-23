@@ -190,7 +190,20 @@ async function sendMarketelLifecycleEmail({ toEmail, subject, template, replacem
     }
 }
 
-async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, pin, domain, frontdeskUrl }) {
+async function sendSetupResumeEmail({ toEmail, hotelName, setupUrl }) {
+    return sendMarketelLifecycleEmail({
+        toEmail,
+        subject: `Continue building ${hotelName || 'your Marketel'}`,
+        template: 'setup-resume.html',
+        replacements: {
+            HOTEL_NAME: hotelName || 'your property',
+            SETUP_URL: setupUrl,
+        },
+        text: `Your Marketel setup is saved.\n\nContinue where you left off: ${setupUrl}\n\nNo payment has been taken. Questions? Reply to this email.`,
+    });
+}
+
+async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, domain, frontdeskUrl }) {
     return sendMarketelLifecycleEmail({
         toEmail,
         subject: `Your ${hotelName || 'Marketel'} preview is ready`,
@@ -199,10 +212,9 @@ async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, pin, domain,
             HOTEL_NAME: hotelName || 'Your property',
             HOTEL_ID: hotelId,
             DOMAIN: domain,
-            PIN: pin,
             FRONTDESK_URL: frontdeskUrl,
         },
-        text: `Your Marketel preview is ready.\n\nFront Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nPIN: ${pin}\nBooking-page preview: https://${domain}\n\nThe booking page remains in preview mode until you activate Marketel.`,
+        text: `Your Marketel preview is ready.\n\nContinue your personalized walkthrough: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking-page preview: https://${domain}\n\nThe booking page remains in preview mode until you activate Marketel.`,
     });
 }
 
@@ -773,9 +785,9 @@ function marketelFrontdeskOrigin(req, preferredOrigin = '') {
     return 'https://bookmarketel.com';
 }
 
-function frontdeskReturnHtml({ token = '', hotelId = '', activated = false, reveal = '' } = {}) {
+function frontdeskReturnHtml({ token = '', hotelId = '', activated = false, reveal = '', checkoutCancelled = false } = {}) {
     const cleanToken = String(token || '').trim();
-    const nextPath = buildFrontdeskReturnPath({ hotelId, activated, reveal });
+    const nextPath = buildFrontdeskReturnPath({ hotelId, activated, reveal, checkoutCancelled });
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening Front Desk...</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f5;color:#1a2b22}.box{text-align:center;padding:24px}.mark{width:38px;height:38px;margin:0 auto 14px;border-radius:50%;border:4px solid #d8e4dc;border-top-color:#2E7D5B;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.title{font-size:15px;font-weight:800}.sub{margin-top:6px;font-size:12px;color:#66756c}</style></head><body><div class="box"><div class="mark"></div><div class="title">Opening Front Desk</div><div class="sub">Finishing activation...</div></div><script>!function(){var embedded=${JSON.stringify(cleanToken)};var fragment=new URLSearchParams(location.hash.slice(1));var token=embedded||fragment.get("pin")||fragment.get("returnToken")||"";var next=${JSON.stringify(nextPath)};try{console.info("[FrontDesk return] bridge loaded",{hasToken:!!token,tokenKind:token&&token.indexOf("fd_")===0?"return-token":token?"pin":"none"});}catch(e){}try{if(token){localStorage.setItem("crmToken",token);document.cookie="frontdeskReturnToken="+encodeURIComponent(token)+"; path=/; max-age=86400; SameSite=Lax; Secure";}}catch(e){try{console.warn("[FrontDesk return] token storage failed",e&&e.message?e.message:e);}catch(_){}}location.replace(next);}();</script></body></html>`;
 }
 
@@ -790,8 +802,13 @@ app.get('/frontdesk-return', (req, res) => {
     const token = String(req.query.pin || req.query.returnToken || '').trim();
     const hotelId = String(req.query.hotelId || '').trim();
     const activated = String(req.query.activated || '') === '1';
+    const checkoutCancelled = String(req.query.checkoutCancelled || '') === '1';
     const requestedReveal = String(req.query.reveal || '').trim();
-    const reveal = requestedReveal === 'checkout' || requestedReveal === '1' ? requestedReveal : '';
+    const reveal = requestedReveal === 'checkout'
+        || requestedReveal === '1'
+        || /^step-[0-2]$/.test(requestedReveal)
+        ? requestedReveal
+        : '';
     res.setHeader('Cache-Control', 'no-store');
     console.log('frontdesk-return bridge served:', {
         host: req.get('host'),
@@ -800,8 +817,9 @@ app.get('/frontdesk-return', (req, res) => {
         hotelId,
         activated,
         reveal,
+        checkoutCancelled,
     });
-    res.send(frontdeskReturnHtml({ token, hotelId, activated, reveal }));
+    res.send(frontdeskReturnHtml({ token, hotelId, activated, reveal, checkoutCancelled }));
 });
 app.get(['/frontdesk', '/frontdesk/'], serveFrontdesk);
 app.get('/simple-crm.html', (req, res) => {
@@ -2436,6 +2454,11 @@ const crmBootstrapRateLimit = createRouteRateLimiter('crm-bootstrap', {
 const funnelOnboardingRateLimit = createRouteRateLimiter('marketel-onboarding', { windowMs: 60 * 1000, max: 40 });
 const journeyEventRateLimit = createRouteRateLimiter('marketel-journey', { windowMs: 60 * 1000, max: 180 });
 const setupStartRateLimit = createRouteRateLimiter('marketel-setup-start', { windowMs: 15 * 60 * 1000, max: 8 });
+const magicLinkRateLimit = createRouteRateLimiter('marketel-magic-link', {
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    scope: req => String(req.body?.email || '').trim().toLowerCase(),
+});
 const nativeCodeRequestRateLimit = createRouteRateLimiter('native-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
 const nativeCodeVerifyRateLimit = createRouteRateLimiter('native-code-verify', { windowMs: 15 * 60 * 1000, max: 12 });
 const guestCodeRequestRateLimit = createRouteRateLimiter('guest-code-request', { windowMs: 15 * 60 * 1000, max: 6 });
@@ -5188,7 +5211,13 @@ const NATIVE_SESSION_TOKEN_SECRET = process.env.NATIVE_SESSION_TOKEN_SECRET || C
 const NATIVE_SESSION_TOKEN_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
 
 function configuredFrontdeskAppStoreUrl() {
-    const raw = String(process.env.MARKETEL_FRONTDESK_APP_STORE_URL || '').trim();
+    // The public listing is stable product configuration, not a secret. Keep
+    // the env override for regional/testing builds, but never hide the already
+    // published owner app because Render is missing an optional URL variable.
+    const raw = String(
+        process.env.MARKETEL_FRONTDESK_APP_STORE_URL
+        || 'https://apps.apple.com/us/app/marketel/id6801005750'
+    ).trim();
     if (!raw) return '';
     try {
         const parsed = new URL(raw);
@@ -5357,8 +5386,12 @@ function generateCrmReturnToken(hotelId, hotelSecret = '') {
 }
 
 async function generateCrmReturnTokenForHotel(hotelId, currentSetupToken = '') {
-    const hotelSecret = await ensureCrmReturnHotelSecret(hotelId, currentSetupToken);
-    return generateCrmReturnToken(hotelId, hotelSecret);
+    // Handoff tokens are already short-lived, purpose-bound, hotel-scoped and
+    // signed with the server secret. Do not additionally bind new tokens to the
+    // mutable setup credential: finalization rotates that credential, which
+    // used to invalidate the handoff between receiving it and opening it.
+    void currentSetupToken;
+    return generateCrmReturnToken(hotelId, '');
 }
 
 async function createCrmActivationReturnPin(hotelId) {
@@ -6629,6 +6662,8 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     'JourneyPhotoSelected',
     'JourneyQualitySelected',
     'JourneyPreviewReady',
+    'JourneySetupResumed',
+    'JourneyRecoveryEmailRequested',
     'JourneyHandoffStarted',
     'JourneyHandoffCompleted',
     'JourneyFrontDeskReady',
@@ -6654,6 +6689,7 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     'JourneyGuestAppDemo',
     'JourneyBookingPageStatus',
     'JourneyCheckoutRequested',
+    'JourneyCheckoutCancelled',
     'JourneyCheckoutRedirected',
     'JourneyCheckoutFailed',
 ]);
@@ -6882,6 +6918,22 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
         const contentName = String(req.body?.contentName || '').trim().slice(0, 120);
         if (!MARKETEL_VALUE_REVEAL_EVENTS.has(eventName)) {
             return res.status(400).json({ success: false, message: 'Unknown reveal event.' });
+        }
+        const revealStepByEvent = {
+            BookingEngineRevealViewed: 0,
+            GuestAppRevealViewed: 1,
+            AssistantRevealViewed: 2,
+            ActivationOfferViewed: 3,
+            ActivationCtaClicked: 3,
+        };
+        if (Object.prototype.hasOwnProperty.call(revealStepByEvent, eventName)) {
+            // This intentionally follows backward navigation too: a recovery
+            // link should return to the screen the owner was actually viewing,
+            // not merely the furthest screen they once touched.
+            await prisma.hotelConfig.update({
+                where: { id: hotelId },
+                data: { revealProgressStep: revealStepByEvent[eventName] },
+            }).catch(() => {});
         }
         const existing = await prisma.funnelEvent.findFirst({
             where: { hotelId, eventName },
@@ -10203,6 +10255,11 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'LandingPageView',
     'AcquisitionAngle',
     'SetupStarted',
+    'SetupResumed',
+    'RevealResumed',
+    'RevealResumeEmailSent',
+    'MagicLinkRequested',
+    'MagicLinkOpened',
     'Step1Reached',
     'Step2Reached',
     'Step3Reached',
@@ -10215,7 +10272,13 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'GoLiveClicked',
     'CheckoutStarted',
     'PaymentSucceeded',
+    'SetupResumeEmailSent',
+    'PreviewReadyEmailSending',
     'PreviewReadyEmailSent',
+    'CheckoutCancelled',
+    'CheckoutRecoveryEmailSending',
+    'CheckoutRecoveryEmailSent',
+    'LegacyComebackEmailSent',
     'ActivationEmailSending',
     'ActivationEmailSent',
     'SubscriptionStatusChanged',
@@ -10265,7 +10328,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         if (setupToken) {
             setupHotel = await prisma.hotelConfig.findUnique({
                 where: { setupToken },
-                select: { id: true, ownerEmail: true },
+                select: { id: true, ownerEmail: true, setupProgressStep: true },
             });
             if (!setupHotel) {
                 return res.status(404).json({ success: false, message: 'Invalid setup token' });
@@ -10279,6 +10342,18 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             if (!setupHotel || !allowedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid quality answer' });
             }
+        }
+
+        const setupStepMatch = /^Step([1-4])Reached$/.exec(String(eventName || ''));
+        const durableSetupStep = eventName === 'QualityAnswer'
+            ? 4
+            : (setupStepMatch ? Number(setupStepMatch[1]) : 0);
+        if (setupHotel && durableSetupStep > (Number(setupHotel.setupProgressStep) || 1)) {
+            await prisma.hotelConfig.update({
+                where: { id: setupHotel.id },
+                data: { setupProgressStep: durableSetupStep },
+            }).catch(() => {});
+            setupHotel.setupProgressStep = durableSetupStep;
         }
 
         if (eventName === 'Lead') {
@@ -10905,16 +10980,139 @@ app.get('/', (req, res) => {
 
 // ── SELF-SERVE SETUP ──────────────────────────────────────────
 
+async function recordSetupRecoveryEvent(req, { hotelId, email, eventName, metadata = {}, surface = 'recovery', pagePath = '/landing' }) {
+    if (!funnelTrackingEnabled || !hotelId || !eventName) return;
+    await prisma.funnelEvent.create({
+        data: {
+            hotelId,
+            eventName,
+            eventId: `marketel-${eventName.toLowerCase()}.${hotelId}.${Date.now()}.${crypto.randomBytes(3).toString('hex')}`,
+            guestEmail: email || null,
+            userAgent: req.headers['user-agent'] || null,
+            ipAddress: req.ip || req.socket?.remoteAddress || null,
+            surface,
+            pagePath,
+            metadata,
+        },
+    }).catch(() => {});
+}
+
 // Start free setup — create hotel and redirect to wizard (no payment needed)
 app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = normalizeOwnerEmail(req.body?.email);
         const requestedAngle = String(req.body?.acquisitionAngle || 'direct').trim();
         const acquisitionAngle = new Set(['direct', 'guest_app', 'assistant']).has(requestedAngle)
             ? requestedAngle
             : 'direct';
-        if (!email || !email.includes('@')) {
+        if (!validOwnerEmail(email)) {
             return res.status(400).json({ error: 'Valid email required' });
+        }
+
+        // An ad click must never create a second empty property merely because
+        // the owner returned in another tab. A signed first-party cookie lets
+        // the same browser resume immediately; an unknown browser gets a
+        // secure email link, so knowing an email address never grants access.
+        const existingHotels = await prisma.hotelConfig.findMany({
+            where: { ownerEmail: { equals: email, mode: 'insensitive' } },
+            orderBy: { updatedAt: 'desc' },
+            take: 10,
+            select: {
+                id: true,
+                name: true,
+                ownerEmail: true,
+                setupToken: true,
+                setupComplete: true,
+                setupProgressStep: true,
+                revealProgressStep: true,
+                subscribed: true,
+            },
+        });
+        if (existingHotels.length) {
+            const ownerClaim = verifySetupOwnerCookie(readRequestCookie(req, SETUP_OWNER_COOKIE));
+            const browserHotel = ownerClaim && ownerClaim.email === email
+                ? existingHotels.find(hotel => hotel.id === ownerClaim.hotelId)
+                : null;
+            if (browserHotel) {
+                setSetupOwnerCookie(req, res, browserHotel.id, email);
+                if (!browserHotel.setupComplete && browserHotel.setupToken) {
+                    await recordSetupRecoveryEvent(req, {
+                        hotelId: browserHotel.id,
+                        email,
+                        eventName: 'SetupResumed',
+                        metadata: { source: 'signed-browser', setupStep: browserHotel.setupProgressStep },
+                    });
+                    return res.json({
+                        success: true,
+                        existing: true,
+                        resumed: true,
+                        hotelId: browserHotel.id,
+                        setupUrl: `/setup/${browserHotel.setupToken}?angle=${encodeURIComponent(acquisitionAngle)}`,
+                    });
+                }
+                const returnToken = await generateCrmReturnTokenForHotel(browserHotel.id, browserHotel.setupToken || '');
+                const reveal = revealResumeParam(browserHotel.revealProgressStep);
+                await recordSetupRecoveryEvent(req, {
+                    hotelId: browserHotel.id,
+                    email,
+                    eventName: 'RevealResumed',
+                    metadata: { source: 'signed-browser', revealStep: browserHotel.revealProgressStep },
+                });
+                const returnParams = new URLSearchParams({ hotelId: browserHotel.id, reveal });
+                return res.json({
+                    success: true,
+                    existing: true,
+                    resumed: true,
+                    hotelId: browserHotel.id,
+                    resumeUrl: `${marketelFrontdeskOrigin(req)}/frontdesk-return?${returnParams.toString()}#returnToken=${encodeURIComponent(returnToken)}`,
+                });
+            }
+
+            const incomplete = existingHotels.find(hotel => !hotel.setupComplete && hotel.setupToken);
+            let sent = false;
+            if (incomplete) {
+                const setupUrl = `${marketelFrontdeskOrigin(req)}/setup/${encodeURIComponent(incomplete.setupToken)}?angle=${encodeURIComponent(acquisitionAngle)}`;
+                sent = await sendSetupResumeEmail({
+                    toEmail: email,
+                    hotelName: incomplete.name || 'your property',
+                    setupUrl,
+                });
+                if (sent) {
+                    await prisma.hotelConfig.update({
+                        where: { id: incomplete.id },
+                        data: { setupResumeEmailSentAt: new Date() },
+                    }).catch(() => {});
+                    await recordSetupRecoveryEvent(req, {
+                        hotelId: incomplete.id,
+                        email,
+                        eventName: 'SetupResumeEmailSent',
+                        metadata: { source: 'unknown-browser', setupStep: incomplete.setupProgressStep },
+                    });
+                }
+            } else {
+                sent = await sendFrontdeskAccessEmail({
+                    req,
+                    email,
+                    hotels: existingHotels,
+                    expiresInMs: RECOVERY_LINK_EXPIRY_MS,
+                });
+                if (sent) {
+                    await recordSetupRecoveryEvent(req, {
+                        hotelId: existingHotels[0].id,
+                        email,
+                        eventName: 'RevealResumeEmailSent',
+                        metadata: { propertyCount: existingHotels.length },
+                    });
+                }
+            }
+            return res.json({
+                success: true,
+                existing: true,
+                resumeEmailSent: sent,
+                message: sent
+                    ? 'We found your saved Marketel and emailed a secure link.'
+                    : 'We found your saved Marketel. Contact support@bookmarketel.com if the email does not arrive.',
+            });
         }
 
         const hotelSlug = 'hotel-' + crypto.randomBytes(4).toString('hex');
@@ -10927,10 +11125,11 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
                 pms: 'manual',
                 active: false,
                 setupToken,
-                ownerEmail: email.trim().toLowerCase(),
+                ownerEmail: email,
                 setupComplete: false,
             }
         });
+        setSetupOwnerCookie(req, res, hotelSlug, email);
 
         if (funnelTrackingEnabled) {
             await prisma.funnelEvent.create({
@@ -10938,7 +11137,7 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
                     hotelId: hotelSlug,
                     eventName: 'AcquisitionAngle',
                     eventId: `marketel-angle.${hotelSlug}`,
-                    guestEmail: email.trim().toLowerCase(),
+                    guestEmail: email,
                     contentName: acquisitionAngle,
                     userAgent: req.headers['user-agent'] || null,
                     ipAddress: req.ip || req.socket?.remoteAddress || null,
@@ -10946,11 +11145,32 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
             }).catch(() => {});
         }
 
+        const setupUrl = `${marketelFrontdeskOrigin(req)}/setup/${setupToken}?angle=${encodeURIComponent(acquisitionAngle)}`;
+        const setupResumeEmailSent = await sendSetupResumeEmail({
+            toEmail: email,
+            hotelName: 'your property',
+            setupUrl,
+        });
+        if (setupResumeEmailSent) {
+            await prisma.hotelConfig.update({
+                where: { id: hotelSlug },
+                data: { setupResumeEmailSentAt: new Date() },
+            }).catch(() => {});
+            await recordSetupRecoveryEvent(req, {
+                hotelId: hotelSlug,
+                email,
+                eventName: 'SetupResumeEmailSent',
+                metadata: { source: 'setup-created', setupStep: 1 },
+            });
+        }
+
         console.log('✅ Free setup started:', { hotelId: hotelSlug, acquisitionAngle });
         res.json({
             success: true,
             setupUrl: `/setup/${setupToken}?angle=${encodeURIComponent(acquisitionAngle)}`,
             token: setupToken,
+            hotelId: hotelSlug,
+            setupResumeEmailSent,
         });
     } catch (e) {
         console.error('Start setup error:', e.message);
@@ -11010,10 +11230,16 @@ app.get('/api/setup/:token', async (req, res) => {
             },
         });
         if (!hotel) return res.status(404).json({ error: 'Invalid setup token' });
+        const frontdeskReturnToken = hotel.setupComplete
+            ? await generateCrmReturnTokenForHotel(hotel.id, hotel.setupToken || '').catch(() => '')
+            : '';
         res.json({
             hotel: { id: hotel.id, name: hotel.name, address: hotel.address, phone: hotel.phone, subtitle: hotel.subtitle, checkInTime: hotel.checkInTime, checkOutTime: hotel.checkOutTime, setupComplete: hotel.setupComplete },
             rooms: hotel.rooms.map(r => ({ id: r.id, name: r.name, description: r.description, amenities: r.amenities, maxOccupancy: r.maxOccupancy, totalUnits: r.totalUnits, images: r.images.map(i => ({ id: i.id, url: i.url, sortOrder: i.sortOrder })) })),
             rates: hotel.rates ? { nightly: hotel.rates.nightly, weekly: hotel.rates.weekly, monthly: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : null,
+            domain: hotel.domains[0]?.domain || '',
+            resumeStep: Math.max(1, Math.min(4, Number(hotel.setupProgressStep) || 1)),
+            frontdeskReturnToken,
         });
     } catch (e) {
         console.error('Setup GET error:', e.message);
@@ -11029,7 +11255,15 @@ app.post('/api/setup/:token/hotel', async (req, res) => {
         const { name, address, phone, subtitle, checkInTime, checkOutTime } = req.body;
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
-            data: { name: name || hotel.name, address, phone, subtitle, checkInTime, checkOutTime },
+            data: {
+                name: name || hotel.name,
+                address,
+                phone,
+                subtitle,
+                checkInTime,
+                checkOutTime,
+                setupProgressStep: Math.max(2, Number(hotel.setupProgressStep) || 1),
+            },
         });
         res.json({ success: true });
     } catch (e) {
@@ -11582,7 +11816,11 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
 const FUNNEL_PURGE_PROTECTED = new Set([
     'ActivationEmailSending',
     'ActivationEmailSent',
+    'PreviewReadyEmailSending',
     'PreviewReadyEmailSent',
+    'CheckoutRecoveryEmailSending',
+    'CheckoutRecoveryEmailSent',
+    'LegacyComebackEmailSent',
     'BlockedBookingAttempt',
     'OnboardingAnswers',
 ]);
@@ -11935,6 +12173,87 @@ async function rotateCompletedSetupCredential(hotelId) {
     hotelConfigCache.delete(hotelId);
 }
 
+async function sendPreviewReadyEmailOnce(hotelId, req = null) {
+    if (!hotelId || !emailTransporter) return false;
+    let claim = null;
+    await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${hotelId}), hashtext('preview-ready-email'))`;
+        const existing = await tx.funnelEvent.findFirst({
+            where: {
+                hotelId,
+                eventName: { in: ['PreviewReadyEmailSending', 'PreviewReadyEmailSent'] },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (existing?.eventName === 'PreviewReadyEmailSent') return;
+        if (existing && existing.createdAt > new Date(Date.now() - 5 * 60 * 1000)) return;
+        if (existing) await tx.funnelEvent.delete({ where: { id: existing.id } });
+        claim = await tx.funnelEvent.create({
+            data: {
+                hotelId,
+                eventName: 'PreviewReadyEmailSending',
+                eventId: `marketel-preview-email.${hotelId}.${Date.now()}`,
+            },
+        });
+    });
+    if (!claim) return false;
+
+    try {
+        const [hotel, domainRow] = await Promise.all([
+            prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: {
+                    id: true,
+                    name: true,
+                    ownerEmail: true,
+                    subscribed: true,
+                    revealProgressStep: true,
+                },
+            }),
+            prisma.hotelDomain.findFirst({
+                where: { hotelId },
+                orderBy: { isPrimary: 'desc' },
+                select: { domain: true },
+            }),
+        ]);
+        if (!hotel?.ownerEmail) throw new Error('Property has no owner email');
+        if (hotel.subscribed) throw new Error('Property is already activated');
+        const domain = domainRow?.domain || await assignUniqueDomainForHotel(hotel);
+        const frontdeskUrl = frontdeskMagicUrl(req, hotel, {
+            expiresInMs: RECOVERY_LINK_EXPIRY_MS,
+        });
+        const sent = await sendPreviewReadyEmail({
+            toEmail: hotel.ownerEmail,
+            hotelName: hotel.name || 'Your property',
+            hotelId: hotel.id,
+            domain,
+            frontdeskUrl,
+        });
+        if (!sent) throw new Error('Preview email was not sent');
+        await prisma.$transaction([
+            prisma.funnelEvent.update({
+                where: { id: claim.id },
+                data: {
+                    eventName: 'PreviewReadyEmailSent',
+                    eventId: `marketel-preview-email.${hotelId}`,
+                    guestEmail: hotel.ownerEmail,
+                },
+            }),
+            prisma.hotelConfig.update({
+                where: { id: hotelId },
+                data: { previewReadyEmailSentAt: new Date() },
+            }),
+        ]);
+        return true;
+    } catch (error) {
+        await prisma.funnelEvent.deleteMany({
+            where: { id: claim.id, eventName: 'PreviewReadyEmailSending' },
+        }).catch(() => {});
+        console.error('Preview-ready email failed:', error.message);
+        return false;
+    }
+}
+
 app.post('/api/setup/:token/finalize', async (req, res) => {
     try {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
@@ -11974,7 +12293,9 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             }
         }
 
-        // Send a clearly labelled preview/resume email once.
+        // The preview email normally went out as soon as /complete finished.
+        // Retry here if SMTP was temporarily unavailable, but never make the
+        // owner's click the only thing capable of creating their recovery path.
         const finalEmail = email || hotel.ownerEmail;
         let previewEmailSent = false;
         let activationEmailSent = false;
@@ -11984,36 +12305,7 @@ app.post('/api/setup/:token/finalize', async (req, res) => {
             // instead of sending pre-activation language.
             activationEmailSent = await sendMarketelActivationEmailOnce(hotel.id, req);
         } else if (finalEmail) {
-            const domain = String(domainPref === 'custom' ? customDomain : assignedDomain)
-                .trim()
-                .replace(/^https?:\/\//i, '')
-                .replace(/\/.*$/, '');
-            const pin = String(req.body.pin || '').trim();
-            const existingEmail = await prisma.funnelEvent.findFirst({
-                where: { hotelId: hotel.id, eventName: 'PreviewReadyEmailSent' },
-                select: { id: true },
-            });
-            if (!existingEmail) {
-                const frontdeskUrl = `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotel.id)}`;
-                previewEmailSent = await sendPreviewReadyEmail({
-                    toEmail: finalEmail,
-                    hotelName: hotel.name || 'Your property',
-                    hotelId: hotel.id,
-                    pin: pin || 'Use email login',
-                    domain,
-                    frontdeskUrl,
-                });
-                if (previewEmailSent) {
-                    await prisma.funnelEvent.create({
-                        data: {
-                            hotelId: hotel.id,
-                            eventName: 'PreviewReadyEmailSent',
-                            eventId: `marketel-preview-email.${hotel.id}`,
-                            guestEmail: finalEmail,
-                        },
-                    }).catch(() => {});
-                }
-            }
+            previewEmailSent = await sendPreviewReadyEmailOnce(hotel.id, req);
         }
 
         console.log('✅ Preview handoff completed:', {
@@ -12060,6 +12352,24 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
         console.log('Complete called for:', hotel.id, hotel.name);
 
+        // Reloads and retries are normal in a mobile funnel. Completion is
+        // idempotent: reuse the property and issue a fresh, short-lived handoff
+        // token instead of manufacturing another staff PIN.
+        if (hotel.setupComplete) {
+            const assignedDomain = await assignUniqueDomainForHotel(hotel);
+            const frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotel.id, hotel.setupToken || '');
+            const previewEmailSent = await sendPreviewReadyEmailOnce(hotel.id, req);
+            setSetupOwnerCookie(req, res, hotel.id, hotel.ownerEmail || '');
+            return res.json({
+                success: true,
+                bookingUrl: `https://${assignedDomain}`,
+                frontdeskUrl: `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotel.id)}`,
+                frontdeskReturnToken,
+                previewEmailSent,
+                resumed: true,
+            });
+        }
+
         // Generate unique domain
         const assignedDomain = await assignUniqueDomainForHotel(hotel);
 
@@ -12078,7 +12388,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         // Mark setup complete, activate (subscribed defaults to false)
         await prisma.hotelConfig.update({
             where: { id: hotel.id },
-            data: { setupComplete: true, active: true },
+            data: { setupComplete: true, active: true, setupProgressStep: 3 },
         });
 
         // Create a default CRM PIN
@@ -12088,8 +12398,9 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             await prisma.crmPin.create({ data: { hotelId: hotel.id, pinHash, label: 'Default PIN' } });
         } catch (e) { /* ignore duplicate */ }
 
-        // The preview/resume email is sent via /finalize. A separate activation
-        // email is sent only after Stripe verifies payment.
+        const frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotel.id, hotel.setupToken || '');
+        const previewEmailSent = await sendPreviewReadyEmailOnce(hotel.id, req);
+        setSetupOwnerCookie(req, res, hotel.id, hotel.ownerEmail || '');
 
         // Keep local development runs out of production funnel reporting.
         if (funnelTrackingEnabled) {
@@ -12117,7 +12428,14 @@ app.post('/api/setup/:token/complete', async (req, res) => {
 
         void sendAdminPush('SetupCompleted', { property: hotel.name || hotel.ownerEmail || hotel.id });
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
-        res.json({ success: true, bookingUrl: 'https://' + assignedDomain, frontdeskUrl: 'https://' + assignedDomain + '/frontdesk', crmPin: defaultPin });
+        res.json({
+            success: true,
+            bookingUrl: 'https://' + assignedDomain,
+            frontdeskUrl: `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotel.id)}`,
+            crmPin: defaultPin, // backwards compatibility for already-cached setup pages
+            frontdeskReturnToken,
+            previewEmailSent,
+        });
     } catch (e) {
         console.error('Setup complete error:', e.message, e.stack);
         res.status(500).json({ error: 'Failed to complete setup', detail: e.message });
@@ -12630,10 +12948,71 @@ app.post('/api/forgot-pin', forgotPinRateLimit, async (req, res) => {
 const configuredMagicLinkSecret = process.env.MAGIC_LINK_SECRET || process.env.SESSION_SECRET;
 const MAGIC_LINK_SECRET = configuredMagicLinkSecret || crypto.randomBytes(32).toString('hex');
 const MAGIC_LINK_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
+const RECOVERY_LINK_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const NATIVE_LOGIN_CODE_EXPIRY_MS = 10 * 60 * 1000;
+const SETUP_OWNER_COOKIE = 'marketelSetupOwner';
+const SETUP_OWNER_COOKIE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 if (!configuredMagicLinkSecret) {
     console.warn('MAGIC_LINK_SECRET or SESSION_SECRET is not set; using an ephemeral magic-link secret for this process.');
+}
+
+function normalizeOwnerEmail(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function validOwnerEmail(value) {
+    const email = normalizeOwnerEmail(value);
+    return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function readRequestCookie(req, name) {
+    const header = String(req?.headers?.cookie || '');
+    const prefix = `${name}=`;
+    for (const part of header.split(';')) {
+        const clean = part.trim();
+        if (!clean.startsWith(prefix)) continue;
+        try { return decodeURIComponent(clean.slice(prefix.length)); }
+        catch (_) { return ''; }
+    }
+    return '';
+}
+
+function signSetupOwnerPayload(encoded) {
+    return crypto.createHmac('sha256', MAGIC_LINK_SECRET).update(`setup-owner:${encoded}`).digest('base64url');
+}
+
+function generateSetupOwnerCookie(hotelId, email) {
+    const payload = Buffer.from(JSON.stringify({
+        hotelId: String(hotelId || '').trim(),
+        email: normalizeOwnerEmail(email),
+        exp: Date.now() + SETUP_OWNER_COOKIE_EXPIRY_MS,
+    })).toString('base64url');
+    return `${payload}.${signSetupOwnerPayload(payload)}`;
+}
+
+function verifySetupOwnerCookie(value) {
+    const [encoded, signature, extra] = String(value || '').split('.');
+    if (!encoded || !signature || extra) return null;
+    if (!timingSafeTextEqual(signature, signSetupOwnerPayload(encoded))) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
+        if (!payload.hotelId || !payload.email || Number(payload.exp) < Date.now()) return null;
+        return { hotelId: String(payload.hotelId), email: normalizeOwnerEmail(payload.email) };
+    } catch (_) {
+        return null;
+    }
+}
+
+function setSetupOwnerCookie(req, res, hotelId, email) {
+    const secure = req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+    res.cookie(SETUP_OWNER_COOKIE, generateSetupOwnerCookie(hotelId, email), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure,
+        maxAge: SETUP_OWNER_COOKIE_EXPIRY_MS,
+        path: '/',
+    });
 }
 
 function hashNativeLoginCode(email, code) {
@@ -13493,8 +13872,17 @@ app.post('/api/guest/native/push/unregister', guestNativePushRateLimit, async (r
     }
 });
 
-function generateMagicToken(email, hotelId) {
-    const payload = JSON.stringify({ email, hotelId, exp: Date.now() + MAGIC_LINK_EXPIRY_MS });
+function generateMagicToken(email, hotelId, options = {}) {
+    const expiresInMs = Math.max(
+        5 * 60 * 1000,
+        Math.min(RECOVERY_LINK_EXPIRY_MS, Number(options.expiresInMs) || MAGIC_LINK_EXPIRY_MS)
+    );
+    const payload = JSON.stringify({
+        purpose: 'frontdesk-magic',
+        email: normalizeOwnerEmail(email),
+        hotelId: String(hotelId || '').trim(),
+        exp: Date.now() + expiresInMs,
+    });
     const encoded = Buffer.from(payload).toString('base64url');
     const sig = crypto.createHmac('sha256', MAGIC_LINK_SECRET).update(encoded).digest('base64url');
     return encoded + '.' + sig;
@@ -13514,42 +13902,182 @@ function verifyMagicToken(token) {
     if (!timingSafeTextEqual(sig, expectedSig)) return null;
     try {
         const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
-        if (payload.exp < Date.now()) return null;
+        if (payload.purpose && payload.purpose !== 'frontdesk-magic') return null;
+        if (!payload.hotelId || !payload.email || payload.exp < Date.now()) return null;
         return payload;
     } catch (e) { return null; }
 }
 
-// Send magic link email
-app.post('/api/auth/magic-link', async (req, res) => {
+function revealResumeParam(step) {
+    const normalized = Math.max(0, Math.min(3, Number(step) || 0));
+    return normalized === 3 ? 'checkout' : `step-${normalized}`;
+}
+
+function frontdeskMagicUrl(req, hotel, options = {}) {
+    const token = generateMagicToken(hotel.ownerEmail, hotel.id, {
+        expiresInMs: options.expiresInMs || MAGIC_LINK_EXPIRY_MS,
+    });
+    const params = new URLSearchParams({
+        hotelId: hotel.id,
+        magic: token,
+        reveal: options.reveal === false ? '' : 'resume',
+    });
+    if (!params.get('reveal')) params.delete('reveal');
+    return `${marketelFrontdeskOrigin(req)}/frontdesk?${params.toString()}`;
+}
+
+async function sendFrontdeskAccessEmail({ req, email, hotels, expiresInMs = MAGIC_LINK_EXPIRY_MS }) {
+    if (!emailTransporter || !email || !Array.isArray(hotels) || !hotels.length) return false;
+    const cleanHotels = hotels.slice(0, 10).map(hotel => ({
+        id: String(hotel.id || '').trim(),
+        name: String(hotel.name || hotel.id || 'Your property').trim(),
+        subscribed: !!hotel.subscribed,
+        url: frontdeskMagicUrl(req, hotel, { expiresInMs }),
+    })).filter(hotel => hotel.id);
+    if (!cleanHotels.length) return false;
+    const buttons = cleanHotels.map(hotel => `
+        <a href="${emailTemplateValue(hotel.url)}" style="display:block;margin-top:10px;padding:14px 18px;border-radius:11px;background:#2e7d5b;color:#fff;text-decoration:none;font-size:15px;font-weight:700;text-align:center;">
+            ${hotel.subscribed ? 'Open' : 'Continue'} ${emailTemplateValue(hotel.name)}
+        </a>`).join('');
+    const listText = cleanHotels.map(hotel => `${hotel.name}: ${hotel.url}`).join('\n');
     try {
-        const email = String(req.body?.email || '').trim().toLowerCase();
+        await emailTransporter.sendMail({
+            from: '"Marketel" <support@bookmarketel.com>',
+            to: email,
+            subject: cleanHotels.length === 1
+                ? `Continue ${cleanHotels[0].name} in Marketel`
+                : 'Choose a Marketel property to continue',
+            html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:36px 20px;color:#19231d;">
+                <div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#2e7d5b;">Secure access</div>
+                <h1 style="font-size:23px;line-height:1.25;margin:8px 0 10px;">${cleanHotels.length === 1 ? 'Your Marketel is waiting' : 'Choose the property you want to open'}</h1>
+                <p style="font-size:14px;line-height:1.6;color:#5d6a62;margin:0 0 18px;">Each button opens the correct property and returns to its saved stage. No PIN is required.</p>
+                ${buttons}
+                <p style="font-size:12px;line-height:1.5;color:#89938d;margin:22px 0 0;">These links expire automatically. If you did not request this email, you can ignore it.</p>
+            </div>`,
+            text: `Open your Marketel property—no PIN required.\n\n${listText}\n\nThese links expire automatically.`,
+        });
+        return true;
+    } catch (error) {
+        console.error('Front Desk access email failed:', error.message);
+        return false;
+    }
+}
+
+async function runCheckoutRecoverySweep() {
+    if (!emailTransporter) return { checked: 0, sent: 0 };
+    const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+    const candidates = await prisma.hotelConfig.findMany({
+        where: {
+            setupComplete: true,
+            subscribed: false,
+            ownerEmail: { not: null },
+            checkoutStartedAt: { lte: cutoff },
+            checkoutRecoveryEmailSentAt: null,
+        },
+        orderBy: { checkoutStartedAt: 'asc' },
+        take: 25,
+        select: {
+            id: true,
+            name: true,
+            ownerEmail: true,
+            subscribed: true,
+            revealProgressStep: true,
+            checkoutStartedAt: true,
+        },
+    });
+    let sentCount = 0;
+    for (const hotel of candidates) {
+        const claimedAt = new Date();
+        const claimed = await prisma.hotelConfig.updateMany({
+            where: {
+                id: hotel.id,
+                subscribed: false,
+                checkoutStartedAt: hotel.checkoutStartedAt,
+                checkoutRecoveryEmailSentAt: null,
+            },
+            data: { checkoutRecoveryEmailSentAt: claimedAt },
+        });
+        if (!claimed.count) continue;
+        const event = await prisma.funnelEvent.create({
+            data: {
+                hotelId: hotel.id,
+                eventName: 'CheckoutRecoveryEmailSending',
+                eventId: `marketel-checkout-recovery.${hotel.id}.${claimedAt.getTime()}`,
+                guestEmail: hotel.ownerEmail,
+                surface: 'email',
+                pagePath: '/frontdesk',
+                metadata: { checkoutStartedAt: hotel.checkoutStartedAt?.toISOString() || null },
+            },
+        }).catch(() => null);
+        const resumeUrl = frontdeskMagicUrl(null, hotel, {
+            expiresInMs: RECOVERY_LINK_EXPIRY_MS,
+        });
+        const sent = await sendMarketelLifecycleEmail({
+            toEmail: hotel.ownerEmail,
+            subject: `${hotel.name || 'Your Marketel'} is still saved`,
+            template: 'checkout-recovery.html',
+            replacements: {
+                HOTEL_NAME: hotel.name || 'your property',
+                RESUME_URL: resumeUrl,
+            },
+            text: `Your Marketel is still saved and no charge was made.\n\nReview activation when you are ready: ${resumeUrl}\n\nQuestions? Reply to this email.`,
+        });
+        if (sent) {
+            sentCount += 1;
+            if (event) {
+                await prisma.funnelEvent.update({
+                    where: { id: event.id },
+                    data: { eventName: 'CheckoutRecoveryEmailSent' },
+                }).catch(() => {});
+            }
+        } else {
+            await prisma.hotelConfig.updateMany({
+                where: { id: hotel.id, subscribed: false, checkoutRecoveryEmailSentAt: claimedAt },
+                data: { checkoutRecoveryEmailSentAt: null },
+            }).catch(() => {});
+            if (event) await prisma.funnelEvent.delete({ where: { id: event.id } }).catch(() => {});
+        }
+    }
+    return { checked: candidates.length, sent: sentCount };
+}
+
+// Send magic link email
+app.post('/api/auth/magic-link', magicLinkRateLimit, async (req, res) => {
+    try {
+        const email = normalizeOwnerEmail(req.body?.email);
+        const requestedHotelId = String(req.body?.hotelId || '').trim();
         if (!email) return res.json({ success: true }); // Don't reveal if email missing
 
-        const hotel = await prisma.hotelConfig.findFirst({ where: { ownerEmail: email }, select: { id: true, name: true } });
-        if (!hotel) return res.status(404).json({ success: false, message: 'No account found with that email.' });
-
-        // Get the hotel's domain for the link
-        const domain = await prisma.hotelDomain.findFirst({ where: { hotelId: hotel.id, isPrimary: true }, select: { domain: true } });
-        const baseUrl = domain ? 'https://' + domain.domain : (req.protocol + '://' + req.get('host'));
-
-        const token = generateMagicToken(email, hotel.id);
-        const magicUrl = baseUrl + '/frontdesk?magic=' + encodeURIComponent(token);
-
-        if (emailTransporter) {
-            await emailTransporter.sendMail({
-                from: '"Marketel" <support@bookmarketel.com>',
-                to: email,
-                subject: 'Your login link — ' + (hotel.name || 'Front Desk'),
-                html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:400px;margin:0 auto;padding:40px 20px;">
-                    <h2 style="font-size:20px;font-weight:700;color:#1a1a2e;margin:0 0 12px;">Log in to your Front Desk</h2>
-                    <p style="font-size:14px;color:#6b7280;line-height:1.5;margin:0 0 24px;">Tap the button below to access your dashboard. This link expires in 60 minutes.</p>
-                    <a href="${magicUrl}" style="display:block;text-align:center;padding:14px 24px;background:#2E7D5B;color:white;text-decoration:none;border-radius:10px;font-size:15px;font-weight:700;">Open My Dashboard →</a>
-                    <p style="font-size:12px;color:#9ca3af;margin:24px 0 0;text-align:center;">If you didn't request this, you can ignore this email.</p>
-                </div>`,
-                text: `Log in to your Front Desk: ${magicUrl}\n\nThis link expires in 60 minutes.`,
+        const hotels = await prisma.hotelConfig.findMany({
+            where: {
+                ownerEmail: { equals: email, mode: 'insensitive' },
+                ...(requestedHotelId ? { id: requestedHotelId } : {}),
+                active: true,
+            },
+            orderBy: { updatedAt: 'desc' },
+            take: 10,
+            select: {
+                id: true,
+                name: true,
+                ownerEmail: true,
+                subscribed: true,
+                revealProgressStep: true,
+            },
+        });
+        const sent = await sendFrontdeskAccessEmail({ req, email, hotels });
+        if (sent && hotels[0]) {
+            await recordSetupRecoveryEvent(req, {
+                hotelId: hotels[0].id,
+                email,
+                eventName: 'MagicLinkRequested',
+                metadata: { propertyCount: hotels.length, requestedHotelId: requestedHotelId || null },
+                surface: 'frontdesk-auth',
+                pagePath: '/frontdesk',
             });
         }
 
+        // Always use the same response. Besides preventing account discovery,
+        // this keeps a stale/typo email from turning into a dead-end error page.
         res.json({ success: true });
     } catch (e) {
         console.error('magic-link error:', e.message);
@@ -13557,25 +14085,36 @@ app.post('/api/auth/magic-link', async (req, res) => {
     }
 });
 
-// Verify magic link token — returns PIN for auto-login
+// Verify magic link token — returns a scoped session without rotating any
+// owner/staff PIN. Email login is a session, not a password-reset operation.
 app.get('/api/auth/verify-magic', async (req, res) => {
     try {
         const token = String(req.query?.token || '').trim();
         const payload = verifyMagicToken(token);
         if (!payload) return res.status(401).json({ success: false, message: 'Link expired or invalid.' });
 
-        // Find an active PIN for this hotel
-        const pin = await prisma.crmPin.findFirst({ where: { hotelId: payload.hotelId, active: true }, select: { pinHash: true } });
-        if (!pin) return res.status(404).json({ success: false, message: 'No active PIN found.' });
-
-        // We can't reverse the hash, so generate a fresh temporary PIN
-        const tempPin = generateCrmOwnerPin();
-        const pinHash = hashCrmPin(tempPin);
-        // Deactivate old PINs and create new one
-        await prisma.crmPin.updateMany({ where: { hotelId: payload.hotelId }, data: { active: false } });
-        await prisma.crmPin.create({ data: { hotelId: payload.hotelId, pinHash, label: 'Magic link login', active: true } });
-
-        res.json({ success: true, pin: tempPin, hotelId: payload.hotelId });
+        const hotel = await prisma.hotelConfig.findUnique({
+            where: { id: String(payload.hotelId) },
+            select: { id: true, ownerEmail: true, active: true, subscribed: true, revealProgressStep: true },
+        });
+        if (!hotel?.active || normalizeOwnerEmail(hotel.ownerEmail) !== normalizeOwnerEmail(payload.email)) {
+            return res.status(401).json({ success: false, message: 'Link expired or invalid.' });
+        }
+        await recordSetupRecoveryEvent(req, {
+            hotelId: hotel.id,
+            email: hotel.ownerEmail,
+            eventName: 'MagicLinkOpened',
+            metadata: { revealStep: hotel.revealProgressStep, subscribed: hotel.subscribed },
+            surface: 'frontdesk-auth',
+            pagePath: '/frontdesk',
+        });
+        res.json({
+            success: true,
+            token: generateCrmSessionToken(hotel.id),
+            hotelId: hotel.id,
+            revealStep: Math.max(0, Math.min(3, Number(hotel.revealProgressStep) || 0)),
+            subscribed: !!hotel.subscribed,
+        });
     } catch (e) {
         console.error('verify-magic error:', e.message);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -13924,6 +14463,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const cancelParams = new URLSearchParams({
             hotelId,
             reveal: 'checkout',
+            checkoutCancelled: '1',
         });
         const cancelAuth = new URLSearchParams({ returnToken });
         const cancelUrl = `${frontdeskOrigin}/frontdesk-return?${cancelParams.toString()}#${cancelAuth.toString()}`;
@@ -13999,6 +14539,12 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 pagePath: '/checkout',
                 contentName: billing.contentName,
                 metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
+            },
+        }).catch(() => {});
+        await prisma.hotelConfig.update({
+            where: { id: hotelId },
+            data: {
+                checkoutStartedAt: new Date(),
             },
         }).catch(() => {});
         const { fbp, fbc } = getMetaCookies(req);
@@ -16178,6 +16724,16 @@ function startServer() {
             .catch((e) => console.error('Account deletion sweep:', e.message));
         setTimeout(deletionSweep, 45_000);
         setInterval(deletionSweep, ACCOUNT_DELETION_SWEEP_MS);
+    }
+
+    // One restrained reminder after an owner leaves Stripe. This is recovery,
+    // not a drip campaign: the durable sent timestamp is never reset by a new
+    // checkout attempt, and a completed subscription is excluded before send.
+    if (process.env.ENABLE_CHECKOUT_RECOVERY_EMAIL !== 'false') {
+        const checkoutRecoverySweep = () => runCheckoutRecoverySweep()
+            .catch((e) => console.error('Checkout recovery sweep:', e.message));
+        setTimeout(checkoutRecoverySweep, 2 * 60 * 1000);
+        setInterval(checkoutRecoverySweep, 15 * 60 * 1000);
     }
     });
 }

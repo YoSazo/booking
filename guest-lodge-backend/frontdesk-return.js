@@ -1,12 +1,13 @@
-function buildFrontdeskReturnPath({ hotelId = '', activated = false, reveal = '' } = {}) {
+function buildFrontdeskReturnPath({ hotelId = '', activated = false, reveal = '', checkoutCancelled = false } = {}) {
     const params = new URLSearchParams();
     const cleanHotelId = String(hotelId || '').trim();
     if (cleanHotelId) params.set('hotelId', cleanHotelId);
     if (activated) params.set('activated', '1');
-    else if (reveal === 'checkout' || reveal === '1') {
+    else if (reveal === 'checkout' || reveal === '1' || /^step-[0-2]$/.test(String(reveal))) {
         params.set('welcome', '1');
         params.set('reveal', reveal);
     }
+    if (checkoutCancelled) params.set('checkoutCancelled', '1');
     const query = params.toString();
     return `/frontdesk${query ? `?${query}` : ''}`;
 }

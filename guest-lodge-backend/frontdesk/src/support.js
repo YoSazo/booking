@@ -31,7 +31,7 @@ function ensureSupportStyles() {
   style.id = 'marketelSupportStyles';
   style.textContent = `
     body.marketel-support-open{overflow:hidden!important;}
-    .marketel-support-overlay{position:fixed;inset:0;width:100%;z-index:12000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 200vmax #eff4f0;contain:layout;backface-visibility:hidden;}
+    .marketel-support-overlay{position:fixed;inset:0;width:100%;z-index:100100;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(14,27,20,.38);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 200vmax #eff4f0;contain:layout;backface-visibility:hidden;}
     .marketel-support-dialog{width:min(660px,100%);height:min(760px,calc(100% - 36px));display:flex;flex-direction:column;overflow:hidden;background:#eff4f0;border:1px solid rgba(255,255,255,.75);border-radius:24px;box-shadow:0 24px 80px rgba(20,48,33,.28);}
     .marketel-support-head{display:grid;grid-template-columns:64px minmax(0,1fr) 64px;align-items:center;gap:8px;min-height:68px;padding:10px 14px;background:rgba(255,255,255,.88);border-bottom:1px solid #e3ebe6;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
     .marketel-support-title{min-width:0;text-align:center;}

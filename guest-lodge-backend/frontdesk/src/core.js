@@ -425,14 +425,21 @@ try {
     fetch('/api/auth/verify-magic?token=' + encodeURIComponent(_magicToken))
       .then(r => r.json())
       .then(data => {
-        if (data.success && data.pin) {
-          crm.token = data.pin;
+        if (data.success && data.token) {
+          crm.token = data.token;
           localStorage.setItem('crmToken', crm.token);
           if (isNativeFrontdeskApp() && data.hotelId) {
             localStorage.setItem(NATIVE_SELECTED_HOTEL_KEY, String(data.hotelId));
           }
           const _cleanUrl = new URL(window.location);
           _cleanUrl.searchParams.delete('magic');
+          _cleanUrl.searchParams.delete('reveal');
+          _cleanUrl.searchParams.delete('welcome');
+          if (!data.subscribed) {
+            const revealStep = Math.max(0, Math.min(3, Number(data.revealStep) || 0));
+            _cleanUrl.searchParams.set('welcome', '1');
+            _cleanUrl.searchParams.set('reveal', revealStep === 3 ? 'checkout' : `step-${revealStep}`);
+          }
           window.history.replaceState({}, '', _cleanUrl);
           // Reload to trigger normal boot with the new token
           window.location.reload();
@@ -441,10 +448,22 @@ try {
           alert('Login link expired or invalid. Please request a new one.');
           const _cleanUrl = new URL(window.location);
           _cleanUrl.searchParams.delete('magic');
+          _cleanUrl.searchParams.delete('reveal');
+          _cleanUrl.searchParams.delete('welcome');
           window.history.replaceState({}, '', _cleanUrl);
+          bootCrmApp();
         }
       })
-      .catch(() => { crm._magicLoginPending = false; });
+      .catch(() => {
+        crm._magicLoginPending = false;
+        const _cleanUrl = new URL(window.location);
+        _cleanUrl.searchParams.delete('magic');
+        _cleanUrl.searchParams.delete('reveal');
+        _cleanUrl.searchParams.delete('welcome');
+        window.history.replaceState({}, '', _cleanUrl);
+        alert('We could not open that login link. Please request a new one.');
+        bootCrmApp();
+      });
   }
 } catch(e) {}
 
@@ -2408,6 +2427,16 @@ async function startCrmApp(verification, options = {}) {
   cleanFrontdeskReturnAuthParams();
 
   const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('checkoutCancelled') === '1') {
+    window.MarketelJourney?.track('JourneyCheckoutCancelled', {
+      hotelId: crm.activeHotelId || verification?.hotelId || '',
+      returnedTo: 'activation',
+    }, { immediate: true });
+    const cancelledUrl = new URL(window.location);
+    cancelledUrl.searchParams.delete('checkoutCancelled');
+    window.history.replaceState({}, '', cancelledUrl);
+    setTimeout(() => toast('No charge was made. Your Marketel is still saved here.'), 500);
+  }
   const isEmbeddedEditorPreview = urlParams.get('previewEditor') === '1';
   document.documentElement.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
   document.body.classList.toggle('frontdesk-editor-preview', isEmbeddedEditorPreview);
@@ -2418,17 +2447,21 @@ async function startCrmApp(verification, options = {}) {
   }
   const isFirstWelcome = urlParams.has('welcome');
   const revealRequest = urlParams.get('reveal');
+  const revealStepMatch = /^step-([0-2])$/.exec(String(revealRequest || ''));
   let hasPendingValueReveal = false;
   try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
   const shouldResumeValueReveal = !(verification && verification.subscribed) && hasPendingValueReveal;
   const shouldShowValueReveal = !isEmbeddedEditorPreview && (
     revealRequest === '1'
       || revealRequest === 'checkout'
+      || !!revealStepMatch
       || shouldResumeValueReveal
   );
   const revealStartAt = revealRequest === 'checkout'
     ? 3
-    : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined);
+    : (revealStepMatch
+        ? Number(revealStepMatch[1])
+        : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined));
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -2729,16 +2762,39 @@ function showMagicLinkForm(e) {
   e.target.style.display = 'none';
 }
 
+function toggleWebLoginMethod(e) {
+  if (e) e.preventDefault();
+  const emailForm = document.getElementById('magicLinkForm');
+  const pinForm = document.getElementById('webPinLoginForm');
+  const prompt = document.getElementById('webLoginPrompt');
+  const toggle = document.getElementById('webLoginMethodToggle');
+  if (!emailForm || !pinForm || !toggle) return;
+  const showingPin = pinForm.style.display !== 'none';
+  emailForm.style.display = showingPin ? 'block' : 'none';
+  pinForm.style.display = showingPin ? 'none' : 'block';
+  toggle.textContent = showingPin ? 'Use Front Desk PIN instead' : 'Use email instead';
+  if (prompt) {
+    prompt.textContent = showingPin
+      ? 'Front Desk — continue securely by email'
+      : 'Front Desk — enter your property PIN';
+  }
+  const focusTarget = showingPin
+    ? document.getElementById('magicLinkEmail')
+    : document.getElementById('pinInput');
+  setTimeout(() => focusTarget?.focus(), 0);
+}
+
 async function sendMagicLink() {
   const email = document.getElementById('magicLinkEmail').value.trim();
   const msg = document.getElementById('magicLinkMsg');
   if (!email) { msg.textContent = 'Please enter your email'; return; }
+  try { localStorage.setItem('marketelOwnerEmail', email.toLowerCase()); } catch (_) {}
   msg.textContent = 'Sending…';
   try {
     const res = await fetch('/api/auth/magic-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, hotelId: crm.activeHotelId || '' }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -2804,6 +2860,19 @@ function showLogin() {
   setNativeShellVisible(false);
   document.getElementById('app').style.display = 'none';
   document.getElementById('loginScreen').style.display = 'flex';
+  const emailForm = document.getElementById('magicLinkForm');
+  const pinForm = document.getElementById('webPinLoginForm');
+  const prompt = document.getElementById('webLoginPrompt');
+  const toggle = document.getElementById('webLoginMethodToggle');
+  if (emailForm) emailForm.style.display = 'block';
+  if (pinForm) pinForm.style.display = 'none';
+  if (prompt) prompt.textContent = 'Front Desk — continue securely by email';
+  if (toggle) toggle.textContent = 'Use Front Desk PIN instead';
+  try {
+    const savedEmail = localStorage.getItem('marketelOwnerEmail') || '';
+    const emailInput = document.getElementById('magicLinkEmail');
+    if (emailInput && !emailInput.value) emailInput.value = savedEmail;
+  } catch (_) {}
   crm.token = '';
   crm.isMasterPin = false;
   crm.currentHotelPms = '';
@@ -2886,6 +2955,20 @@ async function bootCrmApp() {
     ]),
     showRetry: false,
   });
+
+  // Magic-link verification owns startup until it has exchanged the emailed
+  // credential. Holding here prevents a PIN screen flash and avoids a second
+  // context request racing the secure return.
+  if (crm._magicLoginPending) {
+    showBootState({
+      title: 'Opening your saved Marketel...',
+      message: 'Returning you to the exact place you left off.',
+      debug: '',
+      showRetry: false,
+    });
+    crm.bootInFlight = false;
+    return;
+  }
 
   if (isNativeFrontdeskApp() && !getRequestedHotelId()) {
     showNativePropertyScreen({ choose: getNativeProperties().length > 0, allowCancel: false });
@@ -6430,6 +6513,7 @@ exposeToWindow({
   timeAgo,
   toIsoDate,
   toast,
+  toggleWebLoginMethod,
   toggleAppNotifications,
   toggleAvailabilityDayClosed,
   toggleMessageThreadPicker,
