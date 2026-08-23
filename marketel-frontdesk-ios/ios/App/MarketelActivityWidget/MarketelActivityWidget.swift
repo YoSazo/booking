@@ -36,7 +36,7 @@ struct MarketelActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    StackedCountdown(state: context.state, alignment: .trailing)
+                    ActivityStateLabel(state: context.state)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if context.state.isPending {
@@ -55,7 +55,9 @@ struct MarketelActivityWidget: Widget {
             } compactLeading: {
                 MarketelActivityMark(size: 18)
             } compactTrailing: {
-                CompactCountdown(state: context.state)
+                Text(context.state.isPending ? "DECIDE" : (context.state.isKept ? "KEPT" : "ENDED"))
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(context.state.isPending ? marketelAmber : (context.state.isKept ? marketelGreen : marketelRed))
             } minimal: {
                 Image(systemName: context.state.isPending ? "bell.fill" : statusIcon(context.state))
                     .foregroundStyle(context.state.isPending ? marketelGreen : (context.state.isKept ? marketelGreen : marketelRed))
@@ -97,7 +99,13 @@ private struct LockScreenView: View {
                 }
                 Spacer(minLength: 8)
                 if context.state.isPending {
-                    CountdownPill(state: context.state)
+                    Text("ACTION NEEDED")
+                        .font(.system(size: 9, weight: .heavy))
+                        .tracking(0.3)
+                        .foregroundStyle(marketelAmber)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(marketelAmber.opacity(0.12), in: Capsule())
                 } else {
                     Image(systemName: statusIcon(context.state))
                         .font(.system(size: 19, weight: .semibold))
@@ -188,81 +196,13 @@ private struct MarketelActivityMark: View {
 }
 
 @available(iOS 16.1, *)
-private struct CountdownLabel: View {
+private struct ActivityStateLabel: View {
     let state: BookingDecisionAttributes.ContentState
 
     var body: some View {
-        Group {
-            if let deadline = state.deadlineDate, state.isPending {
-                // Date-style timers are the compact ActivityKit-native form;
-                // they don't reserve the wide interval layout that caused the
-                // previous header to collide with the mark.
-                Text(max(deadline, Date()), style: .timer)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(marketelAmber)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .fixedSize()
-            } else {
-                Image(systemName: statusIcon(state))
-                    .font(.system(size: 14))
-                    .foregroundStyle(state.isKept ? marketelGreen : .secondary)
-            }
-        }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct CountdownPill: View {
-    let state: BookingDecisionAttributes.ContentState
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "clock.fill")
-                .font(.system(size: 9, weight: .bold))
-            CountdownLabel(state: state)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .foregroundStyle(marketelAmber)
-        .background(marketelAmber.opacity(0.12), in: Capsule())
-    }
-}
-
-// The expanded Dynamic Island keeps the stacked form: there the trailing region
-// is a column of its own, so "to decide" has somewhere to sit.
-@available(iOS 16.1, *)
-private struct StackedCountdown: View {
-    let state: BookingDecisionAttributes.ContentState
-    var alignment: HorizontalAlignment = .trailing
-
-    var body: some View {
-        VStack(alignment: alignment, spacing: 1) {
-            CountdownLabel(state: state)
-            if state.isPending, state.deadlineDate != nil {
-                Text("to decide")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
-@available(iOS 16.1, *)
-private struct CompactCountdown: View {
-    let state: BookingDecisionAttributes.ContentState
-
-    var body: some View {
-        if let deadline = state.deadlineDate, state.isPending {
-            Text(max(deadline, Date()), style: .timer)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(marketelAmber)
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize()
-        } else {
-            EmptyView()
-        }
+        Text(state.isPending ? "DECIDE" : (state.isKept ? "KEPT" : "ENDED"))
+            .font(.system(size: 10, weight: .heavy))
+            .foregroundStyle(state.isPending ? marketelAmber : (state.isKept ? marketelGreen : marketelRed))
     }
 }
 
@@ -278,25 +218,35 @@ private struct DecisionButtons: View {
                 Button(intent: KeepBookingIntent(bookingId: bookingId)) {
                     Label("Confirm", systemImage: "checkmark")
                         .font(.system(size: 12, weight: .bold))
-                        .frame(maxWidth: .infinity, minHeight: 30)
                 }
-                .tint(marketelGreen)
+                .buttonStyle(MarketelDecisionButtonStyle(color: marketelGreen, filled: true))
 
                 Button(intent: ReleaseBookingIntent(bookingId: bookingId)) {
                     Label("Release", systemImage: "xmark")
                         .font(.system(size: 12, weight: .bold))
-                        .frame(maxWidth: .infinity, minHeight: 30)
                 }
-                .tint(marketelRed.opacity(0.13))
-                .foregroundStyle(marketelRed)
+                .buttonStyle(MarketelDecisionButtonStyle(color: marketelRed, filled: false))
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.mini)
         } else {
             Text("Open Marketel to decide")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
         }
+    }
+}
+
+@available(iOS 17.0, *)
+private struct MarketelDecisionButtonStyle: ButtonStyle {
+    let color: Color
+    let filled: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(filled ? Color.white : color)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .background(filled ? color : color.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .opacity(configuration.isPressed ? 0.72 : 1)
     }
 }
 

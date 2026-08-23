@@ -155,10 +155,12 @@ test('the native Live Activity stays focused on the Front Desk decision', () => 
   assert.match(widget, /Label\("Release", systemImage: "xmark"\)/);
   assert.match(widget, /No reply: keep/);
   assert.match(widget, /No reply: release/);
-  // Apple's Lock Screen presentation tops out at 160pt. Interval timers and
-  // roomy stacked labels previously pushed the decision below that budget.
+  // Keep the pending subtree deterministic. Dynamic timer text previously
+  // rendered the header but left the pending decision surface blank on-device.
   assert.doesNotMatch(widget, /Text\(timerInterval:/);
-  assert.match(widget, /controlSize\(\.mini\)/);
+  assert.doesNotMatch(widget, /style: \.timer/);
+  assert.match(widget, /Text\("ACTION NEEDED"\)/);
+  assert.match(widget, /MarketelDecisionButtonStyle/);
 });
 
 test('Live Activity intents are compiled into the app as well as the widget', () => {

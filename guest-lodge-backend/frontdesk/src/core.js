@@ -1615,7 +1615,8 @@ function ensureAvailabilityUi() {
         <div class="rooms-shell">
           <div id="roomsPillBar" class="room-pill-bar"></div>
 
-          <div style="margin:0 0 12px;padding:12px 14px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;font-size:12px;line-height:1.5;">
+          <div id="availabilityWalkinHint" style="position:relative;margin:0 0 12px;padding:12px 42px 12px 14px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;font-size:12px;line-height:1.5;">
+            <button id="availabilityWalkinHintDismiss" type="button" aria-label="Dismiss walk-in help" style="position:absolute;top:7px;right:7px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:transparent;color:#47735e;font-family:inherit;font-size:18px;font-weight:600;line-height:1;cursor:pointer;">×</button>
             <strong style="display:block;font-size:13px;margin-bottom:2px;">Walk-in or another channel took a room?</strong>
             Tap the affected dates and set how many rooms are still available. Once saved, that is the number guests can book on your direct booking page. Or text the Marketel Front Desk contact what happened.
           </div>
@@ -1722,6 +1723,19 @@ function bindAvailabilityUiEvents() {
   const next = document.getElementById('availabilityNextMonthBtn');
   if (prev) prev.addEventListener('click', () => changeAvailabilityMonth(-1));
   if (next) next.addEventListener('click', () => changeAvailabilityMonth(1));
+
+  const walkinHint = document.getElementById('availabilityWalkinHint');
+  const walkinHintDismiss = document.getElementById('availabilityWalkinHintDismiss');
+  const walkinHintKey = `marketelAvailabilityWalkinHintDismissed:${crm.activeHotelId || 'default'}`;
+  try {
+    if (walkinHint && localStorage.getItem(walkinHintKey) === '1') walkinHint.hidden = true;
+  } catch (_) {}
+  if (walkinHint && walkinHintDismiss) {
+    walkinHintDismiss.addEventListener('click', () => {
+      walkinHint.hidden = true;
+      try { localStorage.setItem(walkinHintKey, '1'); } catch (_) {}
+    });
+  }
 
   const modalBg = document.getElementById('roomsAddModalBg');
   const modalCancel = document.getElementById('roomsAddCancelBtn');
