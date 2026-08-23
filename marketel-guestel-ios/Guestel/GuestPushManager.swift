@@ -6,6 +6,7 @@ extension Notification.Name {
     static let guestelDeviceTokenChanged = Notification.Name("guestelDeviceTokenChanged")
     static let guestelOpenMessages = Notification.Name("guestelOpenMessages")
     static let guestelOpenHotels = Notification.Name("guestelOpenHotels")
+    static let guestelRefreshData = Notification.Name("guestelRefreshData")
 }
 
 final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
@@ -25,6 +26,7 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         Self.clearBadge(application)
+        NotificationCenter.default.post(name: .guestelRefreshData, object: nil)
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -41,6 +43,12 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
+        Self.captureBookingStatus(notification.request.content.userInfo)
+        NotificationCenter.default.post(
+            name: .guestelRefreshData,
+            object: nil,
+            userInfo: notification.request.content.userInfo
+        )
         // Keep the useful banner and sound while Guestel is visible, but don't
         // leave a red badge for an alert the guest is already looking at.
         [.banner, .sound]
@@ -51,7 +59,23 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         didReceive response: UNNotificationResponse
     ) async {
         Self.clearBadge(UIApplication.shared)
+        Self.captureBookingStatus(response.notification.request.content.userInfo)
         Self.route(response.notification.request.content.userInfo)
+        NotificationCenter.default.post(
+            name: .guestelRefreshData,
+            object: nil,
+            userInfo: response.notification.request.content.userInfo
+        )
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let changed = Self.captureBookingStatus(userInfo)
+        NotificationCenter.default.post(name: .guestelRefreshData, object: nil, userInfo: userInfo)
+        completionHandler(changed ? .newData : .noData)
     }
 
     private static func clearBadge(_ application: UIApplication) {
@@ -83,6 +107,54 @@ final class GuestelAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
             object: nil,
             userInfo: ["hotelId": hotelId, "code": code]
         )
+    }
+
+    @discardableResult
+    static func captureBookingStatus(_ userInfo: [AnyHashable: Any]) -> Bool {
+        let nested = userInfo["data"] as? [AnyHashable: Any]
+        guard (nested?["type"] as? String) == "guest_booking_status" else { return false }
+        let hotelId = (userInfo["hotelId"] as? String) ?? nested?["hotelId"] as? String ?? ""
+        let code = nested?["reservationCode"] as? String ?? ""
+        let status = nested?["status"] as? String ?? ""
+        return GuestBookingStatusInbox.save(hotelId: hotelId, code: code, status: status)
+    }
+}
+
+enum GuestBookingStatusInbox {
+    struct Update: Codable, Hashable {
+        let hotelId: String
+        let code: String
+        let status: String
+    }
+
+    private static let key = "guestel.pendingBookingStatuses.v1"
+
+    @discardableResult
+    static func save(hotelId: String, code: String, status: String) -> Bool {
+        let update = Update(
+            hotelId: hotelId.trimmingCharacters(in: .whitespacesAndNewlines),
+            code: code.trimmingCharacters(in: .whitespacesAndNewlines),
+            status: status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        )
+        guard !update.hotelId.isEmpty, !update.code.isEmpty, !update.status.isEmpty else { return false }
+        var updates = pending
+        updates.removeAll { $0.hotelId == update.hotelId && $0.code == update.code }
+        updates.append(update)
+        if let data = try? JSONEncoder().encode(updates) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+        return true
+    }
+
+    static var pending: [Update] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let updates = try? JSONDecoder().decode([Update].self, from: data)
+        else { return [] }
+        return updates
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
 

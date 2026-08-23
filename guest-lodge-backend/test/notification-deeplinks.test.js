@@ -49,6 +49,27 @@ test('booking decisions show they were received before the reload lands', () => 
     assert.match(decide, /catch \(error\) \{\s*\n\s*restoreButtons\(\);/);
 });
 
+test('native notification decisions verify the mutation and survive APNs data bridging', () => {
+    const appDelegate = fs.readFileSync(
+        path.join(root, '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
+    // Custom APNs dictionaries have appeared both nested and top-level across
+    // iOS bridge versions. The signed URL is the final source of truth.
+    assert.match(appDelegate, /stringValue\(data\?\["token"\]\)/);
+    assert.match(appDelegate, /stringValue\(userInfo\["token"\]\)/);
+    assert.match(appDelegate, /approvalToken\(from: path\)/);
+    // If custom data is stripped, the signed-in App Group session can still
+    // perform the same hotel-scoped booking mutation.
+    assert.match(appDelegate, /appendingPathComponent\("bookings"\)[\s\S]{0,180}appendingPathComponent\("approval"\)/);
+    assert.match(appDelegate, /request\.setValue\(crmToken, forHTTPHeaderField: "x-crm-token"\)/);
+    // A 200 transport response is not enough. The backend must explicitly say
+    // the booking decision succeeded before the UI refreshes or the activity ends.
+    assert.match(appDelegate, /\(json\?\["success"\] as\? Bool\) == true/);
+    assert.match(appDelegate, /if succeeded \{[\s\S]{0,520}marketelRefreshFrontDesk/);
+    assert.match(appDelegate, /else \{[\s\S]{0,120}openBookingDecisionFallback/);
+});
+
 test('the Assistant modal retires its own tutorial', () => {
     // The story teaches what texting your Front Desk means. Rendering it
     // unconditionally meant every configured owner scrolled a fixed demo

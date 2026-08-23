@@ -6,6 +6,9 @@ import Contacts
 import ContactsUI
 import UserNotifications
 import SafariServices
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 private extension Notification.Name {
     static let marketelDidRegisterForRemoteNotifications =
@@ -19,6 +22,27 @@ private extension Notification.Name {
 }
 
 private var marketelPendingNotificationDestination: [String: String]?
+
+private enum MarketelSharedCredentials {
+    static let appGroup = "group.com.bookmarketel.frontdesk"
+
+    static var defaults: UserDefaults? {
+        UserDefaults(suiteName: appGroup)
+    }
+
+    static func save(token: String, hotelId: String, backendOrigin: String) {
+        guard let defaults else { return }
+        defaults.set(token, forKey: "crmToken")
+        defaults.set(hotelId, forKey: "hotelId")
+        defaults.set(backendOrigin, forKey: "backendOrigin")
+    }
+
+    static func clear() {
+        guard let defaults else { return }
+        defaults.removeObject(forKey: "crmToken")
+        defaults.removeObject(forKey: "hotelId")
+    }
+}
 
 /// Compact vector version of the Marketel mark. Keeping it native means the
 /// header stays sharp at every display scale without shipping another asset.
@@ -1086,6 +1110,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             }
             activeHotelId = hotelId
             nativeAuthToken = authToken
+            // Notification actions and Live Activity intents run outside the
+            // webview. Mirror the session here as well as through the
+            // ActivityKit plugin so Confirm/Release never depends on which
+            // bridge finished first during launch.
+            MarketelSharedCredentials.save(
+                token: authToken,
+                hotelId: hotelId,
+                backendOrigin: backendOrigin.absoluteString
+            )
             if payload["deferNotifications"] as? Bool != true {
                 requestNativeNotifications()
             }
@@ -1096,6 +1129,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             postNativeDeviceRegistration(unregister: true)
             nativeAuthToken = ""
             activeHotelId = ""
+            MarketelSharedCredentials.clear()
         case "notificationSettings":
             guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(settingsURL)
@@ -1191,9 +1225,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     ) {
         let userInfo = response.notification.request.content.userInfo
         let path = userInfo["url"] as? String ?? "/frontdesk?tab=bookings"
-        let hotelId = userInfo["hotelId"] as? String ?? ""
-        let data = userInfo["data"] as? NSDictionary
-        let token = data?["token"] as? String ?? ""
+        let data = userInfo["data"] as? [AnyHashable: Any]
+        let hotelId = stringValue(userInfo["hotelId"])
+            ?? stringValue(data?["hotelId"])
+            ?? ""
+        let bookingId = stringValue(data?["bookingId"])
+            ?? stringValue(userInfo["bookingId"])
+            ?? ""
+        // APNs normally preserves our nested `data.token`, but notification
+        // dictionaries are bridged through Objective-C and older builds have
+        // surfaced it at the top level. The URL is the final signed fallback.
+        let token = stringValue(data?["token"])
+            ?? stringValue(userInfo["token"])
+            ?? approvalToken(from: path)
+            ?? ""
 
         let action: String?
         switch response.actionIdentifier {
@@ -1205,7 +1250,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             action = nil
         }
 
-        guard let action, !token.isEmpty else {
+        guard let action else {
             let destination = ["path": path, "hotelId": hotelId]
             marketelPendingNotificationDestination = destination
             NotificationCenter.default.post(name: .marketelOpenNotificationPath, object: destination)
@@ -1213,34 +1258,134 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        guard let url = URL(
-            string: "https://guest-lodge-backend.onrender.com/api/booking-approval/act"
+        guard let request = bookingDecisionRequest(
+            action: action,
+            token: token,
+            bookingId: bookingId,
+            notificationHotelId: hotelId
         ) else {
+            // Do not pretend the tap succeeded. Open the signed review surface
+            // when possible so the owner can still complete the decision.
+            openBookingDecisionFallback(path: path, hotelId: hotelId)
             completionHandler()
             return
         }
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let json: [String: Any]? = data.flatMap { raw in
+                (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any]
+            }
+            let succeeded = error == nil
+                && (200..<300).contains(status)
+                && (json?["success"] as? Bool) == true
+            DispatchQueue.main.async {
+                if succeeded {
+                    self?.endLiveActivity(bookingId: bookingId)
+                    let destination = [
+                        "path": "/frontdesk?tab=bookings",
+                        "hotelId": hotelId,
+                    ]
+                    marketelPendingNotificationDestination = destination
+                    NotificationCenter.default.post(name: .marketelRefreshFrontDesk, object: nil)
+                    NotificationCenter.default.post(name: .marketelOpenNotificationPath, object: destination)
+                } else {
+                    self?.openBookingDecisionFallback(path: path, hotelId: hotelId)
+                }
+                completionHandler()
+            }
+        }.resume()
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        let string = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        return string.isEmpty ? nil : string
+    }
+
+    private func approvalToken(from path: String) -> String? {
+        guard let components = URLComponents(string: path) else { return nil }
+        return components.queryItems?.first(where: { $0.name == "approve" })?.value
+    }
+
+    private func bookingDecisionRequest(
+        action: String,
+        token: String,
+        bookingId: String,
+        notificationHotelId: String
+    ) -> URLRequest? {
+        let fallbackOrigin = "https://guest-lodge-backend.onrender.com"
+        let storedOrigin = MarketelSharedCredentials.defaults?.string(forKey: "backendOrigin")
+        let origin = URL(string: storedOrigin ?? "").flatMap { $0.scheme == "https" ? $0 : nil }
+            ?? URL(string: fallbackOrigin)!
+
+        if !token.isEmpty {
+            let url = origin
+                .appendingPathComponent("api")
+                .appendingPathComponent("booking-approval")
+                .appendingPathComponent("act")
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 12
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: [
+                "token": token,
+                "action": action,
+            ])
+            return request
+        }
+
+        // A signed notification token should always be present, but the
+        // authenticated route makes the buttons self-healing if an APNs bridge
+        // strips nested custom data. It is scoped to the signed-in property.
+        guard
+            !bookingId.isEmpty,
+            let defaults = MarketelSharedCredentials.defaults,
+            let crmToken = defaults.string(forKey: "crmToken"), !crmToken.isEmpty,
+            let storedHotelId = defaults.string(forKey: "hotelId"), !storedHotelId.isEmpty,
+            notificationHotelId.isEmpty || notificationHotelId == storedHotelId
+        else { return nil }
+
+        let url = origin
+            .appendingPathComponent("api")
+            .appendingPathComponent("crm")
+            .appendingPathComponent("bookings")
+            .appendingPathComponent(bookingId)
+            .appendingPathComponent("approval")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(crmToken, forHTTPHeaderField: "x-crm-token")
+        request.setValue("ios", forHTTPHeaderField: "x-marketel-client")
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "token": token,
             "action": action,
+            "hotelId": storedHotelId,
         ])
-        URLSession.shared.dataTask(with: request) { _, _, _ in
-            DispatchQueue.main.async {
-                let destination = [
-                    "path": "/frontdesk?tab=bookings",
-                    "hotelId": hotelId,
-                ]
-                marketelPendingNotificationDestination = destination
-                NotificationCenter.default.post(
-                    name: .marketelOpenNotificationPath,
-                    object: destination
-                )
-                completionHandler()
+        return request
+    }
+
+    private func openBookingDecisionFallback(path: String, hotelId: String) {
+        let destination = [
+            "path": path.contains("approve=") ? path : "/frontdesk?tab=bookings",
+            "hotelId": hotelId,
+        ]
+        marketelPendingNotificationDestination = destination
+        NotificationCenter.default.post(name: .marketelOpenNotificationPath, object: destination)
+    }
+
+    private func endLiveActivity(bookingId: String) {
+        guard !bookingId.isEmpty else { return }
+#if canImport(ActivityKit)
+        if #available(iOS 16.2, *) {
+            Task {
+                for activity in Activity<BookingDecisionAttributes>.activities
+                where activity.attributes.bookingId == bookingId {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             }
-        }.resume()
+        }
+#endif
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

@@ -7617,6 +7617,7 @@ function buildApnsPayload(payloadObj = {}, hotelId = '') {
             sound: 'default',
             badge: 1,
             category,
+            ...(payloadObj.backgroundRefresh ? { 'content-available': 1 } : {}),
             ...(payloadObj.tag ? { 'thread-id': String(payloadObj.tag).slice(0, 64) } : {}),
         },
         url: String(payloadObj.url || '/frontdesk').slice(0, 1000),
@@ -8959,6 +8960,7 @@ async function notifyGuestBookingStateChanged(booking, status, reason = '') {
             {
                 ...payload,
                 url: `guestel://messages?hotelId=${encodeURIComponent(booking.hotelId)}&code=${encodeURIComponent(code)}`,
+                backgroundRefresh: true,
             },
             { TTL: 24 * 60 * 60, preference: 'stayUpdates' },
             'bookingStatus'

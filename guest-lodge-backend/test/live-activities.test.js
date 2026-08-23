@@ -141,3 +141,18 @@ test('an unknown status never starts or ends anything', () => {
   assert.equal(result.action, 'none');
   assert.match(result.reason, /unhandled-status/);
 });
+
+test('the native Live Activity stays focused on the Front Desk decision', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const widget = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App', 'MarketelActivityWidget', 'MarketelActivityWidget.swift'),
+    'utf8'
+  );
+  assert.match(widget, /Text\("FRONT DESK"\)/);
+  assert.ok(widget.includes('Is \\(context.attributes.roomName) still free?'));
+  assert.match(widget, /Label\("Confirm", systemImage: "checkmark"\)/);
+  assert.match(widget, /Label\("Release", systemImage: "xmark"\)/);
+  assert.match(widget, /No answer keeps the booking/);
+  assert.match(widget, /No answer releases the request/);
+});

@@ -146,6 +146,26 @@ final class GuestStore {
         Task { @MainActor in await GuestPushManager.sync(store: self) }
     }
 
+    /// Apply the state carried by a signed APNs event immediately, then let the
+    /// normal server refresh verify it. This is what makes a release/confirm
+    /// visibly land while the guest is looking at Guestel instead of waiting
+    /// for the next app launch.
+    @MainActor
+    @discardableResult
+    func applyReservationStatus(hotelId: String, code: String, status: String) -> Bool {
+        let cleanHotelId = hotelId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanStatus = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanHotelId.isEmpty, !cleanCode.isEmpty, !cleanStatus.isEmpty,
+              let index = reservations.firstIndex(where: {
+                  $0.hotelId == cleanHotelId && $0.code == cleanCode
+              }) else { return false }
+        guard reservations[index].status?.lowercased() != cleanStatus else { return false }
+        reservations[index].status = cleanStatus
+        persistReservations()
+        return true
+    }
+
     private static func loadGuest() -> GuestInfo {
         guard
             let data = UserDefaults.standard.data(forKey: guestKey),
