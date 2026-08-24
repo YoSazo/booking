@@ -1205,94 +1205,180 @@
   animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Guestel is shown as one continuous handoff: the property's Add control,
-   Apple's system card, and the guest's persistent wallet. These are product
-   concepts, not fake controls, so the proof stays quiet and self-explanatory. */
-.mvr-guestel-proof {
+/* App proof uses a restrained Cover Flow: one legible screen in front and two
+   recognizable neighbors behind it. The side screens are also controls, so
+   the visual itself teaches that there is more without another instruction. */
+.mvr-coverflow {
+  width: min(700px, 100%);
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 9px;
+  margin: 0 auto;
+  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mvr-coverflow-viewport {
+  position: relative;
   width: 100%;
-  display: grid;
-  gap: 16px;
-  color: #17271f;
+  min-height: 280px;
+  overflow: hidden;
+  outline: none;
+  perspective: 1200px;
+  touch-action: pan-y;
+  cursor: grab;
 }
 
-.mvr-guestel-booking-card,
-.mvr-guestel-system-card {
+.mvr-coverflow-viewport:active {
+  cursor: grabbing;
+}
+
+.mvr-coverflow-card {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 1;
+  width: auto;
+  max-width: 58%;
+  aspect-ratio: 900 / 1734;
+  padding: 0;
+  border: 0;
+  border-radius: 34px;
+  opacity: 0;
+  background: transparent;
+  transform: translateX(-50%) scale(0.66);
+  transform-origin: center;
+  transition:
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 320ms ease,
+    filter 460ms ease;
+  will-change: transform, opacity;
+  cursor: pointer;
+}
+
+.mvr-coverflow-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 17px 30px rgba(25, 59, 40, 0.16));
+}
+
+.mvr-coverflow-card.is-active {
+  z-index: 4;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  cursor: default;
+}
+
+.mvr-coverflow-card.is-prev {
+  z-index: 2;
+  opacity: 0.52;
+  filter: saturate(0.78) brightness(0.98);
+  transform: translateX(-113%) scale(0.81) rotateY(7deg);
+}
+
+.mvr-coverflow-card.is-next {
+  z-index: 3;
+  opacity: 0.66;
+  filter: saturate(0.84) brightness(0.99);
+  transform: translateX(13%) scale(0.84) rotateY(-7deg);
+}
+
+.mvr-coverflow-card.is-far {
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.66);
+}
+
+.mvr-coverflow-card:focus-visible {
+  outline: 3px solid rgba(40, 128, 88, 0.42);
+  outline-offset: -5px;
+}
+
+.mvr-coverflow-controls {
+  min-height: 42px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 40px auto minmax(112px, max-content);
   align-items: center;
-  gap: 13px;
-  padding: 15px;
-  border: 1px solid rgba(206, 222, 212, 0.78);
-  border-radius: 19px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 12px 28px rgba(23, 58, 39, 0.09);
+  justify-content: center;
+  gap: 10px;
 }
 
-.mvr-guestel-property-mark,
-.mvr-guestel-icon {
-  width: 48px;
-  height: 48px;
+.mvr-coverflow-arrow,
+.mvr-coverflow-next,
+.mvr-coverflow-dots button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.mvr-coverflow-arrow {
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(145deg, #62aa80, #286f50);
-  font-size: 20px;
-  font-weight: 900;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
-}
-
-.mvr-guestel-booking-card > div,
-.mvr-guestel-system-card > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.mvr-guestel-booking-card small,
-.mvr-guestel-system-card small {
-  color: #718078;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: .035em;
-}
-
-.mvr-guestel-booking-card strong,
-.mvr-guestel-system-card strong {
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-guestel-system-card span {
-  overflow: hidden;
-  color: #66766d;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-guestel-booking-card > b,
-.mvr-guestel-system-card > b {
-  padding: 7px 12px;
+  padding: 0;
+  border: 1px solid rgba(49, 102, 75, 0.14);
   border-radius: 999px;
-  color: #267151;
-  background: #e6f3eb;
-  font-size: 11px;
-  letter-spacing: .025em;
+  color: #315c47;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
+  font-size: 16px;
+  font-weight: 850;
 }
 
-.mvr-guestel-flow-arrow {
-  height: 22px;
-  color: #34805e;
-  font-size: 27px;
+.mvr-coverflow-next {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 1px solid rgba(49, 102, 75, 0.14);
+  border-radius: 999px;
+  color: #285a43;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
+  font-size: 12px;
   font-weight: 800;
-  line-height: 22px;
-  text-align: center;
+  white-space: nowrap;
+}
+
+.mvr-coverflow-next span {
+  color: var(--mvr-green);
+  font-size: 14px;
+}
+
+.mvr-coverflow-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mvr-coverflow-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(36, 95, 70, 0.2);
+  transition: width 260ms ease, background 260ms ease;
+}
+
+.mvr-coverflow-dots button.is-active {
+  width: 20px;
+  background: var(--mvr-green);
+}
+
+.mvr-coverflow-arrow:hover,
+.mvr-coverflow-next:hover {
+  border-color: rgba(40, 128, 88, 0.28);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 /* Final proof: the three real surfaces are the diagram. The labels occupy the
@@ -1400,7 +1486,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mvr-beat-proof,
-  .mvr-beat-settings { animation: none; }
+  .mvr-beat-settings,
+  .mvr-coverflow { animation: none; }
+
+  .mvr-coverflow-card,
+  .mvr-coverflow-dots button { transition: none; }
 }
 
 /* The activation screen owns the whole scroll area rather than sitting above a
@@ -2255,6 +2345,32 @@
     gap: 10px;
   }
 
+  .mvr-coverflow-viewport {
+    min-height: 310px;
+  }
+
+  .mvr-coverflow-card {
+    max-width: 62%;
+  }
+
+  .mvr-coverflow-card.is-prev {
+    transform: translateX(-109%) scale(0.79) rotateY(6deg);
+  }
+
+  .mvr-coverflow-card.is-next {
+    transform: translateX(9%) scale(0.82) rotateY(-6deg);
+  }
+
+  .mvr-coverflow-controls {
+    grid-template-columns: 38px auto minmax(108px, max-content);
+    gap: 8px;
+  }
+
+  .mvr-coverflow-next {
+    padding-inline: 11px;
+    font-size: 11.5px;
+  }
+
   .mvr-assistant-visual {
     padding: 0;
     border-radius: 21px;
@@ -2681,6 +2797,7 @@
 #marketelValueReveal.mvr-no-enter .mvr-stage,
 #marketelValueReveal.mvr-no-enter .mvr-beat-proof,
 #marketelValueReveal.mvr-no-enter .mvr-beat-settings,
+#marketelValueReveal.mvr-no-enter .mvr-coverflow,
 #marketelValueReveal.mvr-no-enter .mvr-finale-card,
 #marketelValueReveal.mvr-no-enter .mvr-value-list > div {
   animation: none !important;

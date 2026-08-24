@@ -42,9 +42,14 @@ test('walk-in handling states the action and booking-page outcome', () => {
 
 test('the reveal establishes the owner app before switching to Guestel', () => {
     const ownerApp = revealCopy.indexOf('The Front Desk you just used is your real app.');
-    const guestel = revealCopy.indexOf('Guests tap Add. Guestel handles the rest.');
+    const guestel = revealCopy.indexOf('Your property stays in their Guestel wallet.');
     assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
     assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
+    assert.match(revealCopy, /Download Marketel from the App Store/);
+    assert.match(revealCopy, /Every reservation lands in one place/);
+    assert.match(revealCopy, /Change a room-night in seconds/);
+    assert.match(revealCopy, /They can book you again without an OTA/);
+    assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
     assert.match(revealCopy, /Booking page<\/small><strong>Converts/);
     assert.match(revealCopy, /Front Desk<\/small><strong>Runs it/);
     assert.match(revealCopy, /Guestel<\/small><strong>Keeps them/);

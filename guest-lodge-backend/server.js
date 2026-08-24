@@ -6679,6 +6679,7 @@ const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
     // owner reached the guest-app stage; the beat says whether they got past
     // the install sheet. Without this the middle of the funnel is one bucket.
     'JourneyRevealBeatViewed',
+    'JourneyAppCarouselSlideViewed',
     'JourneyAssistantFallbackSelected',
     'JourneyBillingIntervalSelected',
     'JourneyBookingPreviewOpened',
@@ -6899,8 +6900,8 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppRebookViewed',
     'GuestAppBroadcastViewed',
     // Guestel replaced the promoted Home Screen/PWA path. Keep the historic
-    // names above so old sessions remain readable; new sessions use these
-    // three compact beats.
+    // names above so old sessions remain readable; the current reveal packs
+    // the Front Desk and Guestel screens into two optional carousels.
     'GuestelInstallFlowViewed',
     'GuestelWalletViewed',
     'GuestelReachViewed',
