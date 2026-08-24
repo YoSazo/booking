@@ -6907,6 +6907,7 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'AssistantTextProofViewed',
     'AssistantAppProofViewed',
     'AssistantFallbackViewed',
+    'MarketelSystemViewed',
     'BookingChallengeShown',
     'BookingChallengeStarted',
     'BookingChallengeDismissed',

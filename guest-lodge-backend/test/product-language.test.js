@@ -18,6 +18,7 @@ const files = [
 const productCopy = files
     .map((file) => fs.readFileSync(path.join(backendRoot, file), 'utf8'))
     .join('\n');
+const revealCopy = fs.readFileSync(path.join(backendRoot, 'frontdesk/src/reveal.js'), 'utf8');
 
 test('owner and guest products never collapse into ambiguous app language', () => {
     assert.doesNotMatch(productCopy, /\bGuest App\b/);
@@ -37,4 +38,15 @@ test('walk-in handling states the action and booking-page outcome', () => {
     assert.match(productCopy, /Walk-in or another channel took a room\?/);
     assert.match(productCopy, /text the Marketel Front Desk contact what happened/);
     assert.match(productCopy, /reduces? (?:the )?remaining availability/i);
+});
+
+test('the reveal establishes the owner app before switching to Guestel', () => {
+    const ownerApp = revealCopy.indexOf('The Front Desk you just used is your real app.');
+    const guestel = revealCopy.indexOf('Guests tap Add. Guestel handles the rest.');
+    assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
+    assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
+    assert.match(revealCopy, /Booking page<\/small><strong>Converts/);
+    assert.match(revealCopy, /Front Desk<\/small><strong>Runs it/);
+    assert.match(revealCopy, /Guestel<\/small><strong>Keeps them/);
+    assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });

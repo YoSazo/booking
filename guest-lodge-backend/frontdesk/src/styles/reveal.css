@@ -1216,8 +1216,7 @@
 }
 
 .mvr-guestel-booking-card,
-.mvr-guestel-system-card,
-.mvr-guestel-notification {
+.mvr-guestel-system-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -1245,16 +1244,14 @@
 }
 
 .mvr-guestel-booking-card > div,
-.mvr-guestel-system-card > div,
-.mvr-guestel-notification > div {
+.mvr-guestel-system-card > div {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
 .mvr-guestel-booking-card small,
-.mvr-guestel-system-card small,
-.mvr-guestel-notification small {
+.mvr-guestel-system-card small {
   color: #718078;
   font-size: 10px;
   font-weight: 750;
@@ -1262,8 +1259,7 @@
 }
 
 .mvr-guestel-booking-card strong,
-.mvr-guestel-system-card strong,
-.mvr-guestel-notification strong {
+.mvr-guestel-system-card strong {
   overflow: hidden;
   font-size: 14px;
   font-weight: 850;
@@ -1299,158 +1295,92 @@
   text-align: center;
 }
 
-.mvr-guestel-phone {
-  gap: 13px;
-  padding: 17px;
-  border: 1px solid rgba(197, 217, 204, .85);
-  border-radius: 25px;
-  background: linear-gradient(160deg, rgba(255,255,255,.98), rgba(229,241,233,.94));
-  box-shadow: 0 20px 42px rgba(23, 58, 39, .13);
+/* Final proof: the three real surfaces are the diagram. The labels occupy the
+   transparent gaps in the supplied composition, so the owner reads the system
+   in one glance without shrinking the phones further or adding a fourth card. */
+.mvr-stage-beats.is-integrated-proof {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
 }
 
-.mvr-guestel-phone-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
+.mvr-stage-beats.is-integrated-proof .mvr-beat-stage {
+  min-height: 0;
 }
 
-.mvr-guestel-icon.is-small {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  font-size: 13px;
-}
-
-.mvr-guestel-phone-head strong { font-size: 14px; }
-.mvr-guestel-phone-head i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #43a06f;
-  box-shadow: 0 0 0 5px rgba(67,160,111,.12);
-}
-
-.mvr-guestel-wallet-card {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid rgba(207, 222, 213, .82);
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(25, 57, 40, .08);
-}
-
-.mvr-guestel-wallet-image {
-  height: 118px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(145deg, #5f9877, #245d44);
-  font-size: 34px;
-  font-weight: 900;
-}
-
-.mvr-guestel-wallet-image img {
+.mvr-stage-beats.is-integrated-proof .mvr-beat-settings {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-}
-
-.mvr-guestel-wallet-copy { display: grid; gap: 2px; }
-.mvr-guestel-wallet-copy small { color: #738178; font-size: 10px; }
-.mvr-guestel-wallet-copy strong { font-size: 17px; }
-.mvr-guestel-wallet-copy span { color: #66756d; font-size: 11px; }
-.mvr-guestel-wallet-card button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 12px;
-  color: #fff;
-  background: #2e7d5b;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  pointer-events: none;
-}
-
-.mvr-guestel-wallet-nav {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 5px;
-  border-radius: 13px;
-  background: rgba(217, 230, 221, .72);
-  color: #748279;
-  font-size: 10px;
-  text-align: center;
-}
-.mvr-guestel-wallet-nav > * { padding: 7px 4px; }
-.mvr-guestel-wallet-nav b { border-radius: 9px; color: #245d44; background: #fff; }
-
-.mvr-guestel-notification {
-  grid-template-columns: auto minmax(0, 1fr);
-  border-radius: 22px;
-  background: rgba(255,255,255,.76);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-}
-.mvr-guestel-notification p { margin: 2px 0 0; color: #5f6d65; font-size: 11px; line-height: 1.35; }
-
-.mvr-guestel-outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mvr-guestel-outcomes > span {
-  display: grid;
-  gap: 3px;
-  padding: 15px;
-  border: 1px solid rgba(207, 222, 213, .8);
-  border-radius: 17px;
-  background: rgba(255,255,255,.82);
-}
-.mvr-guestel-outcomes b { color: #2e7d5b; font-size: 20px; line-height: 1; }
-.mvr-guestel-outcomes strong { font-size: 12px; }
-.mvr-guestel-outcomes small { color: #708077; font-size: 9.5px; line-height: 1.35; }
-
-/* In a beat the rule is the whole screen, not a corner widget: flatten the
-   nested card, stack the two options so each is a full-width target, and scale
-   the type up from the 8–10px it used when it sat inside the old visual. */
-.mvr-beat-settings .mvr-fallback-control {
-  margin-top: 0;
-  gap: 14px;
+  min-height: 0;
   padding: 0;
   border: 0;
-  background: none;
-  animation: none;
+  background: transparent;
+  box-shadow: none;
 }
 
-.mvr-beat-settings .mvr-fallback-control > strong {
-  font-size: 16px;
+.mvr-system-proof {
+  position: relative;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: 1500 / 2979;
+  margin: 0 auto;
 }
 
-.mvr-beat-settings .mvr-fallback-options {
-  grid-template-columns: 1fr;
-  gap: 12px;
+.mvr-system-proof > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 38px rgba(24, 55, 38, 0.14));
 }
 
-.mvr-beat-settings .mvr-fallback-options button {
-  gap: 5px;
-  padding: 22px 20px;
-  border-radius: 16px;
-  border-width: 1.5px;
+.mvr-system-label {
+  position: absolute;
+  z-index: 2;
+  width: 42%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 1px;
+  padding: clamp(7px, 1.4vh, 12px) clamp(8px, 1.5vw, 14px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: clamp(12px, 2.2vw, 18px);
+  color: #193528;
+  background: rgba(244, 250, 246, 0.88);
+  box-shadow: 0 10px 28px rgba(20, 55, 37, 0.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  backdrop-filter: blur(18px) saturate(1.35);
 }
 
-.mvr-beat-settings .mvr-fallback-options b {
-  font-size: 18px;
-  white-space: normal;
+.mvr-system-label small {
+  color: #617269;
+  font-size: clamp(8px, 1.7vw, 11px);
+  font-weight: 750;
+  line-height: 1.1;
 }
 
-.mvr-beat-settings .mvr-fallback-options span {
-  font-size: 13.5px;
+.mvr-system-label strong {
+  color: #196d4c;
+  font-size: clamp(12px, 2.9vw, 18px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
-.mvr-beat-settings .mvr-fallback-control > small {
-  font-size: 13px;
-  text-align: center;
+.mvr-system-label.is-booking {
+  top: 9%;
+  right: 1%;
+}
+
+.mvr-system-label.is-frontdesk {
+  top: 46.2%;
+  left: 1%;
+}
+
+.mvr-system-label.is-guestel {
+  right: 1%;
+  bottom: 7%;
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -1471,67 +1401,6 @@
 @media (prefers-reduced-motion: reduce) {
   .mvr-beat-proof,
   .mvr-beat-settings { animation: none; }
-}
-
-.mvr-fallback-control {
-  display: grid;
-  gap: 7px;
-  margin-top: 10px;
-  padding: 10px 11px;
-  border: 1px solid #dce7e0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  animation: mvr-bubble-in 450ms cubic-bezier(0.16, 1, 0.3, 1) 680ms both;
-}
-
-.mvr-fallback-control > strong {
-  color: #253d31;
-  font-size: 10px;
-}
-
-.mvr-fallback-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.mvr-fallback-options button {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px 9px;
-  text-align: left;
-  color: #53665b;
-  border: 1px solid #dce6e0;
-  border-radius: 10px;
-  background: #f8faf9;
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
-}
-
-.mvr-fallback-options button:active {
-  transform: scale(0.98);
-}
-
-.mvr-fallback-options button.is-selected {
-  color: #1f5f43;
-  border-color: var(--mvr-green);
-  background: #eaf7ef;
-}
-
-.mvr-fallback-options b {
-  overflow: hidden;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fallback-options span,
-.mvr-fallback-control > small {
-  color: #74847b;
-  font-size: 8px;
-  line-height: 1.4;
 }
 
 /* The activation screen owns the whole scroll area rather than sitting above a
