@@ -207,12 +207,13 @@ function replayWalkthrough() {
   window.location.assign(next);
 }
 
-// Internal funnel QA: the universal/master PIN identifies our own session, so
-// this shortcut never appears for a property owner. Reload through the same URL
-// contract used by setup.html instead of mounting the reveal ad hoc; that tests
-// the real authentication, boot, data preload, and step-zero handoff together.
+// Internal funnel QA: a development master credential or an explicitly scoped
+// dogfood property identifies our own session, so this shortcut never appears
+// for a customer. Reload through the same URL contract used by setup.html
+// instead of mounting the reveal ad hoc; that tests the real authentication,
+// boot, data preload, and step-zero handoff together.
 function replayValueReveal() {
-  if (!crm.isMasterPin || isNativeFrontdeskApp()) return;
+  if (!(crm.isMasterPin || crm.isDogfoodPreview) || isNativeFrontdeskApp()) return;
   const u = new URL(window.location.href);
   u.searchParams.set('reveal', 'step-0');
   u.searchParams.delete('welcome');
@@ -224,7 +225,7 @@ function replayValueReveal() {
 function syncAdminReplayControl() {
   const button = document.getElementById('btnReplayReveal');
   if (!button) return;
-  button.style.display = crm.isMasterPin && !isNativeFrontdeskApp() ? '' : 'none';
+  button.style.display = (crm.isMasterPin || crm.isDogfoodPreview) && !isNativeFrontdeskApp() ? '' : 'none';
 }
 
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
@@ -351,6 +352,8 @@ function getFrontdeskCookie(name) {
 function frontdeskTokenKind(token) {
   const clean = String(token || '');
   if (!clean) return 'none';
+  if (clean.startsWith('fds_')) return 'session';
+  if (clean.startsWith('fdn_')) return 'native-session';
   return clean.startsWith('fd_') ? 'return-token' : 'pin';
 }
 function frontdeskAuthDebugEnabled() {
@@ -2453,6 +2456,7 @@ async function startCrmApp(verification, options = {}) {
   }
   crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
+  crm.isDogfoodPreview = !!(verification && verification.nativePreviewAccess);
   syncAdminReplayControl();
   crm.currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   crm.revenueEnabled = !!(verification && verification.isManualPms);
@@ -2791,6 +2795,7 @@ async function doLogin() {
     crm.token = pin;
     try { localStorage.setItem('crmToken', crm.token); } catch(e) {}
     await startCrmApp(verification);
+    upgradeToDurableSession(verification).catch(() => {});
   } catch (e) {
     err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : (e.message || 'Connection failed');
   } finally {
@@ -2920,6 +2925,8 @@ function showLogin() {
   } catch (_) {}
   crm.token = '';
   crm.isMasterPin = false;
+  crm.isDogfoodPreview = false;
+  syncAdminReplayControl();
   crm.currentHotelPms = '';
   crm.revenueEnabled = false;
   crm.revenueCache = {};
@@ -2930,7 +2937,10 @@ function showLogin() {
   crm.assistantError = '';
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
-  rememberCrmHotelId('');
+  // Keep the last resolved property after an expired/invalid credential. The
+  // replacement login still needs that scope, and losing it made the generic
+  // web Front Desk look like it had forgotten the owner's property as well as
+  // their session. Explicit native sign-out clears its own selected property.
 }
 
 function showNativeAuthenticationError(error) {
@@ -2941,14 +2951,18 @@ function showNativeAuthenticationError(error) {
   return true;
 }
 
-// fd_ return tokens are handoff credentials that expire in a day, and storing
-// one as the session is why Front Desk would sign an owner out with
-// "Unauthorized" some time after they arrived from setup or Stripe. Trade it
-// for a real session as soon as one request has proved it still works. Failure
-// is not fatal — the handoff token is still valid today, so the owner carries
-// on and the next load tries again.
-async function upgradeToDurableSession() {
-  if (!crm.token || !String(crm.token).startsWith('fd_')) return;
+// Browser credentials are exchanged for a property-scoped 90-day session as
+// soon as one request proves them. This covers setup/Stripe handoff tokens and
+// ordinary web PIN logins, so returning owners do not have to authenticate on
+// every visit and their reusable PIN is not kept in browser storage. Native
+// sessions already have their own durable identity. Failure is non-fatal: the
+// proven credential remains usable and the next launch can try again.
+async function upgradeToDurableSession(verification = null) {
+  const token = String(crm.token || '');
+  if (!token || isNativeFrontdeskApp() || token.startsWith('fds_') || token.startsWith('fdn_')) return;
+  // Development master access should remain visibly administrative rather
+  // than being converted into an ordinary property session.
+  if (verification && verification.isMasterPin) return;
   if (crm.sessionUpgradeInFlight) return;
   crm.sessionUpgradeInFlight = true;
   try {
@@ -2959,7 +2973,7 @@ async function upgradeToDurableSession() {
       logFrontdeskAuth('session-upgraded', { hotelId: data.hotelId || '' });
     }
   } catch (_) {
-    // Keep the handoff token; it still has time left on it.
+    // Keep the proven credential and retry on a future launch.
   } finally {
     crm.sessionUpgradeInFlight = false;
   }
@@ -3032,8 +3046,8 @@ async function bootCrmApp() {
         const verification = await loadCrmBootstrap();
         await startCrmApp(verification, { bootstrapped: true });
         // Bootstrap succeeding is the proof the credential works, which is the
-        // right moment to trade a handoff token for a lasting session.
-        upgradeToDurableSession().catch(() => {});
+        // right moment to trade browser auth for a lasting scoped session.
+        upgradeToDurableSession(verification).catch(() => {});
         return;
       } catch (e) {
         // Safe rolling deploy: an already-installed native bundle may launch
@@ -3045,6 +3059,7 @@ async function bootCrmApp() {
             await loadHotelContext();
             const verification = await verifyCrmToken(crm.token);
             await startCrmApp(verification);
+            upgradeToDurableSession(verification).catch(() => {});
             return;
           } catch (legacyError) {
             e = legacyError;
@@ -3079,6 +3094,7 @@ async function bootCrmApp() {
         try {
           const verification = await verifyCrmToken(crm.token);
           await startCrmApp(verification);
+          upgradeToDurableSession(verification).catch(() => {});
           return;
         } catch (verifyError) {
           crm.lastAuthError = verifyError && verifyError.message ? verifyError.message : 'legacy verify failed';

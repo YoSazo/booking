@@ -5279,10 +5279,11 @@ function verifyNativeSessionToken(token) {
 // and sign out its staff, or add a new PIN on every return.
 const CRM_SESSION_TOKEN_EXPIRY_MS = NATIVE_SESSION_TOKEN_EXPIRY_MS;
 
-function generateCrmSessionToken(hotelId) {
+function generateCrmSessionToken(hotelId, options = {}) {
     const payload = JSON.stringify({
         purpose: 'frontdesk-session',
         hotelId: String(hotelId || '').trim(),
+        dogfoodPreview: !!options.dogfoodPreview,
         exp: Date.now() + CRM_SESSION_TOKEN_EXPIRY_MS,
     });
     const encoded = Buffer.from(payload).toString('base64url');
@@ -5301,7 +5302,10 @@ function verifyCrmSessionToken(token) {
     try {
         const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString());
         if (payload.purpose !== 'frontdesk-session' || !payload.hotelId || payload.exp < Date.now()) return null;
-        return { hotelId: String(payload.hotelId).trim() };
+        return {
+            hotelId: String(payload.hotelId).trim(),
+            dogfoodPreview: !!payload.dogfoodPreview,
+        };
     } catch (_) {
         return null;
     }
@@ -5542,7 +5546,7 @@ const crmAuth = async (req, res, next) => {
                 : (dbAllowedHotels.length ? dbAllowedHotels : (CRM_TOKEN_HOTELS_MAP[token] || []));
 
     const requestedHotelId = String(req.query?.hotelId || req.body?.hotelId || '').trim();
-    let isDogfoodPreviewAccess = false;
+    let isDogfoodPreviewAccess = !!sessionAuth?.dogfoodPreview;
     if (
         !returnAuth
         && !sessionAuth
@@ -16181,17 +16185,18 @@ async function getCrmBookingList(hotelId) {
 // One startup request replaces the sequential context → verification →
 // bookings/availability chain. Secondary surfaces (messages, analytics,
 // conflicts and push maintenance) intentionally load after first paint.
-// Trades a one-boundary handoff token for a real session, so arriving from
-// setup or from Stripe does not leave the browser holding a credential that
-// dies in 24 hours. Any already-valid credential can call this; a PIN holder
-// simply gets a session that does not depend on remembering the PIN.
+// Trades any proven browser credential for a real property-scoped session.
+// Setup/Stripe handoffs therefore do not die after 24 hours, and an ordinary
+// PIN login no longer has to keep the reusable staff PIN in browser storage.
 app.post('/api/crm/session/exchange', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
         res.json({
             success: true,
-            token: generateCrmSessionToken(hotelId),
+            token: generateCrmSessionToken(hotelId, {
+                dogfoodPreview: !!req.crmIsDogfoodPreview,
+            }),
             hotelId,
             expiresInMs: CRM_SESSION_TOKEN_EXPIRY_MS,
         });
