@@ -207,6 +207,26 @@ function replayWalkthrough() {
   window.location.assign(next);
 }
 
+// Internal funnel QA: the universal/master PIN identifies our own session, so
+// this shortcut never appears for a property owner. Reload through the same URL
+// contract used by setup.html instead of mounting the reveal ad hoc; that tests
+// the real authentication, boot, data preload, and step-zero handoff together.
+function replayValueReveal() {
+  if (!crm.isMasterPin || isNativeFrontdeskApp()) return;
+  const u = new URL(window.location.href);
+  u.searchParams.set('reveal', 'step-0');
+  u.searchParams.delete('welcome');
+  u.searchParams.delete('tab');
+  u.searchParams.delete('checkoutCancelled');
+  window.location.assign(u.pathname + u.search + u.hash);
+}
+
+function syncAdminReplayControl() {
+  const button = document.getElementById('btnReplayReveal');
+  if (!button) return;
+  button.style.display = crm.isMasterPin && !isNativeFrontdeskApp() ? '' : 'none';
+}
+
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
 // Captured as early as possible so the "Install Front Desk" button can fire the
 // browser's native install prompt on Android/desktop.
@@ -2433,6 +2453,7 @@ async function startCrmApp(verification, options = {}) {
   }
   crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
+  syncAdminReplayControl();
   crm.currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   crm.revenueEnabled = !!(verification && verification.isManualPms);
   crm.revenueCache = {};
@@ -6582,6 +6603,7 @@ exposeToWindow({
   loadAppsModule,
   loadRevealModule,
   replayWalkthrough,
+  replayValueReveal,
   resetWalkthroughProgress,
 });
 
