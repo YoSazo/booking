@@ -171,7 +171,7 @@ struct MarketelNativeAPI {
 
 // MARK: - Shared API models
 
-struct MarketelEmptyEnvelope: Decodable { let success: Bool; let message: String? }
+struct MarketelCoreEmptyEnvelope: Decodable { let success: Bool; let message: String? }
 
 struct MarketelBookingEnvelope: Decodable {
     let success: Bool

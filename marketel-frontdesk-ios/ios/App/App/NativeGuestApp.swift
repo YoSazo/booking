@@ -65,7 +65,7 @@ private final class MarketelGuestAppModel: ObservableObject {
 
     func removeCover() async {
         await perform("Guestel cover removed") {
-            let response: MarketelEmptyEnvelope = try await api.request(
+            let response: MarketelCoreEmptyEnvelope = try await api.request(
                 "/api/crm/guestel-wallet-image",
                 method: "DELETE"
             )
