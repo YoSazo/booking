@@ -10,6 +10,8 @@ import { APP_CLIP_INSTALL_ENABLED, guestelInvocationUrl } from './appClipInstall
 function GuestInstallCard({
   hotelName,
   appIconUrl,
+  walletImageUrl,
+  walletSubtitle,
   hotelId,
   reservationCode,
   handoffToken,
@@ -160,7 +162,7 @@ function GuestInstallCard({
       ? 'See stay updates, message the Front Desk, and book direct again without searching.'
       : 'Book direct, message the Front Desk, and return anytime without searching again.')
     : 'Return here to book direct, get stay updates, and message the front desk. No App Store.');
-  const primaryLabel = nativeGuestel ? (isConfirmation ? 'Keep this stay' : 'Add to Guestel') : 'Add to Home Screen';
+  const primaryLabel = nativeGuestel ? (isConfirmation ? 'Keep this stay in Guestel' : 'Add to Guestel') : 'Add to Home Screen';
 
   const installCoach = showInstallCoach && (
     <BookingInstallCoach
@@ -219,14 +221,26 @@ function GuestInstallCard({
   }
 
   if (isConfirmation) {
+    const walletInitial = (hotelName || 'P').trim().charAt(0).toUpperCase();
     return (
       <>
         <section className="guest-install-confirmation-card">
-          <div className="guest-install-confirmation-card__identity">
-            <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={46} />
-            <div className="guest-install-confirmation-card__copy">
-              <div className="guest-install-confirmation-card__title">{title}</div>
-              <div className="guest-install-confirmation-card__subtitle">{subtitle}</div>
+          <div className="guest-install-confirmation-card__eyebrow">
+            <Smartphone size={14} aria-hidden="true" /> Guestel
+          </div>
+          <div className="guest-install-confirmation-card__copy">
+            <div className="guest-install-confirmation-card__title">{title}</div>
+            <div className="guest-install-confirmation-card__subtitle">{subtitle}</div>
+          </div>
+          <div className="guest-install-confirmation-wallet" aria-label={`${hotelName || 'Your property'} card in Guestel`}>
+            <div className={`guest-install-confirmation-wallet__cover${walletImageUrl ? ' has-image' : ''}`}>
+              <span>{walletInitial}</span>
+              {walletImageUrl && <img src={walletImageUrl} alt="" />}
+            </div>
+            <div className="guest-install-confirmation-wallet__shade" aria-hidden="true" />
+            <div className="guest-install-confirmation-wallet__copy">
+              <strong>{hotelName || 'Your property'}</strong>
+              <span>{walletSubtitle || 'Direct booking'}</span>
             </div>
           </div>
           <button
@@ -235,13 +249,6 @@ function GuestInstallCard({
             className="guest-install-confirmation-card__button"
           >
             <Smartphone size={17} /> {primaryLabel}
-          </button>
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="guest-install-confirmation-card__later"
-          >
-            Maybe later
           </button>
         </section>
         {installCoach}
