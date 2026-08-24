@@ -1381,92 +1381,192 @@
   background: rgba(255, 255, 255, 0.95);
 }
 
-/* Final proof: the three real surfaces are the diagram. The labels occupy the
-   transparent gaps in the supplied composition, so the owner reads the system
-   in one glance without shrinking the phones further or adding a fourth card. */
-.mvr-stage-beats.is-integrated-proof {
-  grid-template-rows: minmax(0, 1fr);
-  gap: 0;
-  padding: 0;
+/* The last beat has only one job: make the three-product system click. Its
+   copy is intentionally compact, returning the reclaimed height to the real
+   screens. On a phone this makes the active proof roughly 30% larger than the
+   feature carousels while the activation CTA remains above the fold. */
+.mvr-stage-beats.is-system-showcase {
+  gap: 4px;
+  padding-top: 4px;
 }
 
-.mvr-stage-beats.is-integrated-proof .mvr-beat-stage {
-  min-height: 0;
+.mvr-stage-beats.is-system-showcase .mvr-beat-band {
+  min-height: 82px;
+  margin-bottom: 0;
+  gap: 3px;
 }
 
-.mvr-stage-beats.is-integrated-proof .mvr-beat-settings {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.mvr-stage-beats.is-system-showcase .mvr-beat-title {
+  font-size: clamp(20px, 5vw, 25px);
 }
 
-.mvr-system-proof {
-  position: relative;
-  width: auto;
-  max-width: 100%;
-  height: 100%;
-  max-height: 100%;
-  aspect-ratio: 1500 / 2979;
-  margin: 0 auto;
+.mvr-stage-beats.is-system-showcase .mvr-beat-body {
+  font-size: 13px;
+  line-height: 1.35;
 }
 
-.mvr-system-proof > img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 18px 38px rgba(24, 55, 38, 0.14));
+.mvr-coverflow.is-system .mvr-coverflow-card {
+  max-width: 76%;
 }
 
-.mvr-system-label {
+.mvr-coverflow.is-system .mvr-coverflow-card.is-prev {
+  opacity: 0.42;
+  transform: translateX(-104%) scale(0.75) rotateY(6deg);
+}
+
+.mvr-coverflow.is-system .mvr-coverflow-card.is-next {
+  opacity: 0.55;
+  transform: translateX(4%) scale(0.78) rotateY(-6deg);
+}
+
+.mvr-coverflow.is-system .mvr-coverflow-card.is-active {
+  cursor: zoom-in;
+}
+
+.mvr-coverflow-expand-corners {
   position: absolute;
-  z-index: 2;
-  width: 42%;
+  inset: 5px;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+.mvr-coverflow-card.is-active .mvr-coverflow-expand-corners {
+  opacity: 0.82;
+}
+
+.mvr-coverflow-expand-corners i {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+}
+
+.mvr-coverflow-expand-corners i:nth-child(1) {
+  top: 0;
+  left: 0;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-radius: 5px 0 0;
+}
+
+.mvr-coverflow-expand-corners i:nth-child(2) {
+  top: 0;
+  right: 0;
+  border-top: 2px solid #fff;
+  border-right: 2px solid #fff;
+  border-radius: 0 5px 0 0;
+}
+
+.mvr-coverflow-expand-corners i:nth-child(3) {
+  bottom: 0;
+  left: 0;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-radius: 0 0 0 5px;
+}
+
+.mvr-coverflow-expand-corners i:nth-child(4) {
+  right: 0;
+  bottom: 0;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  border-radius: 0 0 5px;
+}
+
+.mvr-showcase-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
   box-sizing: border-box;
   display: grid;
-  gap: 1px;
-  padding: clamp(7px, 1.4vh, 12px) clamp(8px, 1.5vw, 14px);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: clamp(12px, 2.2vw, 18px);
-  color: #193528;
-  background: rgba(244, 250, 246, 0.88);
-  box-shadow: 0 10px 28px rgba(20, 55, 37, 0.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.35);
-  backdrop-filter: blur(18px) saturate(1.35);
+  place-items: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  background: rgba(18, 34, 26, 0.58);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+  backdrop-filter: blur(22px) saturate(1.1);
+  animation: mvr-lightbox-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.mvr-system-label small {
-  color: #617269;
-  font-size: clamp(8px, 1.7vw, 11px);
-  font-weight: 750;
-  line-height: 1.1;
+.mvr-showcase-lightbox.is-closing {
+  animation: mvr-lightbox-out 180ms ease both;
 }
 
-.mvr-system-label strong {
-  color: #196d4c;
-  font-size: clamp(12px, 2.9vw, 18px);
-  font-weight: 900;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+.mvr-showcase-lightbox figure {
+  width: min(520px, 100%);
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin: 0;
 }
 
-.mvr-system-label.is-booking {
-  top: 9%;
-  right: 1%;
+.mvr-showcase-lightbox img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 24px 46px rgba(0, 0, 0, 0.28));
 }
 
-.mvr-system-label.is-frontdesk {
-  top: 46.2%;
-  left: 1%;
+.mvr-showcase-lightbox figcaption {
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 16px;
+  color: #183126;
+  background: rgba(244, 250, 246, 0.9);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  text-align: center;
 }
 
-.mvr-system-label.is-guestel {
-  right: 1%;
-  bottom: 7%;
+.mvr-showcase-lightbox figcaption strong {
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.mvr-showcase-lightbox figcaption span {
+  color: #617168;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.mvr-showcase-lightbox-close {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  color: #173126;
+  background: rgba(244, 250, 246, 0.9);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+  font-size: 27px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes mvr-lightbox-in {
+  from { opacity: 0; transform: scale(0.975); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mvr-lightbox-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.985); }
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -1490,7 +1590,11 @@
   .mvr-coverflow { animation: none; }
 
   .mvr-coverflow-card,
-  .mvr-coverflow-dots button { transition: none; }
+  .mvr-coverflow-dots button,
+  .mvr-coverflow-expand-corners { transition: none; }
+
+  .mvr-showcase-lightbox,
+  .mvr-showcase-lightbox.is-closing { animation: none; }
 }
 
 /* The activation screen owns the whole scroll area rather than sitting above a
@@ -2351,6 +2455,10 @@
 
   .mvr-coverflow-card {
     max-width: 62%;
+  }
+
+  .mvr-coverflow.is-system .mvr-coverflow-card {
+    max-width: 78%;
   }
 
   .mvr-coverflow-card.is-prev {

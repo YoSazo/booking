@@ -50,8 +50,9 @@ test('the reveal establishes the owner app before switching to Guestel', () => {
     assert.match(revealCopy, /Change a room-night in seconds/);
     assert.match(revealCopy, /They can book you again without an OTA/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
-    assert.match(revealCopy, /Booking page<\/small><strong>Converts/);
-    assert.match(revealCopy, /Front Desk<\/small><strong>Runs it/);
-    assert.match(revealCopy, /Guestel<\/small><strong>Keeps them/);
+    assert.match(revealCopy, /Booking page converts\./);
+    assert.match(revealCopy, /Front Desk runs it\./);
+    assert.match(revealCopy, /Guestel keeps them\./);
+    assert.match(revealCopy, /openAppCarouselLightbox/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });
