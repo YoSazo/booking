@@ -141,6 +141,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var nativeAuthToken = ""
     private var activeHotelId = ""
     private var apnsDeviceToken = ""
+    private let nativeSession = MarketelNativeSession()
+    private var nativeCoreController: UIHostingController<MarketelNativeCoreView>?
+    private var nativeCoreTemporarilyDisabled = false
+    private var nativeAssistantSurfaceVisible = true
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -153,6 +157,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         webView?.scrollView.contentInsetAdjustmentBehavior = .never
         webView?.scrollView.verticalScrollIndicatorInsets = .zero
         webView?.scrollView.alwaysBounceVertical = true
+        webView?.scrollView.bounces = true
+        webView?.scrollView.decelerationRate = .normal
+        webView?.scrollView.scrollsToTop = true
         // Forms should scroll behind the keyboard without a drag implicitly
         // dismissing it. Messaging surfaces provide their own explicit
         // composer dismissal behavior in the web layer.
@@ -166,6 +173,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         configureTopBar()
         configureTabBar()
         configureAssistantPill()
+        configureNativeCore()
         setShellVisible(false, animated: false)
         NotificationCenter.default.addObserver(
             self,
@@ -240,6 +248,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             height: tabHeight
         )
 
+        nativeCoreController?.view.frame = CGRect(
+            x: 0,
+            y: topBar.frame.maxY + 6,
+            width: bounds.width,
+            height: max(0, tabBar.frame.minY - topBar.frame.maxY - 6)
+        )
+
         // Sits above the tab bar, centred, sized to its own content.
         let pillSize = assistantPillButton.systemLayoutSizeFitting(
             UIView.layoutFittingCompressedSize
@@ -259,6 +274,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         }
 
         view.bringSubviewToFront(statusBarBackdrop)
+        if let nativeView = nativeCoreController?.view, !nativeView.isHidden {
+            view.bringSubviewToFront(nativeView)
+        }
         view.bringSubviewToFront(topBar)
         view.bringSubviewToFront(menuButton)
         view.bringSubviewToFront(tabBar)
@@ -380,6 +398,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             title: "Refresh",
             image: UIImage(systemName: "arrow.clockwise")
         ) { [weak self] _ in
+            self?.nativeSession.requestRefresh()
             self?.sendWebAction("refresh")
         }
         let notificationSettingsAction = UIAction(
@@ -411,7 +430,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             title: "Switch property",
             image: UIImage(systemName: "building.2")
         ) { [weak self] _ in
-            self?.sendWebAction("properties")
+            self?.openPropertyPicker()
         }
         let accountAction = UIAction(
             title: "Privacy & account",
@@ -597,6 +616,74 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.addSubview(tabBar)
     }
 
+    private func configureNativeCore() {
+        let content = MarketelNativeCoreView(
+            session: nativeSession,
+            origin: backendOrigin,
+            onDataChanged: { [weak self] in
+                self?.nativeSession.requestRefresh()
+                self?.sendWebAction("refresh")
+            },
+            onOpenMessages: { [weak self] in
+                self?.presentNativeGuestMessages()
+            },
+            onAssistantVisibility: { [weak self] visible in
+                guard let self else { return }
+                self.nativeAssistantSurfaceVisible = visible
+                if self.nativeSession.currentTab == .bookings {
+                    self.updateAssistantPill(visible: visible, label: self.assistantPillLabel)
+                }
+            },
+            onOpenWebFallback: { [weak self] in
+                guard let self else { return }
+                self.nativeCoreTemporarilyDisabled = true
+                self.updateNativeCoreVisibility()
+            }
+        )
+        let controller = UIHostingController(rootView: content)
+        controller.view.backgroundColor = UIColor(
+            red: 239 / 255,
+            green: 244 / 255,
+            blue: 240 / 255,
+            alpha: 1
+        )
+        controller.view.isHidden = true
+        controller.view.accessibilityIdentifier = "marketel.native.core"
+        addChild(controller)
+        view.addSubview(controller.view)
+        controller.didMove(toParent: self)
+        nativeCoreController = controller
+    }
+
+    private func nativeTab(for tag: Int) -> MarketelNativeTab {
+        switch tag {
+        case 1: return .bookings
+        case 2: return .availability
+        case 3: return .guestApp
+        default: return .settings
+        }
+    }
+
+    private func updateNativeCoreVisibility() {
+        guard let nativeView = nativeCoreController?.view else { return }
+        let shouldShow = shellVisible
+            && !shellSuppressedByModal
+            && !nativeTourActive
+            && !nativeCoreTemporarilyDisabled
+            && nativeSession.isReady
+            && nativeSession.currentTab != .settings
+        nativeView.isHidden = !shouldShow
+        nativeView.isUserInteractionEnabled = shouldShow
+        if shouldShow {
+            view.bringSubviewToFront(nativeView)
+            view.bringSubviewToFront(topBar)
+            view.bringSubviewToFront(menuButton)
+            view.bringSubviewToFront(tabBar)
+            view.bringSubviewToFront(assistantPill)
+            view.bringSubviewToFront(assistantPillButton)
+        }
+    }
+
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         let filter: String
         switch item.tag {
@@ -605,12 +692,37 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         case 3: filter = "apps"
         default: filter = "settings"
         }
+        nativeCoreTemporarilyDisabled = false
+        nativeSession.currentTab = nativeTab(for: item.tag)
+        nativeAssistantSurfaceVisible = item.tag == 1
+        updateNativeCoreVisibility()
         callWeb(function: "marketelNativeSelectTab", argument: filter)
     }
 
     @objc private func openPropertyPicker() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        sendWebAction("properties")
+        guard nativeSession.isReady, presentedViewController == nil else {
+            sendWebAction("properties")
+            return
+        }
+        let picker = MarketelNativePropertyPickerView(
+            session: nativeSession,
+            origin: backendOrigin
+        ) { [weak self] hotelId in
+            guard let self else { return }
+            self.nativeCoreTemporarilyDisabled = false
+            self.nativeSession.clear()
+            self.callWeb(function: "marketelNativeSwitchProperty", argument: hotelId)
+            self.updateNativeCoreVisibility()
+        }
+        let controller = UIHostingController(rootView: picker)
+        controller.modalPresentationStyle = .pageSheet
+        if let sheet = controller.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 28
+        }
+        present(controller, animated: true)
     }
 
     @objc private func propertyHeaderTouchDown() {
@@ -638,7 +750,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func showGuestQR() {
-        sendWebAction("qr")
+        guard nativeSession.isReady, presentedViewController == nil else {
+            sendWebAction("qr")
+            return
+        }
+        let controller = UIHostingController(
+            rootView: MarketelNativeQRView(session: nativeSession, origin: backendOrigin)
+        )
+        controller.modalPresentationStyle = .fullScreen
+        present(controller, animated: true)
     }
 
     private func sendWebAction(_ action: String) {
@@ -770,6 +890,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     @objc private func refreshFrontDeskData(_ notification: Notification) {
+        nativeSession.requestRefresh()
         sendWebAction("refresh")
     }
 
@@ -778,6 +899,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         let path = destination["path"] ?? "/frontdesk?tab=bookings"
         let notificationHotelId = destination["hotelId"] ?? ""
         if !notificationHotelId.isEmpty {
+            if notificationHotelId != activeHotelId {
+                nativeSession.clear()
+                nativeCoreTemporarilyDisabled = false
+                updateNativeCoreVisibility()
+            }
             activeHotelId = notificationHotelId
         }
         let relative = path.hasPrefix("/") ? path : "/frontdesk"
@@ -819,6 +945,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         default: tag = 0
         }
         tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tag })
+        let next = nativeTab(for: tag)
+        if nativeSession.currentTab != next {
+            nativeSession.currentTab = next
+            nativeCoreTemporarilyDisabled = false
+            nativeAssistantSurfaceVisible = next == .bookings
+        }
+        updateNativeCoreVisibility()
     }
 
     private func updateBookingBadge(_ count: Int) {
@@ -952,6 +1085,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuButton.isUserInteractionEnabled = visible && !nativeTourActive
         tabBar.isUserInteractionEnabled = visible && !nativeTourActive
         assistantPillButton.isUserInteractionEnabled = visible && !nativeTourActive
+        updateNativeCoreVisibility()
     }
 
     private func presentInAppBrowser(_ rawURL: String) {
@@ -1079,8 +1213,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
             updateGuestAppBadge(payload["guestAppBadge"] as? Int ?? 0)
+            let requestedAssistant = payload["assistantPill"] as? Bool ?? false
             updateAssistantPill(
-                visible: (payload["assistantPill"] as? Bool ?? false),
+                visible: nativeCoreController?.view.isHidden == false
+                    ? (nativeSession.currentTab == .bookings && nativeAssistantSurfaceVisible)
+                    : requestedAssistant,
                 label: payload["assistantPillLabel"] as? String ?? ""
             )
             let requestedVisible = payload["visible"] as? Bool ?? true
@@ -1110,6 +1247,18 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             }
             activeHotelId = hotelId
             nativeAuthToken = authToken
+            nativeCoreTemporarilyDisabled = false
+            nativeSession.configure(
+                hotelId: hotelId,
+                hotelName: payload["hotelName"] as? String ?? "Front Desk",
+                domain: payload["domain"] as? String ?? "",
+                authToken: authToken,
+                appIconURL: payload["appIconUrl"] as? String ?? "",
+                walletImageURL: payload["guestelWalletImageUrl"] as? String ?? "",
+                walletSubtitle: payload["guestelWalletSubtitle"] as? String ?? "",
+                isManualPMS: payload["isManualPms"] as? Bool ?? true
+            )
+            updateNativeCoreVisibility()
             // Notification actions and Live Activity intents run outside the
             // webview. Mirror the session here as well as through the
             // ActivityKit plugin so Confirm/Release never depends on which
@@ -1129,6 +1278,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             postNativeDeviceRegistration(unregister: true)
             nativeAuthToken = ""
             activeHotelId = ""
+            nativeSession.clear()
+            updateNativeCoreVisibility()
             MarketelSharedCredentials.clear()
         case "notificationSettings":
             guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }

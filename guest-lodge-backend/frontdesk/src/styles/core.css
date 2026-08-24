@@ -2575,7 +2575,8 @@
     body.native-ios {
       min-height: 100%;
       background: var(--bg);
-      overscroll-behavior-y: none;
+      overscroll-behavior-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     body.native-ios {
       background-attachment: scroll;

@@ -613,7 +613,13 @@ function syncNativeAuthenticatedSession() {
   nativeShellPost({
     type: 'authenticated',
     hotelId: crm.activeHotelId,
+    hotelName: crm.activeHotelName || 'Front Desk',
+    domain: crm.activeHotelDomain || '',
     authToken: crm.token,
+    appIconUrl: crm.activeHotelAppIcon || '',
+    guestelWalletImageUrl: crm.guestelWalletImageUrl || '',
+    guestelWalletSubtitle: crm.guestelWalletSubtitle || '',
+    isManualPms: !!crm.revenueEnabled,
     subscribed: true,
     deferNotifications: localStorage.getItem(NATIVE_ONBOARDING_DONE_KEY) !== '1',
   });
@@ -866,6 +872,10 @@ function marketelNativeSelectTab(filter) {
   const allowed = ['settings', 'bookings', 'availability', 'revenue', 'apps'];
   if (!allowed.includes(filter)) return;
   setFilter(filter, document.querySelector(`.tab[data-nav-filter="${filter}"]`));
+}
+
+function marketelNativeSwitchProperty(hotelId) {
+  selectNativeProperty(hotelId);
 }
 
 function marketelNativeAction(action) {
@@ -3677,8 +3687,33 @@ async function refreshCurrentView(options = {}) {
 }
 
 let lastAutomaticRefreshAt = 0;
+let nativeScrollInteractionActive = false;
+let nativeScrollIdleTimer = 0;
+let deferredAutomaticRefreshSource = '';
+
+function markNativeScrollInteraction() {
+  if (!isNativeFrontdeskApp()) return;
+  nativeScrollInteractionActive = true;
+  clearTimeout(nativeScrollIdleTimer);
+  nativeScrollIdleTimer = setTimeout(() => {
+    nativeScrollInteractionActive = false;
+    if (!deferredAutomaticRefreshSource) return;
+    const source = deferredAutomaticRefreshSource;
+    deferredAutomaticRefreshSource = '';
+    requestAutomaticRefresh(source);
+  }, 280);
+}
+
 function requestAutomaticRefresh(source = 'automatic') {
   if (document.visibilityState === 'hidden') return;
+  const activeElement = document.activeElement;
+  const editing = !!activeElement && (
+    activeElement.matches?.('input, textarea, select, [contenteditable="true"]')
+  );
+  if (isNativeFrontdeskApp() && (nativeScrollInteractionActive || editing)) {
+    deferredAutomaticRefreshSource = source;
+    return;
+  }
   const now = Date.now();
   if (now - lastAutomaticRefreshAt < 1200) return;
   lastAutomaticRefreshAt = now;
@@ -6444,6 +6479,7 @@ exposeToWindow({
   markMessageRead,
   marketelNativeAction,
   marketelNativeSelectTab,
+  marketelNativeSwitchProperty,
   maybePromptInstalledNotifications,
   moveSlider,
   needsEditPageLoad,
@@ -6620,6 +6656,21 @@ window.addEventListener('online', () => requestAutomaticRefresh('online'));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestAutomaticRefresh('visible');
 });
+if (isNativeFrontdeskApp()) {
+  document.addEventListener('touchstart', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('touchmove', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('touchend', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('scroll', markNativeScrollInteraction, { passive: true, capture: true });
+  document.addEventListener('focusout', () => {
+    if (!deferredAutomaticRefreshSource) return;
+    window.setTimeout(() => {
+      if (!deferredAutomaticRefreshSource) return;
+      const source = deferredAutomaticRefreshSource;
+      deferredAutomaticRefreshSource = '';
+      requestAutomaticRefresh(source);
+    }, 180);
+  });
+}
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event?.data?.type === 'marketel-frontdesk-data-updated') {

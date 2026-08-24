@@ -16109,6 +16109,8 @@ const CRM_BOOKING_LIST_SELECT = {
     ownerReviewedAt: true,
     ownerReviewReminderCount: true,
     ownerReviewNextReminderAt: true,
+    ourReservationCode: true,
+    pmsConfirmationCode: true,
 };
 
 const CRM_DECLINED_LEAD_LIST_SELECT = {
