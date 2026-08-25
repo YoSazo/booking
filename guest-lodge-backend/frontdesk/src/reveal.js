@@ -720,8 +720,8 @@ function appShowcases() {
     assistant: {
       id: 'assistant',
       eyebrow: 'PROTECT YOUR SETUP',
-      title: 'Fits around what you already use.',
-      body: 'Front Desk checks each request and updates availability from your reply.',
+      title: 'Nothing slips through the cracks.',
+      body: 'The moment a request lands, Front Desk alerts you three ways — Live Activity, text, and push. Reply in plain words or tap once in the app, and it checks the request and updates availability for you.',
       slides: [
         {
           label: 'Booking Alert',

@@ -14869,8 +14869,8 @@ async function loadOwnerSupportThread(hotelId) {
 
 app.get('/api/crm/support', crmAuth, async (req, res) => {
     try {
-        const hotelId = requireScopedHotelId(req, res);
-        if (!hotelId) return;
+        const hotelId = resolveScopedHotelId(req);
+        if (!hotelId) { res.status(403).json({ success: false, message: 'Missing authorized property context.' }); return; }
         const thread = await loadOwnerSupportThread(hotelId);
         res.json({ success: true, thread: serializeSupportThread(thread, 'owner') });
     } catch (e) {
@@ -14881,8 +14881,8 @@ app.get('/api/crm/support', crmAuth, async (req, res) => {
 
 app.post('/api/crm/support/read', crmAuth, async (req, res) => {
     try {
-        const hotelId = requireScopedHotelId(req, res);
-        if (!hotelId) return;
+        const hotelId = resolveScopedHotelId(req);
+        if (!hotelId) { res.status(403).json({ success: false, message: 'Missing authorized property context.' }); return; }
         await withRetry(() => prisma.supportThread.updateMany({
             where: { hotelId },
             data: { ownerLastReadAt: new Date() },
@@ -14896,8 +14896,8 @@ app.post('/api/crm/support/read', crmAuth, async (req, res) => {
 
 app.post('/api/crm/support', crmAuth, supportMessageRateLimit, async (req, res) => {
     try {
-        const hotelId = requireScopedHotelId(req, res);
-        if (!hotelId) return;
+        const hotelId = resolveScopedHotelId(req);
+        if (!hotelId) { res.status(403).json({ success: false, message: 'Missing authorized property context.' }); return; }
         const message = normalizeSupportMessage(req.body?.message);
         if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
         const hotel = await withRetry(() => prisma.hotelConfig.findUnique({

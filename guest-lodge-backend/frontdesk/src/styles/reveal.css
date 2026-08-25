@@ -1791,7 +1791,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 1px;
   overflow: hidden;
   color: #315f48;
@@ -1810,7 +1810,11 @@
   font: inherit;
   font-size: 15px;
   font-weight: 900;
-  text-align: left;
+  text-align: right;
+  /* Hug the number so it right-aligns snug against the $ instead of floating left. */
+  field-sizing: content;
+  min-width: 1.5ch;
+  max-width: 62px;
   appearance: textfield;
 }
 
