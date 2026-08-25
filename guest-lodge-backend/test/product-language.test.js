@@ -52,7 +52,7 @@ test('the reveal establishes the owner app before switching to Guestel', () => {
     assert.match(revealCopy, /Your page, bookings, rooms and guest reach all live in Front Desk/);
     assert.match(revealCopy, /They save your property, book direct again/);
     assert.match(revealCopy, /Front Desk checks each request and updates availability from your reply/);
-    assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel brings them back/);
+    assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel keeps them forever/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
@@ -60,4 +60,16 @@ test('the reveal establishes the owner app before switching to Guestel', () => {
     assert.match(revealCopy, /id: 'system'/);
     assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
+});
+
+test('activation turns the nightly rate into an editable break-even decision', () => {
+    assert.match(revealCopy, /id="mvrActivationRate"/);
+    assert.match(revealCopy, /data-mvr-rate-step="-5"/);
+    assert.match(revealCopy, /Estimate uses a 15% OTA commission/);
+    assert.match(revealCopy, /Three things you're activating/);
+    assert.match(revealCopy, /Direct Booking Page/);
+    assert.match(revealCopy, /Marketel Front Desk/);
+    assert.match(revealCopy, /Guestel/);
+    assert.match(productCopy, /previewActivation/);
+    assert.match(revealCopy, /activationPreviewMode && crm\.hotelSubscribed/);
 });

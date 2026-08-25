@@ -2511,6 +2511,11 @@ async function startCrmApp(verification, options = {}) {
     : (revealStepMatch
         ? Number(revealStepMatch[1])
         : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined));
+  const previewActivation = !!(
+    verification?.subscribed
+    && (crm.isMasterPin || crm.isDogfoodPreview)
+    && shouldShowValueReveal
+  );
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -2640,7 +2645,7 @@ async function startCrmApp(verification, options = {}) {
     try {
       if (typeof loadSettingsModule === 'function') await loadSettingsModule();
       const revealModule = await loadRevealModule();
-      await revealModule.showMarketelValueReveal({ startAt: revealStartAt });
+      await revealModule.showMarketelValueReveal({ startAt: revealStartAt, previewActivation });
     } catch (error) {
       console.error('Marketel value reveal failed:', error);
       if (isFirstWelcome) showWelcomeModal();

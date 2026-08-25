@@ -1552,7 +1552,7 @@
   border-top: 1px solid rgba(211, 227, 217, 0.7);
 }
 
-.mvr-activation-proof .mvr-value-bridge {
+.mvr-activation-proof .mvr-direct-proof {
   margin: 0 auto 18px;
 }
 
@@ -1622,61 +1622,27 @@
   line-height: 1.4;
 }
 
-.mvr-value-bridge {
-  display: grid;
-  gap: 4px;
-  margin: -4px auto 14px;
-  padding: 14px 16px;
+.mvr-direct-proof {
+  width: min(420px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  padding: 11px 14px;
   color: #68776f;
-  text-align: left;
+  text-align: center;
   border: 1px solid rgba(211, 227, 217, 0.6);
   border-left: 3px solid var(--mvr-green);
   border-radius: 14px;
   background: rgba(243, 248, 245, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
-.mvr-value-bridge > span {
-  color: #4e725f;
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.mvr-value-bridge > strong {
+.mvr-direct-proof strong {
+  flex: 0 0 auto;
   color: #1f6848;
-  font-size: 14px;
-}
-
-.mvr-value-bridge p {
-  margin: 0;
-}
-
-.mvr-value-bridge small {
-  margin-top: 3px;
-  padding-top: 7px;
-  color: #718078;
-  border-top: 1px solid #dce8e0;
-  font-size: 9px;
-}
-
-.mvr-value-bridge small b {
-  color: #53685c;
-}
-
-.mvr-value-bridge.is-proof-only {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
-  text-align: center;
-}
-
-.mvr-value-bridge.is-proof-only > strong {
   font-size: 12px;
 }
 
@@ -1752,6 +1718,129 @@
 
 .mvr-price-detail.is-visible {
   color: var(--mvr-green);
+}
+
+.mvr-rate-calculator {
+  width: min(380px, 100%);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(132px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 9px 12px;
+  margin: 8px auto 13px;
+  padding: 12px;
+  color: #53685c;
+  text-align: left;
+  border: 1px solid rgba(185, 215, 197, 0.72);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(238, 248, 242, 0.96), rgba(247, 251, 248, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 8px 20px rgba(34, 87, 59, 0.06);
+}
+
+.mvr-rate-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mvr-rate-heading span {
+  color: #315f48;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.mvr-rate-heading small {
+  color: #779084;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.mvr-rate-stepper {
+  min-width: 0;
+  height: 42px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid rgba(46, 125, 91, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 3px rgba(22, 59, 39, 0.05);
+}
+
+.mvr-rate-stepper button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  color: #fff;
+  border: 0;
+  border-radius: 50%;
+  background: var(--mvr-green);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mvr-rate-stepper label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #315f48;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mvr-rate-stepper input {
+  width: 58px;
+  min-width: 0;
+  padding: 0;
+  color: #1f513a;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+  appearance: textfield;
+}
+
+.mvr-rate-stepper input::-webkit-inner-spin-button,
+.mvr-rate-stepper input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.mvr-rate-result {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.mvr-rate-result strong {
+  color: #1f6848;
+  font-size: 13px;
+  line-height: 1.18;
+}
+
+.mvr-rate-result span {
+  color: #697c71;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.mvr-rate-calculator > small {
+  grid-column: 1 / -1;
+  color: #819087;
+  font-size: 8.5px;
+  line-height: 1.35;
 }
 
 .mvr-guarantee {
@@ -2379,7 +2468,8 @@
     padding-top: 17px;
   }
 
-  .mvr-value-bridge {
+  .mvr-rate-calculator,
+  .mvr-direct-proof {
     max-width: 420px;
   }
 

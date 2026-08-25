@@ -68,6 +68,8 @@ let appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
+let activationNightlyRate = null;
+let activationPreviewMode = false;
 let activeBookingChallenge = null;
 let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
@@ -131,8 +133,9 @@ function nightlyRate() {
   return revealData.rates?.nightly || 99;
 }
 
-// One source for the break-even maths so the reveal's rebooking beat and the
-// activation screen can never quote different numbers.
+// The earlier Guestel chapter uses the saved setup rate. The activation screen
+// has its own editable calculator below because an owner may have skipped that
+// field or may want to test a different room rate before paying.
 function breakEvenEstimate() {
   const rate = Number(revealData.rates?.nightly);
   if (!Number.isFinite(rate) || rate <= 0) return null;
@@ -141,21 +144,75 @@ function breakEvenEstimate() {
   return { rate, roomNights, savings: commissionPerNight * roomNights };
 }
 
-function directBookingValueHtml() {
-  const estimate = breakEvenEstimate();
-  if (!estimate) {
-    return `<div class="mvr-value-bridge is-proof-only">
-      <strong>$5,800 booked direct</strong>
-      <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
-    </div>`;
-  }
-  const { rate, roomNights: breakEvenRoomNights, savings: estimatedSavings } = estimate;
-  return `<div class="mvr-value-bridge">
-    <span>Your potential break-even</span>
-    <strong>About ${breakEvenRoomNights} direct room-night${breakEvenRoomNights === 1 ? '' : 's'} could cover a month.</strong>
-    <p>At ${money(rate)} per night, shifting ${breakEvenRoomNights} room-night${breakEvenRoomNights === 1 ? '' : 's'} from an estimated 15% OTA fee to direct represents about ${money(estimatedSavings)} in commission savings.</p>
-    <small><b>Real result:</b> Suite Stay booked $5,800 direct in one recorded month through this booking engine. Estimates vary with your OTA fees.</small>
+function normalizedActivationRate(value, fallback = 99) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return Math.min(5000, Math.max(25, Math.round(numeric * 100) / 100));
+}
+
+function currentActivationRate() {
+  const savedRate = normalizedActivationRate(revealData.rates?.nightly, 99);
+  return normalizedActivationRate(activationNightlyRate, savedRate);
+}
+
+function activationBreakEven(rate = currentActivationRate()) {
+  const normalizedRate = normalizedActivationRate(rate);
+  const monthlyCost = billingInterval === 'year' ? 1990 / 12 : 199;
+  const commissionPerNight = normalizedRate * 0.15;
+  const roomNights = Math.max(1, Math.ceil(monthlyCost / commissionPerNight));
+  return { rate: normalizedRate, roomNights };
+}
+
+function activationRateCalculatorHtml() {
+  const { rate, roomNights } = activationBreakEven();
+  const unit = roomNights === 1 ? 'room-night' : 'room-nights';
+  const result = billingInterval === 'year'
+    ? 'per month could cover the yearly plan.'
+    : 'could cover one month of Marketel.';
+  return `<div class="mvr-rate-calculator">
+    <div class="mvr-rate-heading"><span>Your nightly rate</span><small>Adjust it</small></div>
+    <div class="mvr-rate-stepper" role="group" aria-label="Nightly room rate">
+      <button type="button" data-mvr-rate-step="-5" aria-label="Lower nightly rate by five dollars">−</button>
+      <label><span>$</span><input type="number" id="mvrActivationRate" min="25" max="5000" step="1" inputmode="decimal" value="${rate}" aria-label="Nightly room rate in dollars"></label>
+      <button type="button" data-mvr-rate-step="5" aria-label="Raise nightly rate by five dollars">+</button>
+    </div>
+    <div class="mvr-rate-result" aria-live="polite">
+      <strong id="mvrBreakEvenNights">${roomNights} direct ${unit}</strong>
+      <span id="mvrBreakEvenContext">${result}</span>
+    </div>
+    <small>Estimate uses a 15% OTA commission. Actual savings depend on your rates and channels.</small>
   </div>`;
+}
+
+function directBookingProofHtml() {
+  return `<div class="mvr-direct-proof">
+    <strong>$5,800 booked direct</strong>
+    <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
+  </div>`;
+}
+
+function updateActivationRateCalculator(value, options = {}) {
+  const rate = normalizedActivationRate(value, currentActivationRate());
+  activationNightlyRate = rate;
+  const { roomNights } = activationBreakEven(rate);
+  const input = document.getElementById('mvrActivationRate');
+  const nights = document.getElementById('mvrBreakEvenNights');
+  const context = document.getElementById('mvrBreakEvenContext');
+  if (options.syncInput !== false && input) input.value = String(rate);
+  if (nights) nights.textContent = `${roomNights} direct ${roomNights === 1 ? 'room-night' : 'room-nights'}`;
+  if (context) {
+    context.textContent = billingInterval === 'year'
+      ? 'per month could cover the yearly plan.'
+      : 'could cover one month of Marketel.';
+  }
+  if (options.track) {
+    trackJourney('JourneyControlActivated', {
+      controlName: 'activation-nightly-rate',
+      nightlyRate: rate,
+      breakEvenRoomNights: roomNights,
+      billingInterval,
+    });
+  }
 }
 
 function bookingUrl() {
@@ -686,7 +743,7 @@ function appShowcases() {
       id: 'system',
       eyebrow: 'THE COMPLETE LOOP',
       title: 'The full direct-booking loop.',
-      body: 'Your page converts. Front Desk runs it. Guestel brings them back.',
+      body: 'Your page converts. Front Desk runs it. Guestel keeps them forever.',
       compact: true,
       slides: [
         {
@@ -966,7 +1023,7 @@ function assistantRevealHtml() {
 }
 
 function finaleHtml() {
-  const isSubscribed = crm.hotelSubscribed;
+  const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
   const displayedPrice = isYearly ? '$1,990' : '$199';
   const displayedInterval = isYearly ? '/year' : '/month';
@@ -974,9 +1031,9 @@ function finaleHtml() {
     ? 'Activate Marketel — $1,990/year'
     : 'Activate Marketel — $199/month';
   const includedValueHtml = `<div class="mvr-value-list">
-    <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-    <div style="--stagger:1"><span>✓</span><p><strong>Your property in Guestel</strong><small>Guests keep your rooms, their stays and your messages one tap away</small></p></div>
-    <div style="--stagger:2"><span>✓</span><p><strong>Marketel Front Desk and Assistant</strong><small>Tell it when a walk-in takes a room; it updates remaining availability</small></p></div>
+    <div style="--stagger:0"><span>1</span><p><strong>Direct Booking Page</strong><small>Take bookings on your own page without OTA commission</small></p></div>
+    <div style="--stagger:1"><span>2</span><p><strong>Marketel Front Desk</strong><small>Control bookings and availability around the setup you already use</small></p></div>
+    <div style="--stagger:2"><span>3</span><p><strong>Guestel</strong><small>Keep repeat direct bookings and guest messages one tap away</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
     <button type="button" class="mvr-finale-back" id="mvrBack">← Back</button>
@@ -984,7 +1041,7 @@ function finaleHtml() {
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>Guests book on your direct page and keep your property in Guestel. You use Marketel Front Desk to manage bookings, availability and the guest relationship.</p>
+      <p>Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.</p>
       ${isSubscribed ? `${includedValueHtml}
         <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
         <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
@@ -995,14 +1052,15 @@ function finaleHtml() {
           </div>
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
           <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">${isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
+          ${activationRateCalculatorHtml()}
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
           <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
           <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
-          ${directBookingValueHtml()}
-          <div class="mvr-included-label">Everything included</div>
+          ${directBookingProofHtml()}
+          <div class="mvr-included-label">Three things you're activating</div>
           ${includedValueHtml}
         </div>`}
     </div>
@@ -1343,6 +1401,17 @@ function finishReveal() {
 }
 
 async function activateMarketel(button) {
+  if (activationPreviewMode && crm.hotelSubscribed) {
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = `${propertyName()} is already active`;
+    window.setTimeout(() => {
+      if (!document.body.contains(button)) return;
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }, 1800);
+    return;
+  }
   if (crm.hotelSubscribed) {
     finishReveal();
     return;
@@ -1406,6 +1475,21 @@ function bindRevealEvents() {
         currency: 'USD',
       });
       renderReveal();
+    });
+  });
+  const rateInput = document.getElementById('mvrActivationRate');
+  rateInput?.addEventListener('input', () => {
+    if (rateInput.value.trim() === '') return;
+    updateActivationRateCalculator(rateInput.value, { syncInput: false });
+  });
+  rateInput?.addEventListener('change', () => {
+    updateActivationRateCalculator(rateInput.value, { track: true });
+  });
+  document.querySelectorAll('[data-mvr-rate-step]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const delta = Number(button.dataset.mvrRateStep) || 0;
+      const current = Number(rateInput?.value) || currentActivationRate();
+      updateActivationRateCalculator(current + delta, { track: true });
     });
   });
   bindAppCarousels();
@@ -1503,6 +1587,7 @@ export async function showMarketelValueReveal(options = {}) {
   revealOpening = false;
   if (document.getElementById('marketelValueReveal')) return;
 
+  activationPreviewMode = options.previewActivation === true && !!crm.hotelSubscribed;
   const requestedStep = Number(options.startAt);
   let storedStep = 0;
   let hadPendingReveal = false;
@@ -1512,10 +1597,11 @@ export async function showMarketelValueReveal(options = {}) {
   currentStep = Number.isFinite(requestedStep)
     ? Math.max(0, Math.min(3, requestedStep))
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));
-  if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
+  if (crm.hotelSubscribed && !activationPreviewMode && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
   stageBeatIndex = { 1: 0, 2: 0 };
   appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
+  activationNightlyRate = null;
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
   bookingEditorVisited = false;
