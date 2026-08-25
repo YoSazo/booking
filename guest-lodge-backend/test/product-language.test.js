@@ -41,19 +41,23 @@ test('walk-in handling states the action and booking-page outcome', () => {
 });
 
 test('the reveal establishes the owner app before switching to Guestel', () => {
-    const ownerApp = revealCopy.indexOf('This is your real Front Desk app.');
-    const guestel = revealCopy.indexOf('Your property stays in Guestel.');
+    const ownerApp = revealCopy.indexOf('Control your engine from one app.');
+    const guestel = revealCopy.indexOf('Keep every guest one tap away.');
+    const assistant = revealCopy.indexOf('Fits around what you already use.');
+    const system = revealCopy.indexOf('The full direct-booking loop.');
     assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
     assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
-    assert.match(revealCopy, /Download Marketel\. Edit your page, rooms and prices from your phone/);
-    assert.match(revealCopy, /Every booking, in one place/);
-    assert.match(revealCopy, /Change availability in seconds/);
-    assert.match(revealCopy, /Guests book you again—direct/);
+    assert.ok(assistant > guestel, 'setup protection appears before the guest relationship is established');
+    assert.ok(system > assistant, 'the complete loop appears before its parts are established');
+    assert.match(revealCopy, /Your page, bookings, rooms and guest reach all live in Front Desk/);
+    assert.match(revealCopy, /They save your property, book direct again/);
+    assert.match(revealCopy, /Front Desk checks each request and updates availability from your reply/);
+    assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel brings them back/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
-    assert.match(revealCopy, /Booking page<\/small><strong>Converts/);
-    assert.match(revealCopy, /Front Desk<\/small><strong>Runs it/);
-    assert.match(revealCopy, /Guestel<\/small><strong>Keeps them/);
+    assert.match(revealCopy, /id: 'assistant'/);
+    assert.match(revealCopy, /id: 'system'/);
+    assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });

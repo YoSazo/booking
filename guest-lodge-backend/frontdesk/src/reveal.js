@@ -3,6 +3,7 @@ import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
+import bookingPageStudios17Url from './assets/booking-page-studios17.webp';
 import frontdeskYourPageUrl from './assets/frontdesk-your-page.webp';
 import frontdeskBookingsUrl from './assets/frontdesk-bookings.webp';
 import frontdeskAvailabilityUrl from './assets/frontdesk-availability.webp';
@@ -10,7 +11,6 @@ import frontdeskGuestAppUrl from './assets/frontdesk-guest-app.webp';
 import guestelHotelsUrl from './assets/guestel-hotels.webp';
 import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
 import guestelChatUrl from './assets/guestel-chat.webp';
-import marketelSystemProofUrl from './assets/marketel-system.webp';
 
 // The owner reaches these carousels only after inspecting the live booking
 // page, which gives us a useful preload window. Warm every carousel screenshot
@@ -24,6 +24,9 @@ const CAROUSEL_SCREEN_URLS = [
   guestelHotelsUrl,
   guestelChooseRoomUrl,
   guestelChatUrl,
+  assistantTextResolutionUrl,
+  assistantBookingRequestUrl,
+  bookingPageStudios17Url,
 ];
 const carouselImageWarmups = new Map();
 
@@ -59,9 +62,9 @@ let revealOpening = false;
 // Which beat each beat-driven stage is showing. Keyed by reveal step.
 let stageBeatIndex = { 1: 0, 2: 0 };
 // The app proof is deliberately optional exploration inside each beat. Keeping
-// its position separate from the funnel beat means someone can inspect all
-// seven screens or move to the next subject after seeing only one.
-let appCarouselIndex = { frontdesk: 0, guestel: 0 };
+// its position separate from the funnel beat means someone can inspect every
+// screen or move to the next subject after seeing only one.
+let appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -584,70 +587,128 @@ function guestAppRevealHtml() {
 function appShowcases() {
   const estimate = breakEvenEstimate();
   const rebookBody = estimate
-    ? `Guests book direct again. About ${estimate.roomNights} room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
-    : 'Guests reopen your rooms and book direct again.';
+    ? `They save your property and book direct again. About ${estimate.roomNights} room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
+    : 'They save your property, book direct again and message you in Guestel.';
   return {
     frontdesk: {
       id: 'frontdesk',
-      eyebrow: '2 · Your Front Desk app',
+      eyebrow: 'CONTROL YOUR ENGINE',
+      title: 'Control your engine from one app.',
+      body: 'Your page, bookings, rooms and guest reach all live in Front Desk.',
       slides: [
         {
           label: 'Your Page',
-          title: 'This is your real Front Desk app.',
-          body: 'Download Marketel. Edit your page, rooms and prices from your phone.',
           url: frontdeskYourPageUrl,
+          width: 900,
+          height: 1721,
           alt: 'Marketel Front Desk Your Page showing the live booking-page editor.',
           event: 'GuestAppOwnerEditorViewed',
         },
         {
           label: 'Bookings',
-          title: 'Every booking, in one place.',
-          body: 'See the guest and keep or release each room request.',
           url: frontdeskBookingsUrl,
+          width: 900,
+          height: 1728,
           alt: 'Marketel Front Desk Bookings showing a complete reservation and availability decision.',
         },
         {
           label: 'Availability',
-          title: 'Change availability in seconds.',
-          body: 'Tap a date and set how many rooms are left.',
           url: frontdeskAvailabilityUrl,
+          width: 900,
+          height: 1734,
           alt: 'Marketel Front Desk Availability showing a room calendar and remaining inventory.',
         },
         {
           label: 'Guest Reach',
-          title: 'Reach guests directly.',
-          body: 'Notify guests who keep your property in Guestel.',
           url: frontdeskGuestAppUrl,
+          width: 900,
+          height: 1734,
           alt: 'Marketel Front Desk Guest Reach showing a live guest notification preview and composer.',
         },
       ],
     },
     guestel: {
       id: 'guestel',
-      eyebrow: '2 · Their Guestel app',
+      eyebrow: 'KEEP YOUR GUESTS',
+      title: 'Keep every guest one tap away.',
+      body: rebookBody,
       slides: [
         {
           label: 'Your Hotels',
-          title: 'Your property stays in Guestel.',
-          body: rebookBody,
           url: guestelHotelsUrl,
+          width: 900,
+          height: 1764,
           alt: 'Guestel Your Hotels showing an upcoming stay and the property saved for direct rebooking.',
           event: 'GuestelWalletViewed',
         },
         {
           label: 'Book Again',
-          title: 'Guests book you again—direct.',
-          body: 'Your rooms and checkout reopen from their saved property.',
           url: guestelChooseRoomUrl,
+          width: 900,
+          height: 1764,
           alt: 'Guestel showing a property room picker and direct stay dates.',
         },
         {
           label: 'Messages',
-          title: 'Keep the guest relationship.',
-          body: 'Their stay and your Front Desk messages live together.',
           url: guestelChatUrl,
+          width: 900,
+          height: 1762,
           alt: 'Guestel Messages showing a direct conversation between a guest and the property Front Desk.',
           event: 'GuestelReachViewed',
+        },
+      ],
+    },
+    assistant: {
+      id: 'assistant',
+      eyebrow: 'PROTECT YOUR SETUP',
+      title: 'Fits around what you already use.',
+      body: 'Front Desk checks each request and updates availability from your reply.',
+      slides: [
+        {
+          label: 'Reply by Text',
+          url: assistantTextResolutionUrl,
+          width: 780,
+          height: 1528,
+          alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk handles the online request and availability.',
+          event: 'AssistantTextProofViewed',
+        },
+        {
+          label: 'Answer in App',
+          url: assistantBookingRequestUrl,
+          width: 780,
+          height: 1528,
+          alt: 'A Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
+          event: 'AssistantAppProofViewed',
+        },
+      ],
+    },
+    system: {
+      id: 'system',
+      eyebrow: 'THE COMPLETE LOOP',
+      title: 'The full direct-booking loop.',
+      body: 'Your page converts. Front Desk runs it. Guestel brings them back.',
+      compact: true,
+      slides: [
+        {
+          label: 'Booking Page',
+          url: bookingPageStudios17Url,
+          width: 900,
+          height: 1948,
+          alt: 'The Studios 17 direct booking page showing its property details, room and Add control.',
+        },
+        {
+          label: 'Front Desk',
+          url: frontdeskYourPageUrl,
+          width: 900,
+          height: 1721,
+          alt: 'Marketel Front Desk showing the page editor used to run the property.',
+        },
+        {
+          label: 'Guestel',
+          url: guestelHotelsUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel showing the property kept in the guest’s hotel wallet.',
         },
       ],
     },
@@ -656,6 +717,7 @@ function appShowcases() {
 
 function carouselPosition(index, active, length) {
   if (index === active) return 'is-active';
+  if (length === 2) return 'is-next';
   if (index === (active - 1 + length) % length) return 'is-prev';
   if (index === (active + 1) % length) return 'is-next';
   return 'is-far';
@@ -663,28 +725,25 @@ function carouselPosition(index, active, length) {
 
 function appCarouselHtml(showcase) {
   const active = Math.max(0, Math.min(showcase.slides.length - 1, appCarouselIndex[showcase.id] || 0));
-  return `<div class="mvr-coverflow" data-mvr-carousel="${showcase.id}" data-active="${active}">
-    <div class="mvr-coverflow-viewport" tabindex="0" role="group" aria-label="${esc(showcase.id === 'frontdesk' ? 'Explore the Marketel Front Desk app' : 'Explore Guestel')}">
-      ${showcase.slides.map((slide, index) => `<button type="button" class="mvr-coverflow-card ${carouselPosition(index, active, showcase.slides.length)}" data-carousel-slide="${index}" aria-label="View ${esc(slide.label)}" aria-pressed="${index === active ? 'true' : 'false'}">
-        <img src="${slide.url}" width="900" height="${showcase.id === 'frontdesk' ? (index === 0 ? '1721' : index === 1 ? '1728' : '1734') : (index === 2 ? '1762' : '1764')}" loading="eager" decoding="async" alt="${esc(slide.alt)}">
+  const subject = {
+    frontdesk: 'Front Desk screen',
+    guestel: 'Guestel screen',
+    assistant: 'Front Desk response',
+    system: 'Marketel system screen',
+  }[showcase.id] || 'screen';
+  return `<div class="mvr-coverflow${showcase.compact ? ' is-system' : ''}" data-mvr-carousel="${showcase.id}" data-active="${active}">
+    <div class="mvr-coverflow-viewport" tabindex="0" role="group" aria-label="Explore ${esc(showcase.title)}">
+      ${showcase.slides.map((slide, index) => `<button type="button" class="mvr-coverflow-card ${carouselPosition(index, active, showcase.slides.length)}" style="aspect-ratio:${slide.width}/${slide.height}" data-carousel-slide="${index}" aria-label="View ${esc(slide.label)}" aria-pressed="${index === active ? 'true' : 'false'}">
+        <img src="${slide.url}" width="${slide.width}" height="${slide.height}" loading="eager" decoding="async" alt="${esc(slide.alt)}">
       </button>`).join('')}
     </div>
     <div class="mvr-coverflow-controls">
-      <button type="button" class="mvr-coverflow-arrow" data-carousel-prev aria-label="Previous ${esc(showcase.id === 'frontdesk' ? 'Front Desk feature' : 'Guestel feature')}">←</button>
+      <button type="button" class="mvr-coverflow-arrow" data-carousel-prev aria-label="Previous ${esc(subject)}">←</button>
       <span class="mvr-coverflow-dots" role="group" aria-label="Choose a screen">
         ${showcase.slides.map((slide, index) => `<button type="button" data-carousel-dot="${index}" class="${index === active ? 'is-active' : ''}" aria-label="${esc(slide.label)}" aria-current="${index === active ? 'true' : 'false'}"></button>`).join('')}
       </span>
       <button type="button" class="mvr-coverflow-next" data-carousel-next>Next: ${esc(showcase.slides[(active + 1) % showcase.slides.length].label)} <span>→</span></button>
     </div>
-  </div>`;
-}
-
-function marketelSystemProofHtml() {
-  return `<div class="mvr-system-proof" role="img" aria-label="Marketel works as one system: the booking page converts guests, Front Desk runs the property, and Guestel keeps the guest relationship.">
-    <img src="${marketelSystemProofUrl}" width="1500" height="2979" decoding="async" alt="">
-    <span class="mvr-system-label is-booking"><small>Booking page</small><strong>Converts</strong></span>
-    <span class="mvr-system-label is-frontdesk"><small>Front Desk</small><strong>Runs it</strong></span>
-    <span class="mvr-system-label is-guestel"><small>Guestel</small><strong>Keeps them</strong></span>
   </div>`;
 }
 
@@ -704,37 +763,22 @@ function guestAppBeats() {
   ];
 }
 
-// Beat 3 is the single real setting on the screen — text vs in-app is not a
-// choice (both always fire), so it is never offered as a toggle.
+// The assistant's two response surfaces belong to one idea, so they swipe
+// inside one beat. The second beat then closes the story with the complete
+// booking-page → Front Desk → Guestel loop.
 function assistantBeats() {
+  const showcases = appShowcases();
   return [
     {
-      title: 'Front Desk checks every booking request.',
-      body: 'When a request arrives, it texts you — reply naturally with whatever changed.',
-      next: 'See how you answer',
+      next: 'See the complete loop',
       event: 'AssistantTextProofViewed',
-      proof: {
-        url: assistantTextResolutionUrl,
-        alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.',
-      },
+      carousel: showcases.assistant,
     },
     {
-      title: 'Or answer with one tap.',
-      body: 'The same request is already waiting in Bookings. Either way works.',
-      next: 'See the whole system',
-      event: 'AssistantAppProofViewed',
-      proof: {
-        url: assistantBookingRequestUrl,
-        alt: 'A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
-      },
-    },
-    {
-      title: '',
-      body: '',
       next: 'Review plans and activation',
       event: 'MarketelSystemViewed',
-      integratedProof: true,
-      render: marketelSystemProofHtml,
+      systemShowcase: true,
+      carousel: showcases.system,
     },
   ];
 }
@@ -756,17 +800,14 @@ function proofFrames(proof) {
 function beatStageHtml(stageClass, eyebrow, beats, index) {
   const beat = beats[Math.max(0, Math.min(beats.length - 1, index))] || beats[0];
   const carousel = beat.carousel;
-  const carouselSlide = carousel
-    ? carousel.slides[Math.max(0, Math.min(carousel.slides.length - 1, appCarouselIndex[carousel.id] || 0))]
-    : null;
   const frames = proofFrames(beat.proof);
   const paired = frames.length > 1;
-  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${beat.integratedProof ? ' is-integrated-proof' : ''}">
-    ${beat.integratedProof ? '' : `<div class="mvr-beat-band">
+  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${beat.systemShowcase ? ' is-system-showcase' : ''}">
+    <div class="mvr-beat-band">
       <div class="mvr-eyebrow">${carousel ? carousel.eyebrow : eyebrow}</div>
-      <h1 class="mvr-beat-title"${carousel ? ' data-carousel-title' : ''}>${carousel ? carouselSlide.title : beat.title}</h1>
-      <p class="mvr-beat-body"${carousel ? ' data-carousel-body' : ''}>${carousel ? carouselSlide.body : beat.body}</p>
-    </div>`}
+      <h1 class="mvr-beat-title"${carousel ? ' data-carousel-title' : ''}>${carousel ? carousel.title : beat.title}</h1>
+      <p class="mvr-beat-body"${carousel ? ' data-carousel-body' : ''}>${carousel ? carousel.body : beat.body}</p>
+    </div>
     <div class="mvr-beat-stage">
       ${carousel ? appCarouselHtml(carousel) : beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
         ${frames.map((frame, i) => `<img class="mvr-beat-frame${i === 0 ? ' is-active' : ''}" src="${frame.url}" width="780" height="1528" decoding="async" alt="${esc(frame.alt)}">`).join('')}
@@ -842,8 +883,8 @@ function setAppCarouselSlide(root, requestedIndex, manual = false) {
   const slide = showcase.slides[active];
   const title = root.closest('.mvr-stage')?.querySelector('[data-carousel-title]');
   const body = root.closest('.mvr-stage')?.querySelector('[data-carousel-body]');
-  if (title) title.textContent = slide.title;
-  if (body) body.textContent = slide.body;
+  if (title) title.textContent = showcase.title;
+  if (body) body.textContent = showcase.body;
   const next = root.querySelector('[data-carousel-next]');
   if (next) next.innerHTML = `Next: ${esc(showcase.slides[(active + 1) % length].label)} <span>→</span>`;
   if (!manual || active === previous) return;
@@ -1474,7 +1515,7 @@ export async function showMarketelValueReveal(options = {}) {
   if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
   stageBeatIndex = { 1: 0, 2: 0 };
-  appCarouselIndex = { frontdesk: 0, guestel: 0 };
+  appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
   bookingEditorVisited = false;
