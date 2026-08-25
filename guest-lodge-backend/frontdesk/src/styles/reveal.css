@@ -1209,12 +1209,11 @@
    recognizable neighbors behind it. The side screens are also controls, so
    the visual itself teaches that there is more without another instruction. */
 .mvr-coverflow {
+  position: relative;
   width: min(700px, 100%);
   height: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 9px;
+  display: block;
   margin: 0 auto;
   animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -1222,6 +1221,7 @@
 .mvr-coverflow-viewport {
   position: relative;
   width: 100%;
+  height: 100%;
   min-height: 280px;
   overflow: hidden;
   outline: none;
@@ -1241,7 +1241,7 @@
   left: 50%;
   z-index: 1;
   width: auto;
-  max-width: 58%;
+  max-width: 70%;
   aspect-ratio: 900 / 1734;
   padding: 0;
   border: 0;
@@ -1301,12 +1301,25 @@
 }
 
 .mvr-coverflow-controls {
+  position: absolute;
+  right: auto;
+  bottom: 5px;
+  left: 50%;
+  z-index: 8;
   min-height: 42px;
   display: grid;
   grid-template-columns: 40px auto minmax(112px, max-content);
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding: 4px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  background: rgba(240, 247, 242, 0.72);
+  box-shadow: 0 8px 24px rgba(28, 67, 46, 0.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  transform: translateX(-50%);
 }
 
 .mvr-coverflow-arrow,
@@ -1381,28 +1394,62 @@
   background: rgba(255, 255, 255, 0.95);
 }
 
-/* The last beat has only one job: make the three-product system click. Its
-   copy is intentionally compact, returning the reclaimed height to the real
-   screens. On a phone this makes the active proof roughly 30% larger than the
-   feature carousels while the activation CTA remains above the fold. */
-.mvr-stage-beats.is-system-showcase {
+/* Carousel copy is part of the product canvas instead of consuming a row above
+   it. The wash has no card edge: it starts opaque below the progress bar and
+   dissolves into the screenshot, keeping the text readable while allowing the
+   phone to use the full distance down to the primary CTA. */
+.mvr-stage-beats.is-carousel-showcase {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.mvr-stage-beats.is-carousel-showcase .mvr-beat-stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mvr-carousel-copy-wash {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 7;
+  box-sizing: border-box;
+  min-height: 146px;
+  display: grid;
+  align-content: start;
   gap: 4px;
-  padding-top: 4px;
+  padding: 8px 18px 52px;
+  text-align: center;
+  pointer-events: none;
 }
 
-.mvr-stage-beats.is-system-showcase .mvr-beat-band {
-  min-height: 82px;
-  margin-bottom: 0;
-  gap: 3px;
+.mvr-carousel-copy-wash::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  background: linear-gradient(
+    180deg,
+    rgba(239, 246, 241, 0.99) 0%,
+    rgba(239, 246, 241, 0.94) 52%,
+    rgba(239, 246, 241, 0.62) 72%,
+    rgba(239, 246, 241, 0) 100%
+  );
 }
 
-.mvr-stage-beats.is-system-showcase .mvr-beat-title {
-  font-size: clamp(20px, 5vw, 25px);
+.mvr-carousel-copy-wash .mvr-beat-title {
+  margin: 0;
+  font-size: clamp(21px, 5.5vw, 27px);
 }
 
-.mvr-stage-beats.is-system-showcase .mvr-beat-body {
-  font-size: 13px;
-  line-height: 1.35;
+.mvr-carousel-copy-wash .mvr-beat-body {
+  max-width: 580px;
+  margin: 0 auto;
+  font-size: 13.5px;
+  line-height: 1.42;
 }
 
 .mvr-coverflow.is-system .mvr-coverflow-card {
@@ -1417,156 +1464,6 @@
 .mvr-coverflow.is-system .mvr-coverflow-card.is-next {
   opacity: 0.55;
   transform: translateX(4%) scale(0.78) rotateY(-6deg);
-}
-
-.mvr-coverflow.is-system .mvr-coverflow-card.is-active {
-  cursor: zoom-in;
-}
-
-.mvr-coverflow-expand-corners {
-  position: absolute;
-  inset: 5px;
-  z-index: 5;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 240ms ease;
-}
-
-.mvr-coverflow-card.is-active .mvr-coverflow-expand-corners {
-  opacity: 0.82;
-}
-
-.mvr-coverflow-expand-corners i {
-  position: absolute;
-  width: 15px;
-  height: 15px;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
-}
-
-.mvr-coverflow-expand-corners i:nth-child(1) {
-  top: 0;
-  left: 0;
-  border-top: 2px solid #fff;
-  border-left: 2px solid #fff;
-  border-radius: 5px 0 0;
-}
-
-.mvr-coverflow-expand-corners i:nth-child(2) {
-  top: 0;
-  right: 0;
-  border-top: 2px solid #fff;
-  border-right: 2px solid #fff;
-  border-radius: 0 5px 0 0;
-}
-
-.mvr-coverflow-expand-corners i:nth-child(3) {
-  bottom: 0;
-  left: 0;
-  border-bottom: 2px solid #fff;
-  border-left: 2px solid #fff;
-  border-radius: 0 0 0 5px;
-}
-
-.mvr-coverflow-expand-corners i:nth-child(4) {
-  right: 0;
-  bottom: 0;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-  border-radius: 0 0 5px;
-}
-
-.mvr-showcase-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  box-sizing: border-box;
-  display: grid;
-  place-items: center;
-  padding:
-    max(18px, env(safe-area-inset-top))
-    max(14px, env(safe-area-inset-right))
-    max(14px, env(safe-area-inset-bottom))
-    max(14px, env(safe-area-inset-left));
-  background: rgba(18, 34, 26, 0.58);
-  -webkit-backdrop-filter: blur(22px) saturate(1.1);
-  backdrop-filter: blur(22px) saturate(1.1);
-  animation: mvr-lightbox-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.mvr-showcase-lightbox.is-closing {
-  animation: mvr-lightbox-out 180ms ease both;
-}
-
-.mvr-showcase-lightbox figure {
-  width: min(520px, 100%);
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
-  margin: 0;
-}
-
-.mvr-showcase-lightbox img {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  object-fit: contain;
-  filter: drop-shadow(0 24px 46px rgba(0, 0, 0, 0.28));
-}
-
-.mvr-showcase-lightbox figcaption {
-  display: grid;
-  gap: 2px;
-  padding: 11px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  border-radius: 16px;
-  color: #183126;
-  background: rgba(244, 250, 246, 0.9);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
-  text-align: center;
-}
-
-.mvr-showcase-lightbox figcaption strong {
-  font-size: 15px;
-  font-weight: 850;
-}
-
-.mvr-showcase-lightbox figcaption span {
-  color: #617168;
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.mvr-showcase-lightbox-close {
-  position: absolute;
-  top: max(14px, env(safe-area-inset-top));
-  right: max(14px, env(safe-area-inset-right));
-  z-index: 2;
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  padding: 0 0 2px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  color: #173126;
-  background: rgba(244, 250, 246, 0.9);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
-  font-size: 27px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-@keyframes mvr-lightbox-in {
-  from { opacity: 0; transform: scale(0.975); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes mvr-lightbox-out {
-  from { opacity: 1; transform: scale(1); }
-  to { opacity: 0; transform: scale(0.985); }
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -1590,11 +1487,7 @@
   .mvr-coverflow { animation: none; }
 
   .mvr-coverflow-card,
-  .mvr-coverflow-dots button,
-  .mvr-coverflow-expand-corners { transition: none; }
-
-  .mvr-showcase-lightbox,
-  .mvr-showcase-lightbox.is-closing { animation: none; }
+  .mvr-coverflow-dots button { transition: none; }
 }
 
 /* The activation screen owns the whole scroll area rather than sitting above a
@@ -2454,11 +2347,25 @@
   }
 
   .mvr-coverflow-card {
-    max-width: 62%;
+    max-width: 92%;
   }
 
   .mvr-coverflow.is-system .mvr-coverflow-card {
-    max-width: 78%;
+    max-width: 94%;
+  }
+
+  .mvr-carousel-copy-wash {
+    min-height: 142px;
+    padding: 7px 12px 49px;
+  }
+
+  .mvr-carousel-copy-wash .mvr-beat-title {
+    font-size: clamp(20px, 5.7vw, 25px);
+  }
+
+  .mvr-carousel-copy-wash .mvr-beat-body {
+    font-size: 12.75px;
+    line-height: 1.38;
   }
 
   .mvr-coverflow-card.is-prev {

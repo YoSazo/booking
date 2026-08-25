@@ -633,7 +633,6 @@ function appShowcases() {
       id: 'system',
       eyebrow: '3 · One connected system',
       compact: true,
-      expandable: true,
       slides: [
         {
           label: 'Booking Page',
@@ -675,9 +674,8 @@ function appCarouselHtml(showcase) {
   const active = Math.max(0, Math.min(showcase.slides.length - 1, appCarouselIndex[showcase.id] || 0));
   return `<div class="mvr-coverflow${showcase.compact ? ' is-system' : ''}" data-mvr-carousel="${showcase.id}" data-active="${active}">
     <div class="mvr-coverflow-viewport" tabindex="0" role="group" aria-label="${esc(showcase.id === 'frontdesk' ? 'Explore the Marketel Front Desk app' : showcase.id === 'guestel' ? 'Explore Guestel' : 'Explore the complete Marketel system')}">
-      ${showcase.slides.map((slide, index) => `<button type="button" class="mvr-coverflow-card ${carouselPosition(index, active, showcase.slides.length)}" style="aspect-ratio:900/${slide.height}" data-carousel-slide="${index}" aria-label="${showcase.expandable && index === active ? 'Expand' : 'View'} ${esc(slide.label)}" aria-pressed="${index === active ? 'true' : 'false'}">
+      ${showcase.slides.map((slide, index) => `<button type="button" class="mvr-coverflow-card ${carouselPosition(index, active, showcase.slides.length)}" style="aspect-ratio:900/${slide.height}" data-carousel-slide="${index}" aria-label="View ${esc(slide.label)}" aria-pressed="${index === active ? 'true' : 'false'}">
         <img src="${slide.url}" width="900" height="${slide.height}" decoding="async" alt="${esc(slide.alt)}">
-        ${showcase.expandable ? '<span class="mvr-coverflow-expand-corners" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' : ''}
       </button>`).join('')}
     </div>
     <div class="mvr-coverflow-controls">
@@ -762,14 +760,15 @@ function beatStageHtml(stageClass, eyebrow, beats, index) {
     : null;
   const frames = proofFrames(beat.proof);
   const paired = frames.length > 1;
-  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${beat.systemShowcase ? ' is-system-showcase' : ''}">
-    <div class="mvr-beat-band">
+  const copy = `<div class="${carousel ? 'mvr-carousel-copy-wash' : 'mvr-beat-band'}">
       <div class="mvr-eyebrow">${carousel ? carousel.eyebrow : eyebrow}</div>
       <h1 class="mvr-beat-title"${carousel ? ' data-carousel-title' : ''}>${carousel ? carouselSlide.title : beat.title}</h1>
       <p class="mvr-beat-body"${carousel ? ' data-carousel-body' : ''}>${carousel ? carouselSlide.body : beat.body}</p>
-    </div>
+    </div>`;
+  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${carousel ? ' is-carousel-showcase' : ''}${beat.systemShowcase ? ' is-system-showcase' : ''}">
+    ${carousel ? '' : copy}
     <div class="mvr-beat-stage">
-      ${carousel ? appCarouselHtml(carousel) : beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
+      ${carousel ? `${appCarouselHtml(carousel)}${copy}` : beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
         ${frames.map((frame, i) => `<img class="mvr-beat-frame${i === 0 ? ' is-active' : ''}" src="${frame.url}" width="780" height="1528" decoding="async" alt="${esc(frame.alt)}">`).join('')}
         ${paired ? `<span class="mvr-beat-frame-dots" aria-hidden="true">${frames.map((_, i) => `<i${i === 0 ? ' class="is-active"' : ''}></i>`).join('')}</span>` : ''}
       </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
@@ -833,7 +832,7 @@ function setAppCarouselSlide(root, requestedIndex, manual = false) {
     card.classList.remove('is-active', 'is-prev', 'is-next', 'is-far');
     card.classList.add(carouselPosition(index, active, length));
     card.setAttribute('aria-pressed', index === active ? 'true' : 'false');
-    card.setAttribute('aria-label', `${showcase.expandable && index === active ? 'Expand' : 'View'} ${showcase.slides[index].label}`);
+    card.setAttribute('aria-label', `View ${showcase.slides[index].label}`);
     card.tabIndex = index === active ? 0 : -1;
   });
   root.querySelectorAll('[data-carousel-dot]').forEach((dot) => {
@@ -857,52 +856,6 @@ function setAppCarouselSlide(root, requestedIndex, manual = false) {
   });
 }
 
-function openAppCarouselLightbox(root, slideIndex) {
-  const showcase = appShowcases()[root?.dataset.mvrCarousel];
-  const slide = showcase?.slides?.[slideIndex];
-  if (!showcase?.expandable || !slide || document.querySelector('.mvr-showcase-lightbox')) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'mvr-showcase-lightbox';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', `${slide.label} full-screen preview`);
-  overlay.innerHTML = `<button type="button" class="mvr-showcase-lightbox-close" aria-label="Close full-screen preview">×</button>
-    <figure>
-      <img src="${slide.url}" width="900" height="${slide.height}" alt="${esc(slide.alt)}">
-      <figcaption><strong>${esc(slide.title)}</strong><span>${esc(slide.body)}</span></figcaption>
-    </figure>`;
-  const opener = root.querySelector(`[data-carousel-slide="${slideIndex}"]`);
-  let closing = false;
-  const close = () => {
-    if (closing) return;
-    closing = true;
-    document.removeEventListener('keydown', onKeyDown);
-    overlay.classList.add('is-closing');
-    window.setTimeout(() => {
-      overlay.remove();
-      opener?.focus({ preventScroll: true });
-    }, 180);
-  };
-  const onKeyDown = (event) => {
-    if (event.key === 'Escape') close();
-    if (event.key === 'Tab') {
-      event.preventDefault();
-      overlay.querySelector('.mvr-showcase-lightbox-close')?.focus({ preventScroll: true });
-    }
-  };
-  overlay.querySelector('.mvr-showcase-lightbox-close')?.addEventListener('click', close);
-  overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) close();
-  });
-  document.addEventListener('keydown', onKeyDown);
-  document.getElementById('marketelValueReveal')?.appendChild(overlay);
-  overlay.querySelector('.mvr-showcase-lightbox-close')?.focus({ preventScroll: true });
-  trackJourney('JourneyControlActivated', {
-    controlName: 'system-showcase-expanded',
-    screen: slide.label,
-  });
-}
-
 function bindAppCarousels() {
   document.querySelectorAll('[data-mvr-carousel]').forEach((root) => {
     const showcase = appShowcases()[root.dataset.mvrCarousel];
@@ -919,10 +872,6 @@ function bindAppCarousels() {
       card.addEventListener('click', () => {
         if (performance.now() < suppressCardClickUntil) return;
         const index = Number(card.dataset.carouselSlide);
-        if (showcase.expandable && index === active()) {
-          openAppCarouselLightbox(root, index);
-          return;
-        }
         setAppCarouselSlide(root, index, true);
       });
     });
