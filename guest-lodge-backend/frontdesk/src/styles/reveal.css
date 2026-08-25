@@ -1085,7 +1085,7 @@
    Reserving room for the longest beat keeps all of them identical. */
 .mvr-beat-band {
   width: min(620px, 100%);
-  min-height: 132px;
+  min-height: 112px;
   display: grid;
   align-content: center;
   gap: 6px;
@@ -1096,7 +1096,7 @@
 .mvr-beat-title {
   margin: 0;
   color: #16281f;
-  font-size: clamp(20px, 5.4vw, 27px);
+  font-size: clamp(19px, 5vw, 25px);
   font-weight: 800;
   line-height: 1.16;
   letter-spacing: -0.025em;
@@ -1106,8 +1106,8 @@
 .mvr-beat-body {
   margin: 0;
   color: #5d6f65;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
@@ -1209,11 +1209,12 @@
    recognizable neighbors behind it. The side screens are also controls, so
    the visual itself teaches that there is more without another instruction. */
 .mvr-coverflow {
-  position: relative;
   width: min(700px, 100%);
   height: 100%;
   min-height: 0;
-  display: block;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 9px;
   margin: 0 auto;
   animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -1221,7 +1222,6 @@
 .mvr-coverflow-viewport {
   position: relative;
   width: 100%;
-  height: 100%;
   min-height: 280px;
   overflow: hidden;
   outline: none;
@@ -1241,7 +1241,7 @@
   left: 50%;
   z-index: 1;
   width: auto;
-  max-width: 70%;
+  max-width: 58%;
   aspect-ratio: 900 / 1734;
   padding: 0;
   border: 0;
@@ -1301,25 +1301,12 @@
 }
 
 .mvr-coverflow-controls {
-  position: absolute;
-  right: auto;
-  bottom: 5px;
-  left: 50%;
-  z-index: 8;
   min-height: 42px;
   display: grid;
   grid-template-columns: 40px auto minmax(112px, max-content);
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 4px 5px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  border-radius: 999px;
-  background: rgba(240, 247, 242, 0.72);
-  box-shadow: 0 8px 24px rgba(28, 67, 46, 0.1);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
-  transform: translateX(-50%);
 }
 
 .mvr-coverflow-arrow,
@@ -1394,76 +1381,92 @@
   background: rgba(255, 255, 255, 0.95);
 }
 
-/* Carousel copy is part of the product canvas instead of consuming a row above
-   it. The wash has no card edge: it starts opaque below the progress bar and
-   dissolves into the screenshot, keeping the text readable while allowing the
-   phone to use the full distance down to the primary CTA. */
-.mvr-stage-beats.is-carousel-showcase {
+/* Final proof: the three real surfaces are the diagram. The labels occupy the
+   transparent gaps in the supplied composition, so the owner reads the system
+   in one glance without shrinking the phones further or adding a fourth card. */
+.mvr-stage-beats.is-integrated-proof {
   grid-template-rows: minmax(0, 1fr);
   gap: 0;
   padding: 0;
 }
 
-.mvr-stage-beats.is-carousel-showcase .mvr-beat-stage {
-  position: relative;
+.mvr-stage-beats.is-integrated-proof .mvr-beat-stage {
   min-height: 0;
-  overflow: hidden;
 }
 
-.mvr-carousel-copy-wash {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 7;
-  box-sizing: border-box;
-  min-height: 146px;
-  display: grid;
-  align-content: start;
-  gap: 4px;
-  padding: 8px 18px 52px;
-  text-align: center;
-  pointer-events: none;
+.mvr-stage-beats.is-integrated-proof .mvr-beat-settings {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.mvr-carousel-copy-wash::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  content: '';
-  background: linear-gradient(
-    180deg,
-    rgba(239, 246, 241, 0.99) 0%,
-    rgba(239, 246, 241, 0.94) 52%,
-    rgba(239, 246, 241, 0.62) 72%,
-    rgba(239, 246, 241, 0) 100%
-  );
-}
-
-.mvr-carousel-copy-wash .mvr-beat-title {
-  margin: 0;
-  font-size: clamp(21px, 5.5vw, 27px);
-}
-
-.mvr-carousel-copy-wash .mvr-beat-body {
-  max-width: 580px;
+.mvr-system-proof {
+  position: relative;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  aspect-ratio: 1500 / 2979;
   margin: 0 auto;
-  font-size: 13.5px;
-  line-height: 1.42;
 }
 
-.mvr-coverflow.is-system .mvr-coverflow-card {
-  max-width: 76%;
+.mvr-system-proof > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 38px rgba(24, 55, 38, 0.14));
 }
 
-.mvr-coverflow.is-system .mvr-coverflow-card.is-prev {
-  opacity: 0.42;
-  transform: translateX(-104%) scale(0.75) rotateY(6deg);
+.mvr-system-label {
+  position: absolute;
+  z-index: 2;
+  width: 42%;
+  box-sizing: border-box;
+  display: grid;
+  gap: 1px;
+  padding: clamp(7px, 1.4vh, 12px) clamp(8px, 1.5vw, 14px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: clamp(12px, 2.2vw, 18px);
+  color: #193528;
+  background: rgba(244, 250, 246, 0.88);
+  box-shadow: 0 10px 28px rgba(20, 55, 37, 0.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  backdrop-filter: blur(18px) saturate(1.35);
 }
 
-.mvr-coverflow.is-system .mvr-coverflow-card.is-next {
-  opacity: 0.55;
-  transform: translateX(4%) scale(0.78) rotateY(-6deg);
+.mvr-system-label small {
+  color: #617269;
+  font-size: clamp(8px, 1.7vw, 11px);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.mvr-system-label strong {
+  color: #196d4c;
+  font-size: clamp(12px, 2.9vw, 18px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.mvr-system-label.is-booking {
+  top: 9%;
+  right: 1%;
+}
+
+.mvr-system-label.is-frontdesk {
+  top: 46.2%;
+  left: 1%;
+}
+
+.mvr-system-label.is-guestel {
+  right: 1%;
+  bottom: 7%;
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -2347,25 +2350,7 @@
   }
 
   .mvr-coverflow-card {
-    max-width: 92%;
-  }
-
-  .mvr-coverflow.is-system .mvr-coverflow-card {
-    max-width: 94%;
-  }
-
-  .mvr-carousel-copy-wash {
-    min-height: 142px;
-    padding: 7px 12px 49px;
-  }
-
-  .mvr-carousel-copy-wash .mvr-beat-title {
-    font-size: clamp(20px, 5.7vw, 25px);
-  }
-
-  .mvr-carousel-copy-wash .mvr-beat-body {
-    font-size: 12.75px;
-    line-height: 1.38;
+    max-width: 62%;
   }
 
   .mvr-coverflow-card.is-prev {
@@ -2780,14 +2765,13 @@
   .mvr-brand { display: none; }
 
   .mvr-stage-beats .mvr-beat-band {
-    /* Measured: the tallest beat's copy is 123px at 375px wide. */
-    min-height: 124px;
+    min-height: 104px;
     margin-bottom: 8px;
   }
 
   .mvr-stage-beats .mvr-beat-body {
-    font-size: 13.5px;
-    line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.38;
   }
 
   .mvr-footer {

@@ -41,17 +41,19 @@ test('walk-in handling states the action and booking-page outcome', () => {
 });
 
 test('the reveal establishes the owner app before switching to Guestel', () => {
-    const ownerApp = revealCopy.indexOf('The Front Desk you just used is your real app.');
-    const guestel = revealCopy.indexOf('Your property stays in their Guestel wallet.');
+    const ownerApp = revealCopy.indexOf('This is your real Front Desk app.');
+    const guestel = revealCopy.indexOf('Your property stays in Guestel.');
     assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
     assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
-    assert.match(revealCopy, /Download Marketel from the App Store/);
-    assert.match(revealCopy, /Every reservation lands in one place/);
-    assert.match(revealCopy, /Change a room-night in seconds/);
-    assert.match(revealCopy, /They can book you again without an OTA/);
+    assert.match(revealCopy, /Download Marketel\. Edit your page, rooms and prices from your phone/);
+    assert.match(revealCopy, /Every booking, in one place/);
+    assert.match(revealCopy, /Change availability in seconds/);
+    assert.match(revealCopy, /Guests book you again—direct/);
+    assert.match(revealCopy, /preloadCarouselScreens/);
+    assert.match(revealCopy, /loading="eager"/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
-    assert.match(revealCopy, /Booking page converts\./);
-    assert.match(revealCopy, /Front Desk runs it\./);
-    assert.match(revealCopy, /Guestel keeps them\./);
+    assert.match(revealCopy, /Booking page<\/small><strong>Converts/);
+    assert.match(revealCopy, /Front Desk<\/small><strong>Runs it/);
+    assert.match(revealCopy, /Guestel<\/small><strong>Keeps them/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });
