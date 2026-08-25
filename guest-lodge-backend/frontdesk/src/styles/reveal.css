@@ -1792,13 +1792,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 1px;
+  overflow: hidden;
   color: #315f48;
   font-size: 13px;
   font-weight: 900;
 }
 
 .mvr-rate-stepper input {
-  width: 58px;
+  width: 46px;
   min-width: 0;
   padding: 0;
   color: #1f513a;
@@ -1808,7 +1810,7 @@
   font: inherit;
   font-size: 15px;
   font-weight: 900;
-  text-align: center;
+  text-align: left;
   appearance: textfield;
 }
 

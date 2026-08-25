@@ -1,6 +1,7 @@
 import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
+import assistantAlertStackUrl from './assets/assistant-alert-stack.webp';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
 import bookingPageStudios17Url from './assets/booking-page-studios17.webp';
@@ -24,6 +25,7 @@ const CAROUSEL_SCREEN_URLS = [
   guestelHotelsUrl,
   guestelChooseRoomUrl,
   guestelChatUrl,
+  assistantAlertStackUrl,
   assistantTextResolutionUrl,
   assistantBookingRequestUrl,
   bookingPageStudios17Url,
@@ -722,6 +724,13 @@ function appShowcases() {
       body: 'Front Desk checks each request and updates availability from your reply.',
       slides: [
         {
+          label: 'Booking Alert',
+          url: assistantAlertStackUrl,
+          width: 900,
+          height: 1748,
+          alt: 'A Marketel booking request reaching the owner through a Front Desk Live Activity, text message and push notification.',
+        },
+        {
           label: 'Reply by Text',
           url: assistantTextResolutionUrl,
           width: 780,
@@ -750,7 +759,7 @@ function appShowcases() {
           label: 'Booking Page',
           url: bookingPageStudios17Url,
           width: 900,
-          height: 1948,
+          height: 1724,
           alt: 'The Studios 17 direct booking page showing its property details, room and Add control.',
         },
         {
