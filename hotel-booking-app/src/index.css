@@ -2980,8 +2980,8 @@ padding: 6px 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
+    gap: 14px;
+    padding: 22px 20px 24px;
     background: linear-gradient(135deg, #2E7D5B 0%, #1a5c3f 100%);
     text-align: center;
 }
@@ -2989,20 +2989,20 @@ padding: 6px 16px;
 .checkout-booking-banner__copy {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     max-width: 360px;
 }
 
 .checkout-booking-banner__copy strong {
     color: #fff;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
 }
 
 .checkout-booking-banner__copy span {
     color: rgba(255, 255, 255, 0.88);
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 13.5px;
+    line-height: 1.5;
 }
 
 .checkout-booking-banner__call {
@@ -3012,7 +3012,7 @@ padding: 6px 16px;
     gap: 8px;
     width: 100%;
     max-width: 320px;
-    padding: 13px;
+    padding: 14px;
     border-radius: 10px;
     background: #fff;
     color: #1a5c3f;
@@ -4438,67 +4438,52 @@ padding: 6px 16px;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-/* On short screens, make the modal sheet scrollable so CTA is always reachable */
-@media (max-height: 700px) {
-  .confirmation-call-modal-overlay {
+/* On very short screens only, let the sheet scroll so the CTA stays reachable.
+   Do not squash normal iPhones — Safari chrome often leaves height under 700px. */
+@media (max-height: 560px) {
+  .confirmation-call-modal-overlay,
+  .why-card-modal-overlay {
     align-items: flex-start;
     padding: 16px;
     overflow-y: auto;
   }
 
-  .confirmation-call-modal-sheet {
+  .confirmation-call-modal-sheet,
+  .why-card-modal-sheet {
     max-height: calc(100dvh - 32px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 }
 
-/* iPhone SE and similar (375x667) - tighten spacing so CTA fits without scrolling */
-@media (max-height: 700px) and (max-width: 390px) {
+/* iPhone SE-class only — slight tighten, keep readable spacing */
+@media (max-height: 560px) and (max-width: 390px) {
   .confirmation-call-modal-sheet {
-    padding: 16px 16px 16px;
+    padding: 20px 18px 18px;
   }
 
   .confirmation-call-phone-pulse-wrapper {
-    margin-bottom: 8px;
-  }
-
-  .confirmation-call-phone-pulse {
-    width: 44px;
-    height: 44px;
-  }
-
-  .confirmation-call-phone-inner {
-    font-size: 18px;
-    inset: 6px;
-  }
-
-  .confirmation-call-title {
-    font-size: 17px;
-    margin-bottom: 4px;
-  }
-
-  .confirmation-call-subtitle {
-    font-size: 12px;
     margin-bottom: 12px;
   }
 
-  .confirmation-call-info-rows {
-    gap: 6px;
+  .confirmation-call-title {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .confirmation-call-subtitle {
+    font-size: 13px;
     margin-bottom: 14px;
   }
 
-  .confirmation-call-info-row {
-    padding: 8px 10px;
-  }
-
-  .confirmation-call-phone-number-row {
-    padding: 8px 10px;
+  .confirmation-call-info-rows {
+    gap: 8px;
+    margin-bottom: 16px;
   }
 
   .confirmation-call-cta-btn {
-    padding: 13px 20px;
-    font-size: 14px;
+    padding: 14px 20px;
+    font-size: 15px;
   }
 }
 

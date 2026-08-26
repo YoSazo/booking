@@ -1310,7 +1310,9 @@ const handlePayLaterBooking = async (e) => {
             {showLoadingScreen && <LoadingScreen message="Securing Your Reservation..." />}
 
             {/* Why We Need Your Card - Centered Floating Modal */}
-            {showWhyCardModal && (
+            {showWhyCardModal
+              && typeof document !== 'undefined'
+              && createPortal(
               <div className="why-card-modal-overlay" onClick={(e) => e.stopPropagation()}>
                 <div className="why-card-modal-sheet">
                   <div className="why-card-modal-sheet__icon-row">
@@ -1350,11 +1352,14 @@ const handlePayLaterBooking = async (e) => {
                     🔒 Secured by Stripe &bull; 256-bit encryption
                   </p>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
 
             {/* Card Declined / Payment Issue Recovery Modal */}
-            {showCardDeclineModal && (
+            {showCardDeclineModal
+              && typeof document !== 'undefined'
+              && createPortal(
               <div className="confirmation-call-modal-overlay" onClick={(e) => e.stopPropagation()}>
                 <div className="confirmation-call-modal-sheet">
                   <div className="confirmation-call-phone-pulse-wrapper">
@@ -1423,7 +1428,8 @@ const handlePayLaterBooking = async (e) => {
                     Got It — I&apos;ll Watch for the Call
                   </button>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
             
             <div style={{ position: 'relative', paddingTop: '8px', paddingBottom: '2px', marginBottom: '8px' }}>
