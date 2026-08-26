@@ -90,8 +90,10 @@ final class GuestStore {
     var hotels: [Hotel]
     var reservations: [Reservation]
     var guest: GuestInfo
+    private(set) var hotelDetails: [String: BookingAPI.HotelPublic]
     var conversations: [BookingAPI.ConversationPreview] = []
     var arrival: GuestelArrival? = nil
+    private var refreshingHotels = false
 
     var guestName: String { guest.name.isEmpty ? "Guest" : guest.name }
     var unreadMessageCount: Int { conversations.reduce(0) { $0 + $1.unreadCount } }
@@ -99,11 +101,14 @@ final class GuestStore {
     private static let reservationsKey = "guestel.reservations.v1"
     private static let guestKey = "guestel.guest.v1"
     private static let hotelsKey = "guestel.hotels.v1"
+    private static let hotelDetailsKey = "guestel.hotel-details.v1"
 
     init(hotels: [Hotel]? = nil) {
         self.hotels = hotels ?? GuestStore.loadHotels()
         self.reservations = GuestStore.loadReservations()
         self.guest = GuestStore.loadGuest()
+        self.hotelDetails = GuestStore.loadHotelDetails()
+        for data in hotelDetails.values { ImagePrefetch.warm(data: data) }
     }
 
     func hotelName(for hotelId: String) -> String {
@@ -122,10 +127,12 @@ final class GuestStore {
         hotels = []
         reservations = []
         guest = GuestInfo()
+        hotelDetails = [:]
         conversations = []
         UserDefaults.standard.removeObject(forKey: Self.hotelsKey)
         UserDefaults.standard.removeObject(forKey: Self.reservationsKey)
         UserDefaults.standard.removeObject(forKey: Self.guestKey)
+        UserDefaults.standard.removeObject(forKey: Self.hotelDetailsKey)
         GuestIdentityAccess.clear()
         GuestPaymentAccess.clear()
     }
@@ -139,12 +146,39 @@ final class GuestStore {
         Task { @MainActor in await GuestPushManager.sync(store: self) }
     }
 
+    /// Apply the state carried by a signed APNs event immediately, then let the
+    /// normal server refresh verify it. This is what makes a release/confirm
+    /// visibly land while the guest is looking at Guestel instead of waiting
+    /// for the next app launch.
+    @MainActor
+    @discardableResult
+    func applyReservationStatus(hotelId: String, code: String, status: String) -> Bool {
+        let cleanHotelId = hotelId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanStatus = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanHotelId.isEmpty, !cleanCode.isEmpty, !cleanStatus.isEmpty,
+              let index = reservations.firstIndex(where: {
+                  $0.hotelId == cleanHotelId && $0.code == cleanCode
+              }) else { return false }
+        guard reservations[index].status?.lowercased() != cleanStatus else { return false }
+        reservations[index].status = cleanStatus
+        persistReservations()
+        return true
+    }
+
     private static func loadGuest() -> GuestInfo {
         guard
             let data = UserDefaults.standard.data(forKey: guestKey),
             let g = try? JSONDecoder().decode(GuestInfo.self, from: data)
         else { return GuestInfo() }
         return g
+    }
+
+    private static func loadHotelDetails() -> [String: BookingAPI.HotelPublic] {
+        guard let data = UserDefaults.standard.data(forKey: hotelDetailsKey),
+              let details = try? JSONDecoder().decode([String: BookingAPI.HotelPublic].self, from: data)
+        else { return [:] }
+        return details
     }
 
     // The next stay whose checkout hasn't passed — shown prominently up top.
@@ -166,17 +200,39 @@ final class GuestStore {
         persistHotels()
     }
 
+    func details(for hotelId: String) -> BookingAPI.HotelPublic? {
+        hotelDetails[hotelId]
+    }
+
+    @MainActor
+    func cacheHotelDetails(_ data: BookingAPI.HotelPublic) {
+        hotelDetails[data.id] = data
+        if let encoded = try? JSONEncoder().encode(hotelDetails) {
+            UserDefaults.standard.set(encoded, forKey: Self.hotelDetailsKey)
+        }
+        ImagePrefetch.warm(data: data)
+    }
+
     /// Refreshes display data from the backend without replacing the guest's
     /// wallet ordering or locally retained stay history.
     @MainActor
     func refreshHotels() async {
+        guard !refreshingHotels else { return }
+        refreshingHotels = true
+        defer { refreshingHotels = false }
         let identifiers = hotels.map(\.hotelId)
-        for hotelId in identifiers {
-            guard let data = try? await BookingAPI.hotel(hotelId),
-                  let index = hotels.firstIndex(where: { $0.hotelId == hotelId }) else { continue }
-            hotels[index].name = data.name
-            hotels[index].location = data.guestelWalletSubtitle ?? hotels[index].location
-            hotels[index].imageURL = data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
+        await withTaskGroup(of: BookingAPI.HotelPublic?.self) { group in
+            for hotelId in identifiers {
+                group.addTask { try? await BookingAPI.hotel(hotelId) }
+            }
+            for await result in group {
+                guard let data = result,
+                      let index = hotels.firstIndex(where: { $0.hotelId == data.id }) else { continue }
+                cacheHotelDetails(data)
+                hotels[index].name = data.name
+                hotels[index].location = data.guestelWalletSubtitle ?? hotels[index].location
+                hotels[index].imageURL = data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
+            }
         }
         persistHotels()
     }

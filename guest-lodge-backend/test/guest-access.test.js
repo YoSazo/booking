@@ -140,3 +140,26 @@ test('Guestel clears stale notification badges when the guest returns', () => {
     assert.match(foregroundHandler, /\[\.banner, \.sound\]/);
     assert.doesNotMatch(foregroundHandler, /\.badge/);
 });
+
+test('Guestel applies booking decisions without waiting for another launch', () => {
+    const root = path.join(__dirname, '..', '..');
+    const iosRoot = path.join(root, 'marketel-guestel-ios', 'Guestel');
+    const pushManager = fs.readFileSync(path.join(iosRoot, 'GuestPushManager.swift'), 'utf8');
+    const store = fs.readFileSync(path.join(iosRoot, 'Store.swift'), 'utf8');
+    const rootView = fs.readFileSync(path.join(iosRoot, 'RootView.swift'), 'utf8');
+    const project = fs.readFileSync(path.join(root, 'marketel-guestel-ios', 'project.yml'), 'utf8');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+
+    assert.match(server, /payloadObj\.backgroundRefresh \? \{ 'content-available': 1 \}/);
+    assert.match(server, /backgroundRefresh: true/);
+    assert.match(project, /INFOPLIST_KEY_UIBackgroundModes:[\s\S]{0,80}remote-notification/);
+    assert.match(pushManager, /didReceiveRemoteNotification userInfo/);
+    assert.match(pushManager, /captureBookingStatus/);
+    assert.match(pushManager, /guestelRefreshData/);
+    assert.match(store, /func applyReservationStatus\(hotelId: String, code: String, status: String\)/);
+    assert.match(rootView, /applyPendingBookingStatuses\(\)/);
+    assert.match(rootView, /store\.syncVerifiedWallet\(\)/);
+    // Poll tightly only for the short pending decision window; settled wallets
+    // fall back to a low-cost safety refresh.
+    assert.match(rootView, /hasPendingRequest \? 10 : 60/);
+});

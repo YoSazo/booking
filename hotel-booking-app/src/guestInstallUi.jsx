@@ -80,6 +80,21 @@ export function resolvePropertyIconUrl(hotel, rooms) {
     || '';
 }
 
+// Guestel's Wallet card intentionally uses a wide cover rather than the
+// property's square legacy/PWA icon. Keep this fallback order aligned with the
+// native Guestel wallet API so the confirmation preview is the card that will
+// actually appear after the handoff.
+export function resolveGuestelWalletImageUrl(hotel, rooms) {
+  const roomList = Array.isArray(rooms) && rooms.length ? rooms : hotel?.rooms;
+  const firstRoom = Array.isArray(roomList) ? roomList[0] : null;
+  return hotel?.guestelWalletImageUrl
+    || firstRoom?.imageUrls?.[0]
+    || firstRoom?.images?.[0]?.url
+    || firstRoom?.imageUrl
+    || hotel?.appIconUrl
+    || '';
+}
+
 export function HotelIcon({ hotelName, appIconUrl, size = 68, style = {} }) {
   const initial = (hotelName || 'H').trim().charAt(0).toUpperCase();
   const radius = Math.round(size * 0.25);
@@ -398,4 +413,3 @@ export function IosInstallSheet({
     </div>
   );
 }
-

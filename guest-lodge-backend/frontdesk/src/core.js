@@ -207,6 +207,27 @@ function replayWalkthrough() {
   window.location.assign(next);
 }
 
+// Internal funnel QA: a development master credential or an explicitly scoped
+// dogfood property identifies our own session, so this shortcut never appears
+// for a customer. Reload through the same URL contract used by setup.html
+// instead of mounting the reveal ad hoc; that tests the real authentication,
+// boot, data preload, and step-zero handoff together.
+function replayValueReveal() {
+  if (!(crm.isMasterPin || crm.isDogfoodPreview) || isNativeFrontdeskApp()) return;
+  const u = new URL(window.location.href);
+  u.searchParams.set('reveal', 'step-0');
+  u.searchParams.delete('welcome');
+  u.searchParams.delete('tab');
+  u.searchParams.delete('checkoutCancelled');
+  window.location.assign(u.pathname + u.search + u.hash);
+}
+
+function syncAdminReplayControl() {
+  const button = document.getElementById('btnReplayReveal');
+  if (!button) return;
+  button.style.display = (crm.isMasterPin || crm.isDogfoodPreview) && !isNativeFrontdeskApp() ? '' : 'none';
+}
+
 // ── PWA INSTALL / NOTIFICATIONS STATE ──────────────────────────
 // Captured as early as possible so the "Install Front Desk" button can fire the
 // browser's native install prompt on Android/desktop.
@@ -331,6 +352,8 @@ function getFrontdeskCookie(name) {
 function frontdeskTokenKind(token) {
   const clean = String(token || '');
   if (!clean) return 'none';
+  if (clean.startsWith('fds_')) return 'session';
+  if (clean.startsWith('fdn_')) return 'native-session';
   return clean.startsWith('fd_') ? 'return-token' : 'pin';
 }
 function frontdeskAuthDebugEnabled() {
@@ -613,7 +636,13 @@ function syncNativeAuthenticatedSession() {
   nativeShellPost({
     type: 'authenticated',
     hotelId: crm.activeHotelId,
+    hotelName: crm.activeHotelName || 'Front Desk',
+    domain: crm.activeHotelDomain || '',
     authToken: crm.token,
+    appIconUrl: crm.activeHotelAppIcon || '',
+    guestelWalletImageUrl: crm.guestelWalletImageUrl || '',
+    guestelWalletSubtitle: crm.guestelWalletSubtitle || '',
+    isManualPms: !!crm.revenueEnabled,
     subscribed: true,
     deferNotifications: localStorage.getItem(NATIVE_ONBOARDING_DONE_KEY) !== '1',
   });
@@ -866,6 +895,10 @@ function marketelNativeSelectTab(filter) {
   const allowed = ['settings', 'bookings', 'availability', 'revenue', 'apps'];
   if (!allowed.includes(filter)) return;
   setFilter(filter, document.querySelector(`.tab[data-nav-filter="${filter}"]`));
+}
+
+function marketelNativeSwitchProperty(hotelId) {
+  selectNativeProperty(hotelId);
 }
 
 function marketelNativeAction(action) {
@@ -1615,7 +1648,8 @@ function ensureAvailabilityUi() {
         <div class="rooms-shell">
           <div id="roomsPillBar" class="room-pill-bar"></div>
 
-          <div style="margin:0 0 12px;padding:12px 14px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;font-size:12px;line-height:1.5;">
+          <div id="availabilityWalkinHint" style="position:relative;margin:0 0 12px;padding:12px 42px 12px 14px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;font-size:12px;line-height:1.5;">
+            <button id="availabilityWalkinHintDismiss" type="button" aria-label="Dismiss walk-in help" style="position:absolute;top:7px;right:7px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:transparent;color:#47735e;font-family:inherit;font-size:18px;font-weight:600;line-height:1;cursor:pointer;">×</button>
             <strong style="display:block;font-size:13px;margin-bottom:2px;">Walk-in or another channel took a room?</strong>
             Tap the affected dates and set how many rooms are still available. Once saved, that is the number guests can book on your direct booking page. Or text the Marketel Front Desk contact what happened.
           </div>
@@ -1722,6 +1756,19 @@ function bindAvailabilityUiEvents() {
   const next = document.getElementById('availabilityNextMonthBtn');
   if (prev) prev.addEventListener('click', () => changeAvailabilityMonth(-1));
   if (next) next.addEventListener('click', () => changeAvailabilityMonth(1));
+
+  const walkinHint = document.getElementById('availabilityWalkinHint');
+  const walkinHintDismiss = document.getElementById('availabilityWalkinHintDismiss');
+  const walkinHintKey = `marketelAvailabilityWalkinHintDismissed:${crm.activeHotelId || 'default'}`;
+  try {
+    if (walkinHint && localStorage.getItem(walkinHintKey) === '1') walkinHint.hidden = true;
+  } catch (_) {}
+  if (walkinHint && walkinHintDismiss) {
+    walkinHintDismiss.addEventListener('click', () => {
+      walkinHint.hidden = true;
+      try { localStorage.setItem(walkinHintKey, '1'); } catch (_) {}
+    });
+  }
 
   const modalBg = document.getElementById('roomsAddModalBg');
   const modalCancel = document.getElementById('roomsAddCancelBtn');
@@ -2409,6 +2456,8 @@ async function startCrmApp(verification, options = {}) {
   }
   crm.lastAuthError = '';
   crm.isMasterPin = !!(verification && verification.isMasterPin);
+  crm.isDogfoodPreview = !!(verification && verification.nativePreviewAccess);
+  syncAdminReplayControl();
   crm.currentHotelPms = String((verification && verification.pms) || '').toLowerCase();
   crm.revenueEnabled = !!(verification && verification.isManualPms);
   crm.revenueCache = {};
@@ -2462,6 +2511,11 @@ async function startCrmApp(verification, options = {}) {
     : (revealStepMatch
         ? Number(revealStepMatch[1])
         : (revealRequest === '1' && !shouldResumeValueReveal ? 0 : undefined));
+  const previewActivation = !!(
+    verification?.subscribed
+    && (crm.isMasterPin || crm.isDogfoodPreview)
+    && shouldShowValueReveal
+  );
   if (isFirstWelcome) resetWalkthroughProgress();
 
   if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
@@ -2591,7 +2645,7 @@ async function startCrmApp(verification, options = {}) {
     try {
       if (typeof loadSettingsModule === 'function') await loadSettingsModule();
       const revealModule = await loadRevealModule();
-      await revealModule.showMarketelValueReveal({ startAt: revealStartAt });
+      await revealModule.showMarketelValueReveal({ startAt: revealStartAt, previewActivation });
     } catch (error) {
       console.error('Marketel value reveal failed:', error);
       if (isFirstWelcome) showWelcomeModal();
@@ -2746,6 +2800,7 @@ async function doLogin() {
     crm.token = pin;
     try { localStorage.setItem('crmToken', crm.token); } catch(e) {}
     await startCrmApp(verification);
+    upgradeToDurableSession(verification).catch(() => {});
   } catch (e) {
     err.textContent = e.message === 'Wrong PIN' ? 'Wrong PIN' : (e.message || 'Connection failed');
   } finally {
@@ -2875,6 +2930,8 @@ function showLogin() {
   } catch (_) {}
   crm.token = '';
   crm.isMasterPin = false;
+  crm.isDogfoodPreview = false;
+  syncAdminReplayControl();
   crm.currentHotelPms = '';
   crm.revenueEnabled = false;
   crm.revenueCache = {};
@@ -2885,7 +2942,10 @@ function showLogin() {
   crm.assistantError = '';
   syncRevenueUi();
   try { localStorage.removeItem('crmToken'); } catch(e) {}
-  rememberCrmHotelId('');
+  // Keep the last resolved property after an expired/invalid credential. The
+  // replacement login still needs that scope, and losing it made the generic
+  // web Front Desk look like it had forgotten the owner's property as well as
+  // their session. Explicit native sign-out clears its own selected property.
 }
 
 function showNativeAuthenticationError(error) {
@@ -2896,14 +2956,18 @@ function showNativeAuthenticationError(error) {
   return true;
 }
 
-// fd_ return tokens are handoff credentials that expire in a day, and storing
-// one as the session is why Front Desk would sign an owner out with
-// "Unauthorized" some time after they arrived from setup or Stripe. Trade it
-// for a real session as soon as one request has proved it still works. Failure
-// is not fatal — the handoff token is still valid today, so the owner carries
-// on and the next load tries again.
-async function upgradeToDurableSession() {
-  if (!crm.token || !String(crm.token).startsWith('fd_')) return;
+// Browser credentials are exchanged for a property-scoped 90-day session as
+// soon as one request proves them. This covers setup/Stripe handoff tokens and
+// ordinary web PIN logins, so returning owners do not have to authenticate on
+// every visit and their reusable PIN is not kept in browser storage. Native
+// sessions already have their own durable identity. Failure is non-fatal: the
+// proven credential remains usable and the next launch can try again.
+async function upgradeToDurableSession(verification = null) {
+  const token = String(crm.token || '');
+  if (!token || isNativeFrontdeskApp() || token.startsWith('fds_') || token.startsWith('fdn_')) return;
+  // Development master access should remain visibly administrative rather
+  // than being converted into an ordinary property session.
+  if (verification && verification.isMasterPin) return;
   if (crm.sessionUpgradeInFlight) return;
   crm.sessionUpgradeInFlight = true;
   try {
@@ -2914,7 +2978,7 @@ async function upgradeToDurableSession() {
       logFrontdeskAuth('session-upgraded', { hotelId: data.hotelId || '' });
     }
   } catch (_) {
-    // Keep the handoff token; it still has time left on it.
+    // Keep the proven credential and retry on a future launch.
   } finally {
     crm.sessionUpgradeInFlight = false;
   }
@@ -2987,8 +3051,8 @@ async function bootCrmApp() {
         const verification = await loadCrmBootstrap();
         await startCrmApp(verification, { bootstrapped: true });
         // Bootstrap succeeding is the proof the credential works, which is the
-        // right moment to trade a handoff token for a lasting session.
-        upgradeToDurableSession().catch(() => {});
+        // right moment to trade browser auth for a lasting scoped session.
+        upgradeToDurableSession(verification).catch(() => {});
         return;
       } catch (e) {
         // Safe rolling deploy: an already-installed native bundle may launch
@@ -3000,6 +3064,7 @@ async function bootCrmApp() {
             await loadHotelContext();
             const verification = await verifyCrmToken(crm.token);
             await startCrmApp(verification);
+            upgradeToDurableSession(verification).catch(() => {});
             return;
           } catch (legacyError) {
             e = legacyError;
@@ -3034,6 +3099,7 @@ async function bootCrmApp() {
         try {
           const verification = await verifyCrmToken(crm.token);
           await startCrmApp(verification);
+          upgradeToDurableSession(verification).catch(() => {});
           return;
         } catch (verifyError) {
           crm.lastAuthError = verifyError && verifyError.message ? verifyError.message : 'legacy verify failed';
@@ -3663,8 +3729,33 @@ async function refreshCurrentView(options = {}) {
 }
 
 let lastAutomaticRefreshAt = 0;
+let nativeScrollInteractionActive = false;
+let nativeScrollIdleTimer = 0;
+let deferredAutomaticRefreshSource = '';
+
+function markNativeScrollInteraction() {
+  if (!isNativeFrontdeskApp()) return;
+  nativeScrollInteractionActive = true;
+  clearTimeout(nativeScrollIdleTimer);
+  nativeScrollIdleTimer = setTimeout(() => {
+    nativeScrollInteractionActive = false;
+    if (!deferredAutomaticRefreshSource) return;
+    const source = deferredAutomaticRefreshSource;
+    deferredAutomaticRefreshSource = '';
+    requestAutomaticRefresh(source);
+  }, 280);
+}
+
 function requestAutomaticRefresh(source = 'automatic') {
   if (document.visibilityState === 'hidden') return;
+  const activeElement = document.activeElement;
+  const editing = !!activeElement && (
+    activeElement.matches?.('input, textarea, select, [contenteditable="true"]')
+  );
+  if (isNativeFrontdeskApp() && (nativeScrollInteractionActive || editing)) {
+    deferredAutomaticRefreshSource = source;
+    return;
+  }
   const now = Date.now();
   if (now - lastAutomaticRefreshAt < 1200) return;
   lastAutomaticRefreshAt = now;
@@ -6430,6 +6521,7 @@ exposeToWindow({
   markMessageRead,
   marketelNativeAction,
   marketelNativeSelectTab,
+  marketelNativeSwitchProperty,
   maybePromptInstalledNotifications,
   moveSlider,
   needsEditPageLoad,
@@ -6532,6 +6624,7 @@ exposeToWindow({
   loadAppsModule,
   loadRevealModule,
   replayWalkthrough,
+  replayValueReveal,
   resetWalkthroughProgress,
 });
 
@@ -6606,6 +6699,21 @@ window.addEventListener('online', () => requestAutomaticRefresh('online'));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') requestAutomaticRefresh('visible');
 });
+if (isNativeFrontdeskApp()) {
+  document.addEventListener('touchstart', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('touchmove', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('touchend', markNativeScrollInteraction, { passive: true });
+  document.addEventListener('scroll', markNativeScrollInteraction, { passive: true, capture: true });
+  document.addEventListener('focusout', () => {
+    if (!deferredAutomaticRefreshSource) return;
+    window.setTimeout(() => {
+      if (!deferredAutomaticRefreshSource) return;
+      const source = deferredAutomaticRefreshSource;
+      deferredAutomaticRefreshSource = '';
+      requestAutomaticRefresh(source);
+    }, 180);
+  });
+}
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event?.data?.type === 'marketel-frontdesk-data-updated') {

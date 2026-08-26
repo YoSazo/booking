@@ -45,6 +45,10 @@ function isEmbeddedEditorPreview() {
     || new URLSearchParams(window.location.search).get('previewEditor') === '1';
 }
 
+function isOpaqueCrmSessionToken(value) {
+  return /^(?:fd_|fds_|fdn_)/.test(String(value || ''));
+}
+
 let embeddedHeaderSnapshot = null;
 
 function normalizedPreviewValue(value) {
@@ -413,6 +417,7 @@ async function settingsChangePin() {
     if (!result.success) throw new Error(result.message || 'Failed to change PIN');
     crm.token = newPin;
     crm.isMasterPin = false;
+    crm.isDogfoodPreview = false;
     try { localStorage.setItem('crmToken', crm.token); } catch(e) {}
     toast('PIN updated!', 'success');
     document.getElementById('settings-new-pin').value = '';
@@ -967,7 +972,7 @@ async function loadEditRooms() {
       })}
       ${pageSectionHtml('Change PIN', `
             <div style="margin-bottom:12px;">
-              <input type="text" id="edit-new-pin" value="${crm.isMasterPin ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
+              <input type="text" id="edit-new-pin" value="${crm.isMasterPin || isOpaqueCrmSessionToken(crm.token) ? '' : crm.token}" placeholder="${crm.isMasterPin ? 'Enter a unique property PIN' : 'Enter new PIN (min 6 chars)'}" style="width:100%;box-sizing:border-box;font-size:16px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-family:inherit;outline:none;text-align:center;letter-spacing:2px;">
             </div>
             <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
             <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>`)}
@@ -1315,6 +1320,7 @@ async function changePin() {
     if (!result.success) throw new Error(result.message || 'Failed to change PIN');
     crm.token = newPin;
     crm.isMasterPin = false;
+    crm.isDogfoodPreview = false;
     try { localStorage.setItem('crmToken', crm.token); } catch(e) {}
     toast('PIN updated!', 'success');
     // Keep the new PIN visible in the input

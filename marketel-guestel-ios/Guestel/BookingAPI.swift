@@ -6,7 +6,7 @@ import Foundation
 enum BookingAPI {
     static let base = URL(string: "https://guest-lodge-backend.onrender.com")!
 
-    struct APIRoom: Identifiable, Decodable, Hashable {
+    struct APIRoom: Identifiable, Codable, Hashable, Sendable {
         let id: Int
         let roomId: String?
         let name: String
@@ -23,7 +23,7 @@ enum BookingAPI {
         }
     }
 
-    struct Rates: Decodable, Hashable {
+    struct Rates: Codable, Hashable, Sendable {
         let nightly: Double
         let weekly: Double
         let monthly: Double
@@ -33,7 +33,7 @@ enum BookingAPI {
         }
     }
 
-    struct HotelPublic: Decodable {
+    struct HotelPublic: Codable, Sendable {
         let id: String
         let domain: String?
         let name: String

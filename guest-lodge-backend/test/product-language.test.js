@@ -18,6 +18,7 @@ const files = [
 const productCopy = files
     .map((file) => fs.readFileSync(path.join(backendRoot, file), 'utf8'))
     .join('\n');
+const revealCopy = fs.readFileSync(path.join(backendRoot, 'frontdesk/src/reveal.js'), 'utf8');
 
 test('owner and guest products never collapse into ambiguous app language', () => {
     assert.doesNotMatch(productCopy, /\bGuest App\b/);
@@ -37,4 +38,38 @@ test('walk-in handling states the action and booking-page outcome', () => {
     assert.match(productCopy, /Walk-in or another channel took a room\?/);
     assert.match(productCopy, /text the Marketel Front Desk contact what happened/);
     assert.match(productCopy, /reduces? (?:the )?remaining availability/i);
+});
+
+test('the reveal establishes the owner app before switching to Guestel', () => {
+    const ownerApp = revealCopy.indexOf('Control your engine from one app.');
+    const guestel = revealCopy.indexOf('Keep every guest one tap away.');
+    const assistant = revealCopy.indexOf('Fits around what you already use.');
+    const system = revealCopy.indexOf('The full direct-booking loop.');
+    assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
+    assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
+    assert.ok(assistant > guestel, 'setup protection appears before the guest relationship is established');
+    assert.ok(system > assistant, 'the complete loop appears before its parts are established');
+    assert.match(revealCopy, /Your page, bookings, rooms and guest reach all live in Front Desk/);
+    assert.match(revealCopy, /They save your property, book direct again/);
+    assert.match(revealCopy, /Front Desk checks each request and updates availability from your reply/);
+    assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel keeps them forever/);
+    assert.match(revealCopy, /preloadCarouselScreens/);
+    assert.match(revealCopy, /loading="eager"/);
+    assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
+    assert.match(revealCopy, /id: 'assistant'/);
+    assert.match(revealCopy, /id: 'system'/);
+    assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
+    assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
+});
+
+test('activation turns the nightly rate into an editable break-even decision', () => {
+    assert.match(revealCopy, /id="mvrActivationRate"/);
+    assert.match(revealCopy, /data-mvr-rate-step="-5"/);
+    assert.match(revealCopy, /Estimate uses a 15% OTA commission/);
+    assert.match(revealCopy, /Three things you're activating/);
+    assert.match(revealCopy, /Direct Booking Page/);
+    assert.match(revealCopy, /Marketel Front Desk/);
+    assert.match(revealCopy, /Guestel/);
+    assert.match(productCopy, /previewActivation/);
+    assert.match(revealCopy, /activationPreviewMode && crm\.hotelSubscribed/);
 });

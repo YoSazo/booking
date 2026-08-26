@@ -1,9 +1,11 @@
 import SwiftUI
+import UserNotifications
 
 struct GuestelWelcomeView: View {
     @Environment(GuestStore.self) private var store
     let arrival: GuestelArrival
     let onDone: () -> Void
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
     private var pending: Bool {
         arrival.stay?.status?.lowercased() == "pending"
@@ -31,7 +33,9 @@ struct GuestelWelcomeView: View {
 
                 Text(arrival.stay == nil
                      ? "The property invited you to stay connected directly—without a booking-site middleman."
-                     : (pending
+                     : (authorizationStatus == .denied
+                        ? "Notifications are off in iOS Settings. Turn them on to receive confirmation and Front Desk replies."
+                        : pending
                         ? "Turn on updates so Guestel can tell you when the property confirms and when Front Desk replies."
                         : "Your reservation, Front Desk messages, and future direct bookings now live together."))
                     .font(.system(size: 15))
@@ -77,17 +81,26 @@ struct GuestelWelcomeView: View {
                     if arrival.stay == nil {
                         UserDefaults.standard.set(true, forKey: "guestel.notif.deals")
                     }
-                    GuestPushManager.requestAuthorization()
-                    Task { await GuestPushManager.sync(store: store) }
+                    if authorizationStatus == .denied {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } else {
+                        GuestPushManager.requestAuthorization()
+                    }
+                    Task { await GuestPushManager.registerIfAuthorized(store: store) }
                     onDone()
                 } label: {
-                    Text(arrival.stay == nil ? "Allow direct updates" : "Turn on booking updates")
+                    Text(authorizationStatus == .denied
+                         ? "Open Notification Settings"
+                         : (arrival.stay == nil ? "Allow direct updates" : "Turn on booking updates"))
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Theme.green, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                .buttonStyle(GuestelPressButtonStyle())
 
                 Button("Not now", action: onDone)
                     .font(.system(size: 14, weight: .semibold))
@@ -97,6 +110,15 @@ struct GuestelWelcomeView: View {
             .padding(22)
         }
         .background(Theme.canvas)
+        .task {
+            authorizationStatus = await GuestPushManager.authorizationStatus()
+            // The sheet can race with a system-settings change. If permission
+            // is already active, don't make a repeat guest dismiss onboarding.
+            if GuestPushManager.isAuthorized(authorizationStatus) {
+                await GuestPushManager.registerIfAuthorized(store: store)
+                onDone()
+            }
+        }
     }
 
     private var propertyIcon: some View {
@@ -104,7 +126,7 @@ struct GuestelWelcomeView: View {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .fill(Theme.green.opacity(0.12))
             if let url = arrival.hotel.imageURL {
-                AsyncImage(url: url) { image in
+                CachedRemoteImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { initial }
                 .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))

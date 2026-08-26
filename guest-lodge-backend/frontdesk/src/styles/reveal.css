@@ -1085,7 +1085,7 @@
    Reserving room for the longest beat keeps all of them identical. */
 .mvr-beat-band {
   width: min(620px, 100%);
-  min-height: 132px;
+  min-height: 112px;
   display: grid;
   align-content: center;
   gap: 6px;
@@ -1096,7 +1096,7 @@
 .mvr-beat-title {
   margin: 0;
   color: #16281f;
-  font-size: clamp(20px, 5.4vw, 27px);
+  font-size: clamp(19px, 5vw, 25px);
   font-weight: 800;
   line-height: 1.16;
   letter-spacing: -0.025em;
@@ -1106,8 +1106,8 @@
 .mvr-beat-body {
   margin: 0;
   color: #5d6f65;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
@@ -1205,252 +1205,218 @@
   animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Guestel is shown as one continuous handoff: the property's Add control,
-   Apple's system card, and the guest's persistent wallet. These are product
-   concepts, not fake controls, so the proof stays quiet and self-explanatory. */
-.mvr-guestel-proof {
-  width: 100%;
-  display: grid;
-  gap: 16px;
-  color: #17271f;
-}
-
-.mvr-guestel-booking-card,
-.mvr-guestel-system-card,
-.mvr-guestel-notification {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 13px;
-  padding: 15px;
-  border: 1px solid rgba(206, 222, 212, 0.78);
-  border-radius: 19px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 12px 28px rgba(23, 58, 39, 0.09);
-}
-
-.mvr-guestel-property-mark,
-.mvr-guestel-icon {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(145deg, #62aa80, #286f50);
-  font-size: 20px;
-  font-weight: 900;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
-}
-
-.mvr-guestel-booking-card > div,
-.mvr-guestel-system-card > div,
-.mvr-guestel-notification > div {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.mvr-guestel-booking-card small,
-.mvr-guestel-system-card small,
-.mvr-guestel-notification small {
-  color: #718078;
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: .035em;
-}
-
-.mvr-guestel-booking-card strong,
-.mvr-guestel-system-card strong,
-.mvr-guestel-notification strong {
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 850;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-guestel-system-card span {
-  overflow: hidden;
-  color: #66766d;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-guestel-booking-card > b,
-.mvr-guestel-system-card > b {
-  padding: 7px 12px;
-  border-radius: 999px;
-  color: #267151;
-  background: #e6f3eb;
-  font-size: 11px;
-  letter-spacing: .025em;
-}
-
-.mvr-guestel-flow-arrow {
-  height: 22px;
-  color: #34805e;
-  font-size: 27px;
-  font-weight: 800;
-  line-height: 22px;
-  text-align: center;
-}
-
-.mvr-guestel-phone {
-  gap: 13px;
-  padding: 17px;
-  border: 1px solid rgba(197, 217, 204, .85);
-  border-radius: 25px;
-  background: linear-gradient(160deg, rgba(255,255,255,.98), rgba(229,241,233,.94));
-  box-shadow: 0 20px 42px rgba(23, 58, 39, .13);
-}
-
-.mvr-guestel-phone-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.mvr-guestel-icon.is-small {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  font-size: 13px;
-}
-
-.mvr-guestel-phone-head strong { font-size: 14px; }
-.mvr-guestel-phone-head i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #43a06f;
-  box-shadow: 0 0 0 5px rgba(67,160,111,.12);
-}
-
-.mvr-guestel-wallet-card {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid rgba(207, 222, 213, .82);
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(25, 57, 40, .08);
-}
-
-.mvr-guestel-wallet-image {
-  height: 118px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(145deg, #5f9877, #245d44);
-  font-size: 34px;
-  font-weight: 900;
-}
-
-.mvr-guestel-wallet-image img {
-  width: 100%;
+/* App proof uses a restrained Cover Flow: one legible screen in front and two
+   recognizable neighbors behind it. The side screens are also controls, so
+   the visual itself teaches that there is more without another instruction. */
+.mvr-coverflow {
+  width: min(700px, 100%);
   height: 100%;
-  object-fit: cover;
-}
-
-.mvr-guestel-wallet-copy { display: grid; gap: 2px; }
-.mvr-guestel-wallet-copy small { color: #738178; font-size: 10px; }
-.mvr-guestel-wallet-copy strong { font-size: 17px; }
-.mvr-guestel-wallet-copy span { color: #66756d; font-size: 11px; }
-.mvr-guestel-wallet-card button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 12px;
-  color: #fff;
-  background: #2e7d5b;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  pointer-events: none;
-}
-
-.mvr-guestel-wallet-nav {
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  padding: 5px;
-  border-radius: 13px;
-  background: rgba(217, 230, 221, .72);
-  color: #748279;
-  font-size: 10px;
-  text-align: center;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 9px;
+  margin: 0 auto;
+  animation: mvr-bubble-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.mvr-guestel-wallet-nav > * { padding: 7px 4px; }
-.mvr-guestel-wallet-nav b { border-radius: 9px; color: #245d44; background: #fff; }
 
-.mvr-guestel-notification {
-  grid-template-columns: auto minmax(0, 1fr);
-  border-radius: 22px;
-  background: rgba(255,255,255,.76);
-  backdrop-filter: blur(22px) saturate(1.35);
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+.mvr-coverflow-viewport {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  outline: none;
+  perspective: 1200px;
+  touch-action: pan-y;
+  cursor: grab;
 }
-.mvr-guestel-notification p { margin: 2px 0 0; color: #5f6d65; font-size: 11px; line-height: 1.35; }
 
-.mvr-guestel-outcomes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mvr-guestel-outcomes > span {
-  display: grid;
-  gap: 3px;
-  padding: 15px;
-  border: 1px solid rgba(207, 222, 213, .8);
-  border-radius: 17px;
-  background: rgba(255,255,255,.82);
+.mvr-coverflow-viewport:active {
+  cursor: grabbing;
 }
-.mvr-guestel-outcomes b { color: #2e7d5b; font-size: 20px; line-height: 1; }
-.mvr-guestel-outcomes strong { font-size: 12px; }
-.mvr-guestel-outcomes small { color: #708077; font-size: 9.5px; line-height: 1.35; }
 
-/* In a beat the rule is the whole screen, not a corner widget: flatten the
-   nested card, stack the two options so each is a full-width target, and scale
-   the type up from the 8–10px it used when it sat inside the old visual. */
-.mvr-beat-settings .mvr-fallback-control {
-  margin-top: 0;
-  gap: 14px;
+.mvr-coverflow-card {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 1;
+  width: auto;
+  max-width: 58%;
+  aspect-ratio: 900 / 1734;
   padding: 0;
   border: 0;
-  background: none;
-  animation: none;
+  border-radius: 34px;
+  opacity: 0;
+  background: transparent;
+  transform: translateX(-50%) scale(0.66);
+  transform-origin: center;
+  transition:
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 320ms ease,
+    filter 460ms ease;
+  will-change: transform, opacity;
+  cursor: pointer;
 }
 
-.mvr-beat-settings .mvr-fallback-control > strong {
+.mvr-coverflow-card img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 17px 30px rgba(25, 59, 40, 0.16));
+}
+
+.mvr-coverflow-card.is-active {
+  z-index: 4;
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  cursor: default;
+}
+
+.mvr-coverflow-card.is-prev {
+  z-index: 2;
+  opacity: 0.52;
+  filter: saturate(0.78) brightness(0.98);
+  transform: translateX(-113%) scale(0.81) rotateY(7deg);
+}
+
+.mvr-coverflow-card.is-next {
+  z-index: 3;
+  opacity: 0.66;
+  filter: saturate(0.84) brightness(0.99);
+  transform: translateX(13%) scale(0.84) rotateY(-7deg);
+}
+
+.mvr-coverflow-card.is-far {
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.66);
+}
+
+.mvr-coverflow-card:focus-visible {
+  outline: 3px solid rgba(40, 128, 88, 0.42);
+  outline-offset: -5px;
+}
+
+.mvr-coverflow-controls {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 40px auto minmax(112px, max-content);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.mvr-coverflow-arrow,
+.mvr-coverflow-next,
+.mvr-coverflow-dots button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.mvr-coverflow-arrow {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(49, 102, 75, 0.14);
+  border-radius: 999px;
+  color: #315c47;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
   font-size: 16px;
+  font-weight: 850;
 }
 
-.mvr-beat-settings .mvr-fallback-options {
-  grid-template-columns: 1fr;
-  gap: 12px;
+.mvr-coverflow-next {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 1px solid rgba(49, 102, 75, 0.14);
+  border-radius: 999px;
+  color: #285a43;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
-.mvr-beat-settings .mvr-fallback-options button {
-  gap: 5px;
-  padding: 22px 20px;
-  border-radius: 16px;
-  border-width: 1.5px;
+.mvr-coverflow-next span {
+  color: var(--mvr-green);
+  font-size: 14px;
 }
 
-.mvr-beat-settings .mvr-fallback-options b {
-  font-size: 18px;
-  white-space: normal;
+.mvr-coverflow-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.mvr-beat-settings .mvr-fallback-options span {
-  font-size: 13.5px;
+.mvr-coverflow-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(36, 95, 70, 0.2);
+  transition: width 260ms ease, background 260ms ease;
 }
 
-.mvr-beat-settings .mvr-fallback-control > small {
+.mvr-coverflow-dots button.is-active {
+  width: 20px;
+  background: var(--mvr-green);
+}
+
+.mvr-coverflow-arrow:hover,
+.mvr-coverflow-next:hover {
+  border-color: rgba(40, 128, 88, 0.28);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* The closing carousel gets a little more screen area than the feature
+   carousels because its only job is to make the three-part loop click. It is
+   still the same inline Cover Flow; there is deliberately no full-screen or
+   tap-to-expand state. */
+.mvr-stage-beats.is-system-showcase {
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.mvr-stage-beats.is-system-showcase .mvr-beat-band {
+  min-height: 82px;
+  margin-bottom: 0;
+  gap: 3px;
+}
+
+.mvr-stage-beats.is-system-showcase .mvr-beat-title {
+  font-size: clamp(19px, 4.8vw, 24px);
+}
+
+.mvr-stage-beats.is-system-showcase .mvr-beat-body {
   font-size: 13px;
-  text-align: center;
+  line-height: 1.35;
+}
+
+.mvr-coverflow.is-system .mvr-coverflow-card {
+  max-width: 76%;
+}
+
+.mvr-coverflow.is-system .mvr-coverflow-card.is-prev {
+  opacity: 0.42;
+  transform: translateX(-104%) scale(0.75) rotateY(6deg);
+}
+
+.mvr-coverflow.is-system .mvr-coverflow-card.is-next {
+  opacity: 0.55;
+  transform: translateX(4%) scale(0.78) rotateY(-6deg);
 }
 
 /* Single column with a fixed text band on top; the proof takes the rest. This
@@ -1470,68 +1436,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mvr-beat-proof,
-  .mvr-beat-settings { animation: none; }
-}
+  .mvr-beat-settings,
+  .mvr-coverflow { animation: none; }
 
-.mvr-fallback-control {
-  display: grid;
-  gap: 7px;
-  margin-top: 10px;
-  padding: 10px 11px;
-  border: 1px solid #dce7e0;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  animation: mvr-bubble-in 450ms cubic-bezier(0.16, 1, 0.3, 1) 680ms both;
-}
-
-.mvr-fallback-control > strong {
-  color: #253d31;
-  font-size: 10px;
-}
-
-.mvr-fallback-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.mvr-fallback-options button {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px 9px;
-  text-align: left;
-  color: #53665b;
-  border: 1px solid #dce6e0;
-  border-radius: 10px;
-  background: #f8faf9;
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
-}
-
-.mvr-fallback-options button:active {
-  transform: scale(0.98);
-}
-
-.mvr-fallback-options button.is-selected {
-  color: #1f5f43;
-  border-color: var(--mvr-green);
-  background: #eaf7ef;
-}
-
-.mvr-fallback-options b {
-  overflow: hidden;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mvr-fallback-options span,
-.mvr-fallback-control > small {
-  color: #74847b;
-  font-size: 8px;
-  line-height: 1.4;
+  .mvr-coverflow-card,
+  .mvr-coverflow-dots button { transition: none; }
 }
 
 /* The activation screen owns the whole scroll area rather than sitting above a
@@ -1643,7 +1552,7 @@
   border-top: 1px solid rgba(211, 227, 217, 0.7);
 }
 
-.mvr-activation-proof .mvr-value-bridge {
+.mvr-activation-proof .mvr-direct-proof {
   margin: 0 auto 18px;
 }
 
@@ -1713,61 +1622,27 @@
   line-height: 1.4;
 }
 
-.mvr-value-bridge {
-  display: grid;
-  gap: 4px;
-  margin: -4px auto 14px;
-  padding: 14px 16px;
+.mvr-direct-proof {
+  width: min(420px, 100%);
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  padding: 11px 14px;
   color: #68776f;
-  text-align: left;
+  text-align: center;
   border: 1px solid rgba(211, 227, 217, 0.6);
   border-left: 3px solid var(--mvr-green);
   border-radius: 14px;
   background: rgba(243, 248, 245, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
-.mvr-value-bridge > span {
-  color: #4e725f;
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.mvr-value-bridge > strong {
+.mvr-direct-proof strong {
+  flex: 0 0 auto;
   color: #1f6848;
-  font-size: 14px;
-}
-
-.mvr-value-bridge p {
-  margin: 0;
-}
-
-.mvr-value-bridge small {
-  margin-top: 3px;
-  padding-top: 7px;
-  color: #718078;
-  border-top: 1px solid #dce8e0;
-  font-size: 9px;
-}
-
-.mvr-value-bridge small b {
-  color: #53685c;
-}
-
-.mvr-value-bridge.is-proof-only {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
-  justify-content: center;
-  gap: 5px;
-  text-align: center;
-}
-
-.mvr-value-bridge.is-proof-only > strong {
   font-size: 12px;
 }
 
@@ -1843,6 +1718,135 @@
 
 .mvr-price-detail.is-visible {
   color: var(--mvr-green);
+}
+
+.mvr-rate-calculator {
+  width: min(380px, 100%);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(132px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 9px 12px;
+  margin: 8px auto 13px;
+  padding: 12px;
+  color: #53685c;
+  text-align: left;
+  border: 1px solid rgba(185, 215, 197, 0.72);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(238, 248, 242, 0.96), rgba(247, 251, 248, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 8px 20px rgba(34, 87, 59, 0.06);
+}
+
+.mvr-rate-heading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mvr-rate-heading span {
+  color: #315f48;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.mvr-rate-heading small {
+  color: #779084;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.mvr-rate-stepper {
+  min-width: 0;
+  height: 42px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid rgba(46, 125, 91, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 3px rgba(22, 59, 39, 0.05);
+}
+
+.mvr-rate-stepper button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  color: #fff;
+  border: 0;
+  border-radius: 50%;
+  background: var(--mvr-green);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mvr-rate-stepper label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  overflow: hidden;
+  color: #315f48;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mvr-rate-stepper input {
+  width: 46px;
+  min-width: 0;
+  padding: 0;
+  color: #1f513a;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: right;
+  /* Hug the number so it right-aligns snug against the $ instead of floating left. */
+  field-sizing: content;
+  min-width: 1.5ch;
+  max-width: 62px;
+  appearance: textfield;
+}
+
+.mvr-rate-stepper input::-webkit-inner-spin-button,
+.mvr-rate-stepper input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.mvr-rate-result {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.mvr-rate-result strong {
+  color: #1f6848;
+  font-size: 13px;
+  line-height: 1.18;
+}
+
+.mvr-rate-result span {
+  color: #697c71;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.mvr-rate-calculator > small {
+  grid-column: 1 / -1;
+  color: #819087;
+  font-size: 8.5px;
+  line-height: 1.35;
 }
 
 .mvr-guarantee {
@@ -2386,6 +2390,32 @@
     gap: 10px;
   }
 
+  .mvr-coverflow-viewport {
+    min-height: 310px;
+  }
+
+  .mvr-coverflow-card {
+    max-width: 62%;
+  }
+
+  .mvr-coverflow-card.is-prev {
+    transform: translateX(-109%) scale(0.79) rotateY(6deg);
+  }
+
+  .mvr-coverflow-card.is-next {
+    transform: translateX(9%) scale(0.82) rotateY(-6deg);
+  }
+
+  .mvr-coverflow-controls {
+    grid-template-columns: 38px auto minmax(108px, max-content);
+    gap: 8px;
+  }
+
+  .mvr-coverflow-next {
+    padding-inline: 11px;
+    font-size: 11.5px;
+  }
+
   .mvr-assistant-visual {
     padding: 0;
     border-radius: 21px;
@@ -2444,7 +2474,8 @@
     padding-top: 17px;
   }
 
-  .mvr-value-bridge {
+  .mvr-rate-calculator,
+  .mvr-direct-proof {
     max-width: 420px;
   }
 
@@ -2780,14 +2811,13 @@
   .mvr-brand { display: none; }
 
   .mvr-stage-beats .mvr-beat-band {
-    /* Measured: the tallest beat's copy is 123px at 375px wide. */
-    min-height: 124px;
+    min-height: 104px;
     margin-bottom: 8px;
   }
 
   .mvr-stage-beats .mvr-beat-body {
-    font-size: 13.5px;
-    line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.38;
   }
 
   .mvr-footer {
@@ -2812,6 +2842,7 @@
 #marketelValueReveal.mvr-no-enter .mvr-stage,
 #marketelValueReveal.mvr-no-enter .mvr-beat-proof,
 #marketelValueReveal.mvr-no-enter .mvr-beat-settings,
+#marketelValueReveal.mvr-no-enter .mvr-coverflow,
 #marketelValueReveal.mvr-no-enter .mvr-finale-card,
 #marketelValueReveal.mvr-no-enter .mvr-value-list > div {
   animation: none !important;

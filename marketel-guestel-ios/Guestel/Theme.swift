@@ -34,3 +34,15 @@ struct GlassCircle: ViewModifier {
         }
     }
 }
+
+// Preserve Guestel's custom button surface while still giving a restrained,
+// tactile response. SwiftUI's automatic style can temporarily wash a custom
+// full-width label out during navigation, which reads like the CTA vanished.
+struct GuestelPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}

@@ -7,17 +7,25 @@
 // without a code change via VITE_GUESTEL_APP_CLIP_ENABLED=true.
 export const APP_CLIP_INSTALL_ENABLED = import.meta.env.VITE_GUESTEL_APP_CLIP_ENABLED === 'true';
 
-// One scalable invocation domain for QR codes and links. Property subdomains no
-// longer need to be baked into the App Clip entitlement one by one.
+// Invocation URL for a Safari button tap.
+//
+// IMPORTANT: navigating to an associated domain (clip.mktel.co / a hotel subdomain)
+// does NOT pop the App Clip card — Safari just loads the page. Only Apple's hosted
+// default link (appclip.apple.com/id?p=<bundle>) invokes the card from a link/button.
+// The clip reads the hotel from the domain/hotelId param below; extra params (intent,
+// handoff) ride along to the clip too. (QR codes / NFC use clip.mktel.co/clip/<id>
+// separately — those ARE supported invocation surfaces; a plain navigation is not.)
 export function guestelInvocationUrl({ hotelId, intent = 'add', handoffToken } = {}) {
-  const base = hotelId
-    ? `https://clip.mktel.co/clip/${encodeURIComponent(hotelId)}`
-    : 'https://clip.mktel.co/';
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ p: 'com.bookmarketel.guestel.Clip' });
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (/\.mktel\.co$/i.test(host)) {
+    params.set('domain', host);
+  } else if (hotelId) {
+    params.set('hotelId', hotelId);
+  }
   if (intent) params.set('intent', intent);
-  // This is a one-use, handoff-only capability. It cannot read messages or
-  // mutate a reservation and is exchanged by Guestel for the normal token.
+  // One-use, handoff-only capability — cannot read messages or mutate a reservation;
+  // Guestel exchanges it for the normal token.
   if (handoffToken) params.set('handoff', handoffToken);
-  const query = params.toString();
-  return query ? `${base}?${query}` : base;
+  return `https://appclip.apple.com/id?${params.toString()}`;
 }

@@ -4,6 +4,7 @@ import SwiftUI
 // Liquid Glass automatically.
 struct RootView: View {
     @Environment(GuestStore.self) private var store
+    @Environment(\.scenePhase) private var scenePhase
     @State private var messageDestination: MessageDestination?
     @State private var selectedTab: GuestelTab = .hotels
 
@@ -28,11 +29,30 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .guestelOpenHotels)) { _ in
             openHotels()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .guestelRefreshData)) { _ in
+            applyPendingBookingStatuses()
+            Task { await refreshGuestState() }
+        }
         .onAppear {
+            applyPendingBookingStatuses()
             openPendingHotel()
             openPendingMessages()
         }
         .onChange(of: store.reservations) { _, _ in openPendingMessages() }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            applyPendingBookingStatuses()
+            await refreshGuestState()
+            while !Task.isCancelled {
+                let hasPendingRequest = store.reservations.contains {
+                    ($0.status ?? "").lowercased() == "pending"
+                }
+                try? await Task.sleep(for: .seconds(hasPendingRequest ? 10 : 60))
+                guard !Task.isCancelled, scenePhase == .active else { return }
+                applyPendingBookingStatuses()
+                await refreshGuestState()
+            }
+        }
         .sheet(item: $messageDestination) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
         }
@@ -44,7 +64,10 @@ struct RootView: View {
         ) {
             if let arrival = store.arrival {
                 GuestelWelcomeView(arrival: arrival) { store.arrival = nil }
-                    .presentationDetents([.medium, .large])
+                    // This is a one-time, contextual permission explanation.
+                    // A full-height sheet prevents the primary action from
+                    // landing below the medium detent on smaller iPhones.
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
         }
@@ -77,6 +100,26 @@ struct RootView: View {
         selectedTab = .messages
         messageDestination = MessageDestination(hotel: hotel, stay: stay)
         Task { await store.refreshConversations() }
+    }
+
+    @MainActor
+    private func applyPendingBookingStatuses() {
+        let updates = GuestBookingStatusInbox.pending
+        guard !updates.isEmpty else { return }
+        for update in updates {
+            store.applyReservationStatus(
+                hotelId: update.hotelId,
+                code: update.code,
+                status: update.status
+            )
+        }
+        GuestBookingStatusInbox.clear()
+    }
+
+    @MainActor
+    private func refreshGuestState() async {
+        await store.syncVerifiedWallet()
+        await store.refreshConversations()
     }
 }
 

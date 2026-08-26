@@ -1,8 +1,50 @@
 import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
+import assistantAlertStackUrl from './assets/assistant-alert-stack.webp';
 import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
 import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
+import bookingPageStudios17Url from './assets/booking-page-studios17.webp';
+import frontdeskYourPageUrl from './assets/frontdesk-your-page.webp';
+import frontdeskBookingsUrl from './assets/frontdesk-bookings.webp';
+import frontdeskAvailabilityUrl from './assets/frontdesk-availability.webp';
+import frontdeskGuestAppUrl from './assets/frontdesk-guest-app.webp';
+import guestelHotelsUrl from './assets/guestel-hotels.webp';
+import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
+import guestelChatUrl from './assets/guestel-chat.webp';
+
+// The owner reaches these carousels only after inspecting the live booking
+// page, which gives us a useful preload window. Warm every carousel screenshot
+// as soon as this reveal chunk is requested so changing slides is a transition,
+// not the moment the browser starts fetching or decoding the next screen.
+const CAROUSEL_SCREEN_URLS = [
+  frontdeskYourPageUrl,
+  frontdeskBookingsUrl,
+  frontdeskAvailabilityUrl,
+  frontdeskGuestAppUrl,
+  guestelHotelsUrl,
+  guestelChooseRoomUrl,
+  guestelChatUrl,
+  assistantAlertStackUrl,
+  assistantTextResolutionUrl,
+  assistantBookingRequestUrl,
+  bookingPageStudios17Url,
+];
+const carouselImageWarmups = new Map();
+
+function preloadCarouselScreens() {
+  if (typeof Image === 'undefined' || carouselImageWarmups.size) return;
+  CAROUSEL_SCREEN_URLS.forEach((url) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.fetchPriority = 'low';
+    image.src = url;
+    carouselImageWarmups.set(url, image);
+    if (typeof image.decode === 'function') image.decode().catch(() => {});
+  });
+}
+
+preloadCarouselScreens();
 
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
@@ -21,9 +63,15 @@ let bookingPageTimer = 0;
 let revealOpening = false;
 // Which beat each beat-driven stage is showing. Keyed by reveal step.
 let stageBeatIndex = { 1: 0, 2: 0 };
+// The app proof is deliberately optional exploration inside each beat. Keeping
+// its position separate from the funnel beat means someone can inspect every
+// screen or move to the next subject after seeing only one.
+let appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
+let activationNightlyRate = null;
+let activationPreviewMode = false;
 let activeBookingChallenge = null;
 let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
@@ -32,7 +80,6 @@ let bookingPreviewUnavailable = false;
 // time. Once the editor has been seen, the only way on is the Guestel stage.
 let bookingEditorVisited = false;
 let nextStageViewIsResume = false;
-let assistantNoResponseAction = 'confirm';
 
 
 function isLocalFrontdesk() {
@@ -88,8 +135,9 @@ function nightlyRate() {
   return revealData.rates?.nightly || 99;
 }
 
-// One source for the break-even maths so the reveal's rebooking beat and the
-// activation screen can never quote different numbers.
+// The earlier Guestel chapter uses the saved setup rate. The activation screen
+// has its own editable calculator below because an owner may have skipped that
+// field or may want to test a different room rate before paying.
 function breakEvenEstimate() {
   const rate = Number(revealData.rates?.nightly);
   if (!Number.isFinite(rate) || rate <= 0) return null;
@@ -98,21 +146,75 @@ function breakEvenEstimate() {
   return { rate, roomNights, savings: commissionPerNight * roomNights };
 }
 
-function directBookingValueHtml() {
-  const estimate = breakEvenEstimate();
-  if (!estimate) {
-    return `<div class="mvr-value-bridge is-proof-only">
-      <strong>$5,800 booked direct</strong>
-      <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
-    </div>`;
-  }
-  const { rate, roomNights: breakEvenRoomNights, savings: estimatedSavings } = estimate;
-  return `<div class="mvr-value-bridge">
-    <span>Your potential break-even</span>
-    <strong>About ${breakEvenRoomNights} direct room-night${breakEvenRoomNights === 1 ? '' : 's'} could cover a month.</strong>
-    <p>At ${money(rate)} per night, shifting ${breakEvenRoomNights} room-night${breakEvenRoomNights === 1 ? '' : 's'} from an estimated 15% OTA fee to direct represents about ${money(estimatedSavings)} in commission savings.</p>
-    <small><b>Real result:</b> Suite Stay booked $5,800 direct in one recorded month through this booking engine. Estimates vary with your OTA fees.</small>
+function normalizedActivationRate(value, fallback = 99) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
+  return Math.min(5000, Math.max(25, Math.round(numeric * 100) / 100));
+}
+
+function currentActivationRate() {
+  const savedRate = normalizedActivationRate(revealData.rates?.nightly, 99);
+  return normalizedActivationRate(activationNightlyRate, savedRate);
+}
+
+function activationBreakEven(rate = currentActivationRate()) {
+  const normalizedRate = normalizedActivationRate(rate);
+  const monthlyCost = billingInterval === 'year' ? 1990 / 12 : 199;
+  const commissionPerNight = normalizedRate * 0.15;
+  const roomNights = Math.max(1, Math.ceil(monthlyCost / commissionPerNight));
+  return { rate: normalizedRate, roomNights };
+}
+
+function activationRateCalculatorHtml() {
+  const { rate, roomNights } = activationBreakEven();
+  const unit = roomNights === 1 ? 'room-night' : 'room-nights';
+  const result = billingInterval === 'year'
+    ? 'per month could cover the yearly plan.'
+    : 'could cover one month of Marketel.';
+  return `<div class="mvr-rate-calculator">
+    <div class="mvr-rate-heading"><span>Your nightly rate</span><small>Adjust it</small></div>
+    <div class="mvr-rate-stepper" role="group" aria-label="Nightly room rate">
+      <button type="button" data-mvr-rate-step="-5" aria-label="Lower nightly rate by five dollars">−</button>
+      <label><span>$</span><input type="number" id="mvrActivationRate" min="25" max="5000" step="1" inputmode="decimal" value="${rate}" aria-label="Nightly room rate in dollars"></label>
+      <button type="button" data-mvr-rate-step="5" aria-label="Raise nightly rate by five dollars">+</button>
+    </div>
+    <div class="mvr-rate-result" aria-live="polite">
+      <strong id="mvrBreakEvenNights">${roomNights} direct ${unit}</strong>
+      <span id="mvrBreakEvenContext">${result}</span>
+    </div>
+    <small>Estimate uses a 15% OTA commission. Actual savings depend on your rates and channels.</small>
   </div>`;
+}
+
+function directBookingProofHtml() {
+  return `<div class="mvr-direct-proof">
+    <strong>$5,800 booked direct</strong>
+    <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
+  </div>`;
+}
+
+function updateActivationRateCalculator(value, options = {}) {
+  const rate = normalizedActivationRate(value, currentActivationRate());
+  activationNightlyRate = rate;
+  const { roomNights } = activationBreakEven(rate);
+  const input = document.getElementById('mvrActivationRate');
+  const nights = document.getElementById('mvrBreakEvenNights');
+  const context = document.getElementById('mvrBreakEvenContext');
+  if (options.syncInput !== false && input) input.value = String(rate);
+  if (nights) nights.textContent = `${roomNights} direct ${roomNights === 1 ? 'room-night' : 'room-nights'}`;
+  if (context) {
+    context.textContent = billingInterval === 'year'
+      ? 'per month could cover the yearly plan.'
+      : 'could cover one month of Marketel.';
+  }
+  if (options.track) {
+    trackJourney('JourneyControlActivated', {
+      controlName: 'activation-nightly-rate',
+      nightlyRate: rate,
+      breakEvenRoomNights: roomNights,
+      billingInterval,
+    });
+  }
 }
 
 function bookingUrl() {
@@ -438,7 +540,7 @@ function handleBookingPreviewMessage(event) {
 }
 
 function progressHtml() {
-  const labels = ['Booking page', 'Guestel', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
+  const labels = ['Booking page', 'Your apps', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
   return `<div class="mvr-progress" aria-label="Marketel overview progress">
     ${labels.map((label, index) => `<div class="mvr-progress-item ${index === currentStep ? 'is-active' : ''} ${index < currentStep ? 'is-done' : ''}">
       <span></span><small>${esc(label)}</small>
@@ -518,7 +620,7 @@ function bookingRevealHtml() {
       <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
       <div class="mvr-control-proof">
         <span>See what guests will use.</span>
-        Open the booking page built for your property. Then see how guests keep you in Guestel and how you run it from Front Desk.
+        Open the booking page built for your property. Then see how Front Desk runs it and Guestel keeps guests coming back.
       </div>
       ${bookingPageStatusHtml()}
     </div>
@@ -538,118 +640,211 @@ function guestAppRevealHtml() {
   );
 }
 
-// Beat-driven stages: one claim over one full-size proof, advanced only by the
-// footer. Screenshots are real product, shown whole rather than cropped, so the
-// owner is looking at the thing itself instead of an illustration of it.
-function guestelInstallProofHtml() {
-  const name = esc(propertyName());
-  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
-  return `<div class="mvr-guestel-proof mvr-guestel-install-proof">
-    <div class="mvr-guestel-booking-card">
-      <span class="mvr-guestel-property-mark">${initial}</span>
-      <div><small>${name}</small><strong>Keep this property in Guestel</strong></div>
-      <b>Add</b>
-    </div>
-    <span class="mvr-guestel-flow-arrow" aria-hidden="true">↓</span>
-    <div class="mvr-guestel-system-card">
-      <div class="mvr-guestel-icon">G</div>
-      <div><small>APP CLIP</small><strong>Guestel</strong><span>Book direct. Keep every stay together.</span></div>
-      <b>OPEN</b>
-    </div>
-  </div>`;
+// These are real screens, not feature illustrations. The active screen comes
+// forward while the neighboring screens remain visible behind it, making the
+// breadth of each app obvious without forcing seven separate funnel steps.
+function appShowcases() {
+  const estimate = breakEvenEstimate();
+  const rebookBody = estimate
+    ? `They save your property and book direct again. About ${estimate.roomNights} room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
+    : 'They save your property, book direct again and message you in Guestel.';
+  return {
+    frontdesk: {
+      id: 'frontdesk',
+      eyebrow: 'CONTROL YOUR ENGINE',
+      title: 'Control your engine from one app.',
+      body: 'Your page, bookings, rooms and guest reach all live in Front Desk.',
+      slides: [
+        {
+          label: 'Your Page',
+          url: frontdeskYourPageUrl,
+          width: 900,
+          height: 1721,
+          alt: 'Marketel Front Desk Your Page showing the live booking-page editor.',
+          event: 'GuestAppOwnerEditorViewed',
+        },
+        {
+          label: 'Bookings',
+          url: frontdeskBookingsUrl,
+          width: 900,
+          height: 1728,
+          alt: 'Marketel Front Desk Bookings showing a complete reservation and availability decision.',
+        },
+        {
+          label: 'Availability',
+          url: frontdeskAvailabilityUrl,
+          width: 900,
+          height: 1734,
+          alt: 'Marketel Front Desk Availability showing a room calendar and remaining inventory.',
+        },
+        {
+          label: 'Guest Reach',
+          url: frontdeskGuestAppUrl,
+          width: 900,
+          height: 1734,
+          alt: 'Marketel Front Desk Guest Reach showing a live guest notification preview and composer.',
+        },
+      ],
+    },
+    guestel: {
+      id: 'guestel',
+      eyebrow: 'KEEP YOUR GUESTS',
+      title: 'Keep every guest one tap away.',
+      body: rebookBody,
+      slides: [
+        {
+          label: 'Your Hotels',
+          url: guestelHotelsUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel Your Hotels showing an upcoming stay and the property saved for direct rebooking.',
+          event: 'GuestelWalletViewed',
+        },
+        {
+          label: 'Book Again',
+          url: guestelChooseRoomUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel showing a property room picker and direct stay dates.',
+        },
+        {
+          label: 'Messages',
+          url: guestelChatUrl,
+          width: 900,
+          height: 1762,
+          alt: 'Guestel Messages showing a direct conversation between a guest and the property Front Desk.',
+          event: 'GuestelReachViewed',
+        },
+      ],
+    },
+    assistant: {
+      id: 'assistant',
+      eyebrow: 'PROTECT YOUR SETUP',
+      title: 'Nothing slips through the cracks.',
+      body: 'The moment a request lands, Front Desk alerts you three ways — Live Activity, text, and push. Reply in plain words or tap once in the app, and it checks the request and updates availability for you.',
+      slides: [
+        {
+          label: 'Booking Alert',
+          url: assistantAlertStackUrl,
+          width: 900,
+          height: 1748,
+          alt: 'A Marketel booking request reaching the owner through a Front Desk Live Activity, text message and push notification.',
+        },
+        {
+          label: 'Reply by Text',
+          url: assistantTextResolutionUrl,
+          width: 780,
+          height: 1528,
+          alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk handles the online request and availability.',
+          event: 'AssistantTextProofViewed',
+        },
+        {
+          label: 'Answer in App',
+          url: assistantBookingRequestUrl,
+          width: 780,
+          height: 1528,
+          alt: 'A Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
+          event: 'AssistantAppProofViewed',
+        },
+      ],
+    },
+    system: {
+      id: 'system',
+      eyebrow: 'THE COMPLETE LOOP',
+      title: 'The full direct-booking loop.',
+      body: 'Your page converts. Front Desk runs it. Guestel keeps them forever.',
+      compact: true,
+      slides: [
+        {
+          label: 'Booking Page',
+          url: bookingPageStudios17Url,
+          width: 900,
+          height: 1724,
+          alt: 'The Studios 17 direct booking page showing its property details, room and Add control.',
+        },
+        {
+          label: 'Front Desk',
+          url: frontdeskYourPageUrl,
+          width: 900,
+          height: 1721,
+          alt: 'Marketel Front Desk showing the page editor used to run the property.',
+        },
+        {
+          label: 'Guestel',
+          url: guestelHotelsUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel showing the property kept in the guest’s hotel wallet.',
+        },
+      ],
+    },
+  };
 }
 
-function guestelWalletProofHtml() {
-  const name = esc(propertyName());
-  const room = esc(firstRoom().name || 'Your room');
-  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
-  return `<div class="mvr-guestel-proof mvr-guestel-phone">
-    <div class="mvr-guestel-phone-head"><span class="mvr-guestel-icon is-small">G</span><strong>Guestel</strong><i></i></div>
-    <div class="mvr-guestel-wallet-card">
-      <div class="mvr-guestel-wallet-image">${firstRoomImage() ? `<img src="${esc(firstRoomImage())}" alt="">` : `<span>${initial}</span>`}</div>
-      <div class="mvr-guestel-wallet-copy"><small>Saved property</small><strong>${name}</strong><span>${room} · Direct booking</span></div>
-      <button type="button" tabindex="-1">Book direct</button>
-    </div>
-    <div class="mvr-guestel-wallet-nav"><b>Properties</b><span>Stays</span><span>Messages</span></div>
-  </div>`;
+function carouselPosition(index, active, length) {
+  if (index === active) return 'is-active';
+  if (length === 2) return 'is-next';
+  if (index === (active - 1 + length) % length) return 'is-prev';
+  if (index === (active + 1) % length) return 'is-next';
+  return 'is-far';
 }
 
-function guestelReachProofHtml() {
-  const name = esc(propertyName());
-  const initial = esc(propertyName().trim().charAt(0).toUpperCase() || 'P');
-  return `<div class="mvr-guestel-proof mvr-guestel-reach-proof">
-    <div class="mvr-guestel-notification">
-      <span class="mvr-guestel-property-mark">${initial}</span>
-      <div><small>${name} · now</small><strong>Come back direct and save</strong><p>Your returning-guest rate is ready in Guestel.</p></div>
+function appCarouselHtml(showcase) {
+  const active = Math.max(0, Math.min(showcase.slides.length - 1, appCarouselIndex[showcase.id] || 0));
+  const subject = {
+    frontdesk: 'Front Desk screen',
+    guestel: 'Guestel screen',
+    assistant: 'Front Desk response',
+    system: 'Marketel system screen',
+  }[showcase.id] || 'screen';
+  return `<div class="mvr-coverflow${showcase.compact ? ' is-system' : ''}" data-mvr-carousel="${showcase.id}" data-active="${active}">
+    <div class="mvr-coverflow-viewport" tabindex="0" role="group" aria-label="Explore ${esc(showcase.title)}">
+      ${showcase.slides.map((slide, index) => `<button type="button" class="mvr-coverflow-card ${carouselPosition(index, active, showcase.slides.length)}" style="aspect-ratio:${slide.width}/${slide.height}" data-carousel-slide="${index}" aria-label="View ${esc(slide.label)}" aria-pressed="${index === active ? 'true' : 'false'}">
+        <img src="${slide.url}" width="${slide.width}" height="${slide.height}" loading="eager" decoding="async" alt="${esc(slide.alt)}">
+      </button>`).join('')}
     </div>
-    <div class="mvr-guestel-outcomes">
-      <span><b>01</b><strong>Book direct again</strong><small>Your rooms stay one tap away</small></span>
-      <span><b>02</b><strong>Message the property</strong><small>The conversation stays with the stay</small></span>
+    <div class="mvr-coverflow-controls">
+      <button type="button" class="mvr-coverflow-arrow" data-carousel-prev aria-label="Previous ${esc(subject)}">←</button>
+      <span class="mvr-coverflow-dots" role="group" aria-label="Choose a screen">
+        ${showcase.slides.map((slide, index) => `<button type="button" data-carousel-dot="${index}" class="${index === active ? 'is-active' : ''}" aria-label="${esc(slide.label)}" aria-current="${index === active ? 'true' : 'false'}"></button>`).join('')}
+      </span>
+      <button type="button" class="mvr-coverflow-next" data-carousel-next>Next: ${esc(showcase.slides[(active + 1) % showcase.slides.length].label)} <span>→</span></button>
     </div>
   </div>`;
 }
 
 function guestAppBeats() {
-  const estimate = breakEvenEstimate();
-  const rebookBody = estimate
-    ? `Guests keep your property, then return to your rooms in one tap. About ${estimate.roomNights} direct room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
-    : 'Guests keep your property, then return to your rooms in one tap instead of searching an OTA again.';
+  const showcases = appShowcases();
   return [
     {
-      title: 'Guests tap Add. Guestel handles the rest.',
-      body: 'Your booking page opens a real Apple experience. They can book immediately and install Guestel without hunting through the App Store.',
-      next: 'See what they keep',
-      event: 'GuestelInstallFlowViewed',
-      render: guestelInstallProofHtml,
+      next: 'See the Guestel experience',
+      event: 'GuestAppOwnerEditorViewed',
+      carousel: showcases.frontdesk,
     },
     {
-      title: 'Your property stays in their Guestel wallet.',
-      body: rebookBody,
-      next: 'See what that unlocks',
-      event: 'GuestelWalletViewed',
-      render: guestelWalletProofHtml,
-    },
-    {
-      title: 'The guest relationship stays yours.',
-      body: 'Their stay, your messages and your next direct offer live together—without paying an OTA to reach the same guest again.',
       next: 'See how Front Desk protects you',
-      event: 'GuestelReachViewed',
-      render: guestelReachProofHtml,
+      event: 'GuestelWalletViewed',
+      carousel: showcases.guestel,
     },
   ];
 }
 
-// Beat 3 is the single real setting on the screen — text vs in-app is not a
-// choice (both always fire), so it is never offered as a toggle.
+// The assistant's two response surfaces belong to one idea, so they swipe
+// inside one beat. The second beat then closes the story with the complete
+// booking-page → Front Desk → Guestel loop.
 function assistantBeats() {
+  const showcases = appShowcases();
   return [
     {
-      title: 'Front Desk does more than edit your booking page.',
-      body: 'It also runs your bookings and availability. When a request arrives, it texts you — reply naturally with whatever changed.',
-      next: 'See how you answer',
+      next: 'See the complete loop',
       event: 'AssistantTextProofViewed',
-      proof: {
-        url: assistantTextResolutionUrl,
-        alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk releases the online request, voids the hold, notifies the guest, and updates availability.',
-      },
+      carousel: showcases.assistant,
     },
     {
-      title: 'Or answer with one tap.',
-      body: 'The same request is already waiting in Bookings. Either way works.',
-      next: 'Set your rule',
-      event: 'AssistantAppProofViewed',
-      proof: {
-        url: assistantBookingRequestUrl,
-        alt: 'A real Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
-      },
-    },
-    {
-      title: 'And if you miss it, your rule decides.',
-      body: 'That’s how a room conflict never becomes a guest problem.',
       next: 'Review plans and activation',
-      event: 'AssistantFallbackViewed',
-      proof: null,
-      render: assistantFallbackHtml,
+      event: 'MarketelSystemViewed',
+      systemShowcase: true,
+      carousel: showcases.system,
     },
   ];
 }
@@ -670,16 +865,17 @@ function proofFrames(proof) {
 
 function beatStageHtml(stageClass, eyebrow, beats, index) {
   const beat = beats[Math.max(0, Math.min(beats.length - 1, index))] || beats[0];
+  const carousel = beat.carousel;
   const frames = proofFrames(beat.proof);
   const paired = frames.length > 1;
-  return `<section class="mvr-stage mvr-stage-beats ${stageClass}">
+  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${beat.systemShowcase ? ' is-system-showcase' : ''}">
     <div class="mvr-beat-band">
-      <div class="mvr-eyebrow">${eyebrow}</div>
-      <h1 class="mvr-beat-title">${beat.title}</h1>
-      <p class="mvr-beat-body">${beat.body}</p>
+      <div class="mvr-eyebrow">${carousel ? carousel.eyebrow : eyebrow}</div>
+      <h1 class="mvr-beat-title"${carousel ? ' data-carousel-title' : ''}>${carousel ? carousel.title : beat.title}</h1>
+      <p class="mvr-beat-body"${carousel ? ' data-carousel-body' : ''}>${carousel ? carousel.body : beat.body}</p>
     </div>
     <div class="mvr-beat-stage">
-      ${beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
+      ${carousel ? appCarouselHtml(carousel) : beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
         ${frames.map((frame, i) => `<img class="mvr-beat-frame${i === 0 ? ' is-active' : ''}" src="${frame.url}" width="780" height="1528" decoding="async" alt="${esc(frame.alt)}">`).join('')}
         ${paired ? `<span class="mvr-beat-frame-dots" aria-hidden="true">${frames.map((_, i) => `<i${i === 0 ? ' class="is-active"' : ''}></i>`).join('')}</span>` : ''}
       </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
@@ -729,6 +925,89 @@ function startBeatFrames() {
   }, BEAT_FRAME_FIRST_MS);
 }
 
+function setAppCarouselSlide(root, requestedIndex, manual = false) {
+  if (!root?.isConnected) return;
+  const showcase = appShowcases()[root.dataset.mvrCarousel];
+  if (!showcase) return;
+  const length = showcase.slides.length;
+  const active = ((Number(requestedIndex) || 0) % length + length) % length;
+  const previous = appCarouselIndex[showcase.id] || 0;
+  appCarouselIndex[showcase.id] = active;
+  root.dataset.active = String(active);
+  root.querySelectorAll('[data-carousel-slide]').forEach((card) => {
+    const index = Number(card.dataset.carouselSlide);
+    card.classList.remove('is-active', 'is-prev', 'is-next', 'is-far');
+    card.classList.add(carouselPosition(index, active, length));
+    card.setAttribute('aria-pressed', index === active ? 'true' : 'false');
+    card.tabIndex = index === active ? 0 : -1;
+  });
+  root.querySelectorAll('[data-carousel-dot]').forEach((dot) => {
+    const selected = Number(dot.dataset.carouselDot) === active;
+    dot.classList.toggle('is-active', selected);
+    dot.setAttribute('aria-current', selected ? 'true' : 'false');
+  });
+  const slide = showcase.slides[active];
+  const title = root.closest('.mvr-stage')?.querySelector('[data-carousel-title]');
+  const body = root.closest('.mvr-stage')?.querySelector('[data-carousel-body]');
+  if (title) title.textContent = showcase.title;
+  if (body) body.textContent = showcase.body;
+  const next = root.querySelector('[data-carousel-next]');
+  if (next) next.innerHTML = `Next: ${esc(showcase.slides[(active + 1) % length].label)} <span>→</span>`;
+  if (!manual || active === previous) return;
+  if (slide.event) trackReveal(slide.event);
+  trackJourney('JourneyAppCarouselSlideViewed', {
+    showcase: showcase.id,
+    slide: active,
+    screen: slide.label,
+  });
+}
+
+function bindAppCarousels() {
+  document.querySelectorAll('[data-mvr-carousel]').forEach((root) => {
+    const showcase = appShowcases()[root.dataset.mvrCarousel];
+    if (!showcase) return;
+    const active = () => appCarouselIndex[showcase.id] || 0;
+    let suppressCardClickUntil = 0;
+    root.querySelector('[data-carousel-prev]')?.addEventListener('click', () => {
+      setAppCarouselSlide(root, active() - 1, true);
+    });
+    root.querySelector('[data-carousel-next]')?.addEventListener('click', () => {
+      setAppCarouselSlide(root, active() + 1, true);
+    });
+    root.querySelectorAll('[data-carousel-slide]').forEach((card) => {
+      card.addEventListener('click', () => {
+        if (performance.now() < suppressCardClickUntil) return;
+        setAppCarouselSlide(root, Number(card.dataset.carouselSlide), true);
+      });
+    });
+    root.querySelectorAll('[data-carousel-dot]').forEach((dot) => {
+      dot.addEventListener('click', () => setAppCarouselSlide(root, Number(dot.dataset.carouselDot), true));
+    });
+    const viewport = root.querySelector('.mvr-coverflow-viewport');
+    viewport?.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      setAppCarouselSlide(root, active() + (event.key === 'ArrowRight' ? 1 : -1), true);
+    });
+    let startX = null;
+    viewport?.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      startX = event.clientX;
+    });
+    viewport?.addEventListener('pointerup', (event) => {
+      if (startX == null) return;
+      const distance = event.clientX - startX;
+      startX = null;
+      if (Math.abs(distance) < 34) return;
+      // A pointer gesture can still synthesize a click on the card it began
+      // over. Suppress only that trailing click or it would undo the swipe.
+      suppressCardClickUntil = performance.now() + 260;
+      setAppCarouselSlide(root, active() + (distance < 0 ? 1 : -1), true);
+    });
+    viewport?.addEventListener('pointercancel', () => { startX = null; });
+  });
+}
+
 function setStageBeat(nextBeat, manual = false) {
   const beats = stageBeats();
   if (!beats) return;
@@ -743,20 +1022,6 @@ function setStageBeat(nextBeat, manual = false) {
   trackJourney('JourneyRevealBeatViewed', { revealStep: currentStep, beat: clamped });
 }
 
-function assistantFallbackHtml() {
-  const releases = assistantNoResponseAction === 'release';
-  return `<div class="mvr-fallback-control">
-    <strong>If you miss the alert</strong>
-    <div class="mvr-fallback-options" role="group" aria-label="Choose what happens when nobody answers">
-      <button type="button" data-mvr-fallback="confirm" class="${releases ? '' : 'is-selected'}"><b>Keep the booking</b><span>Revenue first</span></button>
-      <button type="button" data-mvr-fallback="release" class="${releases ? 'is-selected' : ''}"><b>Release request</b><span>Availability first</span></button>
-    </div>
-    <small>${releases
-      ? 'Your rule: void the $1 hold and notify the guest if nobody replies.'
-      : 'Your rule: confirm the booking automatically if nobody replies.'}</small>
-  </div>`;
-}
-
 function assistantRevealHtml() {
   return beatStageHtml(
     'mvr-stage-assistant',
@@ -767,7 +1032,7 @@ function assistantRevealHtml() {
 }
 
 function finaleHtml() {
-  const isSubscribed = crm.hotelSubscribed;
+  const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
   const displayedPrice = isYearly ? '$1,990' : '$199';
   const displayedInterval = isYearly ? '/year' : '/month';
@@ -775,9 +1040,9 @@ function finaleHtml() {
     ? 'Activate Marketel — $1,990/year'
     : 'Activate Marketel — $199/month';
   const includedValueHtml = `<div class="mvr-value-list">
-    <div style="--stagger:0"><span>✓</span><p><strong>Editable direct booking page</strong><small>Rooms, photos, prices, policies and branding</small></p></div>
-    <div style="--stagger:1"><span>✓</span><p><strong>Your property in Guestel</strong><small>Guests keep your rooms, their stays and your messages one tap away</small></p></div>
-    <div style="--stagger:2"><span>✓</span><p><strong>Marketel Front Desk and Assistant</strong><small>Tell it when a walk-in takes a room; it updates remaining availability</small></p></div>
+    <div style="--stagger:0"><span>1</span><p><strong>Direct Booking Page</strong><small>Take bookings on your own page without OTA commission</small></p></div>
+    <div style="--stagger:1"><span>2</span><p><strong>Marketel Front Desk</strong><small>Control bookings and availability around the setup you already use</small></p></div>
+    <div style="--stagger:2"><span>3</span><p><strong>Guestel</strong><small>Keep repeat direct bookings and guest messages one tap away</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
     <button type="button" class="mvr-finale-back" id="mvrBack">← Back</button>
@@ -785,7 +1050,7 @@ function finaleHtml() {
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>Guests book on your direct page and keep your property in Guestel. You use Marketel Front Desk to manage bookings, availability and the guest relationship.</p>
+      <p>Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.</p>
       ${isSubscribed ? `${includedValueHtml}
         <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
         <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
@@ -796,14 +1061,15 @@ function finaleHtml() {
           </div>
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
           <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">${isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
+          ${activationRateCalculatorHtml()}
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
           <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
           <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
-          ${directBookingValueHtml()}
-          <div class="mvr-included-label">Everything included</div>
+          ${directBookingProofHtml()}
+          <div class="mvr-included-label">Three things you're activating</div>
           ${includedValueHtml}
         </div>`}
     </div>
@@ -821,7 +1087,7 @@ function footerHtml() {
   if (currentStep === 0) {
     if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
     return `<div class="mvr-footer mvr-footer-booking">
-      <button type="button" class="mvr-primary" id="mvrNext">See the Guestel experience →</button>
+      <button type="button" class="mvr-primary" id="mvrNext">See your Front Desk app →</button>
     </div>`;
   }
   // The activation screen carries its own Back pill so the page can run the
@@ -917,7 +1183,7 @@ function showExpandedPreview() {
       <span data-live-forward-long>See how you edit it in Front Desk</span>
       <b aria-hidden="true">→</b>
     </button>
-    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See the Guestel experience</button>
+    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See your Front Desk app</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
   const iframe = modal.querySelector('[data-preview-frame="guest"]');
@@ -1021,7 +1287,7 @@ function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-sel
   if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
   // Exactly one green CTA, and it always names where you are not.
   //   engine            → "See how to edit your booking page"
-  //   editor            → Back + "See the Guestel experience"
+  //   editor            → Back + "See your Front Desk app"
   //   engine after save → forward, because re-offering the step just completed
   //                       reads as though the save did not take.
   // Returning via Back is deliberately *not* a save, so the editor stays one
@@ -1102,6 +1368,8 @@ function moveToStep(nextStep) {
     resumed: nextStageViewIsResume,
     bookingPageReady: currentStep === 0 ? !!bookingPageState.ready : undefined,
   });
+  const openingBeat = stageBeats(currentStep)?.[stageBeatIndex[currentStep] || 0];
+  if (openingBeat?.event) trackReveal(openingBeat.event);
   nextStageViewIsResume = false;
   renderReveal();
   document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
@@ -1142,6 +1410,17 @@ function finishReveal() {
 }
 
 async function activateMarketel(button) {
+  if (activationPreviewMode && crm.hotelSubscribed) {
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = `${propertyName()} is already active`;
+    window.setTimeout(() => {
+      if (!document.body.contains(button)) return;
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }, 1800);
+    return;
+  }
   if (crm.hotelSubscribed) {
     finishReveal();
     return;
@@ -1207,34 +1486,33 @@ function bindRevealEvents() {
       renderReveal();
     });
   });
-  document.querySelectorAll('[data-mvr-fallback]').forEach((button) => {
+  const rateInput = document.getElementById('mvrActivationRate');
+  rateInput?.addEventListener('input', () => {
+    if (rateInput.value.trim() === '') return;
+    updateActivationRateCalculator(rateInput.value, { syncInput: false });
+  });
+  rateInput?.addEventListener('change', () => {
+    updateActivationRateCalculator(rateInput.value, { track: true });
+  });
+  document.querySelectorAll('[data-mvr-rate-step]').forEach((button) => {
     button.addEventListener('click', () => {
-      const next = button.dataset.mvrFallback === 'release' ? 'release' : 'confirm';
-      if (next === assistantNoResponseAction) return;
-      assistantNoResponseAction = next;
-      trackReveal(next === 'release' ? 'AssistantReleaseFallbackSelected' : 'AssistantKeepFallbackSelected');
-      trackJourney('JourneyAssistantFallbackSelected', { noResponseAction: next });
-      if (typeof window.api === 'function') {
-        window.api('POST', '/api/crm/booking-approval', { noResponseAction: next }).catch(() => {});
-      }
-      renderReveal();
+      const delta = Number(button.dataset.mvrRateStep) || 0;
+      const current = Number(rateInput?.value) || currentActivationRate();
+      updateActivationRateCalculator(current + delta, { track: true });
     });
   });
+  bindAppCarousels();
   startBeatFrames();
 }
 
 async function loadRevealData() {
   if (dataPromise || typeof window.api !== 'function') return dataPromise;
-  dataPromise = Promise.all([
-    window.api('GET', '/api/crm/rooms'),
-    window.api('GET', '/api/crm/booking-approval').catch(() => null),
-  ])
-    .then(([result, approvalResult]) => {
+  dataPromise = window.api('GET', '/api/crm/rooms')
+    .then((result) => {
       revealData = {
         rooms: Array.isArray(result?.rooms) ? result.rooms : [],
         rates: result?.rates || null,
       };
-      assistantNoResponseAction = approvalResult?.data?.noResponseAction === 'release' ? 'release' : 'confirm';
       if (revealData.rooms.length) crm.editRooms = revealData.rooms;
       if (document.getElementById('marketelValueReveal') && !document.getElementById('mvrLivePreview')) renderReveal();
       return revealData;
@@ -1318,6 +1596,7 @@ export async function showMarketelValueReveal(options = {}) {
   revealOpening = false;
   if (document.getElementById('marketelValueReveal')) return;
 
+  activationPreviewMode = options.previewActivation === true && !!crm.hotelSubscribed;
   const requestedStep = Number(options.startAt);
   let storedStep = 0;
   let hadPendingReveal = false;
@@ -1327,9 +1606,11 @@ export async function showMarketelValueReveal(options = {}) {
   currentStep = Number.isFinite(requestedStep)
     ? Math.max(0, Math.min(3, requestedStep))
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));
-  if (crm.hotelSubscribed && currentStep === 3) currentStep = 0;
+  if (crm.hotelSubscribed && !activationPreviewMode && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
   stageBeatIndex = { 1: 0, 2: 0 };
+  appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
+  activationNightlyRate = null;
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
   bookingEditorVisited = false;

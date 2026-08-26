@@ -111,10 +111,10 @@ struct KeepBookingIntent: LiveActivityIntent {
     init() {}
     init(bookingId: String) { self.bookingId = bookingId }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let message = try await BookingDecisionService.submit(bookingId: bookingId, action: "confirm")
+    func perform() async throws -> some IntentResult {
+        _ = try await BookingDecisionService.submit(bookingId: bookingId, action: "confirm")
         await endLiveActivity(bookingId: bookingId)
-        return .result(dialog: IntentDialog(stringLiteral: message))
+        return .result()
     }
 }
 
@@ -129,9 +129,9 @@ struct ReleaseBookingIntent: LiveActivityIntent {
     init() {}
     init(bookingId: String) { self.bookingId = bookingId }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let message = try await BookingDecisionService.submit(bookingId: bookingId, action: "release")
+    func perform() async throws -> some IntentResult {
+        _ = try await BookingDecisionService.submit(bookingId: bookingId, action: "release")
         await endLiveActivity(bookingId: bookingId)
-        return .result(dialog: IntentDialog(stringLiteral: message))
+        return .result()
     }
 }

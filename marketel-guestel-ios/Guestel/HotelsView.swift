@@ -98,6 +98,7 @@ struct HotelsView: View {
         .sheet(item: animatedHotelSelection) { hotel in
             HotelSheet(
                 hotel: hotel,
+                preloadedData: store.details(for: hotel.hotelId),
                 maxDetent: .height(maxSheetHeight),
                 detent: $sheetDetent,
                 onBooked: { result, checkin, checkout, roomName in
@@ -117,10 +118,16 @@ struct HotelsView: View {
                     // sheet has finished dismissing, so confirmations and Front
                     // Desk replies can actually reach this iPhone.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
-                        let stay = store.reservations.first {
-                            $0.hotelId == hotel.hotelId && $0.code == result.reservationCode
+                        Task { @MainActor in
+                            let stay = store.reservations.first {
+                                $0.hotelId == hotel.hotelId && $0.code == result.reservationCode
+                            }
+                            if await GuestPushManager.shouldShowPermissionContext() {
+                                store.arrival = GuestelArrival(hotel: hotel, stay: stay)
+                            } else {
+                                await GuestPushManager.registerIfAuthorized(store: store)
+                            }
                         }
-                        store.arrival = GuestelArrival(hotel: hotel, stay: stay)
                     }
                 }
             )
@@ -178,7 +185,6 @@ struct HotelsView: View {
     @MainActor
     private func refreshHotelCards() async {
         await store.refreshHotels()
-        ImagePrefetch.warm(hotels: store.hotels)
     }
 
     private var emptyWallet: some View {
@@ -255,10 +261,10 @@ struct WalletCard: View {
             ZStack {
                 Theme.gradient(for: seed)
                 if let imageURL = hotel.imageURL {
-                    AsyncImage(url: imageURL) { phase in
-                        if case let .success(image) = phase {
-                            image.resizable().scaledToFill()
-                        }
+                    CachedRemoteImage(url: imageURL) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Color.clear
                     }
                     // Covers belong to each property, so brightness is
                     // unpredictable. A light uniform shade preserves the photo

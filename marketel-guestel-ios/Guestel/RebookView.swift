@@ -236,7 +236,11 @@ struct RebookView: View {
         guest = store.guest
         do {
             let d = try await BookingAPI.hotel(hotel.hotelId)
-            await MainActor.run { data = d; stage = .rooms }
+            await MainActor.run {
+                store.cacheHotelDetails(d)
+                data = d
+                stage = .rooms
+            }
         } catch {
             await MainActor.run { errorMessage = "Couldn't load rooms."; stage = .rooms }
         }
@@ -379,7 +383,9 @@ private struct RoomCard: View {
             ZStack {
                 Theme.green.opacity(0.10)
                 if let url = room.image {
-                    AsyncImage(url: url) { img in img.resizable().aspectRatio(contentMode: .fill) } placeholder: { Color.clear }
+                    CachedRemoteImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: { Color.clear }
                 }
             }
             .frame(height: 150)

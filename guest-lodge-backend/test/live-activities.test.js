@@ -141,3 +141,37 @@ test('an unknown status never starts or ends anything', () => {
   assert.equal(result.action, 'none');
   assert.match(result.reason, /unhandled-status/);
 });
+
+test('the native Live Activity stays focused on the Front Desk decision', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const widget = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App', 'MarketelActivityWidget', 'MarketelActivityWidget.swift'),
+    'utf8'
+  );
+  assert.match(widget, /Text\("FRONT DESK"\)/);
+  assert.ok(widget.includes('Is \\(context.attributes.roomName) still free?'));
+  assert.match(widget, /Label\("Confirm", systemImage: "checkmark"\)/);
+  assert.match(widget, /Label\("Release", systemImage: "xmark"\)/);
+  assert.match(widget, /No reply: keep/);
+  assert.match(widget, /No reply: release/);
+  // Keep the pending subtree deterministic. Dynamic timer text previously
+  // rendered the header but left the pending decision surface blank on-device.
+  assert.doesNotMatch(widget, /Text\(timerInterval:/);
+  assert.doesNotMatch(widget, /style: \.timer/);
+  assert.match(widget, /Text\("ACTION NEEDED"\)/);
+  assert.match(widget, /MarketelDecisionButtonStyle/);
+});
+
+test('Live Activity intents are compiled into the app as well as the widget', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const project = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj'),
+    'utf8'
+  );
+  // LiveActivityIntent executes in the app process. Targeting only the widget
+  // renders the buttons but leaves the system with no app-side implementation.
+  const sourceMemberships = project.match(/BookingDecisionIntents\.swift in Sources \*\//g) || [];
+  assert.ok(sourceMemberships.length >= 4, 'intent source must appear in both target source phases');
+});

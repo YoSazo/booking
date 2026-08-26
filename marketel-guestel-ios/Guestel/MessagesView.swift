@@ -39,6 +39,22 @@ struct MessagesView: View {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
+                                .confirmationDialog(
+                                    "Delete this conversation?",
+                                    isPresented: Binding(
+                                        get: { pendingDeletion?.id == stay.id },
+                                        set: { if !$0, pendingDeletion?.id == stay.id { pendingDeletion = nil } }
+                                    ),
+                                    titleVisibility: .visible
+                                ) {
+                                    Button("Delete Conversation", role: .destructive) {
+                                        pendingDeletion = nil
+                                        deleteConversation(stay)
+                                    }
+                                    Button("Cancel", role: .cancel) { pendingDeletion = nil }
+                                } message: {
+                                    Text("This removes the conversation from Guestel. The property keeps its copy.")
+                                }
                         }
                     }
                     .listStyle(.plain)
@@ -65,23 +81,6 @@ struct MessagesView: View {
         }) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
         }
-        .confirmationDialog(
-            "Delete this conversation?",
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete Conversation", role: .destructive) {
-                guard let stay = pendingDeletion else { return }
-                pendingDeletion = nil
-                deleteConversation(stay)
-            }
-            Button("Cancel", role: .cancel) { pendingDeletion = nil }
-        } message: {
-            Text("This removes the conversation from Guestel. The property keeps its copy.")
-        }
         .alert("Conversation Not Deleted", isPresented: Binding(
             get: { deletionError != nil },
             set: { if !$0 { deletionError = nil } }
@@ -98,6 +97,10 @@ struct MessagesView: View {
         let preview = store.conversation(for: stay)
         let last = preview?.latestMessage
         let unread = preview?.unreadCount ?? 0
+        // The reservation receives the APNs status immediately; the inbox
+        // summary may still contain its pre-push value for one network round
+        // trip, so prefer the live reservation state.
+        let status = normalizedStatus(stay.status ?? preview?.status)
 
         return Button {
             store.markConversationRead(stay)
@@ -107,7 +110,7 @@ struct MessagesView: View {
                 ZStack {
                     Circle().fill(Theme.green.opacity(0.12))
                     if let imageURL = hotel.imageURL {
-                        AsyncImage(url: imageURL) { image in
+                        CachedRemoteImage(url: imageURL) { image in
                             image.resizable().scaledToFill()
                         } placeholder: { propertyInitial(hotel.name) }
                         .clipShape(Circle())
@@ -123,6 +126,7 @@ struct MessagesView: View {
                             .font(.system(size: 16, weight: unread > 0 ? .bold : .semibold))
                             .foregroundStyle(Theme.ink)
                             .lineLimit(1)
+                        statusBadge(status)
                         Spacer()
                         if let last {
                             Text(shortTime(last.createdAt))
@@ -130,9 +134,9 @@ struct MessagesView: View {
                                 .foregroundStyle(unread > 0 ? Theme.green : Theme.inkSoft)
                         }
                     }
-                    Text(last.map(messagePreview) ?? "Message the Front Desk about this stay")
+                    Text(conversationSummary(status: status, latest: last))
                         .font(.system(size: 14, weight: unread > 0 ? .semibold : .regular))
-                        .foregroundStyle(unread > 0 ? Theme.ink : Theme.inkSoft)
+                        .foregroundStyle(isInactive(status) ? Color.red.opacity(0.78) : (unread > 0 ? Theme.ink : Theme.inkSoft))
                         .lineLimit(1)
                     HStack(spacing: 6) {
                         Text(stay.roomName?.isEmpty == false ? stay.roomName! : "Your stay")
@@ -203,6 +207,50 @@ struct MessagesView: View {
         let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = body.isEmpty ? message.requests.joined(separator: ", ") : body
         return message.sender == "guest" ? "You: \(text)" : text
+    }
+
+    private func normalizedStatus(_ raw: String?) -> String {
+        raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+    }
+
+    private func isInactive(_ status: String) -> Bool {
+        ["released", "cancelled", "canceled", "declined"].contains(status)
+    }
+
+    private func conversationSummary(status: String, latest: BookingAPI.GuestMessage?) -> String {
+        switch status {
+        case "released", "declined":
+            return "This room request was released"
+        case "cancelled", "canceled":
+            return "This reservation was cancelled"
+        case "pending":
+            return latest.map(messagePreview) ?? "Front Desk is checking your room"
+        default:
+            return latest.map(messagePreview) ?? "Message the Front Desk about this stay"
+        }
+    }
+
+    @ViewBuilder
+    private func statusBadge(_ status: String) -> some View {
+        let label: String? = switch status {
+        case "pending": "Pending"
+        case "confirmed": "Confirmed"
+        case "released", "declined": "Released"
+        case "cancelled", "canceled": "Cancelled"
+        default: nil
+        }
+        if let label {
+            Text(label)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(isInactive(status) ? Color.red : (status == "pending" ? Color.orange : Theme.green))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(
+                    (isInactive(status) ? Color.red : (status == "pending" ? Color.orange : Theme.green)).opacity(0.1),
+                    in: Capsule()
+                )
+                .fixedSize()
+        }
     }
 
     private func dateRange(_ stay: Reservation) -> String {

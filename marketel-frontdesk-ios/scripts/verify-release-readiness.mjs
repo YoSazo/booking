@@ -68,6 +68,9 @@ expect(delegate, /sheet\.detents = \[\.medium\(\), \.large\(\)\][\s\S]{0,120}she
   'Native Front Desk Assistant must open at half height and expand to full height');
 expect(project, /NativeAssistant\.swift in Sources/,
   'Xcode target does not compile NativeAssistant.swift');
+expect(project, /NativeProperties\.swift in Sources/,
+  'Xcode target does not compile NativeProperties.swift');
+read('ios/App/App/NativeProperties.swift');
 const nativeAssistant = read('ios/App/App/NativeAssistant.swift');
 expect(nativeAssistant, /navigationBarItems\(trailing: Button\("Done"\)/,
   'Native Front Desk Assistant must keep Done in the top-right');

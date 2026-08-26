@@ -106,7 +106,7 @@ test('Guestel hotel actions use live data instead of placeholder dead ends', () 
     assert.match(hotelSheet, /NativeMessagesView\(hotel: hotel, stay: stay\)/);
     assert.match(nativeMessages, /BookingAPI\.messages\(hotelId: hotel\.hotelId/);
     assert.doesNotMatch(hotelSheet, /SimpleWebSheet/);
-    assert.match(hotels, /AsyncImage\(url: imageURL\)/);
+    assert.match(hotels, /CachedRemoteImage\(url: imageURL\)/);
     assert.doesNotMatch(hotels, /Paid · Confirmed/);
 });
 

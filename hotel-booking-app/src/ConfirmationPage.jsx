@@ -4,7 +4,7 @@ import { useGuest } from './GuestProvider.jsx';
 import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, XCircle } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
-import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { resolveGuestelWalletImageUrl, resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { isStandalone } from './pwaUtils.js';
@@ -366,71 +366,13 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             </section>
           )}
 
-          {/* 2. YOUR STAY — always visible (was hidden in <details>). The money
-              line is the trust payoff and must never be a tap away. */}
-          <div className="stay-details-card stay-summary-card">
-          <div className="stay-summary-card__head">
-            <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
-            <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : confirmationReleased ? 'Released' : 'Confirmed'}</span>
-          </div>
-
-          <div className="stay-summary-card__dates">
-            <div className="stay-summary-card__date">
-              <span className="detail-label">Check-in</span>
-              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkin)}</span>
-            </div>
-            <div className="stay-summary-card__date">
-              <span className="detail-label">Check-out</span>
-              <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkout)}</span>
-            </div>
-            <div className="stay-summary-card__nights">
-              <Moon size={14} /> {bookingDetails.nights} night{bookingDetails.nights > 1 ? 's' : ''}
-            </div>
-          </div>
-
-          {stayMoney && (
-            <div className="stay-summary-card__money">
-              <div className="detail-row">
-                <span className="detail-label">Paid today</span>
-                <span className="detail-value" style={{ color: '#2E7D5B', fontWeight: 700 }}>{money(stayMoney.paidToday)}</span>
-              </div>
-              {stayMoney.holdNote && (
-                <div className="detail-row">
-                  <span className="detail-label">$1 hold</span>
-                  <span className="detail-value" style={{ color: '#6b7280' }}>temporary authorization</span>
-                </div>
-              )}
-              {stayMoney.dueAtCheckin != null && (
-                <div className="detail-row">
-                  <span className="detail-label">Due at check-in</span>
-                  <span className="detail-value" style={{ fontWeight: 700 }}>{money(stayMoney.dueAtCheckin)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="stay-summary-card__actions">
-            <button
-              type="button"
-              onClick={() => downloadStayIcs({ hotel, bookingDetails, reservationCode })}
-              className="stay-summary-card__btn"
-            >
-              <CalendarPlus size={17} /> Add to calendar
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="stay-summary-card__btn"
-            >
-              <CalendarClock size={17} /> Extend / rebook
-            </button>
-          </div>
-          </div>
-
-          {/* 3. STAY IN TOUCH — install is secondary, framed as how you reach us */}
+          {/* 2. GUESTEL — the post-booking action is now the visual center of
+              the page, using the exact Wallet identity configured in Front Desk. */}
           <GuestInstallCard
           hotelName={hotelName}
           appIconUrl={resolvePropertyIconUrl(hotel)}
+          walletImageUrl={resolveGuestelWalletImageUrl(hotel)}
+          walletSubtitle={hotel?.guestelWalletSubtitle || hotel?.address || 'Direct booking'}
           hotelId={resolvedHotelId}
           reservationCode={reservationCode}
           handoffToken={bookingDetails?.handoffToken || ''}
@@ -442,7 +384,76 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
           subline="See stay updates, message the Front Desk, and book direct again without searching."
           />
 
-          {/* 4. Fine print — the only thing that stays collapsed */}
+          {/* 3. YOUR ROOM — accessible like the payment disclosure, without
+              competing with the one action this screen should drive. */}
+          <details className="confirmation-details confirmation-details--stay">
+          <summary>
+            <span>Your room</span>
+            <small>{bookingDetails.name || 'Stay details'}</small>
+          </summary>
+          <div className="confirmation-details__body confirmation-details__body--stay">
+            <div className="stay-details-card stay-summary-card stay-summary-card--inside-details">
+              <div className="stay-summary-card__head">
+                <span className="stay-summary-card__title">{bookingDetails.name || 'Your room'}</span>
+                <span className="stay-summary-card__badge">{confirmationPending ? 'Room held' : confirmationReleased ? 'Released' : 'Confirmed'}</span>
+              </div>
+
+              <div className="stay-summary-card__dates">
+                <div className="stay-summary-card__date">
+                  <span className="detail-label">Check-in</span>
+                  <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkin)}</span>
+                </div>
+                <div className="stay-summary-card__date">
+                  <span className="detail-label">Check-out</span>
+                  <span className="detail-value">{formatDateWithSuffix(bookingDetails.checkout)}</span>
+                </div>
+                <div className="stay-summary-card__nights">
+                  <Moon size={14} /> {bookingDetails.nights} night{bookingDetails.nights > 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {stayMoney && (
+                <div className="stay-summary-card__money">
+                  <div className="detail-row">
+                    <span className="detail-label">Paid today</span>
+                    <span className="detail-value" style={{ color: '#2E7D5B', fontWeight: 700 }}>{money(stayMoney.paidToday)}</span>
+                  </div>
+                  {stayMoney.holdNote && (
+                    <div className="detail-row">
+                      <span className="detail-label">$1 hold</span>
+                      <span className="detail-value" style={{ color: '#6b7280' }}>temporary authorization</span>
+                    </div>
+                  )}
+                  {stayMoney.dueAtCheckin != null && (
+                    <div className="detail-row">
+                      <span className="detail-label">Due at check-in</span>
+                      <span className="detail-value" style={{ fontWeight: 700 }}>{money(stayMoney.dueAtCheckin)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="stay-summary-card__actions">
+                <button
+                  type="button"
+                  onClick={() => downloadStayIcs({ hotel, bookingDetails, reservationCode })}
+                  className="stay-summary-card__btn"
+                >
+                  <CalendarPlus size={17} /> Add to calendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/')}
+                  className="stay-summary-card__btn"
+                >
+                  <CalendarClock size={17} /> Extend / rebook
+                </button>
+              </div>
+            </div>
+          </div>
+          </details>
+
+          {/* 4. Fine print — collapsed until the guest asks for it. */}
           <details className="confirmation-details">
           <summary>Payment breakdown &amp; policy</summary>
           <div className="confirmation-details__body">

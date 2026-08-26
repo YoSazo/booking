@@ -252,6 +252,8 @@ function App() {
           checkOutTime: data.checkOutTime || '',
           subscribed: data.subscribed || false,
           appIconUrl: data.appIconUrl || '',
+          guestelWalletImageUrl: data.guestelWalletImageUrl || '',
+          guestelWalletSubtitle: data.guestelWalletSubtitle || data.address || '',
           reviews: [],
         };
         setCurrentHotel(hotelConfig);

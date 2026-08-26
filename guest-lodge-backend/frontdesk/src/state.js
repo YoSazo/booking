@@ -2,6 +2,7 @@
 export const crm = {
   token: '',
   isMasterPin: false,
+  isDogfoodPreview: false,
   bookings: [],
   guestMessages: [],
   currentFilter: 'settings',

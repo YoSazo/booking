@@ -60,6 +60,7 @@ struct GuestelApp: App {
             lastStayed: "—",
             imageURL: data.walletImage ?? data.rooms.lazy.compactMap(\.image).first
         )
+        store.cacheHotelDetails(data)
         store.add(hotel)
         var transferredStay: Reservation?
         if let handoff = target.handoffToken, !handoff.isEmpty {
@@ -75,7 +76,11 @@ struct GuestelApp: App {
                 return message.contains("expired") || message.contains("already used")
             }
         }
-        store.arrival = GuestelArrival(hotel: hotel, stay: transferredStay)
+        if await GuestPushManager.shouldShowPermissionContext() {
+            store.arrival = GuestelArrival(hotel: hotel, stay: transferredStay)
+        } else {
+            await GuestPushManager.registerIfAuthorized(store: store)
+        }
         return true
     }
 

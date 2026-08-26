@@ -18,6 +18,14 @@ struct NativeMessagesView: View {
         return reservation?.isEmpty == false ? reservation : GuestIdentityAccess.token
     }
 
+    private var currentStay: Reservation {
+        store.reservations.first(where: { $0.id == stay.id }) ?? stay
+    }
+
+    private var currentStatus: String {
+        currentStay.status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -33,6 +41,7 @@ struct NativeMessagesView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(spacing: 10) {
+                                bookingStatusBanner
                                 if messages.isEmpty {
                                     Text("Ask about check-in, arrival, or anything you need for this stay.")
                                         .font(.system(size: 14))
@@ -100,6 +109,59 @@ struct NativeMessagesView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await load(silent: true) } } }
+    }
+
+    @ViewBuilder
+    private var bookingStatusBanner: some View {
+        let presentation: (icon: String, title: String, detail: String, color: Color)? = switch currentStatus {
+        case "pending": (
+            "clock.fill",
+            "Room request pending",
+            "Front Desk is checking availability now.",
+            .orange
+        )
+        case "confirmed": (
+            "checkmark.circle.fill",
+            "Booking confirmed",
+            "Your room is reserved for these dates.",
+            Theme.green
+        )
+        case "released", "declined": (
+            "xmark.circle.fill",
+            "Room request released",
+            "The property could not confirm this room. Your temporary card hold is being released.",
+            .red
+        )
+        case "cancelled", "canceled": (
+            "xmark.circle.fill",
+            "Reservation cancelled",
+            "This stay is no longer active. You can still message Front Desk below.",
+            .red
+        )
+        default: nil
+        }
+
+        if let presentation {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: presentation.icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(presentation.color)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(presentation.title)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.ink)
+                    Text(presentation.detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(13)
+            .background(presentation.color.opacity(0.08), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .padding(.bottom, 4)
+        }
     }
 
     private func bubble(_ message: BookingAPI.GuestMessage) -> some View {
