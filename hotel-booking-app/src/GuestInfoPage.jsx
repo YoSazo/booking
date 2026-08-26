@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 
 import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint, PhoneCall, Smartphone, DollarSign } from 'lucide-react';
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
@@ -1434,9 +1433,21 @@ const handlePayLaterBooking = async (e) => {
             </div>
             
             <div
-                className={`guest-info-container${showGuestInstallBanner ? ' has-mobile-install' : ''}`}
+                className="guest-info-container"
                 style={{ paddingTop: '0' }}
             >
+                {showGuestInstallBanner && (
+                  <div className="checkout-install-mobile-only">
+                    <InstallAppBanner
+                      hotelName={hotel?.name}
+                      appIconUrl={resolvePropertyIconUrl(hotel)}
+                      hotelId={(hotel && hotel.id) || hotelId}
+                      ownerPreview={isPreviewMode}
+                      touchpoint="checkout"
+                      apiBaseUrl={apiBaseUrl}
+                    />
+                  </div>
+                )}
                 <div className="checkout-progress-bar">
                     <div className={`progress-step ${currentStep >= 1 ? 'completed' : ''} ${currentStep === 1 ? 'active' : ''}`}>
                         <div className="step-circle"></div><span className="step-name">Review Cart</span>
@@ -2165,24 +2176,6 @@ const handlePayLaterBooking = async (e) => {
                 </div>
                 </div>
             </div>
-
-            {showGuestInstallBanner
-              && typeof document !== 'undefined'
-              && createPortal(
-                <div className="checkout-install-mobile-only">
-                  <InstallAppBanner
-                    hotelName={hotel?.name}
-                    appIconUrl={resolvePropertyIconUrl(hotel)}
-                    hotelId={(hotel && hotel.id) || hotelId}
-                    ownerPreview={isPreviewMode}
-                    sticky
-                    bottomOffset={14}
-                    touchpoint="checkout"
-                    apiBaseUrl={apiBaseUrl}
-                  />
-                </div>,
-                document.body
-              )}
 
         </>
     );
