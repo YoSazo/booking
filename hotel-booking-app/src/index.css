@@ -2906,6 +2906,27 @@ padding: 6px 16px;
     padding-bottom: 170px;
 }
 
+/* Floating Guestel chip above the phone chrome — portaled to body so
+   page-transition transform never pins it to the scroll container. */
+.checkout-install-mobile-only {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 8500;
+    padding: 0 14px;
+    pointer-events: none;
+}
+
+.checkout-install-mobile-only #guest-install {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    padding: 0 !important;
+    pointer-events: auto;
+}
+
 .checkout-desktop-rail,
 .checkout-desktop-column {
     display: none;
