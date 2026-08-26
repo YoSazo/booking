@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { Shield, Clock, Zap, CheckCircle, AlertCircle, ShieldCheck, CheckCircle2, Lightbulb, PawPrint, PhoneCall, Smartphone, DollarSign } from 'lucide-react';
 import { Autocomplete, LoadScript } from '@react-google-maps/api';
@@ -1433,19 +1434,12 @@ const handlePayLaterBooking = async (e) => {
             </div>
             
             <div
-                className="guest-info-container"
+                className={`guest-info-container${showGuestInstallBanner ? ' has-mobile-install' : ''}`}
                 style={{ paddingTop: '0' }}
             >
-                {showGuestInstallBanner && (
-                  <div className="checkout-install-mobile-only">
-                    <InstallAppBanner
-                      hotelName={hotel?.name}
-                      appIconUrl={resolvePropertyIconUrl(hotel)}
-                      hotelId={(hotel && hotel.id) || hotelId}
-                      ownerPreview={isPreviewMode}
-                      touchpoint="checkout"
-                      apiBaseUrl={apiBaseUrl}
-                    />
+                {hotel.cancellationPolicy && (
+                  <div className={`static-banner checkout-policy-mobile-top ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
+                    {hotel.cancellationPolicy}
                   </div>
                 )}
                 <div className="checkout-progress-bar">
@@ -2132,12 +2126,7 @@ const handlePayLaterBooking = async (e) => {
                     {!(onlineBookingGateActive && currentStep === 4) && renderCheckoutCta(currentStep === 4 ? paymentOptionsRef : null)}
                 </div>
                 {hotel.cancellationPolicy && currentStep !== 4 && (
-                  <div className={`static-banner ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
-                    {hotel.cancellationPolicy}
-                  </div>
-                )}
-                {hotel.cancellationPolicy && currentStep === 4 && (
-                  <div className={`static-banner checkout-mobile-only ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
+                  <div className={`static-banner checkout-policy-desktop-main ${highlightCheckoutPolicy ? 'preview-saved-target' : ''}`.trim()}>
                     {hotel.cancellationPolicy}
                   </div>
                 )}
@@ -2176,6 +2165,24 @@ const handlePayLaterBooking = async (e) => {
                 </div>
                 </div>
             </div>
+
+            {showGuestInstallBanner
+              && typeof document !== 'undefined'
+              && createPortal(
+                <div className="checkout-install-mobile-only">
+                  <InstallAppBanner
+                    hotelName={hotel?.name}
+                    appIconUrl={resolvePropertyIconUrl(hotel)}
+                    hotelId={(hotel && hotel.id) || hotelId}
+                    ownerPreview={isPreviewMode}
+                    sticky
+                    bottomOffset={14}
+                    touchpoint="checkout"
+                    apiBaseUrl={apiBaseUrl}
+                  />
+                </div>,
+                document.body
+              )}
 
         </>
     );

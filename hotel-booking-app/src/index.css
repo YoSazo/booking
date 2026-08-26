@@ -2906,24 +2906,39 @@ padding: 6px 16px;
     padding-bottom: 170px;
 }
 
-/* Mobile: Guestel keep-pill sits centered above the checkout progress steps. */
+/* Mobile: Check-in / policy pill centered above the progress steps. */
+.checkout-policy-mobile-top {
+    display: block;
+    margin: 0 auto 14px;
+    max-width: min(90%, 420px);
+    width: fit-content;
+    text-align: center;
+    border-radius: 999px;
+    z-index: 1;
+}
+
+.checkout-policy-desktop-main {
+    display: none;
+}
+
+/* Guestel keep-chip floats above phone chrome on mobile. */
 .checkout-install-mobile-only {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin: 0 0 14px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 8500;
+    padding: 0 14px;
+    pointer-events: none;
 }
 
 .checkout-install-mobile-only #guest-install {
-    width: 100%;
-    max-width: 420px;
-}
-
-.checkout-install-mobile-only #guest-install > div {
-    margin: 0;
-    border-radius: 999px;
-    padding: 10px 12px;
-    box-shadow: 0 6px 20px rgba(26, 43, 34, 0.12);
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    padding: 0 !important;
+    pointer-events: auto;
 }
 
 .checkout-desktop-rail,
@@ -5973,6 +5988,15 @@ padding: 6px 16px;
     text-align: left;
     border-radius: 16px;
     z-index: 1;
+  }
+
+  .checkout-policy-mobile-top {
+    display: none !important;
+  }
+
+  .checkout-policy-desktop-main {
+    display: block;
+    margin: 16px 0 0;
   }
 
   .checkout-page-main .static-banner {
