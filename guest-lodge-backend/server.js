@@ -92,7 +92,7 @@ let frontDeskAssistant = null;
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
 
-async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId, contentName } = {}) {
+async function sendMarketelCAPI(eventName, { email, phone, externalId, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId, contentName } = {}) {
     if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
     try {
         const userData = {};
@@ -100,6 +100,15 @@ async function sendMarketelCAPI(eventName, { email, phone, ip, userAgent, source
         if (phone) {
             const digits = String(phone).replace(/\D/g, '');
             if (digits) userData.ph = [crypto.createHash('sha256').update(digits).digest('hex')];
+        }
+        if (externalId) {
+            // Keep one first-party identity across Lead, checkout and payment.
+            // Meta expects customer information parameters to be normalized and
+            // SHA-256 hashed before they leave our server.
+            const normalizedExternalId = String(externalId).trim().toLowerCase();
+            if (normalizedExternalId) {
+                userData.external_id = [crypto.createHash('sha256').update(normalizedExternalId).digest('hex')];
+            }
         }
         if (ip) userData.client_ip_address = ip;
         if (userAgent) userData.client_user_agent = userAgent;
@@ -10435,6 +10444,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             const { fbp: leadFbp, fbc: leadFbc } = getMetaCookies(req);
             sendMarketelCAPI('Lead', {
                 email: trackedEmail || '',
+                externalId: trackedHotelId,
                 ip: req.ip,
                 userAgent: req.headers['user-agent'],
                 sourceUrl: req.headers.referer || '',
@@ -12008,6 +12018,7 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         const { fbp: cpFbp, fbc: cpFbc } = getMetaCookies(req);
         sendMarketelCAPI('CustomizeProduct', {
             email: hotel.ownerEmail,
+            externalId: hotel.id,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
             sourceUrl: req.headers.referer || '',
@@ -14353,6 +14364,7 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
         sendMarketelCAPI('Subscribe', {
             email: hotel?.ownerEmail || '',
             phone: hotel?.ownerPhone || '',
+            externalId: hotelId,
             ip: req?.ip || '',
             userAgent: req?.headers?.['user-agent'] || '',
             sourceUrl: req
@@ -14560,6 +14572,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         sendMarketelCAPI('InitiateCheckout', {
             email: hotel.ownerEmail || '',
             phone: hotel.ownerPhone || '',
+            externalId: hotelId,
             ip: req.ip,
             userAgent: req.headers['user-agent'],
             sourceUrl: req.headers.referer || '',

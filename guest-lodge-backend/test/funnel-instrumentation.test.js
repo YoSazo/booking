@@ -110,6 +110,35 @@ test('the dashboard offers exactly the triggers the server supports', () => {
     assert.deepEqual(shown.sort(), supported.sort());
 });
 
+test('Meta CAPI uses one hashed first-party external ID across the commercial funnel', () => {
+    const helper = server.slice(
+        server.indexOf('async function sendMarketelCAPI'),
+        server.indexOf('// Helper to extract fbp/fbc')
+    );
+    assert.match(helper, /externalId/);
+    assert.match(helper, /userData\.external_id = \[crypto\.createHash\('sha256'\)/);
+
+    const lead = server.slice(
+        server.indexOf("if (eventName === 'Lead') {", server.indexOf('// Match the browser')),
+        server.indexOf('res.json({ success: true });', server.indexOf('// Match the browser'))
+    );
+    assert.match(lead, /externalId: trackedHotelId/);
+
+    const subscribeStart = server.indexOf("sendMarketelCAPI('Subscribe'");
+    const subscribe = server.slice(
+        subscribeStart,
+        server.indexOf('await sendMarketelActivationEmailOnce', subscribeStart)
+    );
+    assert.match(subscribe, /externalId: hotelId/);
+
+    const checkoutStart = server.indexOf("sendMarketelCAPI('InitiateCheckout'");
+    const checkout = server.slice(
+        checkoutStart,
+        server.indexOf("console.log('crm:go-live checkout session created:", checkoutStart)
+    );
+    assert.match(checkout, /externalId: hotelId/);
+});
+
 test('purging activity is confirmed, scoped, and never touches business records', () => {
     const purge = server.slice(
         server.indexOf("app.post('/api/admin/funnel/purge'"),
