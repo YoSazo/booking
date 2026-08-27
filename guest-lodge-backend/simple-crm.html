@@ -12,23 +12,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Front Desk">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script id="marketel-web-analytics">
-  (function(){
-    // Session replay is intentionally disabled inside the authenticated native
-    // app. This keeps guest/property data out of third-party analytics and
-    // makes the App Store privacy disclosure substantially simpler.
-    var isNative = new URLSearchParams(window.location.search).get('native')
-      || window.location.protocol === 'capacitor:'
-      || (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function'
-        && window.Capacitor.isNativePlatform());
-    if (isNative) return;
-    function loadClarity(){
-      (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","wvc5g15yl5");
-    }
-    if ('requestIdleCallback' in window) requestIdleCallback(loadClarity, { timeout: 5000 });
-    else setTimeout(loadClarity, 3000);
-  })();
-  </script>
+  <!-- Session replay is disabled by the loader inside the native app. The web
+       setup/reveal journey uses both Clarity and Smartlook. -->
+  <script id="marketel-web-analytics"  defer src="/marketel-session-replay.js"></script>
   <script  defer src="/marketel-journey.js"></script>
   <script id="frontdesk-boot-guard">
   (function () {

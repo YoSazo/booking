@@ -205,6 +205,26 @@ test('the funnel dashboard exposes sanitized Meta delivery receipts and test con
     assert.match(dashboard, /Declined cards stop at InitiateCheckout/);
 });
 
+test('QA properties and their sessions never inflate the business dashboard', () => {
+    const exclusionBlock = server.slice(
+        server.indexOf('const FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS'),
+        server.indexOf('function normalizedMarketelAngle')
+    );
+    for (const hotelId of ['hotel-a39be0df', 'hotel-app-review', 'marketel-review-inn', 'hotel-9dbf11ec']) {
+        assert.match(exclusionBlock, new RegExp(hotelId), `${hotelId} is not excluded`);
+    }
+    assert.match(exclusionBlock, /sessionId: \{ notIn: exclusions\.sessionIds \}/);
+    assert.match(server, /buildMarketelFunnelAttribution\(since, until, exclusions/);
+    assert.match(server, /const visibleWhere = funnelDashboardWhere\(where, exclusions\)/);
+    assert.match(server, /const where = funnelDashboardWhere\(\{[\s\S]{0,180}MARKETEL_ONBOARDING_EVENT_NAMES/);
+    const portfolio = server.slice(
+        server.indexOf("app.get('/api/admin/portfolio'"),
+        server.indexOf('// FunnelEvent is not only analytics')
+    );
+    assert.match(portfolio, /id: \{ notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS \}/);
+    assert.match(portfolio, /hotelId: \{ notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS \}/);
+});
+
 test('funnel dashboard attributes each ad angle and UTM through paid activation', () => {
     assert.match(server, /async function buildMarketelFunnelAttribution/);
     assert.match(server, /eventName: 'AcquisitionAngle'/);

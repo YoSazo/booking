@@ -10766,6 +10766,54 @@ const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
 ]);
 const MARKETEL_ACQUISITION_ANGLES = ['direct', 'guest_app', 'assistant'];
 
+// These are Marketel's own QA/App Review properties. They must keep working in
+// the product, but counting them as customers, MRR, booking volume or funnel
+// conversions makes the business dashboard lie. The exact IDs avoid hiding a
+// future real property merely because its name happens to contain "studio".
+const FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS = [
+    'hotel-a39be0df',      // Jack’s Inn
+    'hotel-app-review',    // App Review property
+    'marketel-review-inn', // App Review property (legacy ID)
+    'hotel-9dbf11ec',      // Studios 17
+];
+let funnelDashboardExclusionCache = { expiresAt: 0, sessionIds: [] };
+
+async function funnelDashboardExclusions() {
+    if (funnelDashboardExclusionCache.expiresAt > Date.now()) {
+        return {
+            hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS,
+            sessionIds: funnelDashboardExclusionCache.sessionIds,
+        };
+    }
+    const rows = await prisma.funnelEvent.findMany({
+        where: {
+            hotelId: { in: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS },
+            sessionId: { not: null },
+        },
+        distinct: ['sessionId'],
+        select: { sessionId: true },
+    }).catch(() => []);
+    const sessionIds = rows.map((row) => row.sessionId).filter(Boolean);
+    funnelDashboardExclusionCache = { expiresAt: Date.now() + 15_000, sessionIds };
+    return { hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS, sessionIds };
+}
+
+function funnelDashboardWhere(where, exclusions) {
+    const filters = [where];
+    if (exclusions?.hotelIds?.length) {
+        filters.push({ hotelId: { notIn: exclusions.hotelIds } });
+    }
+    if (exclusions?.sessionIds?.length) {
+        filters.push({
+            OR: [
+                { sessionId: null },
+                { sessionId: { notIn: exclusions.sessionIds } },
+            ],
+        });
+    }
+    return filters.length === 1 ? where : { AND: filters };
+}
+
 function normalizedMarketelAngle(value) {
     const angle = String(value || '').trim().toLowerCase();
     return MARKETEL_ACQUISITION_ANGLES.includes(angle) ? angle : 'direct';
@@ -10835,14 +10883,14 @@ function addMarketelAttributionProperty(group, property) {
     group.revenue += property.revenue;
 }
 
-async function buildMarketelFunnelAttribution(since, until) {
+async function buildMarketelFunnelAttribution(since, until, exclusions = { hotelIds: [], sessionIds: [] }) {
     const [acquisitionRows, landingRows] = await Promise.all([
         withRetry(() => prisma.funnelEvent.findMany({
-            where: {
+            where: funnelDashboardWhere({
                 eventName: 'AcquisitionAngle',
                 createdAt: { gte: since, lte: until },
                 hotelId: { not: 'marketel-onboarding' },
-            },
+            }, exclusions),
             orderBy: { createdAt: 'asc' },
             select: {
                 hotelId: true,
@@ -10852,10 +10900,10 @@ async function buildMarketelFunnelAttribution(since, until) {
             },
         })),
         withRetry(() => prisma.funnelEvent.findMany({
-            where: {
+            where: funnelDashboardWhere({
                 eventName: 'LandingPageView',
                 createdAt: { gte: since, lte: until },
-            },
+            }, exclusions),
             orderBy: { createdAt: 'asc' },
             select: {
                 id: true,
@@ -11008,12 +11056,14 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
             where.eventName = { notIn: MARKETEL_ONBOARDING_EVENT_NAMES };
         }
 
+        const exclusions = await funnelDashboardExclusions();
+        const visibleWhere = funnelDashboardWhere(where, exclusions);
         const requestedLimit = parseInt(req.query.limit, 10);
         const eventLimit = Number.isFinite(requestedLimit)
             ? Math.max(100, Math.min(5000, requestedLimit))
             : (source === 'onboarding' ? 2000 : 500);
         const events = await withRetry(() => prisma.funnelEvent.findMany({
-            where,
+            where: visibleWhere,
             orderBy: { createdAt: 'desc' },
             take: eventLimit,
         }));
@@ -11049,7 +11099,7 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
 
         const attribution = source === 'bookings'
             ? null
-            : await buildMarketelFunnelAttribution(since, until);
+            : await buildMarketelFunnelAttribution(since, until, exclusions);
         res.json({ counts, recent, attribution });
     } catch (e) {
         console.error('Funnel API error:', e.message);
@@ -11075,10 +11125,11 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
         }
 
-        const where = {
+        const exclusions = await funnelDashboardExclusions();
+        const where = funnelDashboardWhere({
             createdAt: { gte: since, lte: until },
             eventName: { in: MARKETEL_ONBOARDING_EVENT_NAMES },
-        };
+        }, exclusions);
         const [totalRows, rows] = await Promise.all([
             prisma.funnelEvent.count({ where }),
             prisma.funnelEvent.findMany({
@@ -12291,10 +12342,14 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
         const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
         const [hotels, bookings] = await Promise.all([
             prisma.hotelConfig.findMany({
+                where: { id: { notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS } },
                 select: { id: true, name: true, marketelSubscriptionStatus: true, createdAt: true },
             }),
             prisma.booking.findMany({
-                where: { createdAt: { gte: since } },
+                where: {
+                    createdAt: { gte: since },
+                    hotelId: { notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS },
+                },
                 select: { hotelId: true, grandTotal: true, nights: true, status: true },
             }),
         ]);
@@ -12542,14 +12597,18 @@ app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
 
 app.get('/api/admin/meta-capi/status', adminAuth, async (_req, res) => {
     try {
+        const exclusions = await funnelDashboardExclusions();
+        const visibleMetaWhere = funnelDashboardWhere({
+            eventName: { in: MARKETEL_CAPI_STATUS_NAMES },
+        }, exclusions);
         const [grouped, recent] = await Promise.all([
             prisma.funnelEvent.groupBy({
                 by: ['eventName'],
-                where: { eventName: { in: MARKETEL_CAPI_STATUS_NAMES } },
+                where: visibleMetaWhere,
                 _count: { _all: true },
             }),
             prisma.funnelEvent.findMany({
-                where: { eventName: { in: MARKETEL_CAPI_STATUS_NAMES } },
+                where: visibleMetaWhere,
                 orderBy: { createdAt: 'desc' },
                 take: 30,
                 select: {
