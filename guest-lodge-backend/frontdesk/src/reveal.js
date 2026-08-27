@@ -12,6 +12,11 @@ import frontdeskGuestAppUrl from './assets/frontdesk-guest-app.webp';
 import guestelHotelsUrl from './assets/guestel-hotels.webp';
 import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
 import guestelChatUrl from './assets/guestel-chat.webp';
+import guestelAddBookingPageUrl from './assets/guestel-add-booking-page.webp';
+import guestelAppClipCardUrl from './assets/guestel-app-clip-card.webp';
+import guestelAppClipInviteUrl from './assets/guestel-app-clip-invite.webp';
+import guestelPropertySavedUrl from './assets/guestel-property-saved.webp';
+import guestelWalletReadyUrl from './assets/guestel-wallet-ready.webp';
 
 // The owner reaches these carousels only after inspecting the live booking
 // page, which gives us a useful preload window. Warm every carousel screenshot
@@ -25,6 +30,11 @@ const CAROUSEL_SCREEN_URLS = [
   guestelHotelsUrl,
   guestelChooseRoomUrl,
   guestelChatUrl,
+  guestelAddBookingPageUrl,
+  guestelAppClipCardUrl,
+  guestelAppClipInviteUrl,
+  guestelPropertySavedUrl,
+  guestelWalletReadyUrl,
   assistantAlertStackUrl,
   assistantTextResolutionUrl,
   assistantBookingRequestUrl,
@@ -66,7 +76,7 @@ let stageBeatIndex = { 1: 0, 2: 0 };
 // The app proof is deliberately optional exploration inside each beat. Keeping
 // its position separate from the funnel beat means someone can inspect every
 // screen or move to the next subject after seeing only one.
-let appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
+let appCarouselIndex = { frontdesk: 0, guestelInstall: 0, guestel: 0, assistant: 0, system: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -686,6 +696,49 @@ function appShowcases() {
         },
       ],
     },
+    guestelInstall: {
+      id: 'guestelInstall',
+      eyebrow: 'HOW GUESTS ADD YOU',
+      title: 'One tap keeps your property on their phone.',
+      body: 'They tap Add on your booking page, open Apple\'s instant App Clip, and keep your property, their stay and a direct way back in Guestel.',
+      slides: [
+        {
+          label: 'Tap Add',
+          url: guestelAddBookingPageUrl,
+          width: 900,
+          height: 1786,
+          alt: 'The Studios 17 booking page showing the Add control that starts the Guestel handoff.',
+        },
+        {
+          label: 'Open Guestel',
+          url: guestelAppClipCardUrl,
+          width: 900,
+          height: 1786,
+          alt: 'Apple\'s Guestel App Clip card opening over the property booking page.',
+        },
+        {
+          label: 'See the Benefits',
+          url: guestelAppClipInviteUrl,
+          width: 900,
+          height: 1787,
+          alt: 'The personalized Guestel invitation explaining direct rates, property messaging and faster rebooking.',
+        },
+        {
+          label: 'Save the Property',
+          url: guestelPropertySavedUrl,
+          width: 900,
+          height: 1787,
+          alt: 'Studios 17 saved to Guestel with direct rates, Front Desk messaging and faster rebooking enabled.',
+        },
+        {
+          label: 'Kept for Next Time',
+          url: guestelWalletReadyUrl,
+          width: 900,
+          height: 1787,
+          alt: 'The completed Guestel hotel wallet with Studios 17 kept for the guest\'s next direct stay.',
+        },
+      ],
+    },
     guestel: {
       id: 'guestel',
       eyebrow: 'KEEP YOUR GUESTS',
@@ -793,6 +846,7 @@ function appCarouselHtml(showcase) {
   const active = Math.max(0, Math.min(showcase.slides.length - 1, appCarouselIndex[showcase.id] || 0));
   const subject = {
     frontdesk: 'Front Desk screen',
+    guestelInstall: 'Guestel setup step',
     guestel: 'Guestel screen',
     assistant: 'Front Desk response',
     system: 'Marketel system screen',
@@ -817,9 +871,14 @@ function guestAppBeats() {
   const showcases = appShowcases();
   return [
     {
-      next: 'See the Guestel experience',
+      next: 'See how guests add you',
       event: 'GuestAppOwnerEditorViewed',
       carousel: showcases.frontdesk,
+    },
+    {
+      next: 'See what Guestel does next',
+      event: 'GuestelInstallFlowViewed',
+      carousel: showcases.guestelInstall,
     },
     {
       next: 'See how Front Desk protects you',
@@ -1609,7 +1668,7 @@ export async function showMarketelValueReveal(options = {}) {
   if (crm.hotelSubscribed && !activationPreviewMode && currentStep === 3) currentStep = 0;
   livePreviewMode = 'guest';
   stageBeatIndex = { 1: 0, 2: 0 };
-  appCarouselIndex = { frontdesk: 0, guestel: 0, assistant: 0, system: 0 };
+  appCarouselIndex = { frontdesk: 0, guestelInstall: 0, guestel: 0, assistant: 0, system: 0 };
   activationNightlyRate = null;
   bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;

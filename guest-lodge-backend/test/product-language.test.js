@@ -42,16 +42,19 @@ test('walk-in handling states the action and booking-page outcome', () => {
 
 test('the reveal establishes the owner app before switching to Guestel', () => {
     const ownerApp = revealCopy.indexOf('Control your engine from one app.');
+    const guestelInstall = revealCopy.indexOf('One tap keeps your property on their phone.');
     const guestel = revealCopy.indexOf('Keep every guest one tap away.');
-    const assistant = revealCopy.indexOf('Fits around what you already use.');
+    const assistant = revealCopy.indexOf('Nothing slips through the cracks.');
     const system = revealCopy.indexOf('The full direct-booking loop.');
     assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
-    assert.ok(guestel > ownerApp, 'Guestel appears before Front Desk is established as the owner app');
+    assert.ok(guestelInstall > ownerApp, 'the App Clip handoff appears before Front Desk is established as the owner app');
+    assert.ok(guestel > guestelInstall, 'Guestel value appears before the guest handoff is explained');
     assert.ok(assistant > guestel, 'setup protection appears before the guest relationship is established');
     assert.ok(system > assistant, 'the complete loop appears before its parts are established');
     assert.match(revealCopy, /Your page, bookings, rooms and guest reach all live in Front Desk/);
+    assert.match(revealCopy, /open Apple\\'s instant App Clip/);
     assert.match(revealCopy, /They save your property, book direct again/);
-    assert.match(revealCopy, /Front Desk checks each request and updates availability from your reply/);
+    assert.match(revealCopy, /The moment a request lands, Front Desk alerts you three ways/);
     assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel keeps them forever/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);

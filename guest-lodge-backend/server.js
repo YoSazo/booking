@@ -6901,7 +6901,8 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppBroadcastViewed',
     // Guestel replaced the promoted Home Screen/PWA path. Keep the historic
     // names above so old sessions remain readable; the current reveal packs
-    // the Front Desk and Guestel screens into two optional carousels.
+    // the Front Desk, App Clip handoff and Guestel screens into three optional
+    // carousels.
     'GuestelInstallFlowViewed',
     'GuestelWalletViewed',
     'GuestelReachViewed',
