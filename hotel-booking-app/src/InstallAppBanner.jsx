@@ -31,7 +31,10 @@ function InstallAppBanner({
   const ios = isIos();
   const inGuestelClip = typeof window !== 'undefined'
     && !!window.webkit?.messageHandlers?.guestelClip;
-  const nativeGuestel = ios && !ownerPreview && (APP_CLIP_INSTALL_ENABLED || inGuestelClip);
+  // Preview mode identifies an owner viewing their own live page; it must not
+  // replace the real guest handoff with the retired PWA coach. Owners need to
+  // see and test the exact App Clip experience their guests receive.
+  const nativeGuestel = ios && (APP_CLIP_INSTALL_ENABLED || inGuestelClip);
 
   const markInstalled = useCallback(() => {
     setInstalled(true);
@@ -101,7 +104,7 @@ function InstallAppBanner({
         window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
         return;
       }
-      if (APP_CLIP_INSTALL_ENABLED && !ownerPreview) {
+      if (APP_CLIP_INSTALL_ENABLED) {
         window.location.href = guestelInvocationUrl({ hotelId, intent: 'add' });
         return;
       }
