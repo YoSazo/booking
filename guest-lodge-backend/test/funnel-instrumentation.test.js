@@ -7,6 +7,7 @@ const root = path.join(__dirname, '..');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const reveal = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'reveal.js'), 'utf8');
 const dashboard = fs.readFileSync(path.join(root, 'funnel.html'), 'utf8');
+const setup = fs.readFileSync(path.join(root, 'setup.html'), 'utf8');
 
 function allowlist(startMarker) {
     const start = server.indexOf(startMarker);
@@ -137,6 +138,45 @@ test('Meta CAPI uses one hashed first-party external ID across the commercial fu
         server.indexOf("console.log('crm:go-live checkout session created:", checkoutStart)
     );
     assert.match(checkout, /externalId: hotelId/);
+});
+
+test('Meta setup completion is a deduplicated standard CompleteRegistration event', () => {
+    const completeRoute = server.slice(
+        server.indexOf("app.post('/api/setup/:token/complete'"),
+        server.indexOf("app.get('/api/setup/:token/site-status'")
+    );
+    assert.match(completeRoute, /sendMarketelCAPI\('CompleteRegistration'/);
+    assert.match(completeRoute, /eventId: registrationEventId/);
+    assert.match(completeRoute, /registrationEventId = `marketel-registration\.\$\{hotel\.id\}`/);
+    assert.match(completeRoute, /registrationNewlyCompleted: true/);
+    assert.match(completeRoute, /registrationNewlyCompleted: false/);
+    assert.match(setup, /fbq\('track', 'CompleteRegistration'/);
+    assert.match(setup, /eventID: completeData\.registrationEventId/);
+    assert.match(setup, /completeData\.registrationNewlyCompleted/);
+});
+
+test('Marketel CAPI uses a configurable current Graph API version', () => {
+    const helper = server.slice(
+        server.indexOf('// Marketel CAPI'),
+        server.indexOf('// Helper to extract fbp/fbc')
+    );
+    assert.match(helper, /MARKETEL_META_GRAPH_API_VERSION/);
+    assert.match(helper, /process\.env\.MARKETEL_META_GRAPH_API_VERSION/);
+    assert.match(helper, /'v26\.0'/);
+    assert.doesNotMatch(helper, /graph\.facebook\.com\/v18\.0/);
+});
+
+test('funnel dashboard attributes each ad angle and UTM through paid activation', () => {
+    assert.match(server, /async function buildMarketelFunnelAttribution/);
+    assert.match(server, /eventName: 'AcquisitionAngle'/);
+    assert.match(server, /'PaymentSucceeded'/);
+    assert.match(server, /utm_campaign/);
+    assert.match(server, /utm_content/);
+    assert.match(server, /startToPaidRate/);
+    assert.match(dashboard, /Which ads become subscribers/);
+    assert.match(dashboard, /Campaign and creative/);
+    assert.match(dashboard, /row\.paid/);
+    assert.match(dashboard, /row\.revenue/);
 });
 
 test('purging activity is confirmed, scoped, and never touches business records', () => {

@@ -895,6 +895,17 @@ async function addRoomAndFinish() {
     const completeData = await completeRes.json();
     if (!completeRes.ok || !completeData.success) throw new Error(completeData.error || 'Could not finish setup');
 
+    // The server sends the matching Conversions API event with this exact ID.
+    // Sending the browser copy only for the response that first completed the
+    // property keeps retries idempotent and lets Meta deduplicate Pixel + CAPI.
+    if (completeData.registrationNewlyCompleted
+        && completeData.registrationEventId
+        && typeof fbq === 'function') {
+      fbq('track', 'CompleteRegistration', {
+        content_name: 'marketel-property-setup',
+      }, { eventID: completeData.registrationEventId });
+    }
+
     // Show success
     console.log('Complete response:', completeData);
     const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-property').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';

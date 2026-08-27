@@ -91,6 +91,15 @@ let frontDeskAssistant = null;
 // Marketel CAPI (separate pixel for the onboarding funnel)
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
+// Meta versions the Conversions API endpoint. Keep the version deploy-time
+// configurable so an API sunset never requires a code change, while validating
+// the value before it is interpolated into an outbound URL. v26.0 is the
+// current Graph API release as of this implementation.
+const MARKETEL_META_GRAPH_API_VERSION = (() => {
+    const configured = String(process.env.MARKETEL_META_GRAPH_API_VERSION || 'v26.0').trim();
+    const normalized = configured.startsWith('v') ? configured : `v${configured}`;
+    return /^v\d{1,2}\.\d{1,2}$/.test(normalized) ? normalized : 'v26.0';
+})();
 
 async function sendMarketelCAPI(eventName, { email, phone, externalId, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId, contentName } = {}) {
     if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
@@ -132,7 +141,7 @@ async function sendMarketelCAPI(eventName, { email, phone, externalId, ip, userA
         if (Object.keys(customData).length) eventPayload.custom_data = customData;
 
         await axios.post(
-            `https://graph.facebook.com/v18.0/${MARKETEL_PIXEL_ID}/events`,
+            `https://graph.facebook.com/${MARKETEL_META_GRAPH_API_VERSION}/${MARKETEL_PIXEL_ID}/events`,
             { data: [eventPayload], access_token: MARKETEL_ACCESS_TOKEN }
         );
         console.log(`✅ Marketel CAPI: ${eventName} sent`);
@@ -6748,6 +6757,45 @@ function sanitizeJourneyMetadata(value) {
     };
 }
 
+// Attribution is deliberately narrower than general journey metadata. These
+// are the only URL fields needed to compare ads, and click/cookie identifiers
+// stay out of the founder-facing campaign table.
+const MARKETEL_ATTRIBUTION_KEYS = new Set([
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_content',
+    'utm_term',
+    'angle',
+    'referrer',
+]);
+
+function sanitizeMarketelAttributionTouch(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const touch = {};
+    Object.entries(value).forEach(([key, rawValue]) => {
+        if (!MARKETEL_ATTRIBUTION_KEYS.has(key) || rawValue == null) return;
+        const cleanValue = redactJourneyString(rawValue, key === 'referrer' ? 300 : 180).trim();
+        if (cleanValue) touch[key] = cleanValue;
+    });
+    return touch;
+}
+
+function marketelAttributionFromBody(body) {
+    const firstTouch = sanitizeMarketelAttributionTouch(body?.journeyFirstTouch);
+    const latestTouch = sanitizeMarketelAttributionTouch(body?.journeyLatestTouch);
+    if (!Object.keys(firstTouch).length && !Object.keys(latestTouch).length) return null;
+    return { firstTouch, latestTouch };
+}
+
+function marketelAttributionMetadata(body, base = {}) {
+    const attribution = marketelAttributionFromBody(body);
+    return {
+        ...base,
+        ...(attribution ? { attribution } : {}),
+    };
+}
+
 function sanitizeJourneyIdentifier(value, prefix) {
     const clean = String(value || '').trim().replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 100);
     if (!clean || (prefix && !clean.startsWith(prefix))) return null;
@@ -10332,6 +10380,8 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             journeyOccurredAt: clientOccurredAt,
             journeySurface,
             journeyPagePath,
+            journeyFirstTouch,
+            journeyLatestTouch,
         } = req.body || {};
         if (!MARKETEL_PUBLIC_ONBOARDING_EVENTS.has(eventName)) {
             return res.status(400).json({ success: false, message: 'Invalid onboarding event' });
@@ -10416,6 +10466,9 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             : null;
         const cleanEventId = String(eventId || sanitizeJourneyIdentifier(journeyEventId, 'journey-link.') || '').trim().slice(0, 160) || null;
         const cleanContentName = String(contentName || referrer || '').trim().slice(0, 500) || null;
+        const linkedMetadata = linkedSessionId
+            ? marketelAttributionMetadata({ journeyFirstTouch, journeyLatestTouch }, { linkedJourney: true })
+            : undefined;
         await prisma.funnelEvent.create({
             data: {
                 hotelId: trackedHotelId,
@@ -10426,7 +10479,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
                 sequence: linkedSequence,
                 surface: linkedSessionId ? redactJourneyString(journeySurface || 'unknown', 40) : null,
                 pagePath: linkedSessionId ? sanitizeJourneyPath(journeyPagePath) : null,
-                metadata: linkedSessionId ? { linkedJourney: true } : undefined,
+                metadata: linkedMetadata,
                 guestEmail: trackedEmail,
                 userAgent: req.headers['user-agent'] || null,
                 ipAddress: req.ip || req.socket?.remoteAddress || null,
@@ -10460,6 +10513,229 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         res.json({ success: true }); // Don't fail silently
     }
 });
+
+const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
+    'Lead',
+    'SetupCompleted',
+    'ActivationOfferViewed',
+    'CheckoutStarted',
+    'PaymentSucceeded',
+]);
+const MARKETEL_ACQUISITION_ANGLES = ['direct', 'guest_app', 'assistant'];
+
+function normalizedMarketelAngle(value) {
+    const angle = String(value || '').trim().toLowerCase();
+    return MARKETEL_ACQUISITION_ANGLES.includes(angle) ? angle : 'direct';
+}
+
+function marketelAttributionTouchFromMetadata(metadata, preferLatest = false) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+    const attribution = metadata.attribution && typeof metadata.attribution === 'object'
+        ? metadata.attribution
+        : metadata;
+    const candidates = preferLatest
+        ? [attribution.latestTouch, attribution.firstTouch]
+        : [attribution.firstTouch, attribution.latestTouch];
+    for (const candidate of candidates) {
+        const clean = sanitizeMarketelAttributionTouch(candidate);
+        if (Object.keys(clean).length) return clean;
+    }
+    return {};
+}
+
+function marketelAttributionDimensions(touch, fallbackAngle = 'direct') {
+    const clean = sanitizeMarketelAttributionTouch(touch);
+    let source = String(clean.utm_source || '').trim().toLowerCase();
+    if (!source && /facebook|instagram|meta/i.test(clean.referrer || '')) source = 'meta';
+    return {
+        angle: normalizedMarketelAngle(clean.angle || fallbackAngle),
+        source: source || 'unknown',
+        medium: String(clean.utm_medium || '').trim().toLowerCase() || 'unknown',
+        campaign: String(clean.utm_campaign || '').trim() || 'unlabeled',
+        content: String(clean.utm_content || '').trim() || 'unlabeled',
+        term: String(clean.utm_term || '').trim() || '',
+    };
+}
+
+function emptyMarketelAttributionGroup(dimensions) {
+    return {
+        ...dimensions,
+        landingViews: 0,
+        started: 0,
+        leads: 0,
+        setupCompleted: 0,
+        offerViewed: 0,
+        checkoutStarted: 0,
+        paid: 0,
+        revenue: 0,
+        startToPaidRate: 0,
+    };
+}
+
+function finalizeMarketelAttributionGroup(group) {
+    return {
+        ...group,
+        revenue: Math.round(Number(group.revenue || 0) * 100) / 100,
+        startToPaidRate: group.started
+            ? Math.round((group.paid / group.started) * 10000) / 100
+            : 0,
+    };
+}
+
+function addMarketelAttributionProperty(group, property) {
+    group.started += 1;
+    if (property.milestones.has('Lead')) group.leads += 1;
+    if (property.milestones.has('SetupCompleted')) group.setupCompleted += 1;
+    if (property.milestones.has('ActivationOfferViewed')) group.offerViewed += 1;
+    if (property.milestones.has('CheckoutStarted')) group.checkoutStarted += 1;
+    if (property.milestones.has('PaymentSucceeded')) group.paid += 1;
+    group.revenue += property.revenue;
+}
+
+async function buildMarketelFunnelAttribution(since, until) {
+    const [acquisitionRows, landingRows] = await Promise.all([
+        withRetry(() => prisma.funnelEvent.findMany({
+            where: {
+                eventName: 'AcquisitionAngle',
+                createdAt: { gte: since, lte: until },
+                hotelId: { not: 'marketel-onboarding' },
+            },
+            orderBy: { createdAt: 'asc' },
+            select: {
+                hotelId: true,
+                contentName: true,
+                metadata: true,
+                createdAt: true,
+            },
+        })),
+        withRetry(() => prisma.funnelEvent.findMany({
+            where: {
+                eventName: 'LandingPageView',
+                createdAt: { gte: since, lte: until },
+            },
+            orderBy: { createdAt: 'asc' },
+            select: {
+                id: true,
+                eventId: true,
+                sessionId: true,
+                contentName: true,
+                metadata: true,
+            },
+        })),
+    ]);
+
+    const acquisitionByHotel = new Map();
+    acquisitionRows.forEach((row) => {
+        if (!acquisitionByHotel.has(row.hotelId)) acquisitionByHotel.set(row.hotelId, row);
+    });
+    const hotelIds = Array.from(acquisitionByHotel.keys());
+    const [milestoneRows, journeyFallbackRows] = hotelIds.length
+        ? await Promise.all([
+            withRetry(() => prisma.funnelEvent.findMany({
+                where: {
+                    hotelId: { in: hotelIds },
+                    eventName: { in: Array.from(MARKETEL_ATTRIBUTION_MILESTONES) },
+                    createdAt: { gte: since, lte: until },
+                },
+                orderBy: { createdAt: 'asc' },
+                select: {
+                    hotelId: true,
+                    eventName: true,
+                    eventId: true,
+                    value: true,
+                    metadata: true,
+                },
+            })),
+            // Older acquisition rows predate durable UTM metadata. Their first
+            // linked setup page view still contains the original first touch,
+            // so the dashboard can attribute historical properties too.
+            withRetry(() => prisma.funnelEvent.findMany({
+                where: {
+                    hotelId: { in: hotelIds },
+                    eventName: 'JourneyPageViewed',
+                    createdAt: { lte: until },
+                },
+                orderBy: { createdAt: 'asc' },
+                select: { hotelId: true, metadata: true },
+            })),
+        ])
+        : [[], []];
+
+    const fallbackTouchByHotel = new Map();
+    journeyFallbackRows.forEach((row) => {
+        if (fallbackTouchByHotel.has(row.hotelId)) return;
+        const touch = marketelAttributionTouchFromMetadata(row.metadata);
+        if (Object.keys(touch).length) fallbackTouchByHotel.set(row.hotelId, touch);
+    });
+
+    const properties = new Map();
+    acquisitionByHotel.forEach((row, hotelId) => {
+        const storedTouch = marketelAttributionTouchFromMetadata(row.metadata);
+        const touch = Object.keys(storedTouch).length ? storedTouch : (fallbackTouchByHotel.get(hotelId) || {});
+        properties.set(hotelId, {
+            hotelId,
+            dimensions: marketelAttributionDimensions(touch, row.contentName),
+            milestones: new Set(),
+            paymentEventIds: new Set(),
+            revenue: 0,
+        });
+    });
+    milestoneRows.forEach((row) => {
+        const property = properties.get(row.hotelId);
+        if (!property) return;
+        property.milestones.add(row.eventName);
+        if (row.eventName === 'PaymentSucceeded') {
+            const paymentKey = row.eventId || `${row.hotelId}:${row.value || 0}`;
+            if (!property.paymentEventIds.has(paymentKey)) {
+                property.paymentEventIds.add(paymentKey);
+                property.revenue += Number(row.value) || 0;
+            }
+        }
+    });
+
+    const angleGroups = new Map(MARKETEL_ACQUISITION_ANGLES.map((angle) => [
+        angle,
+        emptyMarketelAttributionGroup({ angle }),
+    ]));
+    const campaignGroups = new Map();
+    const campaignGroup = (dimensions) => {
+        const key = [dimensions.angle, dimensions.source, dimensions.medium, dimensions.campaign, dimensions.content, dimensions.term].join('\u001f');
+        if (!campaignGroups.has(key)) campaignGroups.set(key, emptyMarketelAttributionGroup(dimensions));
+        return campaignGroups.get(key);
+    };
+
+    properties.forEach((property) => {
+        addMarketelAttributionProperty(angleGroups.get(property.dimensions.angle), property);
+        addMarketelAttributionProperty(campaignGroup(property.dimensions), property);
+    });
+
+    // Landing views are authoritative at the angle level. New milestone rows
+    // also carry the sanitized UTM touch, so campaign-level visits can be
+    // compared with server-owned starts and Stripe-confirmed paid outcomes.
+    const seenLanding = new Set();
+    landingRows.forEach((row) => {
+        const identity = row.sessionId || row.eventId || row.id;
+        if (seenLanding.has(identity)) return;
+        seenLanding.add(identity);
+        const angle = normalizedMarketelAngle(row.contentName);
+        angleGroups.get(angle).landingViews += 1;
+        const touch = marketelAttributionTouchFromMetadata(row.metadata);
+        if (Object.keys(touch).length) {
+            campaignGroup(marketelAttributionDimensions(touch, angle)).landingViews += 1;
+        }
+    });
+
+    const byAngle = MARKETEL_ACQUISITION_ANGLES.map((angle) => finalizeMarketelAttributionGroup(angleGroups.get(angle)));
+    const byCampaign = Array.from(campaignGroups.values())
+        .map(finalizeMarketelAttributionGroup)
+        .sort((left, right) => right.paid - left.paid || right.started - left.started || left.campaign.localeCompare(right.campaign));
+    return {
+        model: 'first-touch acquisition cohort',
+        range: { from: since.toISOString(), to: until.toISOString() },
+        byAngle,
+        byCampaign,
+    };
+}
 
 // Funnel dashboard API (admin only; contains contact and device data)
 app.get('/api/funnel', adminAuth, async (req, res) => {
@@ -10528,10 +10804,13 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
             external_id: e.externalId,
         }));
 
-        res.json({ counts, recent });
+        const attribution = source === 'bookings'
+            ? null
+            : await buildMarketelFunnelAttribution(since, until);
+        res.json({ counts, recent, attribution });
     } catch (e) {
         console.error('Funnel API error:', e.message);
-        res.json({ counts: {}, recent: [] });
+        res.json({ counts: {}, recent: [], attribution: null });
     }
 });
 
@@ -11151,6 +11430,9 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
         setSetupOwnerCookie(req, res, hotelSlug, email);
 
         if (funnelTrackingEnabled) {
+            const linkedExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
+            const linkedSessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
+            const acquisitionMetadata = marketelAttributionMetadata(req.body, { linkedJourney: !!linkedSessionId });
             await prisma.funnelEvent.create({
                 data: {
                     hotelId: hotelSlug,
@@ -11158,6 +11440,13 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
                     eventId: `marketel-angle.${hotelSlug}`,
                     guestEmail: email,
                     contentName: acquisitionAngle,
+                    occurredAt: linkedSessionId ? journeyOccurredAt(req.body?.journeyOccurredAt) : null,
+                    sessionId: linkedSessionId,
+                    sequence: linkedSessionId ? Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1)) : null,
+                    surface: linkedSessionId ? redactJourneyString(req.body?.journeySurface || 'landing', 40) : null,
+                    pagePath: linkedSessionId ? sanitizeJourneyPath(req.body?.journeyPagePath || '/landing') : null,
+                    metadata: Object.keys(acquisitionMetadata).length ? acquisitionMetadata : undefined,
+                    externalId: linkedExternalId,
                     userAgent: req.headers['user-agent'] || null,
                     ipAddress: req.ip || req.socket?.remoteAddress || null,
                 },
@@ -12379,6 +12668,7 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             const assignedDomain = await assignUniqueDomainForHotel(hotel);
             const frontdeskReturnToken = await generateCrmReturnTokenForHotel(hotel.id, hotel.setupToken || '');
             const previewEmailSent = await sendPreviewReadyEmailOnce(hotel.id, req);
+            const registrationEventId = `marketel-registration.${hotel.id}`;
             setSetupOwnerCookie(req, res, hotel.id, hotel.ownerEmail || '');
             return res.json({
                 success: true,
@@ -12387,6 +12677,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
                 frontdeskReturnToken,
                 previewEmailSent,
                 resumed: true,
+                registrationEventId,
+                registrationNewlyCompleted: false,
             });
         }
 
@@ -12439,12 +12731,30 @@ app.post('/api/setup/:token/complete', async (req, res) => {
                     sequence: linkedSessionId ? Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1)) : null,
                     surface: linkedSessionId ? redactJourneyString(req.body?.journeySurface || 'setup', 40) : null,
                     pagePath: linkedSessionId ? sanitizeJourneyPath(req.body?.journeyPagePath) : null,
-                    metadata: linkedSessionId ? { linkedJourney: true } : undefined,
+                    metadata: linkedSessionId ? marketelAttributionMetadata(req.body, { linkedJourney: true }) : undefined,
                     guestEmail: hotel.ownerEmail || null,
                     externalId: linkedExternalId,
                 },
             })).catch(() => {});
         }
+
+        // Setup completion is a deeper standard Meta event than Lead. The
+        // deterministic ID is returned to setup.html so Pixel and CAPI describe
+        // the same registration rather than two conversions.
+        const registrationEventId = `marketel-registration.${hotel.id}`;
+        const { fbp: registrationFbp, fbc: registrationFbc } = getMetaCookies(req);
+        void sendMarketelCAPI('CompleteRegistration', {
+            email: hotel.ownerEmail || '',
+            phone: hotel.ownerPhone || '',
+            externalId: hotel.id,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+            sourceUrl: req.headers.referer || `${req.protocol}://${req.get('host')}/setup`,
+            fbp: registrationFbp,
+            fbc: registrationFbc,
+            eventId: registrationEventId,
+            contentName: 'marketel-property-setup',
+        });
 
         void sendAdminPush('SetupCompleted', { property: hotel.name || hotel.ownerEmail || hotel.id });
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
@@ -12455,6 +12765,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             crmPin: defaultPin, // backwards compatibility for already-cached setup pages
             frontdeskReturnToken,
             previewEmailSent,
+            registrationEventId,
+            registrationNewlyCompleted: true,
         });
     } catch (e) {
         console.error('Setup complete error:', e.message, e.stack);

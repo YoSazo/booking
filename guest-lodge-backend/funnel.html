@@ -612,6 +612,11 @@
   .portfolio-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
   .portfolio-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .portfolio-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+  .attribution-table { min-width: 860px; }
+  .attribution-name { font-weight: 700; color: var(--text); }
+  .attribution-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 500; }
+  .attribution-rate { color: var(--green); font-weight: 700; }
+  .attribution-section-title { margin: 16px 0 8px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .push-triggers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .push-triggers label {
     display: inline-flex;
@@ -856,6 +861,15 @@
     </div>
   </div>
 
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Which ads become subscribers</h2>
+      <span class="panel-note">First-touch properties started in the selected dates</span>
+    </div>
+    <div id="attributionTable"><div class="loading">Loading attribution…</div></div>
+    <div class="panel-hint">Use a unique <b>utm_campaign</b> for the campaign and <b>utm_content</b> for each creative. Paid and revenue come from Stripe-confirmed activations, not browser guesses.</div>
+  </div>
+
   <!-- Beat-level drop-off. A stage count says an owner reached the guest-app
        stage; these say which beat lost them. -->
   <div class="panel">
@@ -951,6 +965,7 @@
 <script>
 let allEvents = [];
 let allCounts = {};
+let allAttribution = null;
 let currentFilter = 'all';
 let currentView = 'overview';
 // localStorage, not sessionStorage: an installed PWA gets a fresh session every
@@ -1533,6 +1548,7 @@ function renderEvents() {
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
   renderBeatFunnel(allCounts);
+  renderAttribution(allAttribution);
 
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty-state"><p>No events found for this filter.</p></div>';
@@ -1572,6 +1588,63 @@ function renderEvents() {
       </div>
     `;
   }).join('');
+}
+
+const ATTRIBUTION_ANGLE_LABELS = {
+  direct: 'Direct booking',
+  guest_app: 'Guestel / home screen',
+  assistant: 'Front Desk Assistant',
+};
+
+function attributionMoney(value) {
+  return '$' + Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function attributionTable(rows, includeCampaign) {
+  if (!rows.length) return '<div class="portfolio-empty">No attributed traffic in this range yet.</div>';
+  return `<div class="portfolio-scroll"><table class="portfolio-table attribution-table"><thead><tr>
+    <th>${includeCampaign ? 'Campaign / creative' : 'Ad angle'}</th>
+    <th style="text-align:right">Visits</th>
+    <th style="text-align:right">Started</th>
+    <th style="text-align:right">Leads</th>
+    <th style="text-align:right">Setup</th>
+    <th style="text-align:right">Checkout</th>
+    <th style="text-align:right">Paid</th>
+    <th style="text-align:right">Start → paid</th>
+    <th style="text-align:right">Cash</th>
+  </tr></thead><tbody>${rows.map((row) => {
+    const title = includeCampaign
+      ? `${row.campaign || 'unlabeled'} · ${row.content || 'unlabeled'}`
+      : (ATTRIBUTION_ANGLE_LABELS[row.angle] || row.angle || 'Unknown');
+    const sub = includeCampaign
+      ? `${ATTRIBUTION_ANGLE_LABELS[row.angle] || row.angle} · ${row.source || 'unknown'} / ${row.medium || 'unknown'}`
+      : `?angle=${row.angle}`;
+    return `<tr>
+      <td><span class="attribution-name">${escapeHtml(title)}</span><span class="attribution-sub">${escapeHtml(sub)}</span></td>
+      <td class="num">${Number(row.landingViews || 0)}</td>
+      <td class="num">${Number(row.started || 0)}</td>
+      <td class="num">${Number(row.leads || 0)}</td>
+      <td class="num">${Number(row.setupCompleted || 0)}</td>
+      <td class="num">${Number(row.checkoutStarted || 0)}</td>
+      <td class="num">${Number(row.paid || 0)}</td>
+      <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
+      <td class="num">${attributionMoney(row.revenue)}</td>
+    </tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+function renderAttribution(attribution) {
+  const host = document.getElementById('attributionTable');
+  if (!host) return;
+  if (!attribution) {
+    host.innerHTML = '<div class="portfolio-empty">Attribution is unavailable for this range.</div>';
+    return;
+  }
+  const angleRows = attribution.byAngle || [];
+  const campaignRows = (attribution.byCampaign || []).filter((row) => row.landingViews || row.started || row.paid);
+  host.innerHTML = attributionTable(angleRows, false)
+    + '<div class="attribution-section-title">Campaign and creative</div>'
+    + attributionTable(campaignRows, true);
 }
 
 async function deleteEvent(eventId, timestamp) {
@@ -1920,6 +1993,7 @@ async function loadEvents() {
     const data = await res.json();
     allEvents = data.recent || [];
     allCounts = data.counts || {};
+    allAttribution = data.attribution || null;
     renderEvents();
     if (currentView !== 'support') loadSupportThreads().catch(() => {});
   } catch (e) {

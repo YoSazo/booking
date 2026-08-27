@@ -473,6 +473,12 @@
       journeyOccurredAt: new Date().toISOString(),
       journeySurface: String(config.surface || 'unknown').slice(0, 40),
       journeyPagePath: sanitizedPath(window.location.href),
+      // These contain only URL attribution fields and are sanitized again on
+      // the server. Carrying them on the durable milestone request joins the
+      // eventual paid property back to the exact ad URL even if the browser
+      // journey batch is delayed or blocked.
+      journeyFirstTouch: safeObject(firstTouch || {}, 0),
+      journeyLatestTouch: safeObject(latestTouch || {}, 0),
     };
   }
 

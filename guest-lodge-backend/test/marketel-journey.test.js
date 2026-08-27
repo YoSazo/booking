@@ -112,4 +112,8 @@ test('journey tracker links attribution and strips sensitive metadata', async ()
     assert.equal(linkage.journeySessionId, pageView.sessionId);
     assert.ok(linkage.journeySequence > validation.sequence);
     assert.equal(linkage.journeyPagePath, '/landing');
+    assert.equal(linkage.journeyFirstTouch.utm_source, 'facebook');
+    assert.equal(linkage.journeyFirstTouch.utm_campaign, 'owners');
+    assert.equal(linkage.journeyFirstTouch.angle, 'assistant');
+    assert.equal(linkage.journeyLatestTouch.utm_campaign, 'owners');
 });
