@@ -44,6 +44,11 @@ const {
     syncPaymentMethodDomains,
 } = require('./stripe-payment-domains');
 const {
+    buildMarketelCapiEvent,
+    marketelCapiRetryDelayMs,
+    marketelMetaRequestContext,
+} = require('./marketel-meta-capi');
+const {
     createGuestIdentityToken,
     createReservationToken,
     readGuestIdentityToken,
@@ -95,6 +100,8 @@ let frontDeskAssistant = null;
 // Marketel CAPI (separate pixel for the onboarding funnel)
 const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
+const MARKETEL_META_TEST_EVENT_CODE = String(process.env.MARKETEL_META_TEST_EVENT_CODE || '').trim();
+const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI !== 'false';
 // Meta versions the Conversions API endpoint. Keep the version deploy-time
 // configurable so an API sunset never requires a code change, while validating
 // the value before it is interpolated into an outbound URL. v26.0 is the
@@ -105,52 +112,57 @@ const MARKETEL_META_GRAPH_API_VERSION = (() => {
     return /^v\d{1,2}\.\d{1,2}$/.test(normalized) ? normalized : 'v26.0';
 })();
 
-async function sendMarketelCAPI(eventName, { email, phone, externalId, ip, userAgent, sourceUrl, fbp, fbc, value, currency, eventId, contentName } = {}) {
-    if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) return;
+async function sendMarketelCAPI(eventName, input = {}) {
+    if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) {
+        return { success: false, configured: false, error: 'Marketel Meta CAPI is not configured' };
+    }
     try {
-        const userData = {};
-        if (email) userData.em = [crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')];
-        if (phone) {
-            const digits = String(phone).replace(/\D/g, '');
-            if (digits) userData.ph = [crypto.createHash('sha256').update(digits).digest('hex')];
-        }
-        if (externalId) {
-            // Keep one first-party identity across Lead, checkout and payment.
-            // Meta expects customer information parameters to be normalized and
-            // SHA-256 hashed before they leave our server.
-            const normalizedExternalId = String(externalId).trim().toLowerCase();
-            if (normalizedExternalId) {
-                userData.external_id = [crypto.createHash('sha256').update(normalizedExternalId).digest('hex')];
-            }
-        }
-        if (ip) userData.client_ip_address = ip;
-        if (userAgent) userData.client_user_agent = userAgent;
-        if (fbp) userData.fbp = fbp;
-        if (fbc) userData.fbc = fbc;
-
-        const eventPayload = {
-            event_name: eventName,
-            event_time: Math.floor(Date.now() / 1000),
-            event_id: eventId || `${eventName.toLowerCase()}.${Date.now()}`,
-            action_source: 'website',
-            user_data: userData,
-        };
-        if (sourceUrl) eventPayload.event_source_url = sourceUrl;
-        const customData = {};
-        if (value) {
-            customData.value = parseFloat(value);
-            customData.currency = currency || 'USD';
-        }
-        if (contentName) customData.content_name = String(contentName).slice(0, 500);
-        if (Object.keys(customData).length) eventPayload.custom_data = customData;
-
-        await axios.post(
+        const eventPayload = buildMarketelCapiEvent(eventName, input);
+        const testEventCode = String(
+            Object.prototype.hasOwnProperty.call(input, 'testEventCode')
+                ? input.testEventCode
+                : MARKETEL_META_TEST_EVENT_CODE
+        ).trim();
+        const response = await axios.post(
             `https://graph.facebook.com/${MARKETEL_META_GRAPH_API_VERSION}/${MARKETEL_PIXEL_ID}/events`,
-            { data: [eventPayload], access_token: MARKETEL_ACCESS_TOKEN }
+            {
+                data: [eventPayload],
+                access_token: MARKETEL_ACCESS_TOKEN,
+                ...(testEventCode ? { test_event_code: testEventCode } : {}),
+            },
+            { timeout: 12_000 }
         );
-        console.log(`✅ Marketel CAPI: ${eventName} sent`);
+        const accepted = Number(response.data?.events_received) > 0;
+        const result = {
+            success: accepted,
+            configured: true,
+            testMode: !!testEventCode,
+            eventsReceived: Number(response.data?.events_received) || 0,
+            fbtraceId: String(response.data?.fbtrace_id || ''),
+            eventId: eventPayload.event_id,
+            ...(accepted ? {} : { error: 'Meta accepted zero events' }),
+        };
+        console.log(`✅ Marketel CAPI: ${eventName} ${accepted ? 'accepted' : 'returned zero events'}`, {
+            eventId: eventPayload.event_id,
+            testMode: !!testEventCode,
+            eventsReceived: result.eventsReceived,
+            fbtraceId: result.fbtraceId,
+        });
+        return result;
     } catch (e) {
-        console.error(`❌ Marketel CAPI ${eventName} failed:`, e.response?.data?.error?.message || e.message);
+        const error = String(e.response?.data?.error?.message || e.message || 'Meta request failed').slice(0, 500);
+        console.error(`❌ Marketel CAPI ${eventName} failed:`, error);
+        return {
+            success: false,
+            configured: true,
+            testMode: !!String(
+                Object.prototype.hasOwnProperty.call(input, 'testEventCode')
+                    ? input.testEventCode
+                    : MARKETEL_META_TEST_EVENT_CODE
+            ).trim(),
+            status: Number(e.response?.status) || null,
+            error,
+        };
     }
 }
 
@@ -511,7 +523,6 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 // Meta Conversions API (CAPI) config
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '';
 const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || ''; // Set in env for testing only; leave unset in production
-const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI !== 'false'; // ON by default; set ENABLE_META_CAPI=false to disable
 
 // Web Push (PWA notifications for new bookings)
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
@@ -673,6 +684,174 @@ async function withRetry(fn, retries = 3, delay = 1000) {
             }
         }
     }
+}
+
+// Meta is an external delivery target, not the source of truth. Persist every
+// Marketel server event before attempting delivery so a provider timeout or a
+// Render restart cannot silently erase the conversion. FunnelEvent is already
+// durable and carries the exact first-party matching context we need, so these
+// three rows form a small outbox without another production migration.
+const MARKETEL_CAPI_PENDING = 'MetaCapiPending';
+const MARKETEL_CAPI_SENT = 'MetaCapiSent';
+const MARKETEL_CAPI_FAILED = 'MetaCapiFailed';
+const MARKETEL_CAPI_STATUS_NAMES = [MARKETEL_CAPI_PENDING, MARKETEL_CAPI_SENT, MARKETEL_CAPI_FAILED];
+const MARKETEL_CAPI_MAX_ATTEMPTS = 8;
+const marketelCapiDelivering = new Set();
+
+function marketelMetaContext(req) {
+    return marketelMetaRequestContext(req, getMetaCookies(req));
+}
+
+function marketelCapiMetadata(row) {
+    return row?.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+        ? row.metadata
+        : {};
+}
+
+async function queueMarketelCAPI(eventName, input = {}) {
+    const providerEventId = String(input.eventId || '').trim().slice(0, 160);
+    if (!providerEventId) throw new Error(`A stable eventId is required for Marketel CAPI ${eventName}`);
+    const testEventCode = String(input.testEventCode ?? MARKETEL_META_TEST_EVENT_CODE ?? '').trim().slice(0, 120);
+    const now = new Date();
+    const metadata = {
+        provider: 'meta',
+        metaEventName: String(eventName || '').trim().slice(0, 80),
+        sourceUrl: String(input.sourceUrl || '').trim().slice(0, 500),
+        fbp: String(input.fbp || '').trim().slice(0, 220),
+        fbc: String(input.fbc || '').trim().slice(0, 220),
+        attempts: 0,
+        nextAttemptAt: now.toISOString(),
+        eventTime: Math.max(1, Math.floor(Number(input.eventTime) || Date.now() / 1000)),
+        testMode: !!testEventCode,
+        ...(testEventCode ? { testEventCode } : {}),
+    };
+
+    const row = await prisma.$transaction(async (tx) => {
+        // FunnelEvent.eventId predates the outbox and is not unique. A scoped
+        // Postgres advisory lock gives this provider event exactly-once queueing
+        // across concurrent Stripe webhook and browser-return requests.
+        await tx.$queryRaw`SELECT 1 AS "locked" FROM pg_advisory_xact_lock(hashtext(${providerEventId}))`;
+        const existing = await tx.funnelEvent.findFirst({
+            where: { eventId: providerEventId, eventName: { in: MARKETEL_CAPI_STATUS_NAMES } },
+            orderBy: { createdAt: 'desc' },
+        });
+        if (existing) return existing;
+        return tx.funnelEvent.create({
+            data: {
+                hotelId: String(input.hotelId || input.externalId || 'marketel-capi-system').trim().slice(0, 180),
+                eventName: MARKETEL_CAPI_PENDING,
+                eventId: providerEventId,
+                occurredAt: now,
+                surface: 'server',
+                pagePath: '/meta/capi',
+                metadata,
+                value: Number.isFinite(Number(input.value)) ? Number(input.value) : null,
+                currency: String(input.currency || 'USD').trim().slice(0, 3).toUpperCase(),
+                contentName: String(input.contentName || '').trim().slice(0, 500) || null,
+                guestEmail: String(input.email || '').trim().slice(0, 320) || null,
+                guestPhone: String(input.phone || '').trim().slice(0, 80) || null,
+                externalId: String(input.externalId || '').trim().slice(0, 180) || null,
+                userAgent: String(input.userAgent || '').trim().slice(0, 500) || null,
+                ipAddress: String(input.ip || '').trim().slice(0, 100) || null,
+            },
+        });
+    });
+
+    if (row.eventName === MARKETEL_CAPI_PENDING) {
+        setImmediate(() => deliverMarketelCapiRow(row.id).catch((error) => {
+            console.error('Marketel CAPI immediate delivery failed:', error.message);
+        }));
+    }
+    return { queued: true, id: row.id, status: row.eventName, eventId: providerEventId };
+}
+
+async function deliverMarketelCapiRow(id) {
+    if (!id || marketelCapiDelivering.has(id)) return;
+    marketelCapiDelivering.add(id);
+    try {
+        const row = await prisma.funnelEvent.findUnique({ where: { id } });
+        if (!row || row.eventName !== MARKETEL_CAPI_PENDING) return;
+        const metadata = marketelCapiMetadata(row);
+        const nextAttemptAt = new Date(metadata.nextAttemptAt || 0);
+        if (Number.isFinite(nextAttemptAt.getTime()) && nextAttemptAt > new Date()) return;
+        const attempts = Math.max(0, Number(metadata.attempts) || 0) + 1;
+        const result = await sendMarketelCAPI(metadata.metaEventName, {
+            hotelId: row.hotelId,
+            email: row.guestEmail || '',
+            phone: row.guestPhone || '',
+            externalId: row.externalId || row.hotelId,
+            ip: row.ipAddress || '',
+            userAgent: row.userAgent || '',
+            sourceUrl: metadata.sourceUrl || '',
+            fbp: metadata.fbp || '',
+            fbc: metadata.fbc || '',
+            value: row.value,
+            currency: row.currency || 'USD',
+            contentName: row.contentName || '',
+            eventId: row.eventId,
+            eventTime: metadata.eventTime,
+            // Preserve the routing decision made when the event was queued. A
+            // test event must never become production merely because an env
+            // variable was removed before its retry.
+            testEventCode: metadata.testMode ? metadata.testEventCode || '' : '',
+        });
+        const deliveredAt = new Date();
+        if (result.success) {
+            await prisma.funnelEvent.update({
+                where: { id },
+                data: {
+                    eventName: MARKETEL_CAPI_SENT,
+                    metadata: {
+                        ...metadata,
+                        attempts,
+                        nextAttemptAt: null,
+                        deliveredAt: deliveredAt.toISOString(),
+                        eventsReceived: result.eventsReceived,
+                        fbtraceId: result.fbtraceId || '',
+                        lastError: null,
+                    },
+                },
+            });
+            return;
+        }
+
+        const permanentlyFailed = attempts >= MARKETEL_CAPI_MAX_ATTEMPTS;
+        const nextAttempt = new Date(Date.now() + marketelCapiRetryDelayMs(attempts));
+        await prisma.funnelEvent.update({
+            where: { id },
+            data: {
+                eventName: permanentlyFailed ? MARKETEL_CAPI_FAILED : MARKETEL_CAPI_PENDING,
+                metadata: {
+                    ...metadata,
+                    attempts,
+                    nextAttemptAt: permanentlyFailed ? null : nextAttempt.toISOString(),
+                    lastAttemptAt: deliveredAt.toISOString(),
+                    lastError: String(result.error || 'Meta delivery failed').slice(0, 500),
+                    httpStatus: result.status || null,
+                },
+            },
+        });
+    } finally {
+        marketelCapiDelivering.delete(id);
+    }
+}
+
+async function runMarketelCapiDeliverySweep() {
+    const pending = await prisma.funnelEvent.findMany({
+        where: { eventName: MARKETEL_CAPI_PENDING },
+        orderBy: { createdAt: 'asc' },
+        take: 50,
+        select: { id: true, metadata: true },
+    });
+    const now = Date.now();
+    const due = pending.filter((row) => {
+        const timestamp = new Date(marketelCapiMetadata(row).nextAttemptAt || 0).getTime();
+        return !Number.isFinite(timestamp) || timestamp <= now;
+    });
+    for (let offset = 0; offset < due.length; offset += 4) {
+        await Promise.all(due.slice(offset, offset + 4).map((row) => deliverMarketelCapiRow(row.id)));
+    }
+    return { pending: pending.length, attempted: due.length };
 }
 
 // Keepalive ping so connection never goes idle (Supabase drops ~5 min).
@@ -7059,6 +7238,34 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
                 },
             });
         }
+        // The activation screen is the first point where the owner has seen
+        // the complete product and the $199 offer. Send one standard server
+        // ViewContent event here; the individual reveal beats stay in our rich
+        // first-party telemetry and do not muddy Meta's optimization signal.
+        if (eventName === 'ActivationOfferViewed') {
+            const hotel = await prisma.hotelConfig.findUnique({
+                where: { id: hotelId },
+                select: { ownerEmail: true, ownerPhone: true, subscribed: true },
+            }).catch(() => null);
+            if (hotel && !hotel.subscribed) {
+                const meta = marketelMetaContext(req);
+                await queueMarketelCAPI('ViewContent', {
+                    hotelId,
+                    email: hotel.ownerEmail || '',
+                    phone: hotel.ownerPhone || '',
+                    externalId: hotelId,
+                    ip: req.ip || req.socket?.remoteAddress || '',
+                    userAgent: req.headers['user-agent'] || '',
+                    sourceUrl: meta.sourceUrl,
+                    fbp: meta.fbp,
+                    fbc: meta.fbc,
+                    value: 199,
+                    currency: 'USD',
+                    eventId: `marketel-offer.${hotelId}`,
+                    contentName: 'Marketel activation offer',
+                }).catch((error) => console.error('Activation offer CAPI queue failed:', error.message));
+            }
+        }
         res.json({ success: true });
     } catch (e) {
         console.error('value-reveal-event:', e.message);
@@ -10529,18 +10736,19 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         // Match the browser's standard Lead event and event_id. Meta uses the
         // pair to deduplicate Pixel and Conversions API copies of the same lead.
         if (eventName === 'Lead') {
-            const { fbp: leadFbp, fbc: leadFbc } = getMetaCookies(req);
-            sendMarketelCAPI('Lead', {
+            const meta = marketelMetaContext(req);
+            await queueMarketelCAPI('Lead', {
+                hotelId: trackedHotelId,
                 email: trackedEmail || '',
                 externalId: trackedHotelId,
                 ip: req.ip,
                 userAgent: req.headers['user-agent'],
-                sourceUrl: req.headers.referer || '',
-                fbp: leadFbp,
-                fbc: leadFbc,
-                eventId: cleanEventId || undefined,
+                sourceUrl: meta.sourceUrl,
+                fbp: meta.fbp,
+                fbc: meta.fbc,
+                eventId: cleanEventId || `marketel-lead.${trackedHotelId}`,
                 contentName: cleanContentName || undefined,
-            });
+            }).catch((error) => console.error('Lead CAPI queue failed:', error.message));
         }
         res.json({ success: true });
     } catch (e) {
@@ -12055,7 +12263,8 @@ function productionLaunchReadiness() {
         item('ios-push', 'Front Desk native push notifications', ['APNS_TEAM_ID', 'APNS_KEY_ID', 'APNS_PRIVATE_KEY'].every(name => present(name)) && clean('APNS_BUNDLE_ID') === 'com.bookmarketel.frontdesk', 'Set APNs team, key, private key, and the exact bundle ID.'),
         item('assistant-sms', 'Front Desk Assistant SMS', present('TWILIO_ACCOUNT_SID') && present('TWILIO_AUTH_TOKEN') && twilioSenderReady && clean('TWILIO_VALIDATE_SIGNATURES') === 'true', 'Set Twilio credentials/sender and keep signature validation true.'),
         item('assistant-intelligence', 'Front Desk Assistant language model', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY.', false),
-        item('meta-attribution', 'Meta Pixel/CAPI attribution', present('MARKETEL_META_PIXEL_ID') && present('MARKETEL_META_ACCESS_TOKEN'), 'Set Marketel Meta Pixel and CAPI credentials.', false),
+        item('meta-attribution', 'Meta Pixel/CAPI attribution', ENABLE_META_CAPI && present('MARKETEL_META_PIXEL_ID') && present('MARKETEL_META_ACCESS_TOKEN'), 'Enable Meta CAPI and set the Marketel Pixel and CAPI credentials.'),
+        item('meta-test-mode-disabled', 'Meta production events are not in Test Events mode', !MARKETEL_META_TEST_EVENT_CODE, 'Remove MARKETEL_META_TEST_EVENT_CODE before paid traffic.'),
     ];
     const critical = checks.filter(check => check.critical);
     return {
@@ -12331,6 +12540,141 @@ app.get('/api/admin/launch-readiness', adminAuth, (_req, res) => {
     res.status(readiness.ready ? 200 : 503).json({ success: readiness.ready, ...readiness });
 });
 
+app.get('/api/admin/meta-capi/status', adminAuth, async (_req, res) => {
+    try {
+        const [grouped, recent] = await Promise.all([
+            prisma.funnelEvent.groupBy({
+                by: ['eventName'],
+                where: { eventName: { in: MARKETEL_CAPI_STATUS_NAMES } },
+                _count: { _all: true },
+            }),
+            prisma.funnelEvent.findMany({
+                where: { eventName: { in: MARKETEL_CAPI_STATUS_NAMES } },
+                orderBy: { createdAt: 'desc' },
+                take: 30,
+                select: {
+                    id: true,
+                    hotelId: true,
+                    eventName: true,
+                    eventId: true,
+                    createdAt: true,
+                    occurredAt: true,
+                    metadata: true,
+                },
+            }),
+        ]);
+        const counts = { pending: 0, sent: 0, failed: 0 };
+        for (const row of grouped) {
+            if (row.eventName === MARKETEL_CAPI_PENDING) counts.pending = row._count._all;
+            if (row.eventName === MARKETEL_CAPI_SENT) counts.sent = row._count._all;
+            if (row.eventName === MARKETEL_CAPI_FAILED) counts.failed = row._count._all;
+        }
+        res.json({
+            success: true,
+            configuration: {
+                enabled: ENABLE_META_CAPI,
+                pixelConfigured: !!MARKETEL_PIXEL_ID,
+                accessTokenConfigured: !!MARKETEL_ACCESS_TOKEN,
+                configured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
+                graphVersion: MARKETEL_META_GRAPH_API_VERSION,
+                testMode: !!MARKETEL_META_TEST_EVENT_CODE,
+            },
+            counts,
+            recent: recent.map((row) => {
+                const metadata = marketelCapiMetadata(row);
+                return {
+                    id: row.id,
+                    hotelId: row.hotelId,
+                    status: row.eventName === MARKETEL_CAPI_SENT
+                        ? 'sent'
+                        : row.eventName === MARKETEL_CAPI_FAILED ? 'failed' : 'pending',
+                    metaEventName: metadata.metaEventName || '',
+                    providerEventId: row.eventId || '',
+                    attempts: Number(metadata.attempts) || 0,
+                    testMode: !!metadata.testMode,
+                    eventsReceived: Number(metadata.eventsReceived) || 0,
+                    lastError: String(metadata.lastError || '').slice(0, 500),
+                    queuedAt: row.occurredAt || row.createdAt,
+                    deliveredAt: metadata.deliveredAt || null,
+                    nextAttemptAt: metadata.nextAttemptAt || null,
+                };
+            }),
+        });
+    } catch (error) {
+        console.error('Meta CAPI admin status failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not load Meta delivery status.' });
+    }
+});
+
+app.post('/api/admin/meta-capi/test', adminAuth, async (req, res) => {
+    try {
+        if (!MARKETEL_META_TEST_EVENT_CODE) {
+            return res.status(400).json({
+                success: false,
+                message: 'Set MARKETEL_META_TEST_EVENT_CODE on Render before sending test events.',
+            });
+        }
+        const eventName = String(req.body?.eventName || '').trim();
+        if (!['ViewContent', 'InitiateCheckout', 'Subscribe'].includes(eventName)) {
+            return res.status(400).json({ success: false, message: 'Unsupported Meta test event.' });
+        }
+        const eventId = `marketel-capi-test.${eventName}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
+        const meta = marketelMetaContext(req);
+        const queued = await queueMarketelCAPI(eventName, {
+            hotelId: 'marketel-capi-test',
+            externalId: 'marketel-capi-test',
+            ip: req.ip || req.socket?.remoteAddress || '',
+            userAgent: req.headers['user-agent'] || '',
+            sourceUrl: meta.sourceUrl || `${req.protocol}://${req.get('host')}/funnel`,
+            fbp: meta.fbp,
+            fbc: meta.fbc,
+            value: 199,
+            currency: 'USD',
+            eventId,
+            contentName: 'Marketel CAPI delivery test',
+            testEventCode: MARKETEL_META_TEST_EVENT_CODE,
+        });
+        res.json({ success: true, queued });
+    } catch (error) {
+        console.error('Meta CAPI test queue failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not queue the Meta test event.' });
+    }
+});
+
+app.post('/api/admin/meta-capi/retry', adminAuth, async (_req, res) => {
+    try {
+        const failed = await prisma.funnelEvent.findMany({
+            where: { eventName: MARKETEL_CAPI_FAILED },
+            orderBy: { createdAt: 'asc' },
+            take: 100,
+        });
+        const nextAttemptAt = new Date().toISOString();
+        for (const row of failed) {
+            const metadata = marketelCapiMetadata(row);
+            await prisma.funnelEvent.update({
+                where: { id: row.id },
+                data: {
+                    eventName: MARKETEL_CAPI_PENDING,
+                    metadata: {
+                        ...metadata,
+                        attempts: 0,
+                        nextAttemptAt,
+                        lastError: null,
+                        manuallyRetriedAt: nextAttemptAt,
+                    },
+                },
+            });
+        }
+        setImmediate(() => runMarketelCapiDeliverySweep().catch((error) => {
+            console.error('Manual Meta CAPI retry sweep failed:', error.message);
+        }));
+        res.json({ success: true, requeued: failed.length });
+    } catch (error) {
+        console.error('Meta CAPI retry failed:', error.message);
+        res.status(500).json({ success: false, message: 'Could not retry Meta events.' });
+    }
+});
+
 app.post('/api/setup/:token/checkout', async (req, res) => {
     try {
         if (!marketelStripe) return res.status(503).json({ error: 'Payment not configured' });
@@ -12339,16 +12683,19 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         if (hotel.subscribed) return res.status(409).json({ error: 'This property is already activated' });
 
         // Meta CAPI: CustomizeProduct (they clicked Go Live)
-        const { fbp: cpFbp, fbc: cpFbc } = getMetaCookies(req);
-        sendMarketelCAPI('CustomizeProduct', {
+        const cpMeta = marketelMetaContext(req);
+        await queueMarketelCAPI('CustomizeProduct', {
+            hotelId: hotel.id,
             email: hotel.ownerEmail,
             externalId: hotel.id,
             userAgent: req.headers['user-agent'],
             ip: req.ip || req.socket?.remoteAddress,
-            sourceUrl: req.headers.referer || '',
-            fbp: req.body?.fbp || cpFbp,
-            fbc: req.body?.fbc || cpFbc,
-        });
+            sourceUrl: cpMeta.sourceUrl,
+            fbp: req.body?.fbp || cpMeta.fbp,
+            fbc: req.body?.fbc || cpMeta.fbc,
+            eventId: `marketel-legacy-checkout.${hotel.id}.${Date.now()}`,
+            contentName: 'Marketel legacy activation',
+        }).catch((error) => console.error('Legacy checkout CAPI queue failed:', error.message));
 
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const billingInterval = normalizeMarketelBillingInterval(req.body?.billingInterval);
@@ -12781,19 +13128,20 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         // deterministic ID is returned to setup.html so Pixel and CAPI describe
         // the same registration rather than two conversions.
         const registrationEventId = `marketel-registration.${hotel.id}`;
-        const { fbp: registrationFbp, fbc: registrationFbc } = getMetaCookies(req);
-        void sendMarketelCAPI('CompleteRegistration', {
+        const registrationMeta = marketelMetaContext(req);
+        await queueMarketelCAPI('CompleteRegistration', {
+            hotelId: hotel.id,
             email: hotel.ownerEmail || '',
             phone: hotel.ownerPhone || '',
             externalId: hotel.id,
             ip: req.ip,
             userAgent: req.headers['user-agent'],
-            sourceUrl: req.headers.referer || `${req.protocol}://${req.get('host')}/setup`,
-            fbp: registrationFbp,
-            fbc: registrationFbc,
+            sourceUrl: registrationMeta.sourceUrl || `${req.protocol}://${req.get('host')}/setup`,
+            fbp: registrationMeta.fbp,
+            fbc: registrationMeta.fbc,
             eventId: registrationEventId,
             contentName: 'marketel-property-setup',
-        });
+        }).catch((error) => console.error('CompleteRegistration CAPI queue failed:', error.message));
 
         void sendAdminPush('SetupCompleted', { property: hotel.name || hotel.ownerEmail || hotel.id });
         console.log(`✅ Setup completed (freemium): ${hotel.name} (${hotel.id}) → ${assignedDomain}`);
@@ -14677,6 +15025,11 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
         where: { id: hotelId },
         select: { ownerEmail: true, ownerPhone: true },
     }).catch(() => null);
+    const checkoutTracking = await prisma.funnelEvent.findFirst({
+        where: { eventName: 'CheckoutStarted', eventId: `marketel-checkout.${checkoutSession.id}` },
+        orderBy: { createdAt: 'desc' },
+        select: { metadata: true, userAgent: true, ipAddress: true },
+    }).catch(() => null);
     const existing = await prisma.funnelEvent.findFirst({
         where: { eventName: 'PaymentSucceeded', eventId },
         select: { id: true },
@@ -14707,27 +15060,33 @@ async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = nu
         void sendAdminPush('PaymentSucceeded', { property: hotel?.ownerEmail || hotelId });
     }
 
-    // The webhook guarantees delivery if the owner closes Stripe. The browser
-    // redirect sends the same event ID again with browser identifiers; Meta
-    // deduplicates the pair.
-    if (!existing || req) {
-        const { fbp, fbc } = req ? getMetaCookies(req) : { fbp: '', fbc: '' };
-        sendMarketelCAPI('Subscribe', {
-            email: hotel?.ownerEmail || '',
-            phone: hotel?.ownerPhone || '',
-            externalId: hotelId,
-            ip: req?.ip || '',
-            userAgent: req?.headers?.['user-agent'] || '',
-            sourceUrl: req
-                ? `${req.protocol}://${req.get('host')}${req.originalUrl}`
-                : process.env.BACKEND_URL || 'https://mktel.co',
-            fbp,
-            fbc,
-            value: amountUsd,
-            currency: 'USD',
-            eventId,
-        });
-    }
+    // Stripe redirects leave the browser and webhooks have no browser cookies.
+    // The original fbp/fbc, source URL, IP and user agent were captured before
+    // Checkout and carried in Stripe/FunnelEvent, so Subscribe retains the same
+    // match quality even when the webhook is the only request that arrives.
+    const storedTracking = checkoutTracking?.metadata && typeof checkoutTracking.metadata === 'object'
+        ? checkoutTracking.metadata.metaAttribution || {}
+        : {};
+    const requestMeta = req ? marketelMetaContext(req) : {};
+    await queueMarketelCAPI('Subscribe', {
+        hotelId,
+        email: hotel?.ownerEmail || '',
+        phone: hotel?.ownerPhone || '',
+        externalId: hotelId,
+        ip: checkoutTracking?.ipAddress || req?.ip || '',
+        userAgent: checkoutTracking?.userAgent || req?.headers?.['user-agent'] || '',
+        sourceUrl: checkoutSession?.metadata?.metaSourceUrl
+            || storedTracking.sourceUrl
+            || requestMeta.sourceUrl
+            || process.env.BACKEND_URL
+            || 'https://bookmarketel.com/frontdesk',
+        fbp: checkoutSession?.metadata?.metaFbp || storedTracking.fbp || requestMeta.fbp || '',
+        fbc: checkoutSession?.metadata?.metaFbc || storedTracking.fbc || requestMeta.fbc || '',
+        value: amountUsd,
+        currency: 'USD',
+        eventId,
+        contentName: billingPlan.contentName,
+    });
     await sendMarketelActivationEmailOnce(hotelId, req);
 }
 
@@ -14827,6 +15186,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         const journeyExternalId = sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_');
         const journeySessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
         const journeySequence = Math.max(1, Math.min(1000000, parseInt(req.body?.journeySequence, 10) || 1));
+        const meta = marketelMetaContext(req);
         const billingInterval = normalizeMarketelBillingInterval(req.body?.billingInterval);
         const frontdeskOrigin = marketelFrontdeskOrigin(req);
         const billing = await getMarketelSubscriptionPrice(billingInterval);
@@ -14878,6 +15238,9 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 hotelId,
                 billingInterval,
                 billingAmountUsd: String(amountUsd),
+                ...(meta.fbp ? { metaFbp: meta.fbp } : {}),
+                ...(meta.fbc ? { metaFbc: meta.fbc } : {}),
+                ...(meta.sourceUrl ? { metaSourceUrl: meta.sourceUrl } : {}),
                 ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
                 ...(journeySessionId ? { journeySessionId } : {}),
             },
@@ -14887,6 +15250,9 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                     hotelId,
                     billingInterval,
                     billingAmountUsd: String(amountUsd),
+                    ...(meta.fbp ? { metaFbp: meta.fbp } : {}),
+                    ...(meta.fbc ? { metaFbc: meta.fbc } : {}),
+                    ...(meta.sourceUrl ? { metaSourceUrl: meta.sourceUrl } : {}),
                     ...(journeyExternalId ? { journeyVisitorId: journeyExternalId } : {}),
                     ...(journeySessionId ? { journeySessionId } : {}),
                 },
@@ -14910,7 +15276,14 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 surface: 'stripe',
                 pagePath: '/checkout',
                 contentName: billing.contentName,
-                metadata: { source: 'activation-cta', provider: 'stripe', billingInterval },
+                userAgent: req.headers['user-agent'] || null,
+                ipAddress: req.ip || req.socket?.remoteAddress || null,
+                metadata: {
+                    source: 'activation-cta',
+                    provider: 'stripe',
+                    billingInterval,
+                    metaAttribution: { fbp: meta.fbp, fbc: meta.fbc, sourceUrl: meta.sourceUrl },
+                },
             },
         }).catch(() => {});
         await prisma.hotelConfig.update({
@@ -14919,20 +15292,21 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 checkoutStartedAt: new Date(),
             },
         }).catch(() => {});
-        const { fbp, fbc } = getMetaCookies(req);
-        sendMarketelCAPI('InitiateCheckout', {
+        await queueMarketelCAPI('InitiateCheckout', {
+            hotelId,
             email: hotel.ownerEmail || '',
             phone: hotel.ownerPhone || '',
             externalId: hotelId,
             ip: req.ip,
             userAgent: req.headers['user-agent'],
-            sourceUrl: req.headers.referer || '',
-            fbp,
-            fbc,
+            sourceUrl: meta.sourceUrl,
+            fbp: meta.fbp,
+            fbc: meta.fbc,
             value: amountUsd,
             currency: 'USD',
             eventId: checkoutEventId,
-        });
+            contentName: billing.contentName,
+        }).catch((error) => console.error('InitiateCheckout CAPI queue failed:', error.message));
         console.log('crm:go-live checkout session created:', {
             hotelId,
             sessionId: session?.id || '',
@@ -17108,6 +17482,15 @@ function startServer() {
             .catch((e) => console.error('Checkout recovery sweep:', e.message));
         setTimeout(checkoutRecoverySweep, 2 * 60 * 1000);
         setInterval(checkoutRecoverySweep, 15 * 60 * 1000);
+    }
+
+    // CAPI conversions are queued in Neon before the request completes. This
+    // sweep drains anything left by a transient Meta outage or a Render restart.
+    if (ENABLE_META_CAPI) {
+        const capiSweep = () => runMarketelCapiDeliverySweep()
+            .catch((e) => console.error('Marketel CAPI delivery sweep:', e.message));
+        setTimeout(capiSweep, 12_000);
+        setInterval(capiSweep, 60_000);
     }
 
     // Stripe requires every exact booking-page subdomain to be registered for

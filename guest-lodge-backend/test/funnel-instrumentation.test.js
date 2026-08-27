@@ -6,8 +6,10 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
 const reveal = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'reveal.js'), 'utf8');
+const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.js'), 'utf8');
 const dashboard = fs.readFileSync(path.join(root, 'funnel.html'), 'utf8');
 const setup = fs.readFileSync(path.join(root, 'setup.html'), 'utf8');
+const metaCapi = fs.readFileSync(path.join(root, 'marketel-meta-capi.js'), 'utf8');
 
 function allowlist(startMarker) {
     const start = server.indexOf(startMarker);
@@ -112,12 +114,8 @@ test('the dashboard offers exactly the triggers the server supports', () => {
 });
 
 test('Meta CAPI uses one hashed first-party external ID across the commercial funnel', () => {
-    const helper = server.slice(
-        server.indexOf('async function sendMarketelCAPI'),
-        server.indexOf('// Helper to extract fbp/fbc')
-    );
-    assert.match(helper, /externalId/);
-    assert.match(helper, /userData\.external_id = \[crypto\.createHash\('sha256'\)/);
+    assert.match(metaCapi, /externalId/);
+    assert.match(metaCapi, /userData\.external_id = \[hashMetaValue\(externalId\)\]/);
 
     const lead = server.slice(
         server.indexOf("if (eventName === 'Lead') {", server.indexOf('// Match the browser')),
@@ -125,14 +123,14 @@ test('Meta CAPI uses one hashed first-party external ID across the commercial fu
     );
     assert.match(lead, /externalId: trackedHotelId/);
 
-    const subscribeStart = server.indexOf("sendMarketelCAPI('Subscribe'");
+    const subscribeStart = server.indexOf("queueMarketelCAPI('Subscribe'");
     const subscribe = server.slice(
         subscribeStart,
         server.indexOf('await sendMarketelActivationEmailOnce', subscribeStart)
     );
     assert.match(subscribe, /externalId: hotelId/);
 
-    const checkoutStart = server.indexOf("sendMarketelCAPI('InitiateCheckout'");
+    const checkoutStart = server.indexOf("queueMarketelCAPI('InitiateCheckout'");
     const checkout = server.slice(
         checkoutStart,
         server.indexOf("console.log('crm:go-live checkout session created:", checkoutStart)
@@ -145,7 +143,7 @@ test('Meta setup completion is a deduplicated standard CompleteRegistration even
         server.indexOf("app.post('/api/setup/:token/complete'"),
         server.indexOf("app.get('/api/setup/:token/site-status'")
     );
-    assert.match(completeRoute, /sendMarketelCAPI\('CompleteRegistration'/);
+    assert.match(completeRoute, /queueMarketelCAPI\('CompleteRegistration'/);
     assert.match(completeRoute, /eventId: registrationEventId/);
     assert.match(completeRoute, /registrationEventId = `marketel-registration\.\$\{hotel\.id\}`/);
     assert.match(completeRoute, /registrationNewlyCompleted: true/);
@@ -164,6 +162,47 @@ test('Marketel CAPI uses a configurable current Graph API version', () => {
     assert.match(helper, /process\.env\.MARKETEL_META_GRAPH_API_VERSION/);
     assert.match(helper, /'v26\.0'/);
     assert.doesNotMatch(helper, /graph\.facebook\.com\/v18\.0/);
+});
+
+test('commercial Meta events use a durable retrying server outbox', () => {
+    assert.match(server, /const MARKETEL_CAPI_PENDING = 'MetaCapiPending'/);
+    assert.match(server, /async function queueMarketelCAPI/);
+    assert.match(server, /pg_advisory_xact_lock/);
+    assert.match(server, /async function runMarketelCapiDeliverySweep/);
+    assert.match(server, /setInterval\(capiSweep, 60_000\)/);
+    assert.match(server, /queueMarketelCAPI\('ViewContent'/);
+    assert.match(server, /queueMarketelCAPI\('InitiateCheckout'/);
+    assert.match(server, /queueMarketelCAPI\('Subscribe'/);
+    assert.match(server, /MARKETEL_META_TEST_EVENT_CODE/);
+});
+
+test('Stripe carries Meta attribution into the paid webhook', () => {
+    const goLive = server.slice(
+        server.indexOf("app.post('/api/crm/go-live'"),
+        server.indexOf("app.get('/api/crm/go-live-success'")
+    );
+    assert.match(goLive, /metaFbp/);
+    assert.match(goLive, /metaFbc/);
+    assert.match(goLive, /metaSourceUrl/);
+    assert.match(settings, /journey\?\.linkage\?\.\(\)/);
+    assert.match(settings, /\.\.\.journeyLinkage/);
+    const paid = server.slice(
+        server.indexOf('async function recordMarketelPaymentSuccess'),
+        server.indexOf('function invoiceSubscriptionId')
+    );
+    assert.match(paid, /checkoutSession\?\.metadata\?\.metaFbp/);
+    assert.match(paid, /checkoutSession\?\.metadata\?\.metaFbc/);
+    assert.match(paid, /queueMarketelCAPI\('Subscribe'/);
+});
+
+test('the funnel dashboard exposes sanitized Meta delivery receipts and test controls', () => {
+    assert.match(server, /\/api\/admin\/meta-capi\/status/);
+    assert.match(server, /\/api\/admin\/meta-capi\/test/);
+    assert.match(server, /\/api\/admin\/meta-capi\/retry/);
+    assert.match(dashboard, /Meta CAPI delivery/);
+    assert.match(dashboard, /sendMetaCapiTest\('ViewContent'\)/);
+    assert.match(dashboard, /sendMetaCapiTest\('Subscribe'\)/);
+    assert.match(dashboard, /Declined cards stop at InitiateCheckout/);
 });
 
 test('funnel dashboard attributes each ad angle and UTM through paid activation', () => {

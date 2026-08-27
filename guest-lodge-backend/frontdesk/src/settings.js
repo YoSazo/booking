@@ -1432,11 +1432,13 @@ async function goLive(options = {}) {
     billingInterval,
   }, { immediate: true });
   const journeyContext = journey?.getContext?.() || {};
+  const journeyLinkage = journey?.linkage?.() || {};
   try {
     const res = await api('POST', '/api/crm/go-live', {
-      journeyVisitorId: journeyContext.visitorId || '',
-      journeySessionId: journeyContext.sessionId || '',
-      journeySequence: journeyContext.sequence || null,
+      ...journeyLinkage,
+      journeyVisitorId: journeyLinkage.journeyVisitorId || journeyContext.visitorId || '',
+      journeySessionId: journeyLinkage.journeySessionId || journeyContext.sessionId || '',
+      journeySequence: journeyLinkage.journeySequence || journeyContext.sequence || null,
       billingInterval,
     });
     if (res.success && res.url) {

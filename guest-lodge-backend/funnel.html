@@ -580,6 +580,22 @@
   .ghost-btn:hover { border-color: var(--green); color: var(--green); }
   .danger-btn { background: var(--card); border: 1px solid var(--red); color: var(--red); }
   .danger-btn:hover { background: var(--red); color: #fff; }
+  .meta-capi-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .meta-capi-stat { border: 1px solid var(--border); background: var(--bg); border-radius: 12px; padding: 12px; }
+  .meta-capi-stat b { display: block; font-size: 21px; line-height: 1.1; margin-top: 4px; }
+  .meta-capi-stat span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .meta-capi-list { display: grid; gap: 7px; margin: 12px 0; }
+  .meta-capi-row { display: grid; grid-template-columns: minmax(110px, .8fr) minmax(150px, 1.4fr) auto; gap: 10px; align-items: center; border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; }
+  .meta-capi-row code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .meta-capi-state { justify-self: end; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .meta-capi-state.sent { color: #166534; background: #dcfce7; }
+  .meta-capi-state.pending { color: #854d0e; background: #fef9c3; }
+  .meta-capi-state.failed { color: #991b1b; background: #fee2e2; }
+  .ghost-btn:disabled { opacity: .45; cursor: not-allowed; }
+  @media (max-width: 560px) {
+    .meta-capi-row { grid-template-columns: 1fr auto; }
+    .meta-capi-row code { grid-column: 1 / -1; grid-row: 2; }
+  }
   .beat-row {
     display: grid;
     grid-template-columns: 200px 1fr 52px;
@@ -870,6 +886,26 @@
     <div class="panel-hint">Use a unique <b>utm_campaign</b> for the campaign and <b>utm_content</b> for each creative. Paid and revenue come from Stripe-confirmed activations, not browser guesses.</div>
   </div>
 
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Meta CAPI delivery</h2>
+      <span class="panel-note" id="metaCapiMode">Checking configuration…</span>
+    </div>
+    <div class="meta-capi-stats">
+      <div class="meta-capi-stat"><span>Pending</span><b id="metaCapiPending">—</b></div>
+      <div class="meta-capi-stat"><span>Accepted</span><b id="metaCapiSent">—</b></div>
+      <div class="meta-capi-stat"><span>Failed</span><b id="metaCapiFailed">—</b></div>
+    </div>
+    <div class="panel-actions">
+      <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('ViewContent')">Test offer view</button>
+      <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('InitiateCheckout')">Test checkout</button>
+      <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('Subscribe')">Test subscribe</button>
+      <button class="ghost-btn" onclick="retryMetaCapi()">Retry failed</button>
+    </div>
+    <div class="meta-capi-list" id="metaCapiRecent"><div class="loading">Loading delivery receipts…</div></div>
+    <div class="panel-hint" id="metaCapiHint">Lead, registration, offer view, checkout and paid subscription are queued server-side. A declined card correctly stops at checkout and never sends Subscribe.</div>
+  </div>
+
   <!-- Beat-level drop-off. A stage count says an owner reached the guest-app
        stage; these say which beat lost them. -->
   <div class="panel">
@@ -995,6 +1031,71 @@ async function adminFetch(url, options = {}, allowRetry = true) {
     return adminFetch(url, options, false);
   }
   return response;
+}
+
+async function loadMetaCapiStatus() {
+  const recent = document.getElementById('metaCapiRecent');
+  try {
+    const response = await adminFetch('/api/admin/meta-capi/status');
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Status unavailable');
+    document.getElementById('metaCapiPending').textContent = String(data.counts?.pending || 0);
+    document.getElementById('metaCapiSent').textContent = String(data.counts?.sent || 0);
+    document.getElementById('metaCapiFailed').textContent = String(data.counts?.failed || 0);
+    const config = data.configuration || {};
+    const mode = document.getElementById('metaCapiMode');
+    mode.textContent = !config.configured
+      ? 'Not configured'
+      : config.testMode ? `Test Events · ${config.graphVersion}` : `Production · ${config.graphVersion}`;
+    mode.style.color = !config.configured || data.counts?.failed ? 'var(--red)' : config.testMode ? '#854d0e' : 'var(--green)';
+    document.querySelectorAll('.meta-test-btn').forEach((button) => { button.disabled = !config.testMode; });
+    const rows = Array.isArray(data.recent) ? data.recent.slice(0, 10) : [];
+    recent.innerHTML = rows.length ? rows.map((row) => `
+      <div class="meta-capi-row" title="${escapeHtml(row.lastError || '')}">
+        <b>${escapeHtml(row.metaEventName || 'Unknown')}</b>
+        <code>${escapeHtml(row.providerEventId || '')}${row.attempts ? ` · ${row.attempts} attempt${row.attempts === 1 ? '' : 's'}` : ''}</code>
+        <span class="meta-capi-state ${escapeHtml(row.status)}">${escapeHtml(row.status)}</span>
+      </div>`).join('') : '<div class="panel-hint">No server events queued yet.</div>';
+    document.getElementById('metaCapiHint').textContent = !config.configured
+      ? 'Set MARKETEL_META_PIXEL_ID and MARKETEL_META_ACCESS_TOKEN on Render before ads.'
+      : config.testMode
+        ? 'Test Events mode is active. Use the buttons, verify receipt in Meta, then remove MARKETEL_META_TEST_EVENT_CODE before ads.'
+        : 'Production delivery is active. Declined cards stop at InitiateCheckout; only Stripe-confirmed payment queues Subscribe.';
+  } catch (error) {
+    if (recent) recent.innerHTML = `<div class="panel-hint">Could not load Meta delivery: ${escapeHtml(error.message)}</div>`;
+  }
+}
+
+async function sendMetaCapiTest(eventName) {
+  const hint = document.getElementById('metaCapiHint');
+  try {
+    const response = await adminFetch('/api/admin/meta-capi/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventName }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Test failed');
+    hint.textContent = `${eventName} queued in Meta Test Events. Delivery status will update automatically.`;
+    setTimeout(loadMetaCapiStatus, 1200);
+  } catch (error) {
+    hint.textContent = `Could not test ${eventName}: ${error.message}`;
+  }
+}
+
+async function retryMetaCapi() {
+  const hint = document.getElementById('metaCapiHint');
+  try {
+    const response = await adminFetch('/api/admin/meta-capi/retry', { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.message || 'Retry failed');
+    hint.textContent = data.requeued
+      ? `${data.requeued} failed event${data.requeued === 1 ? '' : 's'} requeued.`
+      : 'There are no failed Meta events to retry.';
+    setTimeout(loadMetaCapiStatus, 1200);
+  } catch (error) {
+    hint.textContent = `Could not retry Meta events: ${error.message}`;
+  }
 }
 
 // Tracking toggle
@@ -1182,6 +1283,7 @@ function switchView(view) {
 }
 
 function refreshCurrentAdminView() {
+  loadMetaCapiStatus();
   if (currentView === 'support') loadSupportThreads({ force: true });
   else loadEvents();
 }
@@ -2039,10 +2141,12 @@ if (new URLSearchParams(window.location.search).get('view') === 'support') {
 // that cadence and the query walks every property.
 loadPortfolio();
 initPush();
+loadMetaCapiStatus();
 
 // Auto-refresh every 30 seconds
 setInterval(() => {
   if (document.hidden) return;
+  loadMetaCapiStatus();
   if (currentView === 'support') loadSupportThreads();
   else loadEvents();
 }, 30000);
