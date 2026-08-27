@@ -10,6 +10,7 @@
     "test": "node --test test/*.test.js",
     "qa:release:auto": "npm test && node scripts/release-qa.js",
     "qa:release:database": "node scripts/release-qa.js",
+    "stripe:domains:sync": "node scripts/register-stripe-payment-domains.js",
     "start": "npx prisma migrate deploy && node server.js",
     "postinstall": "prisma generate",
     "build:frontdesk": "cd frontdesk && npm install && npm run build",

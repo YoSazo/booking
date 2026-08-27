@@ -40,6 +40,10 @@ const {
     readGuestPaymentToken,
 } = require('./guest-payment-access');
 const {
+    ensurePaymentMethodDomain,
+    syncPaymentMethodDomains,
+} = require('./stripe-payment-domains');
+const {
     createGuestIdentityToken,
     createReservationToken,
     readGuestIdentityToken,
@@ -5710,6 +5714,36 @@ function normalizeDomainList(domains = [], primaryDomain = '') {
     return { list: [...out], primary };
 }
 
+const guestStripeDomainAutomationEnabled = process.env.ENABLE_STRIPE_PAYMENT_METHOD_DOMAIN_SYNC !== 'false'
+    && /^sk_(?:test|live)_/.test(String(process.env.STRIPE_SECRET_KEY || ''));
+
+async function registerStripePaymentMethodDomain(domain) {
+    if (!guestStripeDomainAutomationEnabled) return null;
+    try {
+        const result = await ensurePaymentMethodDomain(stripe, domain);
+        if (result?.ok && result.created) {
+            console.log(`✅ Stripe wallet domain registered: ${result.domain}`);
+        }
+        return result;
+    } catch (error) {
+        // Booking-page provisioning still succeeds. The startup reconciliation
+        // repairs temporary Stripe or DNS failures on the next deployment.
+        console.error(`⚠️ Stripe wallet domain registration failed for ${domain}: ${error.message}`);
+        return null;
+    }
+}
+
+async function reconcileStripePaymentMethodDomains() {
+    if (!guestStripeDomainAutomationEnabled) return null;
+    const rows = await prisma.hotelDomain.findMany({ select: { domain: true } });
+    const result = await syncPaymentMethodDomains(stripe, rows.map(row => row.domain));
+    console.log(`Stripe wallet domains: ${result.registered}/${result.requested} ready, ${result.created} added, ${result.failed.length} failed`);
+    if (result.failed.length) {
+        console.error('⚠️ Stripe wallet domain reconciliation failures:', result.failed);
+    }
+    return result;
+}
+
 function sanitizeConfigForResponse(cfg) {
     if (!cfg) return null;
     return {
@@ -6085,6 +6119,7 @@ app.post('/api/admin/hotels', adminAuth, async (req, res) => {
 
         hotelConfigCache.delete(hotelId);
         clearHotelDomainCache();
+        await Promise.all(domains.map(domain => registerStripePaymentMethodDomain(domain)));
         const config = await resolveHotelConfig(hotelId);
         res.json({ success: true, data: sanitizeConfigForResponse(config), hotelId, domains });
     } catch (e) {
@@ -12358,7 +12393,10 @@ async function assignUniqueDomainForHotel(hotel) {
         where: { hotelId: hotel.id, isPrimary: true },
         orderBy: { createdAt: 'desc' }
     });
-    if (existing) return existing.domain;
+    if (existing) {
+        await registerStripePaymentMethodDomain(existing.domain);
+        return existing.domain;
+    }
 
     const baseSlug = (hotel.name || 'hotel').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '');
     let slug = baseSlug;
@@ -12376,6 +12414,7 @@ async function assignUniqueDomainForHotel(hotel) {
     try {
         await prisma.hotelDomain.create({ data: { hotelId: hotel.id, domain: assignedDomain, isPrimary: true } });
     } catch (e) { }
+    await registerStripePaymentMethodDomain(assignedDomain);
     return assignedDomain;
 }
 
@@ -17069,6 +17108,15 @@ function startServer() {
             .catch((e) => console.error('Checkout recovery sweep:', e.message));
         setTimeout(checkoutRecoverySweep, 2 * 60 * 1000);
         setInterval(checkoutRecoverySweep, 15 * 60 * 1000);
+    }
+
+    // Stripe requires every exact booking-page subdomain to be registered for
+    // Apple Pay, Google Pay and Link. New domains are registered inline; this
+    // restrained startup pass backfills older properties and repairs provider
+    // outages without making activation depend on Stripe's domains API.
+    if (guestStripeDomainAutomationEnabled) {
+        setTimeout(() => reconcileStripePaymentMethodDomains()
+            .catch((e) => console.error('Stripe wallet domain reconciliation:', e.message)), 25_000);
     }
     });
 }
