@@ -1791,7 +1791,9 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  /* Centred, so the $ and the number read as one figure sitting in the middle
+     of the pill rather than a symbol pinned left and a number pinned right. */
+  justify-content: center;
   gap: 1px;
   overflow: hidden;
   color: #315f48;
@@ -1800,7 +1802,6 @@
 }
 
 .mvr-rate-stepper input {
-  width: 46px;
   min-width: 0;
   padding: 0;
   color: #1f513a;
@@ -1810,10 +1811,11 @@
   font: inherit;
   font-size: 15px;
   font-weight: 900;
-  text-align: right;
-  /* Hug the number so it right-aligns snug against the $ instead of floating left. */
-  field-sizing: content;
-  min-width: 1.5ch;
+  text-align: left;
+  /* Width is set from the digit count in JS. field-sizing: content was meant
+     to do this, but Safari does not implement it, so in the app the input kept
+     a fixed 46px and its right-aligned number floated away from the $. */
+  width: 2ch;
   max-width: 62px;
   appearance: textfield;
 }

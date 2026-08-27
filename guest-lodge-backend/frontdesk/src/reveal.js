@@ -203,6 +203,15 @@ function directBookingProofHtml() {
   </div>`;
 }
 
+// Safari has no field-sizing: content, so the input cannot shrink to its digits
+// on its own. Setting the width from the digit count keeps the $ and the number
+// together as one centred figure instead of leaving a gap between them.
+function sizeRateInput(input) {
+  if (!input) return;
+  const digits = String(input.value ?? '').replace(/[^\d]/g, '').length;
+  input.style.width = Math.min(5, Math.max(2, digits)) + 'ch';
+}
+
 function updateActivationRateCalculator(value, options = {}) {
   const rate = normalizedActivationRate(value, currentActivationRate());
   activationNightlyRate = rate;
@@ -211,6 +220,7 @@ function updateActivationRateCalculator(value, options = {}) {
   const nights = document.getElementById('mvrBreakEvenNights');
   const context = document.getElementById('mvrBreakEvenContext');
   if (options.syncInput !== false && input) input.value = String(rate);
+  sizeRateInput(input);
   if (nights) nights.textContent = `${roomNights} direct ${roomNights === 1 ? 'room-night' : 'room-nights'}`;
   if (context) {
     context.textContent = billingInterval === 'year'
@@ -1546,7 +1556,9 @@ function bindRevealEvents() {
     });
   });
   const rateInput = document.getElementById('mvrActivationRate');
+  sizeRateInput(rateInput);
   rateInput?.addEventListener('input', () => {
+    sizeRateInput(rateInput);
     if (rateInput.value.trim() === '') return;
     updateActivationRateCalculator(rateInput.value, { syncInput: false });
   });
