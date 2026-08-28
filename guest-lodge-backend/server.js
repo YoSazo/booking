@@ -10648,7 +10648,17 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         }
 
         if (eventName === 'QualityAnswer') {
-            const allowedAnswers = new Set(['google_website', 'social_ads', 'ota_marketplaces', 'referrals_offline']);
+            const allowedAnswers = new Set([
+                'online_ota_leakage',
+                'direct_calls_messages',
+                'repeat_guests',
+                'building_demand',
+                // Accept the previous page for in-flight/cached setup sessions.
+                'google_website',
+                'social_ads',
+                'ota_marketplaces',
+                'referrals_offline',
+            ]);
             if (!setupHotel || !allowedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid quality answer' });
             }
@@ -10667,16 +10677,16 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         }
 
         if (eventName === 'Lead') {
-            const angleEvent = await prisma.funnelEvent.findFirst({
-                where: { hotelId: trackedHotelId, eventName: 'AcquisitionAngle' },
-                select: { contentName: true },
-                orderBy: { createdAt: 'desc' },
-            });
-            const acquisitionAngle = String(angleEvent?.contentName || 'direct').trim();
-            const qualifiedAnswers = new Set(['google_website', 'social_ads']);
-            // Marketplace traffic is qualified only for the guest-app angle:
-            // the product can turn those stays into future direct relationships.
-            if (acquisitionAngle === 'guest_app') qualifiedAnswers.add('ota_marketplaces');
+            const qualifiedAnswers = new Set([
+                'online_ota_leakage',
+                'direct_calls_messages',
+                'repeat_guests',
+                // Cached versions use the former answers. Apply the same
+                // standard across angles while those sessions finish.
+                'google_website',
+                'social_ads',
+                'ota_marketplaces',
+            ]);
             if (!setupHotel || !qualifiedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid qualified lead' });
             }

@@ -402,12 +402,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <!-- STEP 3: Quality question -->
   <div class="step" id="step-3">
     <div class="form-card fade-stagger" style="text-align:center;">
-      <h2 style="font-size:18px; margin-bottom:16px;">Where do most guests find you before they book?</h2>
+      <h2 style="font-size:18px; margin-bottom:16px;">Which sounds most like your property today?</h2>
       <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-back" data-journey="quality-google-website" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('google_website')">They search for us on Google or visit our website</button>
-        <button class="btn btn-back" data-journey="quality-social-ads" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('social_ads')">They find us through social media or ads</button>
-        <button class="btn btn-back" data-journey="quality-ota-marketplaces" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('ota_marketplaces')">They find us on Airbnb, Booking.com, Expedia, or another marketplace</button>
-        <button class="btn btn-back" data-journey="quality-referrals-offline" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('referrals_offline')">Most come through referrals, phone calls, or walk-ins</button>
+        <button class="btn btn-back" data-journey="quality-online-ota-leakage" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('online_ota_leakage')">Guests find us online, but often finish booking through an OTA</button>
+        <button class="btn btn-back" data-journey="quality-direct-calls-messages" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('direct_calls_messages')">Guests call or message us when they want to book</button>
+        <button class="btn btn-back" data-journey="quality-repeat-guests" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('repeat_guests')">We have past or repeat guests who could book directly next time</button>
+        <button class="btn btn-back" data-journey="quality-building-demand" style="text-align:left; padding:14px 16px; font-size:14px;" onclick="answerQualityQ('building_demand')">We&apos;re still building a consistent flow of guests</button>
       </div>
     </div>
   </div>
@@ -604,9 +604,11 @@ function goToStep(n) {
 }
 
 function answerQualityQ(answer) {
-  const isQualifiedLead = answer === 'google_website'
-    || answer === 'social_ads'
-    || (ACQUISITION_ANGLE === 'guest_app' && answer === 'ota_marketplaces');
+  // Qualification is intentionally identical for every acquisition angle so
+  // Meta compares the ads against the same commercial standard.
+  const isQualifiedLead = answer === 'online_ota_leakage'
+    || answer === 'direct_calls_messages'
+    || answer === 'repeat_guests';
   window.MarketelJourney?.track('JourneyQualitySelected', {
     answer,
     qualified: isQualifiedLead,

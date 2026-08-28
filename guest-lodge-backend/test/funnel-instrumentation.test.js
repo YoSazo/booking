@@ -153,6 +153,25 @@ test('Meta setup completion is a deduplicated standard CompleteRegistration even
     assert.match(setup, /completeData\.registrationNewlyCompleted/);
 });
 
+test('Lead qualification describes a current monetizable problem and is identical across ad angles', () => {
+    for (const answer of ['online_ota_leakage', 'direct_calls_messages', 'repeat_guests']) {
+        assert.match(setup, new RegExp(`answer === '${answer}'`), `${answer} is not qualified in setup`);
+        assert.match(server, new RegExp(`'${answer}'`), `${answer} is not accepted by the server`);
+    }
+    assert.match(setup, /answerQualityQ\('building_demand'\)/);
+    assert.doesNotMatch(
+        setup.slice(setup.indexOf('function answerQualityQ'), setup.indexOf("window.MarketelJourney?.track('JourneyQualitySelected'")),
+        /building_demand/,
+        'building demand must remain tracked but unqualified'
+    );
+    const leadValidation = server.slice(
+        server.indexOf("if (eventName === 'Lead')"),
+        server.indexOf('// A setup can qualify only once')
+    );
+    assert.doesNotMatch(leadValidation, /acquisitionAngle|AcquisitionAngle/);
+    assert.doesNotMatch(leadValidation, /building_demand/);
+});
+
 test('Marketel CAPI uses a configurable current Graph API version', () => {
     const helper = server.slice(
         server.indexOf('// Marketel CAPI'),
