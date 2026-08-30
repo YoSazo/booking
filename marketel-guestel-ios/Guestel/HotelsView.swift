@@ -162,7 +162,7 @@ struct HotelsView: View {
         let selectedIndex = store.hotels.firstIndex(where: { $0.id == selectedHotel?.id }) ?? 0
         let isCurrent = hotel.id == selectedHotel?.id
 
-        WalletCard(hotel: hotel, seed: currentIndex, height: cardHeight)
+        WalletCard(hotel: hotel, seed: currentIndex, height: cardHeight, offer: store.details(for: hotel.hotelId)?.returnOffer)
             .opacity(isSelected && !isCurrent ? 0 : 1)
             .contentShape(.rect)
             .onTapGesture {
@@ -262,12 +262,22 @@ struct WalletCard: View {
     let hotel: Hotel
     let seed: Int
     let height: CGFloat
+    var offer: BookingAPI.ReturnOffer? = nil
 
     // Show a real city/state; hide the "Direct booking" placeholder.
     private var locationLine: String? {
         let loc = hotel.location.trimmingCharacters(in: .whitespaces)
         guard !loc.isEmpty, loc.caseInsensitiveCompare("Direct booking") != .orderedSame else { return nil }
         return loc
+    }
+
+    // A compact returning-guest nudge, shown only when the property has a live
+    // offer. The full return rate appears when they open the card to rebook.
+    private var offerText: String? {
+        guard let offer, offer.value > 0 else { return nil }
+        return offer.kind == "amount"
+            ? "$\(Int(offer.value.rounded()))/night off"
+            : "\(Int(offer.value.rounded()))% off to rebook"
     }
 
     var body: some View {
@@ -312,6 +322,20 @@ struct WalletCard: View {
                     startPoint: .top,
                     endPoint: .center
                 )
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let offerText {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles").font(.system(size: 10, weight: .bold))
+                    Text(offerText).font(.system(size: 11, weight: .heavy))
+                }
+                .foregroundStyle(Theme.green)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(.white.opacity(0.95), in: Capsule())
+                .shadow(color: .black.opacity(0.18), radius: 4, x: 0, y: 1)
+                .padding(12)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))

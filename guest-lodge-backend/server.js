@@ -2170,6 +2170,8 @@ async function createManualBookingRecordWithInventory(hotelId, bookingData) {
             data: {
                 ...bookingData,
                 status: bookingData.status || 'confirmed',
+                source: 'source' in bookingData ? normalizeBookingSource(bookingData.source) : undefined,
+                returnOfferApplied: bookingData.returnOfferApplied === true,
                 inventoryOverrideDates: consumedOverrideDates.length
                     ? JSON.stringify(consumedOverrideDates)
                     : null,
@@ -2182,9 +2184,22 @@ async function createManualBookingRecordWithInventory(hotelId, bookingData) {
     }, { maxWait: 5000, timeout: 15000 });
 }
 
+// Attribution for the Guestel rebooking loop. Only a known set is stored; any
+// other/absent value becomes null (untagged) so a client can't invent sources.
+const BOOKING_SOURCES = new Set(['guestel_native', 'app_clip', 'rebook', 'web']);
+function normalizeBookingSource(value) {
+    const v = String(value || '').trim().toLowerCase();
+    return BOOKING_SOURCES.has(v) ? v : null;
+}
+
 async function createBookingRecordWithConfirmation(bookingData) {
+    const data = { ...bookingData };
+    // Sanitize loop-attribution fields at the single create chokepoint, so every
+    // path records a trustworthy source and offer-redemption flag.
+    if ('source' in data) data.source = normalizeBookingSource(data.source);
+    if ('returnOfferApplied' in data) data.returnOfferApplied = data.returnOfferApplied === true;
     return prisma.$transaction(async (tx) => {
-        const booking = await tx.booking.create({ data: bookingData });
+        const booking = await tx.booking.create({ data });
         await enqueueBookingSideEffectsTx(tx, booking, ['confirmation_email']);
         return booking;
     }, { maxWait: 5000, timeout: 15000 });
@@ -2312,7 +2327,7 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
     const periodStartDate = new Date(`${start}T00:00:00.000Z`);
     const periodEndExclusiveDate = new Date(`${addDaysToIso(end, 1)}T00:00:00.000Z`);
 
-    const [bookings, manualRooms, declinedLeads] = await Promise.all([
+    const [bookings, manualRooms, declinedLeads, guestHistory] = await Promise.all([
         withRetry(() => prisma.booking.findMany({
             where: {
                 hotelId,
@@ -2328,6 +2343,8 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
                 nights: true,
                 grandTotal: true,
                 bookingType: true,
+                source: true,
+                returnOfferApplied: true,
                 guestEmail: true,
                 guestPhone: true,
             },
@@ -2363,6 +2380,12 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
                 },
             }))
             : Promise.resolve([]),
+        // Full guest history for this property, so a booking in the window can
+        // be recognized as a *returning* guest (an earlier stay exists).
+        withRetry(() => prisma.booking.findMany({
+            where: { hotelId, status: ACTIVE_BOOKING_STATUS_FILTER },
+            select: { guestEmail: true, guestPhone: true, checkinDate: true },
+        })),
     ]);
 
     const recoveredLeadKeys = new Set();
@@ -2371,6 +2394,27 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
             recoveredLeadKeys.add(key);
         }
     }
+
+    // Earliest check-in per guest (by email, else phone). A window booking whose
+    // guest first stayed before it is a returning guest — the Guestel loop working.
+    const guestFirstStayIso = new Map();
+    const guestKeyOf = (b) => {
+        const email = String(b.guestEmail || '').trim().toLowerCase();
+        if (email) return `e:${email}`;
+        const phone = String(b.guestPhone || '').replace(/\D/g, '');
+        return phone ? `p:${phone}` : '';
+    };
+    for (const b of guestHistory) {
+        const key = guestKeyOf(b);
+        const iso = normalizeIsoDate(b.checkinDate);
+        if (!key || !iso) continue;
+        const prev = guestFirstStayIso.get(key);
+        if (!prev || iso < prev) guestFirstStayIso.set(key, iso);
+    }
+    const GUESTEL_SOURCES = new Set(['guestel_native', 'app_clip', 'rebook']);
+    const repeatGuestKeys = new Set();
+    let guestelBookings = 0;
+    let offerRedemptions = 0;
 
     const roomRevenue = {};
     const bookedCounts = {};
@@ -2432,6 +2476,19 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
             recoveredDeclines += 1;
         }
 
+        // Guestel-loop cuts: attributed source, returning guest, offer redemption.
+        if (GUESTEL_SOURCES.has(String(booking.source || '').trim().toLowerCase())) {
+            guestelBookings += 1;
+        }
+        if (booking.returnOfferApplied) {
+            offerRedemptions += 1;
+        }
+        const guestKey = guestKeyOf(booking);
+        const firstStay = guestKey ? guestFirstStayIso.get(guestKey) : null;
+        if (guestKey && firstStay && firstStay < checkinIso) {
+            repeatGuestKeys.add(guestKey);
+        }
+
         for (const day of overlapDays) {
             const key = `${roomName}|${day}`;
             bookedCounts[key] = (bookedCounts[key] || 0) + 1;
@@ -2482,6 +2539,9 @@ async function computeManualRevenueMetrics(hotelId, startIso, endIso) {
             payLater: payLaterCount,
             recoveredDeclines,
             availableRoomNights,
+            repeatGuests: repeatGuestKeys.size,
+            guestelBookings,
+            offerRedemptions,
         },
     };
 }
@@ -2888,6 +2948,8 @@ async function persistExternalPayLaterBooking({
             hotelId,
             roomName: bookingDetails.name || bookingDetails.roomName,
             bookingType: 'payLater',
+            source: bookingDetails.source,
+            returnOfferApplied: bookingDetails.returnOfferApplied,
             checkinDate: new Date(bookingDetails.checkin),
             checkoutDate: new Date(bookingDetails.checkout),
             nights: bookingDetails.nights,
@@ -5078,6 +5140,8 @@ app.post('/api/book', publicBookingRateLimit, async (req, res) => {
                     hotelId: hotelValidation.hotelId,
                     roomName: bookingDetails.name || bookingDetails.roomName,
                     bookingType: bookingDetails.bookingType || 'standard',
+                    source: bookingDetails.source,
+                    returnOfferApplied: bookingDetails.returnOfferApplied,
                     checkinDate: new Date(bookingDetails.checkin),
                     checkoutDate: new Date(bookingDetails.checkout),
                     nights: bookingDetails.nights,
@@ -13522,6 +13586,15 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             checkInTime: hotel.checkInTime,
             checkOutTime: hotel.checkOutTime,
             cancellationPolicy: hotel.cancellationPolicy || '',
+            // Returning-guest offer, only when live — the booking engine and
+            // Guestel show a "return rate" to guests who already stayed here.
+            returnOffer: (hotel.returnOfferEnabled && Number(hotel.returnOfferValue) > 0)
+                ? {
+                    kind: hotel.returnOfferKind === 'amount' ? 'amount' : 'percent',
+                    value: Number(hotel.returnOfferValue) || 0,
+                    label: hotel.returnOfferLabel || '',
+                }
+                : null,
             subscribed: hotel.subscribed || false,
             rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
             rooms: hotel.rooms.map((r, i) => ({
@@ -13571,6 +13644,11 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 appIconUrl: true,
                 guestelWalletImageUrl: true,
                 guestelWalletSubtitle: true,
+                returnOfferEnabled: true,
+                returnOfferKind: true,
+                returnOfferValue: true,
+                returnOfferLabel: true,
+                otaCommissionRate: true,
                 subscribed: true,
                 setupToken: true,
                 ownerEmail: true,
@@ -13631,6 +13709,11 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             guestelWalletImageUrl: dbHotel?.guestelWalletImageUrl || '',
             guestelWalletFallbackImageUrl: absolutePublicAssetUrl(req, dbHotel?.rooms?.[0]?.images?.[0]?.url),
             guestelWalletSubtitle: dbHotel?.guestelWalletSubtitle || '',
+            returnOfferEnabled: dbHotel?.returnOfferEnabled || false,
+            returnOfferKind: dbHotel?.returnOfferKind || 'percent',
+            returnOfferValue: Number(dbHotel?.returnOfferValue) || 0,
+            returnOfferLabel: dbHotel?.returnOfferLabel || '',
+            otaCommissionRate: Number.isFinite(Number(dbHotel?.otaCommissionRate)) ? Number(dbHotel?.otaCommissionRate) : 0.15,
             subscribed: dbHotel?.subscribed || false,
             frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
         });
@@ -13688,7 +13771,11 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
     try {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
-        const { name, subtitle, address, phone, cancellationPolicy, theme } = req.body;
+        const {
+            name, subtitle, address, phone, cancellationPolicy, theme,
+            returnOfferEnabled, returnOfferKind, returnOfferValue, returnOfferLabel,
+            otaCommissionRate,
+        } = req.body;
         const data = {};
         if (name !== undefined) data.name = name || undefined;
         if (subtitle !== undefined) data.subtitle = subtitle;
@@ -13696,6 +13783,31 @@ app.post('/api/crm/hotel-info', crmAuth, async (req, res) => {
         if (phone !== undefined) data.phone = phone;
         if (cancellationPolicy !== undefined) data.cancellationPolicy = cancellationPolicy;
         if (theme !== undefined) data.theme = theme;
+        // Returning-guest offer. Clamp to safe, sensible bounds so a bad client
+        // value can never produce a negative or absurd return rate for guests.
+        if (returnOfferEnabled !== undefined) data.returnOfferEnabled = !!returnOfferEnabled;
+        if (returnOfferKind !== undefined) {
+            data.returnOfferKind = returnOfferKind === 'amount' ? 'amount' : 'percent';
+        }
+        if (returnOfferValue !== undefined) {
+            const kind = data.returnOfferKind
+                || (returnOfferKind === 'amount' ? 'amount' : 'percent');
+            const raw = Number(returnOfferValue);
+            const safe = Number.isFinite(raw) ? raw : 0;
+            data.returnOfferValue = kind === 'percent'
+                ? Math.min(50, Math.max(0, Math.round(safe)))
+                : Math.min(1000, Math.max(0, Math.round(safe * 100) / 100));
+        }
+        if (returnOfferLabel !== undefined) {
+            data.returnOfferLabel = String(returnOfferLabel || '').slice(0, 80) || null;
+        }
+        if (otaCommissionRate !== undefined) {
+            const raw = Number(otaCommissionRate);
+            const safe = Number.isFinite(raw) ? raw : 0.15;
+            // Accept either a fraction (0.15) or a percentage (15) from the client.
+            const asFraction = safe > 1 ? safe / 100 : safe;
+            data.otaCommissionRate = Math.min(0.4, Math.max(0, asFraction));
+        }
         await prisma.hotelConfig.update({
             where: { id: hotelId },
             data,
@@ -16366,6 +16478,14 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
             ? await computeManualRevenueMetrics(hotelId, window.prevStartIso, window.prevEndIso)
             : null;
 
+        // The owner's real OTA commission %, so "fees avoided" is their number.
+        const rateRow = await prisma.hotelConfig.findUnique({
+            where: { id: hotelId },
+            select: { otaCommissionRate: true },
+        });
+        const otaRate = Number(rateRow?.otaCommissionRate);
+        const otaCommissionRate = Number.isFinite(otaRate) && otaRate > 0 ? otaRate : 0.15;
+
         res.json({
             success: true,
             data: {
@@ -16383,6 +16503,7 @@ app.get('/api/crm/revenue', crmAuth, async (req, res) => {
                 prevAvg: previous ? previous.avg : null,
                 rooms: current.rooms,
                 stats: current.stats,
+                otaCommissionRate,
             },
         });
     } catch (e) {

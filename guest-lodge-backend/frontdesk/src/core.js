@@ -1394,6 +1394,20 @@ function syncRevenueUi() {
                 <div class="revenue-value" id="revenueKpiBookings">0</div>
               </div>
             </div>
+            <div class="revenue-loop-grid">
+              <div class="revenue-card">
+                <div class="revenue-label">Repeat guests</div>
+                <div class="revenue-value" id="revenueKpiRepeat">0</div>
+              </div>
+              <div class="revenue-card">
+                <div class="revenue-label">Via Guestel</div>
+                <div class="revenue-value" id="revenueKpiGuestel">0</div>
+              </div>
+              <div class="revenue-card">
+                <div class="revenue-label">Offer redemptions</div>
+                <div class="revenue-value" id="revenueKpiOffers">0</div>
+              </div>
+            </div>
             <div class="revenue-bottom-grid">
               <div class="revenue-list-card">
                 <div class="revenue-list-title">By room type</div>
@@ -1554,11 +1568,21 @@ function renderRevenueView() {
   const revenueValue = Number(data.rev || 0);
   if (revEl) revEl.textContent = formatCurrencyCompact(revenueValue);
   if (bookingsEl) bookingsEl.textContent = String(data['bookings'] || 0);
-  const savedAmount = revenueValue * crm.OTA_COMMISSION_RATE;
+  // Prefer the owner's real OTA commission %, falling back to the default.
+  const serverRate = Number(data.otaCommissionRate);
+  const otaRate = Number.isFinite(serverRate) && serverRate > 0 ? serverRate : crm.OTA_COMMISSION_RATE;
+  const savedAmount = revenueValue * otaRate;
   if (savedEl) savedEl.textContent = formatCurrencyCompact(savedAmount);
   if (savedCopyEl) savedCopyEl.textContent = crm.revenuePeriod === 'today'
     ? 'Est. OTA fees avoided today'
     : `Est. OTA fees avoided (${currentPeriodLabel.toLowerCase()})`;
+  const stats = data.stats || {};
+  const repeatEl = document.getElementById('revenueKpiRepeat');
+  const guestelEl = document.getElementById('revenueKpiGuestel');
+  const offersEl = document.getElementById('revenueKpiOffers');
+  if (repeatEl) repeatEl.textContent = String(stats.repeatGuests || 0);
+  if (guestelEl) guestelEl.textContent = String(stats.guestelBookings || 0);
+  if (offersEl) offersEl.textContent = String(stats.offerRedemptions || 0);
   renderRevenueRooms(data.rooms);
 }
 

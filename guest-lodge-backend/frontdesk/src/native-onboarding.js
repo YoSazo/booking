@@ -41,6 +41,16 @@ const OPERATIONAL_STEPS = [
     note: 'Tell a guest: “Scan this to book directly and keep us in Guestel.”',
     tabPosition: '87.5%',
   },
+  {
+    // No tab — this step opens the real Front Desk screen on finish, where the
+    // booking rule, who-gets-texts, check-in times and alerts all live. Guiding
+    // owners here means they never have to go hunting to configure it.
+    opensFrontDesk: true,
+    eyebrow: 'Front Desk',
+    title: 'Set your rules — once.',
+    body: 'Your booking rule, the phones that get booking texts, check-in times and alerts all live in Front Desk. Set them here and it runs on its own.',
+    note: 'Opening it next so you can finish in about a minute.',
+  },
 ];
 
 // Intro phase steps, in order. The pill (lock-screen alerts) sits before the
@@ -49,8 +59,7 @@ const OPERATIONAL_STEPS = [
 const READY_STEP = 0;
 const PILL_STEP = 1;
 const ASSISTANT_STEP = 2;
-const ORIENTATION_STEP = 3;
-const INTRO_LAST_STEP = ORIENTATION_STEP;
+const INTRO_LAST_STEP = ASSISTANT_STEP;
 const INTRO_STEP_COUNT = INTRO_LAST_STEP + 1;
 
 let installed = false;
@@ -86,7 +95,7 @@ function setTourMode(active) {
 }
 
 function requestNativeNotifications() {
-  postNative({ type: 'requestNotifications' });
+  return postNative({ type: 'requestNotifications' });
 }
 
 function openNotificationSettings() {
@@ -99,8 +108,7 @@ function notificationState() {
 
 // The native shell reports permission results through window.marketelNativeNotificationState,
 // which core.js already owns. Wrap it once — at the moment the owner taps the button, so
-// core.js has definitely defined it — chaining the original and re-rendering the pill step
-// when the result arrives so its "Alerts on" state updates live.
+// core.js has definitely defined it — chaining the original, then reacting on the pill step.
 let notifStateWrapped = false;
 function wrapNotificationStateOnce() {
   if (notifStateWrapped) return;
@@ -110,14 +118,40 @@ function wrapNotificationStateOnce() {
     try {
       if (typeof prior === 'function') prior(state);
     } finally {
-      if (session && session.phase === 'intro' && session.step === PILL_STEP) render();
+      handlePillNotificationState(String(state || ''));
     }
   };
 }
 
+// A permission result landed. Reflect it on the pill step, and — if the owner just
+// asked to turn alerts on and they're authorized (including "already on") — advance
+// once, after a beat, so it never bounces back to this same page.
+function handlePillNotificationState(state) {
+  if (!session || session.phase !== 'intro' || session.step !== PILL_STEP) return;
+  const authorized = state === 'authorized';
+  const awaiting = session.awaitingAlerts === true;
+  render();
+  if (authorized && awaiting) {
+    session.awaitingAlerts = false;
+    window.setTimeout(() => {
+      if (session && session.phase === 'intro' && session.step === PILL_STEP) next();
+    }, 750);
+  } else if (!authorized) {
+    session.awaitingAlerts = false;
+  }
+}
+
 function enableLockScreenAlerts() {
+  if (!session) return;
   wrapNotificationStateOnce();
-  requestNativeNotifications();
+  session.awaitingAlerts = true;
+  const posted = requestNativeNotifications();
+  if (!posted) {
+    // Not inside the native shell (e.g. web preview): nothing will call back,
+    // so advance instead of stranding the owner on this step.
+    session.awaitingAlerts = false;
+    next();
+  }
 }
 
 function escapeHtml(value) {
@@ -852,12 +886,11 @@ function ensureStyles() {
     }
 
     .mno-la-mark {
-      width: 15px;
-      height: 15px;
+      width: 16px;
+      height: 17px;
       flex: 0 0 auto;
-      border-radius: 5px;
-      background: linear-gradient(145deg, var(--native-green-light), var(--native-green-dark));
-      box-shadow: inset 0 1px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(46, 125, 91, 0.35);
+      display: block;
+      object-fit: contain;
     }
 
     .mno-la-badge {
@@ -1089,6 +1122,16 @@ function ensureStyles() {
       box-shadow: 0 3px 8px rgba(46, 125, 91, 0.18);
     }
 
+    .mno-coach-card--flat::after {
+      display: none;
+    }
+
+    /* The Front Desk activity pill sits at the top of Bookings; keep it out of
+       the dimmed area behind the coach card while the walkthrough is open. */
+    html.marketel-native-tour-open .fda-native-result {
+      display: none !important;
+    }
+
     .mno-coach-actions {
       display: grid;
       grid-template-columns: 82px minmax(0, 1fr);
@@ -1206,7 +1249,7 @@ function pillStageHtml() {
         <div class="mno-ls-time">9:41</div>
         <div class="mno-la">
           <div class="mno-la-head">
-            <span class="mno-la-brand"><span class="mno-la-mark"></span>Front Desk</span>
+            <span class="mno-la-brand"><img class="mno-la-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</span>
             <span class="mno-la-badge${authorized ? ' is-live' : ''}">${badge}</span>
           </div>
           <div class="mno-la-guest">Jordan M.<i>·</i>Queen Suite</div>
@@ -1297,26 +1340,7 @@ function introStageHtml(step) {
       </div>`;
   }
 
-  return `
-    <div class="mno-stage">
-      <div class="mno-kicker">The essentials</div>
-      <h1 class="mno-title">Four places. No maze.</h1>
-      <p class="mno-copy">One owner app: Marketel Front Desk. Your guests use Guestel, so the owner tools and guest experience never get mixed together.</p>
-      <div class="mno-ready-list">
-        <div class="mno-ready-item" style="--i:0">
-          <div class="mno-ready-number">01</div>
-          <div><strong>Shape the page</strong><span>Rooms, photos, rates and guest-facing details.</span></div>
-        </div>
-        <div class="mno-ready-item" style="--i:1">
-          <div class="mno-ready-number">02</div>
-          <div><strong>Run today</strong><span>Bookings and availability, without the clutter.</span></div>
-        </div>
-        <div class="mno-ready-item" style="--i:2">
-          <div class="mno-ready-number">03</div>
-          <div><strong>Bring guests back</strong><span>Share your Guestel QR so they can keep your property and book direct again.</span></div>
-        </div>
-      </div>
-    </div>`;
+  return '';
 }
 
 function introFooterHtml(step) {
@@ -1352,7 +1376,7 @@ function introFooterHtml(step) {
       <div class="mno-progress">${dots}</div>`;
   }
 
-  const label = step === ORIENTATION_STEP ? 'Show me around' : 'Continue';
+  const label = step === ASSISTANT_STEP ? 'Show me around' : 'Continue';
   return `
     <button class="mno-primary" type="button" data-mno-action="next">${label}</button>
     <div class="mno-progress">${dots}</div>`;
@@ -1385,12 +1409,13 @@ function renderOperationalTour() {
   const step = OPERATIONAL_STEPS[session.step] || OPERATIONAL_STEPS[0];
   setShellVisible(true);
   setTourMode(true);
-  selectOperationalTab(step.filter);
+  if (step.filter) selectOperationalTab(step.filter);
   const overlay = getOverlay();
+  const flat = !step.tabPosition;
   overlay.innerHTML = `
     <section class="mno-tour" role="dialog" aria-modal="true" aria-label="Front Desk walkthrough">
       <button class="mno-tour-skip" type="button" data-mno-action="skip">Skip tour</button>
-      <div class="mno-coach-card" style="--tab-x:${step.tabPosition}">
+      <div class="mno-coach-card${flat ? ' mno-coach-card--flat' : ''}" style="--tab-x:${step.tabPosition || '50%'}">
         <div class="mno-coach-top">
           <span class="mno-coach-eyebrow">${escapeHtml(step.eyebrow)}</span>
           <span class="mno-coach-count">${session.step + 1} of ${OPERATIONAL_STEPS.length}</span>
@@ -1500,6 +1525,16 @@ function cleanUp() {
   setShellVisible(true);
 }
 
+function openFrontDeskConfig() {
+  // Hand off to the real Front Desk screen — booking rule, who gets texts,
+  // check-in and alerts all live there. Prefer the native presentation (same
+  // order core.js uses), falling back to the web overlay.
+  if (postNative({ type: 'openAssistant' })) return;
+  try {
+    if (typeof window.openFrontDeskAssistant === 'function') window.openFrontDeskAssistant();
+  } catch (_) {}
+}
+
 function finish({ skipped = false } = {}) {
   try {
     localStorage.setItem(DONE_KEY, '1');
@@ -1509,8 +1544,11 @@ function finish({ skipped = false } = {}) {
   cleanUp();
   selectOperationalTab('bookings');
   requestNativeNotifications();
-  if (!skipped && typeof window.toast === 'function') {
-    window.toast('Front Desk is ready', 'success');
+  if (!skipped) {
+    // Let the overlay finish tearing down, then drop them into Front Desk to set
+    // their rules — the guided end the tour was building toward.
+    window.setTimeout(openFrontDeskConfig, 300);
+    if (typeof window.toast === 'function') window.toast('Front Desk is ready', 'success');
   }
 }
 

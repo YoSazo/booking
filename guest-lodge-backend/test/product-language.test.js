@@ -28,8 +28,8 @@ test('owner and guest products never collapse into ambiguous app language', () =
 
 test('core owner surfaces teach the permanent two-side vocabulary', () => {
     assert.match(productCopy, /Guests never download Front Desk/);
-    assert.match(productCopy, /One owner app: Marketel Front Desk/);
-    assert.match(productCopy, /Your guests use Guestel/);
+    assert.match(productCopy, /You run everything from Marketel Front Desk/);
+    assert.match(productCopy, /Marketel Front Desk remains your owner app/);
     assert.match(productCopy, /Guests book on .*direct page/);
     assert.match(productCopy, /keep your property in Guestel/i);
 });

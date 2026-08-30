@@ -33,6 +33,14 @@ enum BookingAPI {
         }
     }
 
+    // A returning-guest offer the property honors at the desk. Shown to guests
+    // who already stayed, as a lower "return rate" when they book direct again.
+    struct ReturnOffer: Codable, Hashable, Sendable {
+        let kind: String   // "percent" | "amount"
+        let value: Double
+        let label: String?
+    }
+
     struct HotelPublic: Codable, Sendable {
         let id: String
         let domain: String?
@@ -45,11 +53,21 @@ enum BookingAPI {
         let checkInTime: String?
         let checkOutTime: String?
         let cancellationPolicy: String?
+        let returnOffer: ReturnOffer?
         let subscribed: Bool?
         let rates: Rates?
         let rooms: [APIRoom]
         var walletImage: URL? {
             guestelWalletImageUrl.flatMap { URL(string: $0, relativeTo: BookingAPI.base)?.absoluteURL }
+        }
+        // The discounted nightly rate a returning guest sees, or nil when there
+        // is no live offer. Never returns below zero.
+        func returnRate(nightly: Double) -> Double? {
+            guard let offer = returnOffer, offer.value > 0, nightly > 0 else { return nil }
+            let discounted = offer.kind == "amount"
+                ? nightly - offer.value
+                : nightly * (1 - offer.value / 100)
+            return max(0, (discounted * 100).rounded() / 100)
         }
     }
 

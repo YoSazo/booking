@@ -27,6 +27,12 @@ struct RebookView: View {
         max(0, Calendar.current.dateComponents([.day], from: checkin, to: checkout).day ?? 0)
     }
 
+    // The returning-guest rate for this property, when the owner has a live offer.
+    private var returnNightly: Double? {
+        guard let rates = data?.rates else { return nil }
+        return data?.returnRate(nightly: rates.nightly)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -118,6 +124,9 @@ struct RebookView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 summaryCard
+                if let returnNightly, let rates = data?.rates {
+                    returnOfferBadge(returnNightly: returnNightly, normalNightly: rates.nightly)
+                }
                 priceCard
                 guestCard
                 if let errorMessage {
@@ -159,6 +168,26 @@ struct RebookView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func returnOfferBadge(returnNightly: Double, normalNightly: Double) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "sparkles").font(.system(size: 16)).foregroundStyle(Theme.green)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Returning-guest rate")
+                    .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.ink)
+                Text("$\(Int(returnNightly.rounded()))/night · normally $\(Int(normalNightly.rounded())) — applied at the desk")
+                    .font(.system(size: 12)).foregroundStyle(Theme.inkSoft)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Theme.green.opacity(0.25), lineWidth: 1)
+        )
     }
 
     @ViewBuilder private var priceCard: some View {
@@ -259,6 +288,8 @@ struct RebookView: View {
             "roomName": room.name, "roomId": room.roomId ?? "",
             "checkin": ci, "checkout": co, "nights": nights,
             "reservationCode": code, "adults": 1, "rooms": 1,
+            // Attribute the Guestel rebooking loop + record offer redemption.
+            "source": "rebook", "returnOfferApplied": returnNightly != nil,
         ]
 
         Task {

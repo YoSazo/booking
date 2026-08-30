@@ -30,6 +30,13 @@ model Booking {
   grandTotal            Float
   bookingType           String   @default("standard")
 
+  // Where the booking originated, for attributing the Guestel rebooking loop.
+  // guestel_native | app_clip | rebook | web | null (untagged/legacy).
+  source             String?
+  // The returning-guest offer was applied to this booking (owner honors the
+  // return rate at the desk). Counted as an offer redemption in Revenue.
+  returnOfferApplied Boolean  @default(false)
+
   // Fields for "Pay Later" bookings with pre-auth hold
   amountPaidNow     Float?    @default(0)
   preAuthHoldAmount Float?
@@ -417,6 +424,17 @@ model HotelConfig {
   checkOutTime          String? @default("11:00")
   cancellationPolicy    String?
   growthChecklist       Json? // owner self-reported "get found" steps: { gbp:{done,ts}, qr:{...}, textLink:{...} }
+
+  // Returning-guest offer. A repeat-book perk the owner honors at the desk
+  // (displayed return rate + a note on the reservation), shown on the Guestel
+  // wallet card and in the native rebook flow. One offer per property.
+  returnOfferEnabled Boolean @default(false)
+  returnOfferKind    String? @default("percent") // percent | amount
+  returnOfferValue   Float?  @default(0)
+  returnOfferLabel   String?
+  // Owner's real OTA commission %, so the Revenue tab's "fees avoided" figure
+  // is their number rather than a hard-coded guess.
+  otaCommissionRate  Float?  @default(0.15)
 
   // Owner approval: hold new bookings briefly so the owner can catch a room
   // they already sold on an OTA. Useless without push, so it stays off until
