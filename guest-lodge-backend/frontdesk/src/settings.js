@@ -933,21 +933,6 @@ async function loadEditRooms() {
         <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;padding:11px 13px;font-size:13px;color:var(--text);border:1.5px solid var(--border);border-radius:10px;background:var(--white);outline:none;font-family:inherit;">
         <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
       `, { open: !hotelRes?.cancellationPolicy, hint: hotelRes?.cancellationPolicy ? '' : 'Not set yet' })}
-      ${pageSectionHtml('Returning guests', `
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;line-height:1.5;">Give guests who already stayed a reason to book direct again. It shows on their Guestel card and in the app — you honor it at the desk.</p>
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-bottom:10px;font-weight:600;cursor:pointer;">
-          <input type="checkbox" id="edit-offer-enabled" ${hotelRes?.returnOfferEnabled ? 'checked' : ''} onchange="updateReturnOfferPreview()"> Offer a returning-guest discount
-        </label>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input type="number" min="0" id="edit-offer-value" value="${Number(hotelRes?.returnOfferValue) || 10}" oninput="updateReturnOfferPreview()" style="flex:1;padding:11px 13px;font-size:13px;border:1.5px solid var(--border);border-radius:10px;background:var(--white);outline:none;font-family:inherit;">
-          <select id="edit-offer-kind" onchange="updateReturnOfferPreview()" style="padding:11px 13px;font-size:13px;border:1.5px solid var(--border);border-radius:10px;background:var(--white);font-family:inherit;">
-            <option value="percent" ${hotelRes?.returnOfferKind !== 'amount' ? 'selected' : ''}>% off</option>
-            <option value="amount" ${hotelRes?.returnOfferKind === 'amount' ? 'selected' : ''}>$ off / night</option>
-          </select>
-        </div>
-        <div id="offerPreview" style="font-size:12px;color:var(--green);font-weight:700;min-height:16px;margin-bottom:10px;"></div>
-        <button onclick="saveReturnOffer()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Save</button>
-      `, { open: false, hint: hotelRes?.returnOfferEnabled ? `${hotelRes?.returnOfferKind === 'amount' ? '$' : ''}${Number(hotelRes?.returnOfferValue) || 0}${hotelRes?.returnOfferKind === 'amount' ? '/night' : '%'} off` : 'Off' })}
       ${pageSectionHtml('Your booking link', `
           <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
@@ -1398,36 +1383,6 @@ async function saveHotelInfo(source = 'header') {
     }
   } catch (e) {
     toast('Failed to save', 'error');
-  }
-}
-
-// Live preview of the returning-guest offer as the owner edits it.
-function updateReturnOfferPreview() {
-  const enabled = document.getElementById('edit-offer-enabled')?.checked;
-  const kind = document.getElementById('edit-offer-kind')?.value === 'amount' ? 'amount' : 'percent';
-  const value = Number(document.getElementById('edit-offer-value')?.value) || 0;
-  const el = document.getElementById('offerPreview');
-  if (!el) return;
-  if (!enabled || value <= 0) {
-    el.textContent = 'Guests see their normal rate.';
-    el.style.opacity = '0.6';
-    return;
-  }
-  el.style.opacity = '1';
-  el.textContent = kind === 'amount'
-    ? `Returning guests see $${value} off per night.`
-    : `Returning guests see ${value}% off the direct rate.`;
-}
-
-async function saveReturnOffer() {
-  const returnOfferEnabled = !!document.getElementById('edit-offer-enabled')?.checked;
-  const returnOfferKind = document.getElementById('edit-offer-kind')?.value === 'amount' ? 'amount' : 'percent';
-  const returnOfferValue = Number(document.getElementById('edit-offer-value')?.value) || 0;
-  try {
-    await api('POST', '/api/crm/hotel-info', { returnOfferEnabled, returnOfferKind, returnOfferValue });
-    toast(returnOfferEnabled ? 'Returning-guest offer saved!' : 'Offer turned off', 'success');
-  } catch (e) {
-    toast('Could not save offer', 'error');
   }
 }
 
@@ -2047,8 +2002,6 @@ const _settingsExports = {
   saveEditRoom,
   saveHotelInfo,
   saveRates,
-  saveReturnOffer,
-  updateReturnOfferPreview,
   scrollTourTargetIntoView,
   sendSupportMessage,
   setAppIconPreviewImage,

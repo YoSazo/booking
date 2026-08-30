@@ -1394,19 +1394,11 @@ function syncRevenueUi() {
                 <div class="revenue-value" id="revenueKpiBookings">0</div>
               </div>
             </div>
-            <div class="revenue-loop-grid">
-              <div class="revenue-card">
-                <div class="revenue-label">Repeat guests</div>
-                <div class="revenue-value" id="revenueKpiRepeat">0</div>
-              </div>
-              <div class="revenue-card">
-                <div class="revenue-label">Via Guestel</div>
-                <div class="revenue-value" id="revenueKpiGuestel">0</div>
-              </div>
-              <div class="revenue-card">
-                <div class="revenue-label">Offer redemptions</div>
-                <div class="revenue-value" id="revenueKpiOffers">0</div>
-              </div>
+            <div class="revenue-loop-card">
+              <div class="revenue-list-title">The Guestel loop</div>
+              <div class="revenue-loop-row"><span>Repeat guests</span><b id="revenueKpiRepeat">0</b></div>
+              <div class="revenue-loop-row"><span>Booked via Guestel</span><b id="revenueKpiGuestel">0</b></div>
+              <div class="revenue-loop-row"><span>Offer redemptions</span><b id="revenueKpiOffers">0</b></div>
             </div>
             <div class="revenue-bottom-grid">
               <div class="revenue-list-card">
@@ -2636,6 +2628,10 @@ async function startCrmApp(verification, options = {}) {
   crm.guestelWalletSubtitle = String(
     verification?.guestelWalletSubtitle || verification?.hotelAddress || crm.guestelWalletSubtitle || ''
   ).trim();
+  // Returning-guest offer lives on the guest-facing Guestel tab, so keep it on crm state.
+  crm.returnOfferEnabled = !!verification?.returnOfferEnabled;
+  crm.returnOfferKind = verification?.returnOfferKind === 'amount' ? 'amount' : 'percent';
+  crm.returnOfferValue = Number(verification?.returnOfferValue) || 0;
   if (crm.hotelSubscribed) {
     try {
       localStorage.removeItem('marketelValueRevealPendingV1');

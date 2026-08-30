@@ -399,6 +399,40 @@ async function saveGuestelWalletCard() {
   }
 }
 
+// Returning-guest offer lives here (guest-facing), edited from the Guestel tab.
+function updateReturnOfferPreview() {
+  const enabled = document.getElementById('edit-offer-enabled')?.checked;
+  const kind = document.getElementById('edit-offer-kind')?.value === 'amount' ? 'amount' : 'percent';
+  const value = Number(document.getElementById('edit-offer-value')?.value) || 0;
+  const el = document.getElementById('offerPreview');
+  if (!el) return;
+  if (!enabled || value <= 0) {
+    el.textContent = 'Guests see their normal rate.';
+    el.style.opacity = '0.6';
+    return;
+  }
+  el.style.opacity = '1';
+  el.textContent = kind === 'amount'
+    ? `Returning guests see $${value} off per night.`
+    : `Returning guests see ${value}% off the direct rate.`;
+}
+
+async function saveReturnOffer() {
+  const returnOfferEnabled = !!document.getElementById('edit-offer-enabled')?.checked;
+  const returnOfferKind = document.getElementById('edit-offer-kind')?.value === 'amount' ? 'amount' : 'percent';
+  const returnOfferValue = Number(document.getElementById('edit-offer-value')?.value) || 0;
+  try {
+    await api('POST', '/api/crm/hotel-info', { returnOfferEnabled, returnOfferKind, returnOfferValue });
+    // Keep crm in sync so the value survives tab switches / the apps re-render.
+    crm.returnOfferEnabled = returnOfferEnabled;
+    crm.returnOfferKind = returnOfferKind;
+    crm.returnOfferValue = returnOfferValue;
+    toast(returnOfferEnabled ? 'Returning-guest offer saved!' : 'Offer turned off', 'success');
+  } catch (e) {
+    toast('Could not save offer', 'error');
+  }
+}
+
 function guestelWalletDisplayImageUrl() {
   const roomFallback = (crm.editRooms || [])
     .flatMap((room) => Array.isArray(room?.images) ? room.images : [])
@@ -723,6 +757,13 @@ function renderAppsView() {
   const walletSubtitle = guestelWalletSubtitleValue();
   const walletImage = guestelWalletDisplayImageUrl();
   const walletHasCustomImage = !!String(crm.guestelWalletImageUrl || '').trim();
+  const offerValue = Number(crm.returnOfferValue) || 0;
+  const offerIsAmount = crm.returnOfferKind === 'amount';
+  const offerPreviewText = (crm.returnOfferEnabled && offerValue > 0)
+    ? (offerIsAmount
+        ? `Returning guests see $${offerValue} off per night.`
+        : `Returning guests see ${offerValue}% off the direct rate.`)
+    : 'Guests see their normal rate.';
   const nativeGuestShareHtml = `
     <div class="apps-step-card" id="tour-native-guest-share">
       <div class="apps-step-title">How guests keep you in Guestel</div>
@@ -747,6 +788,20 @@ function renderAppsView() {
         </div>
         <button type="button" class="guestel-wallet-save" id="guestelWalletSubtitleSave" onclick="saveGuestelWalletCard()">Save Guestel card</button>
       </div>
+      <div class="apps-section-divider">Returning-guest offer</div>
+      <p class="apps-card-help">Give guests who already stayed a reason to book direct again. It shows on their Guestel card — you honor it at the desk.</p>
+      <label class="apps-offer-toggle">
+        <input type="checkbox" id="edit-offer-enabled" ${crm.returnOfferEnabled ? 'checked' : ''} onchange="updateReturnOfferPreview()"> Offer a returning-guest discount
+      </label>
+      <div class="apps-offer-row">
+        <input type="number" min="0" inputmode="numeric" id="edit-offer-value" value="${offerValue || 10}" oninput="updateReturnOfferPreview()">
+        <select id="edit-offer-kind" onchange="updateReturnOfferPreview()">
+          <option value="percent" ${offerIsAmount ? '' : 'selected'}>% off</option>
+          <option value="amount" ${offerIsAmount ? 'selected' : ''}>$ off / night</option>
+        </select>
+      </div>
+      <div id="offerPreview" class="apps-offer-preview">${offerPreviewText}</div>
+      <button type="button" class="guestel-wallet-save" onclick="saveReturnOffer()">Save offer</button>
       <div class="apps-section-divider">Invite a guest</div>
       <div style="margin:0 0 14px;padding:11px 12px;border-radius:11px;background:var(--green-pale);color:#245a40;font-size:12px;line-height:1.5;"><strong>What to say:</strong> “Scan this to book directly and keep us in Guestel.”</div>
       <button type="button" onclick="showCheckinQrOverlay()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;border-radius:12px;border:none;background:var(--green);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;"><i data-lucide="qr-code" style="width:18px;height:18px;"></i>Show Guestel QR</button>
@@ -793,6 +848,11 @@ function renderAppsView() {
     .apps-native-title { font-size:24px;font-weight:800;color:var(--text);line-height:1.2;margin:2px 0 7px; }
     .apps-native-lead { margin:0 0 16px;color:var(--text-muted);font-size:14px;line-height:1.5; }
     .apps-card-help { margin:5px 0 14px;color:var(--text-muted);font-size:12px;line-height:1.5; }
+    .apps-offer-toggle { display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text);margin:2px 0 10px;cursor:pointer; }
+    .apps-offer-row { display:flex;gap:8px;margin-bottom:8px; }
+    .apps-offer-row input { flex:0 0 92px;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;outline:none;font-family:inherit; }
+    .apps-offer-row select { flex:1;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;font-family:inherit; }
+    .apps-offer-preview { font-size:12px;color:var(--green);font-weight:700;min-height:16px;margin-bottom:10px; }
     .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px; }
     .guestel-wallet-card { position:relative;aspect-ratio:1.6/1;overflow:hidden;border:1px solid rgba(34,75,52,.16);border-radius:19px;background:linear-gradient(145deg,#4e9a72,#235f46);box-shadow:0 12px 30px rgba(22,55,36,.11); }
     .guestel-wallet-card::after { content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.43),rgba(0,0,0,.02) 62%);pointer-events:none; }
@@ -1067,7 +1127,9 @@ const _appsExports = {
   resetGuestelWalletImage,
   saveBookingReviewReminderSetting,
   saveGuestelWalletCard,
+  saveReturnOffer,
   startAppsTour,
+  updateReturnOfferPreview,
   updateGuestelWalletPreview,
   uploadGuestelWalletImage,
 };

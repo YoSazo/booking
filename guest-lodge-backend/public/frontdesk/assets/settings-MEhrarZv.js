@@ -923,7 +923,6 @@ lucide.createIcons({icons});\``);if(typeof document>"u")throw new Error("`create
       </div>
       <div class="dash-b">
       ${goLiveInlineCardHtml()}
-
       ${(typeof twoRoomExplainerHtml=="function"?twoRoomExplainerHtml:window.twoRoomExplainerHtml)("booking-page")}
       <div id="editRoomsCards"></div>
       <button id="edit-add-room-btn" style="width:100%; padding:14px; border-radius:14px; border:1.5px dashed var(--border); background:none; font-family:inherit; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; margin-top:8px; margin-bottom:14px;" onclick="openEditAddRoom()">+ Add booking page room</button>

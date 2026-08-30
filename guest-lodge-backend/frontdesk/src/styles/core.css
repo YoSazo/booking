@@ -2038,15 +2038,36 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
-    /* The Guestel-loop cuts: repeat guests, via Guestel, offer redemptions. */
-    .revenue-loop-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
+    /* The Guestel-loop cuts, grouped as clean rows so labels never cramp. */
+    .revenue-loop-card {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
       margin-top: 12px;
     }
-    .revenue-loop-grid .revenue-value {
+    .revenue-loop-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+    .revenue-loop-row:first-of-type {
+      margin-top: 4px;
+    }
+    .revenue-loop-row span {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .revenue-loop-row b {
       font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
     }
     .revenue-card,
     .revenue-list-card {
