@@ -94,6 +94,7 @@ final class GuestStore {
     var conversations: [BookingAPI.ConversationPreview] = []
     var arrival: GuestelArrival? = nil
     private var refreshingHotels = false
+    private var hiddenHotelIDs: Set<String>
 
     var guestName: String { guest.name.isEmpty ? "Guest" : guest.name }
     var unreadMessageCount: Int { conversations.reduce(0) { $0 + $1.unreadCount } }
@@ -102,12 +103,16 @@ final class GuestStore {
     private static let guestKey = "guestel.guest.v1"
     private static let hotelsKey = "guestel.hotels.v1"
     private static let hotelDetailsKey = "guestel.hotel-details.v1"
+    private static let hiddenHotelsKey = "guestel.hidden-hotels.v1"
 
     init(hotels: [Hotel]? = nil) {
         self.hotels = hotels ?? GuestStore.loadHotels()
         self.reservations = GuestStore.loadReservations()
         self.guest = GuestStore.loadGuest()
         self.hotelDetails = GuestStore.loadHotelDetails()
+        let hiddenHotelIDs = GuestStore.loadHiddenHotelIDs()
+        self.hiddenHotelIDs = hiddenHotelIDs
+        self.hotels.removeAll { hiddenHotelIDs.contains($0.hotelId) }
         for data in hotelDetails.values { ImagePrefetch.warm(data: data) }
     }
 
@@ -128,11 +133,13 @@ final class GuestStore {
         reservations = []
         guest = GuestInfo()
         hotelDetails = [:]
+        hiddenHotelIDs = []
         conversations = []
         UserDefaults.standard.removeObject(forKey: Self.hotelsKey)
         UserDefaults.standard.removeObject(forKey: Self.reservationsKey)
         UserDefaults.standard.removeObject(forKey: Self.guestKey)
         UserDefaults.standard.removeObject(forKey: Self.hotelDetailsKey)
+        UserDefaults.standard.removeObject(forKey: Self.hiddenHotelsKey)
         GuestIdentityAccess.clear()
         GuestPaymentAccess.clear()
     }
@@ -195,9 +202,33 @@ final class GuestStore {
     }
 
     func add(_ hotel: Hotel) {
+        hiddenHotelIDs.remove(hotel.hotelId)
+        persistHiddenHotelIDs()
+        upsert(hotel)
+    }
+
+    private func upsert(_ hotel: Hotel) {
         hotels.removeAll { $0.hotelId == hotel.hotelId || $0.domain == hotel.domain }
         hotels.insert(hotel, at: 0)
         persistHotels()
+    }
+
+    @MainActor
+    func remove(_ hotel: Hotel) {
+        hiddenHotelIDs.insert(hotel.hotelId)
+        hotels.removeAll { $0.hotelId == hotel.hotelId || (!$0.domain.isEmpty && $0.domain == hotel.domain) }
+        hotelDetails.removeValue(forKey: hotel.hotelId)
+        persistHotels()
+        persistHotelDetails()
+        persistHiddenHotelIDs()
+    }
+
+    @MainActor
+    private func removeMissingHotel(_ hotelId: String) {
+        hotels.removeAll { $0.hotelId == hotelId }
+        hotelDetails.removeValue(forKey: hotelId)
+        persistHotels()
+        persistHotelDetails()
     }
 
     func details(for hotelId: String) -> BookingAPI.HotelPublic? {
@@ -207,9 +238,7 @@ final class GuestStore {
     @MainActor
     func cacheHotelDetails(_ data: BookingAPI.HotelPublic) {
         hotelDetails[data.id] = data
-        if let encoded = try? JSONEncoder().encode(hotelDetails) {
-            UserDefaults.standard.set(encoded, forKey: Self.hotelDetailsKey)
-        }
+        persistHotelDetails()
         ImagePrefetch.warm(data: data)
     }
 
@@ -221,11 +250,23 @@ final class GuestStore {
         refreshingHotels = true
         defer { refreshingHotels = false }
         let identifiers = hotels.map(\.hotelId)
-        await withTaskGroup(of: BookingAPI.HotelPublic?.self) { group in
+        await withTaskGroup(of: (String, BookingAPI.HotelPublic?, Bool).self) { group in
             for hotelId in identifiers {
-                group.addTask { try? await BookingAPI.hotel(hotelId) }
+                group.addTask {
+                    do {
+                        return (hotelId, try await BookingAPI.hotel(hotelId), false)
+                    } catch let failure as BookingAPI.Failure {
+                        return (hotelId, nil, failure.isNotFound)
+                    } catch {
+                        return (hotelId, nil, false)
+                    }
+                }
             }
-            for await result in group {
+            for await (hotelId, result, isMissing) in group {
+                if isMissing {
+                    removeMissingHotel(hotelId)
+                    continue
+                }
                 guard let data = result,
                       let index = hotels.firstIndex(where: { $0.hotelId == data.id }) else { continue }
                 cacheHotelDetails(data)
@@ -245,8 +286,7 @@ final class GuestStore {
             let wallet = try await BookingAPI.wallet(identityToken: token)
             apply(wallet)
         } catch {
-            if case BookingAPI.Failure.message(let message) = error,
-               message.localizedCaseInsensitiveContains("sign in") {
+            if error.localizedDescription.localizedCaseInsensitiveContains("sign in") {
                 GuestIdentityAccess.clear()
             }
         }
@@ -280,7 +320,8 @@ final class GuestStore {
     private func apply(_ wallet: BookingAPI.WalletResponse) {
         saveGuest(GuestInfo(name: wallet.guest.name, email: wallet.guest.email, phone: wallet.guest.phone))
         for remote in wallet.hotels {
-            add(Hotel(
+            guard !hiddenHotelIDs.contains(remote.hotelId) else { continue }
+            upsert(Hotel(
                 hotelId: remote.hotelId,
                 domain: remote.domain,
                 name: remote.name,
@@ -409,6 +450,20 @@ final class GuestStore {
         if let data = try? JSONEncoder().encode(hotels) {
             UserDefaults.standard.set(data, forKey: Self.hotelsKey)
         }
+    }
+
+    private func persistHotelDetails() {
+        if let data = try? JSONEncoder().encode(hotelDetails) {
+            UserDefaults.standard.set(data, forKey: Self.hotelDetailsKey)
+        }
+    }
+
+    private func persistHiddenHotelIDs() {
+        UserDefaults.standard.set(Array(hiddenHotelIDs), forKey: Self.hiddenHotelsKey)
+    }
+
+    private static func loadHiddenHotelIDs() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: hiddenHotelsKey) ?? [])
     }
 
     private static func loadHotels() -> [Hotel] {

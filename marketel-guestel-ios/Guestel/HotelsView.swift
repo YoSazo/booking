@@ -11,6 +11,7 @@ struct HotelsView: View {
     @State private var info = Info()
     @State private var sheetDetent: PresentationDetent = .large
     @State private var showingAdd = false
+    @State private var pendingHotelRemoval: Hotel?
 
     private let cardHeight: CGFloat = 220
     private let overlap: CGFloat = 150
@@ -137,6 +138,22 @@ struct HotelsView: View {
         }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { info.containerSize = $0 }
         .onGeometryChange(for: EdgeInsets.self) { $0.safeAreaInsets } action: { info.safeArea = $0 }
+        .alert("Remove this hotel?", isPresented: Binding(
+            get: { pendingHotelRemoval != nil },
+            set: { if !$0 { pendingHotelRemoval = nil } }
+        )) {
+            Button("Remove Hotel", role: .destructive) {
+                guard let hotel = pendingHotelRemoval else { return }
+                pendingHotelRemoval = nil
+                withAnimation(animation) {
+                    if selectedHotel?.id == hotel.id { selectedHotel = nil }
+                    store.remove(hotel)
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingHotelRemoval = nil }
+        } message: {
+            Text("This removes the hotel from Guestel on this iPhone. It does not cancel any reservation.")
+        }
     }
 
     @ViewBuilder
@@ -163,6 +180,14 @@ struct HotelsView: View {
                     .offset(y: isSelected ? pushOffset : 0)
             }
             .allowsHitTesting(isSelected ? isCurrent : true)
+            .contextMenu {
+                Button(role: .destructive) {
+                    pendingHotelRemoval = hotel
+                } label: {
+                    Label("Remove Hotel", systemImage: "trash")
+                }
+            }
+            .accessibilityHint("Opens the hotel. Touch and hold to remove it from Guestel.")
     }
 
     private var isSelected: Bool { selectedHotel != nil }

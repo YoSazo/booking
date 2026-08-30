@@ -1162,11 +1162,43 @@ const AMENITY_PRESETS = [
 ];
 
 let amenityPickerRoomId = null;
+let amenityPickerCustomValues = [];
+
+function amenityHtmlEscape(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function amenityPresetFor(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return AMENITY_PRESETS.find((preset) => (
+    normalized === preset.label.toLowerCase()
+    || normalized === preset.key
+    || normalized.includes(preset.key)
+  ));
+}
+
+function renderAmenityCustomPills() {
+  const host = document.getElementById('amenityCustomPills');
+  if (!host) return;
+  host.innerHTML = amenityPickerCustomValues.map((value, index) => `
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:8px;background:#E8F5EE;color:#2E7D5B;font-size:13px;font-weight:650;">
+      ${amenityHtmlEscape(value)}
+      <button type="button" onclick="removeCustomAmenity(${index})" aria-label="Remove ${amenityHtmlEscape(value)}" style="width:20px;height:20px;border:0;background:transparent;color:inherit;font:700 17px/1 system-ui;cursor:pointer;padding:0;">×</button>
+    </span>`).join('');
+  host.hidden = amenityPickerCustomValues.length === 0;
+}
 
 function openAmenityPicker(roomId) {
   amenityPickerRoomId = roomId;
   const room = crm.editRooms.find(r => r.id === roomId);
-  const current = (room?.amenities || '').split('•').map(a => a.trim().toLowerCase()).filter(Boolean);
+  const currentValues = (room?.amenities || '').split('•').map(a => a.trim()).filter(Boolean);
+  const current = currentValues.map((value) => value.toLowerCase());
+  amenityPickerCustomValues = currentValues.filter((value) => !amenityPresetFor(value));
   
   let modal = document.getElementById('amenityPickerModal');
   if (!modal) {
@@ -1175,9 +1207,8 @@ function openAmenityPicker(roomId) {
         <div style="background:white;border-radius:16px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
           <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Select Amenities</div>
           <div id="amenityPickerGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
-          <div style="margin-bottom:14px;">
-            <input type="text" id="amenityCustomInput" placeholder="Or type a custom one..." style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:14px;outline:none;">
-          </div>
+          <div id="amenityCustomPills" style="display:flex;flex-wrap:wrap;gap:7px;margin:0 0 10px;"></div>
+          <button type="button" onclick="openCustomAmenityModal()" style="width:100%;margin-bottom:14px;padding:10px 12px;border:1.5px dashed #cbd5d0;border-radius:9px;background:#f8faf9;color:#2E7D5B;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Custom amenity</button>
           <div style="display:flex;gap:8px;">
             <button onclick="confirmAmenityPicker()" style="flex:1;padding:11px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
             <button onclick="closeAmenityPicker()" style="padding:11px 18px;border-radius:10px;border:1.5px solid #e5e7eb;background:none;font-family:inherit;font-size:14px;color:#6b7280;cursor:pointer;">Cancel</button>
@@ -1201,7 +1232,7 @@ function openAmenityPicker(roomId) {
     return `<button onclick="toggleAmenityPreset(this,'${p.key}')" data-key="${p.key}" style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:8px;border:1.5px solid ${isSelected ? '#2E7D5B' : '#e5e7eb'};background:${isSelected ? '#E8F5EE' : 'white'};color:${isSelected ? '#2E7D5B' : '#1a1a2e'};font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;"><i data-lucide="${p.icon}" style="width:14px;height:14px;"></i> ${p.label}</button>`;
   }).join('');
   
-  document.getElementById('amenityCustomInput').value = '';
+  renderAmenityCustomPills();
   modal.style.display = 'flex';
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
@@ -1214,8 +1245,74 @@ function toggleAmenityPreset(btn, key) {
 }
 
 function closeAmenityPicker() {
+  closeCustomAmenityModal();
   document.getElementById('amenityPickerModal').style.display = 'none';
   amenityPickerRoomId = null;
+  amenityPickerCustomValues = [];
+}
+
+function positionCustomAmenityModal() {
+  const modal = document.getElementById('amenityCustomModal');
+  if (!modal || modal.style.display === 'none') return;
+  const viewport = window.visualViewport;
+  modal.style.top = `${Math.round(viewport?.offsetTop || 0)}px`;
+  modal.style.height = `${Math.round(viewport?.height || window.innerHeight)}px`;
+}
+
+function ensureCustomAmenityModal() {
+  let modal = document.getElementById('amenityCustomModal');
+  if (modal) return modal;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="amenityCustomModal" data-marketel-keyboard-surface style="display:none;position:fixed;left:0;right:0;top:0;height:100vh;background:rgba(0,0,0,0.42);z-index:10020;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
+      <div style="width:100%;max-width:340px;padding:20px;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.22);" onclick="event.stopPropagation()">
+        <div style="font-size:16px;font-weight:750;color:#1a1a2e;margin-bottom:12px;">Custom amenity</div>
+        <input type="text" id="amenityCustomInput" maxlength="60" enterkeyhint="done" autocomplete="off" placeholder="e.g. EV charger" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #d9dfdc;border-radius:10px;font-family:inherit;font-size:16px;outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmCustomAmenity();}">
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button type="button" onclick="closeCustomAmenityModal()" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid #e5e7eb;background:white;color:#6b7280;font-family:inherit;font-size:14px;font-weight:700;">Cancel</button>
+          <button type="button" onclick="confirmCustomAmenity()" style="flex:1;padding:11px;border-radius:10px;border:0;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;">Add</button>
+        </div>
+      </div>
+    </div>`);
+  modal = document.getElementById('amenityCustomModal');
+  modal.addEventListener('click', closeCustomAmenityModal);
+  if (window.visualViewport && modal.dataset.viewportBound !== '1') {
+    modal.dataset.viewportBound = '1';
+    window.visualViewport.addEventListener('resize', positionCustomAmenityModal);
+    window.visualViewport.addEventListener('scroll', positionCustomAmenityModal);
+  }
+  return modal;
+}
+
+function openCustomAmenityModal() {
+  const modal = ensureCustomAmenityModal();
+  const input = document.getElementById('amenityCustomInput');
+  if (input) input.value = '';
+  modal.style.display = 'flex';
+  positionCustomAmenityModal();
+  requestAnimationFrame(() => input?.focus({ preventScroll: true }));
+}
+
+function closeCustomAmenityModal() {
+  const modal = document.getElementById('amenityCustomModal');
+  if (!modal) return;
+  document.getElementById('amenityCustomInput')?.blur();
+  modal.style.display = 'none';
+}
+
+function confirmCustomAmenity() {
+  const input = document.getElementById('amenityCustomInput');
+  const custom = String(input?.value || '').replace(/\s+/g, ' ').trim();
+  if (!custom) return;
+  if (!amenityPickerCustomValues.some((value) => value.toLowerCase() === custom.toLowerCase())) {
+    amenityPickerCustomValues.push(custom);
+  }
+  closeCustomAmenityModal();
+  renderAmenityCustomPills();
+}
+
+function removeCustomAmenity(index) {
+  amenityPickerCustomValues.splice(Number(index), 1);
+  renderAmenityCustomPills();
 }
 
 function confirmAmenityPicker() {
@@ -1231,8 +1328,7 @@ function confirmAmenityPicker() {
     }
   });
 
-  const custom = document.getElementById('amenityCustomInput').value.trim();
-  if (custom) selected.push(custom);
+  selected.push(...amenityPickerCustomValues);
 
   room.amenities = selected.join(' • ');
   closeAmenityPicker();
@@ -1867,8 +1963,10 @@ const _settingsExports = {
   cleanupSettingsTourUi,
   cancelAccountDeletion,
   closeAmenityPicker,
+  closeCustomAmenityModal,
   closeEditAddRoom,
   confirmAmenityPicker,
+  confirmCustomAmenity,
   confirmEditAddRoom,
   copyBookingLink,
   copyBookingLinkFromChecklist,
@@ -1886,6 +1984,7 @@ const _settingsExports = {
   loadEditRooms,
   loadSettings,
   openAmenityPicker,
+  openCustomAmenityModal,
   openBillingPortal,
   openEditAddRoom,
   openGuestBookingEngine,
@@ -1895,6 +1994,7 @@ const _settingsExports = {
   queryTourSelector,
   requestAccountDeletion,
   removeAmenity,
+  removeCustomAmenity,
   renderEditRooms,
   renderEditRoomsCards,
   refreshEditRoomsData,

@@ -106,7 +106,7 @@ struct HotelSheet: View {
                 .buttonStyle(GuestelPressButtonStyle())
             HStack(spacing: 12) {
                 Button { messageStay = currentStay } label: {
-                    secondaryLabel(currentStay == nil ? "After booking" : "Message", currentStay == nil ? "lock.fill" : "bubble.left")
+                    secondaryLabel("Message hotel", "bubble.left")
                 }
                 .disabled(currentStay == nil)
                 .opacity(currentStay == nil ? 0.58 : 1)
@@ -119,7 +119,7 @@ struct HotelSheet: View {
             }
 
             if currentStay == nil {
-                Text("Messaging opens after your first booking, so the conversation stays securely attached to your stay.")
+                Text("Message \(hotel.name) after your first booking. The conversation stays securely attached to your stay.")
                     .font(.system(size: 12))
                     .foregroundStyle(Theme.inkSoft)
                     .frame(maxWidth: .infinity, alignment: .leading)

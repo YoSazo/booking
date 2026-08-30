@@ -1159,6 +1159,7 @@ function applyHotelContextData(data = {}) {
   crm.activeHotelName = String(config.name || data.hotelId || '').trim();
   crm.activeHotelAppIcon = String(config.appIconUrl || '').trim();
   crm.guestelWalletImageUrl = String(config.guestelWalletImageUrl || '').trim();
+  crm.guestelWalletFallbackImageUrl = String(config.guestelWalletFallbackImageUrl || '').trim();
   crm.guestelWalletSubtitle = String(config.guestelWalletSubtitle || '').trim();
   const nativeStoredProperty = isNativeFrontdeskApp()
     ? getNativeProperties().find(property => property.id === crm.activeHotelId)
@@ -2016,7 +2017,10 @@ function ensureGrowthStyles() {
     .subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ea580c;color:#fff;font-size:11px;font-weight:800;line-height:1;}
     .growth-wrap{padding:2px 0 8px;animation:growthFade .2s ease;}
     @keyframes growthFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-    .growth-card{background:#fff;border:1.5px solid #e6e9e7;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,0.045);}
+    .growth-card{position:relative;background:#fff;border:1.5px solid #e6e9e7;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,0.045);}
+    .growth-card-close{position:absolute;top:9px;right:9px;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#758078;font:700 22px/1 system-ui;cursor:pointer;}
+    .growth-card-close:hover{background:#f0f4f1;color:#26372e;}
+    .growth-card-dismissible .growth-card-title{padding-right:34px;}
     .growth-card-title{font-size:15px;font-weight:800;color:#1a1a2e;margin:0 0 2px;}
     .growth-card-sub{font-size:12.5px;color:#6b7280;line-height:1.5;margin:0 0 14px;}
     .growth-period{display:inline-flex;gap:3px;background:#f1f5f3;border-radius:9px;padding:3px;margin-bottom:16px;}
@@ -2183,6 +2187,22 @@ function growthCheckDone(key) {
   return !!(crm.growthChecklist && crm.growthChecklist[key] && crm.growthChecklist[key].done);
 }
 
+function growthDiscoveryCardDismissed() {
+  if (!crm.activeHotelId) return false;
+  try {
+    return localStorage.getItem(`marketelGrowthDiscoveryDismissed:${crm.activeHotelId}`) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+function dismissGrowthDiscoveryCard() {
+  if (crm.activeHotelId) {
+    try { localStorage.setItem(`marketelGrowthDiscoveryDismissed:${crm.activeHotelId}`, '1'); } catch (_) {}
+  }
+  renderGrowthPanel();
+}
+
 function renderGrowthPanel() {
   ensureGrowthStyles();
   const targets = [document.getElementById('yourPageGrowthPanel')].filter(Boolean);
@@ -2252,8 +2272,9 @@ function renderGrowthPanel() {
   const qrStep = step('qr', '', 'Share a QR at check-in', 'Guests can scan it to save your property and book direct next time. Print it or show it during check-in.', qrBtn);
   const textStep = step('textLink', '', 'Text it to past guests', 'Repeat guests are your cheapest bookings. Text them your link so they skip Booking.com next time.', textBtn);
 
-  const checklistCard = `
-    <div class="growth-card">
+  const checklistCard = growthDiscoveryCardDismissed() ? '' : `
+    <div class="growth-card growth-card-dismissible">
+      <button type="button" class="growth-card-close" onclick="dismissGrowthDiscoveryCard()" aria-label="Dismiss Get found tips">×</button>
       <div class="growth-card-title">Get found — put your link where guests already are</div>
       <div class="growth-card-sub">A booking page only works if people see it. These are the highest-value places to put your link — no ads required.</div>
       ${gbpStep}${qrStep}${textStep}
@@ -2584,6 +2605,9 @@ async function startCrmApp(verification, options = {}) {
   crm.frontdeskAppStoreUrl = String(verification?.frontdeskAppStoreUrl || '').trim();
   crm.guestelWalletImageUrl = String(
     verification?.guestelWalletImageUrl || crm.guestelWalletImageUrl || ''
+  ).trim();
+  crm.guestelWalletFallbackImageUrl = String(
+    verification?.guestelWalletFallbackImageUrl || crm.guestelWalletFallbackImageUrl || ''
   ).trim();
   crm.guestelWalletSubtitle = String(
     verification?.guestelWalletSubtitle || verification?.hotelAddress || crm.guestelWalletSubtitle || ''
@@ -3891,11 +3915,38 @@ function bookingCardHtml(b) {
             ? `<button class="btn btn-note" type="button" style="color:#b91c1c;" onclick="decideBookingFromCard('${b.id}', 'release')">No, release</button>`
             : `<button class="${noteBtnClass}" onclick="addNote('${b.id}', ${esc(JSON.stringify(b.notes || ''))})">${b.notes ? 'Edit note' : 'Add note'}</button>`}
         </div>
-        ${isDeclined || isPendingApproval ? '' : `<div style="margin-top:8px;text-align:right;">
+        ${isDeclined ? `<div style="margin-top:8px;text-align:right;">
+          <button type="button" onclick="dismissDeclinedLead('${b.id}', ${esc(JSON.stringify(guestLabel))})" style="padding:6px 10px;border-radius:8px;border:none;background:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Remove from Bookings</button>
+        </div>` : (isPendingApproval ? '' : `<div style="margin-top:8px;text-align:right;">
           <button type="button" onclick="promptCancelBooking('${b.id}', ${esc(JSON.stringify(guestLabel))})" style="padding:6px 10px;border-radius:8px;border:none;background:none;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">Cancel this booking</button>
-        </div>`}
+        </div>`)}
       </div>
     </article>`;
+}
+
+async function dismissDeclinedLead(id, guestLabel) {
+  const label = String(guestLabel || 'this guest');
+  if (!window.confirm(`Remove the declined card attempt for ${label} from Bookings?`)) return;
+  const card = document.getElementById(`booking-card-${id}`);
+  if (card) {
+    card.style.pointerEvents = 'none';
+    card.style.opacity = '0.55';
+  }
+  try {
+    const result = await api('PATCH', `/api/crm/payment-declined/${encodeURIComponent(id)}`, { called: true });
+    if (!result?.success) throw new Error(result?.message || 'Could not remove this card attempt.');
+    crm.bookings = crm.bookings.filter((booking) => String(booking.id) !== String(id));
+    expandedBookingCards.delete(String(id));
+    renderBookings();
+    refreshRoomBadge();
+    toast('Removed from Bookings', 'success');
+  } catch (error) {
+    if (card) {
+      card.style.pointerEvents = '';
+      card.style.opacity = '';
+    }
+    toast(error?.message || 'Could not remove this card attempt.', 'error');
+  }
 }
 
 function ensureBookingsVirtualScroll() {
@@ -4388,13 +4439,6 @@ function guestBroadcastCardHtml(options = {}) {
   // Property branding belongs in the notification title and Guestel card;
   // pretending iOS swaps the app icon per hotel makes this preview dishonest.
   const appIcon = `<img src="${esc(guestelAppIconUrl)}" alt="Guestel">`;
-  const demoItems = JSON.stringify([{
-    type: 'video',
-    src: GUEST_BROADCAST_DEMO_VIDEO,
-    alt: 'Guest receives a property notification',
-    title: 'A message arriving on a guest phone',
-    caption: 'You send it once from Front Desk. Every guest with notifications on receives it on their phone.',
-  }]).replace(/"/g, '&quot;');
   return `<div id="guestBroadcastCard" class="apps-broadcast-card guest-reach-card" data-compact="${compact ? 'true' : 'false'}">
     <div id="tour-guest-reach" class="guest-reach-intro">
       <div class="guest-reach-kicker">Guestel notifications</div>
@@ -4425,7 +4469,6 @@ function guestBroadcastCardHtml(options = {}) {
     </div>
     <button id="guest-broadcast-btn" type="button" onclick="sendGuestBroadcast()" disabled style="width:100%;padding:12px;border-radius:10px;border:none;background:#c5d5cc;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:not-allowed;">No guests to notify yet</button>
     <p id="guest-broadcast-result" style="font-size:12px;color:var(--green);margin:8px 0 0;text-align:center;font-weight:600;"></p>
-    <button type="button" class="guest-reach-video" onclick="appsOpenLightbox(${demoItems},0)"><span aria-hidden="true"><i data-lucide="play" style="width:15px;height:15px;"></i></span> Watch a real notification arrive</button>
   </div>`;
 }
 
@@ -4836,6 +4879,10 @@ function openAvailabilityDayPopover(event, dayIso) {
   title.textContent = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   countEl.textContent = String(result.status === 'closed' ? result.baseUnits : result.value);
   if (closedInput) closedInput.checked = result.status === 'closed';
+  crm.availabilityDayOriginal = {
+    closed: result.status === 'closed',
+    availableUnits: result.status === 'closed' ? null : Number(result.value),
+  };
 
   // Sync toggle visual state
   const isClosed = result.status === 'closed';
@@ -4912,6 +4959,7 @@ function setAvailabilityDaySaving(saving) {
 function closeAvailabilityDayPopover() {
   if (crm.availabilityDaySaving) return;
   crm.availabilityEditingDay = '';
+  crm.availabilityDayOriginal = null;
   setAvailabilityDaySaving(false);
   const backdrop = document.getElementById('availabilitySheetBackdrop');
   const pop = document.getElementById('availabilityDayPopover');
@@ -4978,6 +5026,15 @@ async function saveAvailabilityDay() {
   };
   if (!closedInput.checked) {
     payload.availableUnits = Math.max(0, parseInt(countEl.textContent, 10) || 0);
+  }
+
+  const original = crm.availabilityDayOriginal;
+  const unchanged = !!original
+    && original.closed === payload.closed
+    && (payload.closed || Number(original.availableUnits) === Number(payload.availableUnits));
+  if (unchanged) {
+    closeAvailabilityDayPopover();
+    return;
   }
 
   setAvailabilityDaySaving(true);
@@ -6440,6 +6497,8 @@ exposeToWindow({
   bootCrmApp,
   conflictBannerHtml,
   decideBookingFromCard,
+  dismissDeclinedLead,
+  dismissGrowthDiscoveryCard,
   loadBookingConflicts,
   loadOperationalReadiness,
   maybeShowBookingApprovalCard,

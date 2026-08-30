@@ -13500,7 +13500,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
             }
         }
 
-        if (!hotel) return res.status(404).json({ error: 'Hotel not found' });
+        if (!hotel || hotel.active === false) return res.status(404).json({ error: 'Hotel not found' });
 
         // Build absolute image URLs
         const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -13574,6 +13574,17 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 subscribed: true,
                 setupToken: true,
                 ownerEmail: true,
+                rooms: {
+                    orderBy: { sortOrder: 'asc' },
+                    take: 1,
+                    select: {
+                        images: {
+                            orderBy: { sortOrder: 'asc' },
+                            take: 1,
+                            select: { url: true },
+                        },
+                    },
+                },
             },
         })
             .catch(error => {
@@ -13618,6 +13629,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             theme: dbHotel?.theme || 'light',
             appIconUrl: dbHotel?.appIconUrl || '',
             guestelWalletImageUrl: dbHotel?.guestelWalletImageUrl || '',
+            guestelWalletFallbackImageUrl: absolutePublicAssetUrl(req, dbHotel?.rooms?.[0]?.images?.[0]?.url),
             guestelWalletSubtitle: dbHotel?.guestelWalletSubtitle || '',
             subscribed: dbHotel?.subscribed || false,
             frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,

@@ -156,7 +156,19 @@ enum BookingAPI {
 
     enum Failure: LocalizedError {
         case message(String)
-        var errorDescription: String? { if case let .message(m) = self { return m }; return "Something went wrong." }
+        case http(statusCode: Int, message: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .message(let message), .http(_, let message):
+                return message
+            }
+        }
+
+        var isNotFound: Bool {
+            if case .http(let statusCode, _) = self { return statusCode == 404 || statusCode == 410 }
+            return false
+        }
     }
 
     // MARK: - Calls
@@ -515,7 +527,7 @@ enum BookingAPI {
             let message = (object?["message"] as? String)
                 ?? (nested?["message"] as? String)
                 ?? "The request failed (\(http.statusCode))."
-            throw Failure.message(message)
+            throw Failure.http(statusCode: http.statusCode, message: message)
         }
         return data
     }

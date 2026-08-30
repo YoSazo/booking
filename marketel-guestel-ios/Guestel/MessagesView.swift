@@ -39,22 +39,6 @@ struct MessagesView: View {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 }
-                                .confirmationDialog(
-                                    "Delete this conversation?",
-                                    isPresented: Binding(
-                                        get: { pendingDeletion?.id == stay.id },
-                                        set: { if !$0, pendingDeletion?.id == stay.id { pendingDeletion = nil } }
-                                    ),
-                                    titleVisibility: .visible
-                                ) {
-                                    Button("Delete Conversation", role: .destructive) {
-                                        pendingDeletion = nil
-                                        deleteConversation(stay)
-                                    }
-                                    Button("Cancel", role: .cancel) { pendingDeletion = nil }
-                                } message: {
-                                    Text("This removes the conversation from Guestel. The property keeps its copy.")
-                                }
                         }
                     }
                     .listStyle(.plain)
@@ -80,6 +64,19 @@ struct MessagesView: View {
             Task { await store.refreshConversations() }
         }) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
+        }
+        .alert("Delete this conversation?", isPresented: Binding(
+            get: { pendingDeletion != nil },
+            set: { if !$0 { pendingDeletion = nil } }
+        )) {
+            Button("Delete Conversation", role: .destructive) {
+                guard let stay = pendingDeletion else { return }
+                pendingDeletion = nil
+                deleteConversation(stay)
+            }
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+        } message: {
+            Text("This removes the conversation from Guestel. The property keeps its copy.")
         }
         .alert("Conversation Not Deleted", isPresented: Binding(
             get: { deletionError != nil },

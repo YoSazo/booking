@@ -399,16 +399,29 @@ async function saveGuestelWalletCard() {
   }
 }
 
+function guestelWalletDisplayImageUrl() {
+  const roomFallback = (crm.editRooms || [])
+    .flatMap((room) => Array.isArray(room?.images) ? room.images : [])
+    .map((image) => String(image?.url || '').trim())
+    .find(Boolean) || '';
+  return String(
+    crm.guestelWalletImageUrl
+      || crm.guestelWalletFallbackImageUrl
+      || roomFallback
+      || ''
+  ).trim();
+}
+
 function setGuestelWalletImagePreview(url) {
   const preview = document.getElementById('guestelWalletPreviewImage');
   if (!preview) return;
-  const clean = String(url || '').trim();
+  const clean = String(url || guestelWalletDisplayImageUrl()).trim();
   preview.classList.toggle('has-image', !!clean);
   preview.innerHTML = clean
     ? `<img src="${appsEscape(clean)}" alt="Guestel wallet cover">`
-    : '<span>Choose a cover photo</span>';
+    : '<span>Add a room photo</span>';
   const remove = document.getElementById('guestelWalletImageRemove');
-  if (remove) remove.hidden = !clean;
+  if (remove) remove.hidden = !String(crm.guestelWalletImageUrl || '').trim();
 }
 
 async function uploadGuestelWalletImage(input) {
@@ -447,7 +460,7 @@ async function uploadGuestelWalletImage(input) {
     input.value = '';
     if (uploadButton) {
       uploadButton.disabled = false;
-      uploadButton.textContent = crm.guestelWalletImageUrl ? 'Change cover' : 'Choose cover';
+      uploadButton.textContent = crm.guestelWalletImageUrl ? 'Change cover' : 'Choose custom cover';
     }
   }
 }
@@ -459,9 +472,9 @@ async function resetGuestelWalletImage() {
     const data = await api('DELETE', '/api/crm/guestel-wallet-image');
     if (!data?.success) throw new Error(data?.message || 'Could not reset the Guestel cover.');
     crm.guestelWalletImageUrl = '';
-    setGuestelWalletImagePreview('');
+    setGuestelWalletImagePreview(guestelWalletDisplayImageUrl());
     const uploadButton = document.getElementById('guestelWalletImageButton');
-    if (uploadButton) uploadButton.textContent = 'Choose cover';
+    if (uploadButton) uploadButton.textContent = 'Choose custom cover';
     toast('Guestel will use your first room photo.', 'success');
   } catch (error) {
     toast(error?.message || 'Could not reset the Guestel cover.', 'error');
@@ -475,7 +488,7 @@ function ensureAppsViewRendered(force) {
   if (!el) return;
   const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
     || new URLSearchParams(window.location.search).get('previewEditor') === '1';
-  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '') + '|' + (crm.guestelWalletImageUrl || '') + '|' + (crm.guestelWalletSubtitle || '') + '|' + (embeddedNativePreview ? 'native-preview' : 'standard');
+  const key = (crm.activeHotelId || '') + '|' + (crm.activeHotelAppIcon || '') + '|' + (crm.activeHotelDomain || '') + '|' + (crm.guestelWalletImageUrl || '') + '|' + (crm.guestelWalletFallbackImageUrl || '') + '|' + (crm.guestelWalletSubtitle || '') + '|' + (embeddedNativePreview ? 'native-preview' : 'standard');
   if (force || el.dataset.appsKey !== key || !el.querySelector('.apps-page')) {
     renderAppsView();
     el.dataset.appsKey = key;
@@ -708,7 +721,8 @@ function renderAppsView() {
       </div>
     </details>`;
   const walletSubtitle = guestelWalletSubtitleValue();
-  const walletImage = String(crm.guestelWalletImageUrl || '').trim();
+  const walletImage = guestelWalletDisplayImageUrl();
+  const walletHasCustomImage = !!String(crm.guestelWalletImageUrl || '').trim();
   const nativeGuestShareHtml = `
     <div class="apps-step-card" id="tour-native-guest-share">
       <div class="apps-step-title">How guests keep you in Guestel</div>
@@ -723,8 +737,8 @@ function renderAppsView() {
         </div>
         <input type="file" id="guestelWalletImageInput" accept="image/png,image/jpeg,image/webp" hidden onchange="uploadGuestelWalletImage(this)">
         <div class="guestel-wallet-actions">
-          <button type="button" id="guestelWalletImageButton" onclick="document.getElementById('guestelWalletImageInput').click()">${walletImage ? 'Change cover' : 'Choose cover'}</button>
-          <button type="button" id="guestelWalletImageRemove" class="quiet" onclick="resetGuestelWalletImage()"${walletImage ? '' : ' hidden'}>Use room photo</button>
+          <button type="button" id="guestelWalletImageButton" onclick="document.getElementById('guestelWalletImageInput').click()">${walletHasCustomImage ? 'Change cover' : 'Choose custom cover'}</button>
+          <button type="button" id="guestelWalletImageRemove" class="quiet" onclick="resetGuestelWalletImage()"${walletHasCustomImage ? '' : ' hidden'}>Use room photo</button>
         </div>
         <label class="guestel-wallet-label" for="guestelWalletSubtitleInput">Short line under your name</label>
         <div class="guestel-wallet-field">
