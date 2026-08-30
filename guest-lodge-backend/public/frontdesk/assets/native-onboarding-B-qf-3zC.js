@@ -1,11 +1,11 @@
-import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Done",m="marketelNativeOnboardingV1State",g="marketelNativeFrontDeskContactV1",w="marketelNativeBookingFallbackV1",R="+18339830801",x="marketelNativeOnboardingStyles",s="marketelNativeOnboarding",o=[{filter:"settings",eyebrow:"Your Page",title:"Make it yours.",body:"Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.",note:"This is the control room for your booking page.",tabPosition:"12.5%"},{filter:"bookings",eyebrow:"Bookings",title:"You decide what happens.",body:"New room requests arrive here. Keep or release them in one tap, and your no-answer rule handles the moments you miss.",note:"Every pending card shows the countdown and your fallback before you act.",tabPosition:"37.5%"},{filter:"availability",eyebrow:"Availability",title:"When a walk-in takes a room, tell Front Desk.",body:"Text “A walk-in took the Queen Room tonight,” or record it here in Availability. Marketel reduces the remaining availability on your direct booking page.",note:"One rule: if it happened outside Marketel, tell Front Desk.",tabPosition:"62.5%"},{filter:"apps",eyebrow:"Guestel",title:"Guests keep your property in Guestel.",body:"Guests tap Add on your booking page or scan your QR. Guestel keeps your property, their stays, and their messages together while Marketel Front Desk remains your owner app.",note:"Tell a guest: “Scan this to book directly and keep us in Guestel.”",tabPosition:"87.5%"}];let h=!1,t=null;function S(){return window.location.protocol==="capacitor:"||window.location.protocol==="ionic:"||new URLSearchParams(window.location.search).get("native")==="ios"}function p(e){try{const n=window.webkit?.messageHandlers?.marketelShell;return!n||typeof n.postMessage!="function"?!1:(n.postMessage(e),!0)}catch{return!1}}function b(e){if(typeof window.setNativeShellVisible=="function"){window.setNativeShellVisible(e);return}p({type:"visibility",visible:e})}function u(e){p({type:"tourMode",active:!!e})}function $(){p({type:"requestNotifications"})}function i(e){return String(e??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function v(){return String(O.activeHotelName||"your property").trim()||"your property"}function f(e){try{return localStorage.getItem(e)==="1"}catch{return!1}}function z(){try{return localStorage.getItem(w)==="release"?"release":"confirm"}catch{return"confirm"}}function l(){if(t)try{localStorage.setItem(m,JSON.stringify({phase:t.phase,step:t.step,contactSaved:t.contactSaved,noResponseAction:t.noResponseAction}))}catch{}}function C(){try{const e=JSON.parse(localStorage.getItem(m)||"null");if(!e||!["intro","tour"].includes(e.phase))return null;const n=e.phase==="intro"?2:o.length-1;return{phase:e.phase,step:Math.max(0,Math.min(Number(e.step)||0,n)),contactSaved:e.contactSaved===!0||f(g),noResponseAction:e.noResponseAction==="release"?"release":z()}}catch{return null}}function I(){if(document.getElementById(x))return;const e=document.createElement("style");e.id=x,e.textContent=`
+import{c as z}from"./settings-BTVI0x-I.js";const A="marketelNativeOnboardingV2Done",g="marketelNativeOnboardingV2State",b="marketelNativeFrontDeskContactV1",N="marketelNativeBookingFallbackV1",M="+18339830801",y="marketelNativeOnboardingStyles",p="marketelNativeOnboarding",r=[{filter:"settings",eyebrow:"Your Page",title:"Make it yours.",body:"Change rooms, photos, prices and the details guests see. Your direct booking page stays live while you manage it here.",note:"This is the control room for your booking page.",tabPosition:"12.5%"},{filter:"bookings",eyebrow:"Bookings",title:"You decide what happens.",body:"New room requests arrive here. Keep or release them in one tap, and your no-answer rule handles the moments you miss.",note:"Every pending card shows the countdown and your fallback before you act.",tabPosition:"37.5%"},{filter:"availability",eyebrow:"Availability",title:"When a walk-in takes a room, tell Front Desk.",body:"Text “A walk-in took the Queen Room tonight,” or record it here in Availability. Marketel reduces the remaining availability on your direct booking page.",note:"One rule: if it happened outside Marketel, tell Front Desk.",tabPosition:"62.5%"},{filter:"apps",eyebrow:"Guestel",title:"Guests keep your property in Guestel.",body:"Guests tap Add on your booking page or scan your QR. Guestel keeps your property, their stays, and their messages together while Marketel Front Desk remains your owner app.",note:"Tell a guest: “Scan this to book directly and keep us in Guestel.”",tabPosition:"87.5%"}],P=0,u=1,f=2,E=3,d=E,Y=d+1;let k=!1,t=null;function T(){return window.location.protocol==="capacitor:"||window.location.protocol==="ionic:"||new URLSearchParams(window.location.search).get("native")==="ios"}function l(e){try{const n=window.webkit?.messageHandlers?.marketelShell;return!n||typeof n.postMessage!="function"?!1:(n.postMessage(e),!0)}catch{return!1}}function x(e){if(typeof window.setNativeShellVisible=="function"){window.setNativeShellVisible(e);return}l({type:"visibility",visible:e})}function v(e){l({type:"tourMode",active:!!e})}function F(){l({type:"requestNotifications"})}function L(){l({type:"notificationSettings"})}function I(){try{return String(z?.nativeNotificationState||"")}catch{return""}}let w=!1;function B(){if(w)return;w=!0;const e=window.marketelNativeNotificationState;window.marketelNativeNotificationState=function(a){try{typeof e=="function"&&e(a)}finally{t&&t.phase==="intro"&&t.step===u&&i()}}}function G(){B(),F()}function s(e){return String(e??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function S(){return String(z.activeHotelName||"your property").trim()||"your property"}function h(e){try{return localStorage.getItem(e)==="1"}catch{return!1}}function D(){try{return localStorage.getItem(N)==="release"?"release":"confirm"}catch{return"confirm"}}function m(){if(t)try{localStorage.setItem(g,JSON.stringify({phase:t.phase,step:t.step,contactSaved:t.contactSaved,noResponseAction:t.noResponseAction}))}catch{}}function j(){try{const e=JSON.parse(localStorage.getItem(g)||"null");if(!e||!["intro","tour"].includes(e.phase))return null;const n=e.phase==="intro"?d:r.length-1;return{phase:e.phase,step:Math.max(0,Math.min(Number(e.step)||0,n)),contactSaved:e.contactSaved===!0||h(b),noResponseAction:e.noResponseAction==="release"?"release":D()}}catch{return null}}function H(){if(document.getElementById(y))return;const e=document.createElement("style");e.id=y,e.textContent=`
     html.marketel-native-tour-open,
     html.marketel-native-tour-open body {
       overflow: hidden !important;
       overscroll-behavior: none;
     }
 
-    #${s} {
+    #${p} {
       --native-green: #2E7D5B;
       --native-green-light: #4CAF7D;
       --native-green-dark: #205B43;
@@ -26,7 +26,7 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
       -webkit-font-smoothing: antialiased;
     }
 
-    #${s} * {
+    #${p} * {
       box-sizing: border-box;
     }
 
@@ -607,6 +607,178 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
       text-align: center;
     }
 
+    .mno-status-note.mno-status-warn {
+      color: #B7621F;
+    }
+
+    /* Lock-screen Live Activity preview — the Front Desk "pill". */
+    .mno-lockscreen {
+      position: relative;
+      margin-top: 26px;
+      padding: 30px 16px 20px;
+      border-radius: 27px;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 90% at 20% 0%, rgba(38, 74, 55, 0.85), transparent 62%),
+        linear-gradient(165deg, #1e2c24 0%, #0f1712 100%);
+      box-shadow:
+        0 2px 4px rgba(9, 18, 13, 0.20),
+        0 22px 48px rgba(9, 18, 13, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      animation: mno-card-up .5s cubic-bezier(.16,1,.3,1) .12s both;
+    }
+
+    .mno-lockscreen::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(80% 55% at 80% 6%, rgba(85, 166, 122, 0.18), transparent 72%);
+    }
+
+    .mno-ls-time {
+      position: relative;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      margin-bottom: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mno-la {
+      position: relative;
+      border-radius: 20px;
+      padding: 13px 14px 12px;
+      background: rgba(244, 248, 245, 0.98);
+      box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      transition: box-shadow .35s ease;
+    }
+
+    .mno-la-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 9px;
+    }
+
+    .mno-la-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--native-green-dark);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .mno-la-mark {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+      border-radius: 5px;
+      background: linear-gradient(145deg, var(--native-green-light), var(--native-green-dark));
+      box-shadow: inset 0 1px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(46, 125, 91, 0.35);
+    }
+
+    .mno-la-badge {
+      border-radius: 999px;
+      padding: 3px 9px;
+      background: rgba(216, 153, 38, 0.16);
+      color: #A9701A;
+      font-size: 9.5px;
+      font-weight: 850;
+      letter-spacing: .08em;
+    }
+
+    .mno-la-badge.is-live {
+      background: rgba(46, 125, 91, 0.15);
+      color: var(--native-green-dark);
+    }
+
+    .mno-la-guest {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--native-ink);
+      font-size: 15px;
+      font-weight: 780;
+      letter-spacing: -.01em;
+    }
+
+    .mno-la-guest i {
+      color: #9AA8A0;
+      font-style: normal;
+    }
+
+    .mno-la-q {
+      margin-top: 2px;
+      color: #55655C;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .mno-la-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(46, 77, 60, 0.1);
+    }
+
+    .mno-la-when {
+      color: #67766C;
+      font-size: 11px;
+      font-weight: 640;
+    }
+
+    .mno-la-amt {
+      color: var(--native-green-dark);
+      font-size: 14px;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mno-la-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 11px;
+    }
+
+    .mno-la-btn {
+      border-radius: 11px;
+      padding: 9px 0;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+
+    .mno-la-btn.keep {
+      color: #fff;
+      background: linear-gradient(135deg, var(--native-green-light), var(--native-green));
+      box-shadow: 0 5px 13px rgba(46, 125, 91, 0.28);
+    }
+
+    .mno-la-btn.release {
+      color: #9A4B3F;
+      background: rgba(183, 58, 58, 0.09);
+      border: 1px solid rgba(183, 58, 58, 0.18);
+    }
+
+    .mno-lockscreen.is-live .mno-la {
+      box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.7),
+        0 0 0 1.5px rgba(57, 169, 107, 0.55);
+    }
+
     .mno-tour {
       min-height: 100%;
       background: rgba(11, 24, 16, .30);
@@ -812,6 +984,10 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
       .mno-secondary { min-height: 36px; margin-top: 1px; padding-top: 8px; padding-bottom: 8px; }
       .mno-status-note { margin-top: 3px; font-size: 10px; }
       .mno-progress { margin-top: 8px; }
+      .mno-lockscreen { margin-top: 14px; padding: 18px 13px 15px; border-radius: 22px; }
+      .mno-ls-time { font-size: 24px; margin-bottom: 10px; }
+      .mno-la { padding: 11px 12px 10px; }
+      .mno-la-guest { font-size: 14px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -820,6 +996,7 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
       .mno-bubble,
       .mno-property-card,
       .mno-assistant-card,
+      .mno-lockscreen,
       .mno-ready-item,
       .mno-contact-check,
       .mno-intro::before,
@@ -829,7 +1006,31 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
         animation-delay: 0ms !important;
       }
     }
-  `,document.head.appendChild(e)}function y(e,n){return Array.from({length:n},(a,c)=>`<span class="mno-dot${c===e?" active":""}" aria-hidden="true"></span>`).join("")}function Y(e){const n=i(v()),a=i(v().charAt(0).toUpperCase());if(e===0)return`
+  `,document.head.appendChild(e)}function K(e,n){return Array.from({length:n},(a,o)=>`<span class="mno-dot${o===e?" active":""}" aria-hidden="true"></span>`).join("")}function V(){const e=I(),n=e==="authorized";return`
+    <div class="mno-stage">
+      <div class="mno-kicker">Never miss a booking</div>
+      <h1 class="mno-title">It lights up your lock screen.</h1>
+      <p class="mno-copy">The second a guest requests a room, Front Desk appears on your Lock Screen and Dynamic Island. Keep it or release it in one tap — before you even open the app.</p>
+      <div class="mno-lockscreen${n?" is-live":e==="denied"?" is-off":""}" aria-hidden="true">
+        <div class="mno-ls-time">9:41</div>
+        <div class="mno-la">
+          <div class="mno-la-head">
+            <span class="mno-la-brand"><span class="mno-la-mark"></span>Front Desk</span>
+            <span class="mno-la-badge${n?" is-live":""}">${n?"LIVE":"DECIDE"}</span>
+          </div>
+          <div class="mno-la-guest">Jordan M.<i>·</i>Queen Suite</div>
+          <div class="mno-la-q">Is this room still free?</div>
+          <div class="mno-la-meta">
+            <span class="mno-la-when">Tonight → Tue · 1 night</span>
+            <span class="mno-la-amt">$168</span>
+          </div>
+          <div class="mno-la-actions">
+            <span class="mno-la-btn keep">Keep</span>
+            <span class="mno-la-btn release">Release</span>
+          </div>
+        </div>
+      </div>
+    </div>`}function q(e){const n=s(S()),a=s(S().charAt(0).toUpperCase());if(e===P)return`
       <div class="mno-stage">
         <div class="mno-kicker">Connected</div>
         <h1 class="mno-title">Front Desk is ready.</h1>
@@ -848,7 +1049,7 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
             <div class="mno-feature"><strong>Ready</strong>Guestel</div>
           </div>
         </div>
-      </div>`;if(e===1){const c=!!t?.contactSaved,d=t?.noResponseAction==="release";return`
+      </div>`;if(e===u)return V();if(e===f){const o=!!t?.contactSaved,c=t?.noResponseAction==="release";return`
       <div class="mno-stage">
         <div class="mno-kicker">A real second set of eyes</div>
         <h1 class="mno-title">Meet Front Desk Assistant.</h1>
@@ -870,10 +1071,10 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
           <div class="mno-fallback">
             <strong>If nobody answers a new-booking alert</strong>
             <div class="mno-fallback-options">
-              <button type="button" data-mno-action="policy" data-mno-policy="confirm" class="${d?"":"is-selected"}"><b>Keep booking</b><span>Revenue first</span></button>
-              <button type="button" data-mno-action="policy" data-mno-policy="release" class="${d?"is-selected":""}"><b>Release request</b><span>Availability first</span></button>
+              <button type="button" data-mno-action="policy" data-mno-policy="confirm" class="${c?"":"is-selected"}"><b>Keep booking</b><span>Revenue first</span></button>
+              <button type="button" data-mno-action="policy" data-mno-policy="release" class="${c?"is-selected":""}"><b>Release request</b><span>Availability first</span></button>
             </div>
-            <small>${d?"No reply voids the $1 hold and notifies the guest.":"No reply confirms the booking automatically."} You can change this anytime.</small>
+            <small>${c?"No reply voids the $1 hold and notifies the guest.":"No reply confirms the booking automatically."} You can change this anytime.</small>
           </div>
           <div class="mno-contact-strip">
             <div class="mno-assistant-avatar">M</div>
@@ -881,7 +1082,7 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
               <div class="mno-contact-title">Marketel Front Desk</div>
               <div class="mno-contact-number">(833) 983-0801</div>
             </div>
-            ${c?'<div class="mno-contact-check" aria-label="Contact saved">✓</div>':""}
+            ${o?'<div class="mno-contact-check" aria-label="Contact saved">✓</div>':""}
           </div>
         </div>
       </div>`}return`
@@ -903,36 +1104,47 @@ import{c as O}from"./settings-BdyKg63O.js";const k="marketelNativeOnboardingV1Do
           <div><strong>Bring guests back</strong><span>Share your Guestel QR so they can keep your property and book direct again.</span></div>
         </div>
       </div>
-    </div>`}function M(e){return e===1&&!t.contactSaved?`
+    </div>`}function Q(e){const n=K(e,Y);if(e===u){const o=I();return o==="authorized"?`
+        <button class="mno-primary" type="button" data-mno-action="next">Continue</button>
+        <div class="mno-status-note">Alerts on ✓ — you’re covered.</div>
+        <div class="mno-progress">${n}</div>`:o==="denied"?`
+        <button class="mno-primary" type="button" data-mno-action="open-notif-settings">Turn on in Settings</button>
+        <button class="mno-secondary" type="button" data-mno-action="next">Maybe later</button>
+        <div class="mno-status-note mno-status-warn">Alerts are off — you could miss a booking.</div>
+        <div class="mno-progress">${n}</div>`:`
+      <button class="mno-primary" type="button" data-mno-action="enable-alerts">Turn on lock-screen alerts</button>
+      <button class="mno-secondary" type="button" data-mno-action="next">Maybe later</button>
+      <div class="mno-status-note">One tap. Reply to bookings without opening the app.</div>
+      <div class="mno-progress">${n}</div>`}return e===f&&!t.contactSaved?`
       <button class="mno-primary" type="button" data-mno-action="save-contact">Save Front Desk to Contacts</button>
       <button class="mno-secondary" type="button" data-mno-action="next">Continue without saving</button>
       <div class="mno-status-note">${t.contactAttempted?"No problem — you can save it later from Assistant.":"Save it now so you recognize Marketel when messages begin."}</div>
-      <div class="mno-progress">${y(e,3)}</div>`:`
-    <button class="mno-primary" type="button" data-mno-action="next">${e===0?"Set up Front Desk":e===1?"Continue":"Show me Front Desk"}</button>
-    <div class="mno-progress">${y(e,3)}</div>`}function T(){u(!1),b(!1);const e=N();e.innerHTML=`
+      <div class="mno-progress">${n}</div>`:`
+    <button class="mno-primary" type="button" data-mno-action="next">${e===E?"Show me around":"Continue"}</button>
+    <div class="mno-progress">${n}</div>`}function U(){v(!1),x(!1);const e=$();e.innerHTML=`
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
         <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
         <button class="mno-skip" type="button" data-mno-action="skip">Skip</button>
       </div>
-      <main class="mno-main">${Y(t.step)}</main>
+      <main class="mno-main">${q(t.step)}</main>
       <footer class="mno-footer">
-        ${M(t.step)}
+        ${Q(t.step)}
       </footer>
-    </section>`}function A(e){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(e)}function _(){const e=o[t.step]||o[0];b(!0),u(!0),A(e.filter);const n=N();n.innerHTML=`
+    </section>`}function O(e){typeof window.marketelNativeSelectTab=="function"&&window.marketelNativeSelectTab(e)}function J(){const e=r[t.step]||r[0];x(!0),v(!0),O(e.filter);const n=$();n.innerHTML=`
     <section class="mno-tour" role="dialog" aria-modal="true" aria-label="Front Desk walkthrough">
       <button class="mno-tour-skip" type="button" data-mno-action="skip">Skip tour</button>
       <div class="mno-coach-card" style="--tab-x:${e.tabPosition}">
         <div class="mno-coach-top">
-          <span class="mno-coach-eyebrow">${i(e.eyebrow)}</span>
-          <span class="mno-coach-count">${t.step+1} of ${o.length}</span>
+          <span class="mno-coach-eyebrow">${s(e.eyebrow)}</span>
+          <span class="mno-coach-count">${t.step+1} of ${r.length}</span>
         </div>
-        <h2 class="mno-coach-title">${i(e.title)}</h2>
-        <p class="mno-coach-body">${i(e.body)}</p>
-        <div class="mno-coach-note">${i(e.note)}</div>
+        <h2 class="mno-coach-title">${s(e.title)}</h2>
+        <p class="mno-coach-body">${s(e.body)}</p>
+        <div class="mno-coach-note">${s(e.note)}</div>
         <div class="mno-coach-actions">
           <button class="mno-secondary" type="button" data-mno-action="back">Back</button>
-          <button class="mno-primary" type="button" data-mno-action="next">${t.step===o.length-1?"Open Front Desk":"Next"}</button>
+          <button class="mno-primary" type="button" data-mno-action="next">${t.step===r.length-1?"Open Front Desk":"Next"}</button>
         </div>
       </div>
-    </section>`}function N(){let e=document.getElementById(s);return e||(e=document.createElement("div"),e.id=s,e.addEventListener("click",P),document.body.appendChild(e)),e}function r(){t&&(I(),document.documentElement.classList.add("marketel-native-tour-open"),l(),t.phase==="tour"?_():T())}function P(e){const n=e.target?.closest?.("[data-mno-action]");if(!n||!t)return;const a=n.getAttribute("data-mno-action");a==="next"?G():a==="back"?L():a==="skip"?E({skipped:!0}):a==="save-contact"?H():a==="policy"&&B(n.getAttribute("data-mno-policy"))}function B(e){if(t){t.noResponseAction=e==="release"?"release":"confirm";try{localStorage.setItem(w,t.noResponseAction)}catch{}l(),typeof window.api=="function"&&window.api("POST","/api/crm/booking-approval",{noResponseAction:t.noResponseAction}).catch(()=>{}),r()}}function G(){if(t){if(t.phase==="intro")t.step<2?t.step+=1:(t.phase="tour",t.step=0);else if(t.step<o.length-1)t.step+=1;else{E();return}r()}}function L(){t&&(t.phase==="tour"?t.step>0?t.step-=1:(t.phase="intro",t.step=2):t.step>0&&(t.step-=1),r())}function H(){if(!t)return;t.contactAttempted=!0,l(),p({type:"saveContact",phone:R})||r()}function F(){document.getElementById(s)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),u(!1),b(!0)}function E({skipped:e=!1}={}){try{localStorage.setItem(k,"1"),localStorage.removeItem(m)}catch{}t=null,F(),A("bookings"),$(),!e&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function V(e){if(t){if(t.contactAttempted=!0,t.contactSaved=e===!0,e)try{localStorage.setItem(g,"1")}catch{}l(),t.phase==="intro"&&t.step===1&&r()}}function D({replay:e=!1}={}){return S()?(t&&F(),t=(e?null:C())||{phase:"intro",step:0,contactSaved:f(g),contactAttempted:!1,noResponseAction:z()},r(),!0):!1}function j(){return!S()||f(k)?!1:D()}function q(){h||(h=!0,window.marketelNativeContactResult=V,window.startNativeOnboarding=D,window.maybeStartNativeOnboarding=j)}export{q as install,j as maybeStartNativeOnboarding,D as startNativeOnboarding};
+    </section>`}function $(){let e=document.getElementById(p);return e||(e=document.createElement("div"),e.id=p,e.addEventListener("click",X),document.body.appendChild(e)),e}function i(){t&&(H(),document.documentElement.classList.add("marketel-native-tour-open"),m(),t.phase==="tour"?J():U())}function X(e){const n=e.target?.closest?.("[data-mno-action]");if(!n||!t)return;const a=n.getAttribute("data-mno-action");a==="next"?Z():a==="back"?ee():a==="skip"?R({skipped:!0}):a==="save-contact"?te():a==="enable-alerts"?G():a==="open-notif-settings"?L():a==="policy"&&W(n.getAttribute("data-mno-policy"))}function W(e){if(t){t.noResponseAction=e==="release"?"release":"confirm";try{localStorage.setItem(N,t.noResponseAction)}catch{}m(),typeof window.api=="function"&&window.api("POST","/api/crm/booking-approval",{noResponseAction:t.noResponseAction}).catch(()=>{}),i()}}function Z(){if(t){if(t.phase==="intro")t.step<d?t.step+=1:(t.phase="tour",t.step=0);else if(t.step<r.length-1)t.step+=1;else{R();return}i()}}function ee(){t&&(t.phase==="tour"?t.step>0?t.step-=1:(t.phase="intro",t.step=d):t.step>0&&(t.step-=1),i())}function te(){if(!t)return;t.contactAttempted=!0,m(),l({type:"saveContact",phone:M})||i()}function C(){document.getElementById(p)?.remove(),document.documentElement.classList.remove("marketel-native-tour-open"),v(!1),x(!0)}function R({skipped:e=!1}={}){try{localStorage.setItem(A,"1"),localStorage.removeItem(g)}catch{}t=null,C(),O("bookings"),F(),!e&&typeof window.toast=="function"&&window.toast("Front Desk is ready","success")}function ne(e){if(t){if(t.contactAttempted=!0,t.contactSaved=e===!0,e)try{localStorage.setItem(b,"1")}catch{}m(),t.phase==="intro"&&t.step===f&&i()}}function _({replay:e=!1}={}){return T()?(t&&C(),t=(e?null:j())||{phase:"intro",step:0,contactSaved:h(b),contactAttempted:!1,noResponseAction:D()},i(),!0):!1}function ae(){return!T()||h(A)?!1:_()}function ie(){k||(k=!0,window.marketelNativeContactResult=ne,window.startNativeOnboarding=_,window.maybeStartNativeOnboarding=ae)}export{ie as install,ae as maybeStartNativeOnboarding,_ as startNativeOnboarding};
