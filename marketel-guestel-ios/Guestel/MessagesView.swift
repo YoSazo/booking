@@ -34,7 +34,7 @@ struct MessagesView: View {
                                 .listRowBackground(Color.clear)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
-                                        pendingDeletion = stay
+                                        requestConversationDeletion(stay)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -85,6 +85,15 @@ struct MessagesView: View {
             Button("OK", role: .cancel) { deletionError = nil }
         } message: {
             Text(deletionError ?? "Please try again.")
+        }
+    }
+
+    private func requestConversationDeletion(_ stay: Reservation) {
+        // A SwiftUI swipe action needs one beat to close. Showing an alert in
+        // the same transaction makes the next row animate underneath the row
+        // being deleted even though the data has not changed yet.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            pendingDeletion = stay
         }
     }
 

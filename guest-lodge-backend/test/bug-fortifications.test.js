@@ -31,7 +31,33 @@ test('Front Desk Guestel covers and custom amenities have production fallbacks',
     assert.match(apps, /crm\.guestelWalletImageUrl\s*\|\| crm\.guestelWalletFallbackImageUrl\s*\|\| roomFallback/);
     assert.match(settings, /\+ Custom amenity/);
     assert.match(settings, /id="amenityCustomModal" data-marketel-keyboard-surface/);
+    assert.match(settings, /id="amenityCustomModal"[^>]+background:transparent/);
+    assert.match(settings, /pageSectionHtml\('Your booking link'/);
+    assert.match(apps, /object-position:center top/);
     assert.doesNotMatch(settings, /placeholder="Or type a custom one/);
+});
+
+test('Front Desk owner conversations can be hidden without deleting records', () => {
+    const schema = fs.readFileSync(path.join(backend, 'prisma', 'schema.prisma'), 'utf8');
+    const nativeMessages = fs.readFileSync(
+        path.join(repo, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'NativeMessages.swift'),
+        'utf8'
+    );
+    const nativeDelegate = fs.readFileSync(
+        path.join(repo, 'marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift'),
+        'utf8'
+    );
+
+    assert.match(schema, /ownerMessagesHiddenBefore DateTime\?/);
+    assert.match(server, /app\.delete\('\/api\/crm\/messages\/:reservationCode\/conversation'/);
+    assert.match(server, /data: \{ ownerMessagesHiddenBefore: hiddenBefore \}/);
+    assert.match(nativeMessages, /Label\("Delete conversation", systemImage: "trash"\)/);
+    assert.match(nativeMessages, /client\.deleteGuestConversation\(conversation\.code\)/);
+    const nativeMenu = nativeDelegate.slice(
+        nativeDelegate.indexOf('menuButton.menu = UIMenu'),
+        nativeDelegate.indexOf('menuButton.showsMenuAsPrimaryAction')
+    );
+    assert.doesNotMatch(nativeMenu, /assistantAction|switchAction/);
 });
 
 test('Guestel removes stale hotels safely and confirms destructive gestures', () => {
@@ -46,7 +72,11 @@ test('Guestel removes stale hotels safely and confirms destructive gestures', ()
     assert.match(store, /removeMissingHotel\(hotelId\)/);
     assert.match(store, /guestel\.hidden-hotels\.v1/);
     assert.match(hotels, /\.contextMenu \{/);
+    assert.match(hotels, /\.draggable\(hotel\.id\.uuidString\)/);
+    assert.match(hotels, /\.dropDestination\(for: String\.self\)/);
+    assert.match(store, /func moveHotel\(_ movingID: UUID, relativeTo targetID: UUID, placeAfter: Bool\)/);
     assert.match(hotels, /\.alert\("Remove this hotel\?"/);
     assert.match(messages, /\.alert\("Delete this conversation\?"/);
+    assert.match(messages, /asyncAfter\(deadline: \.now\(\) \+ 0\.22\)/);
     assert.doesNotMatch(messages, /\.confirmationDialog\(/);
 });

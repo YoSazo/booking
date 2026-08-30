@@ -189,6 +189,17 @@ private struct MarketelNativeMessageClient {
         return envelope.message
     }
 
+    func deleteGuestConversation(_ reservationCode: String) async throws {
+        let encoded = reservationCode.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? reservationCode
+        let envelope: MarketelEmptyEnvelope = try await request(
+            "/api/crm/messages/\(encoded)/conversation",
+            method: "DELETE"
+        )
+        guard envelope.success else {
+            throw MarketelNativeMessageError.message("Could not delete this conversation.")
+        }
+    }
+
     func supportThread(markRead: Bool) async throws -> MarketelSupportThread? {
         let envelope: MarketelSupportEnvelope = try await request("/api/crm/support")
         guard envelope.success else { throw MarketelNativeMessageError.message("Could not load support.") }
@@ -292,6 +303,15 @@ private final class MarketelGuestMessagesModel: ObservableObject {
         }
         _ = try await client.reply(to: conversation.code, body: body)
         await load(silent: true)
+    }
+
+    func deleteConversation(id: String) async throws {
+        guard let conversation = conversation(id: id) else {
+            throw MarketelNativeMessageError.message("That conversation is no longer available.")
+        }
+        try await client.deleteGuestConversation(conversation.code)
+        let messageIDs = Set(conversation.messages.map(\.id))
+        messages.removeAll { messageIDs.contains($0.id) }
     }
 
     private func clean(_ value: String?, fallback: String = "") -> String {
@@ -457,11 +477,15 @@ private struct MarketelNativeConversationRow: View {
 }
 
 private struct MarketelNativeGuestThreadView: View {
+    @Environment(\.dismiss) private var dismiss
     let conversationID: String
     @ObservedObject var model: MarketelGuestMessagesModel
     @State private var draft = ""
     @State private var sending = false
     @State private var sendError: String?
+    @State private var confirmingDeletion = false
+    @State private var deletingConversation = false
+    @State private var deletionError: String?
 
     var body: some View {
         Group {
@@ -498,7 +522,10 @@ private struct MarketelNativeGuestThreadView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            MarketelNativeContactMenu(conversation: conversation)
+                            MarketelNativeContactMenu(
+                                conversation: conversation,
+                                onDelete: { confirmingDeletion = true }
+                            )
                         }
                     }
                     .task { await model.markRead(conversationID: conversationID) }
@@ -512,6 +539,37 @@ private struct MarketelNativeGuestThreadView: View {
             }
         }
         .background(MarketelMessageTheme.canvas.ignoresSafeArea())
+        .alert("Delete this conversation?", isPresented: $confirmingDeletion) {
+            Button("Delete Conversation", role: .destructive) {
+                deleteConversation()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the conversation from Front Desk. The reservation and the guest’s copy stay intact.")
+        }
+        .alert("Conversation Not Deleted", isPresented: Binding(
+            get: { deletionError != nil },
+            set: { if !$0 { deletionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { deletionError = nil }
+        } message: {
+            Text(deletionError ?? "Please try again.")
+        }
+    }
+
+    private func deleteConversation() {
+        guard !deletingConversation else { return }
+        deletingConversation = true
+        Task {
+            do {
+                try await model.deleteConversation(id: conversationID)
+                deletingConversation = false
+                dismiss()
+            } catch {
+                deletionError = error.localizedDescription
+                deletingConversation = false
+            }
+        }
     }
 
     private func send(_ conversation: MarketelGuestConversation) {
@@ -592,6 +650,7 @@ private struct MarketelNativeBookingContext: View {
 
 private struct MarketelNativeContactMenu: View {
     let conversation: MarketelGuestConversation
+    let onDelete: () -> Void
 
     var body: some View {
         Menu {
@@ -603,6 +662,10 @@ private struct MarketelNativeContactMenu: View {
             }
             if let emailURL = nativeEmailURL(conversation.guestEmail) {
                 Link(destination: emailURL) { Label("Email guest", systemImage: "envelope") }
+            }
+            Divider()
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete conversation", systemImage: "trash")
             }
         } label: {
             Image(systemName: "ellipsis.circle")

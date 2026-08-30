@@ -4014,3 +4014,28 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       backdrop-filter: none;
       background: rgba(255, 255, 255, 0.92);
     }
+
+    /* Modal cards already have borders and shadows. A second dark/blurred
+       layer behind every card made the app flash and visibly stopped at the
+       iOS keyboard boundary. Keep the hit-blocking overlay, but leave the
+       underlying page at its real color on every Front Desk modal surface. */
+    .rooms-modal-bg,
+    .availability-sheet-backdrop,
+    .notes-modal-overlay,
+    .edit-add-room-modal,
+    #amenityPickerModal,
+    #amenityCustomModal,
+    #logoGateOverlay,
+    #cancelBookingOverlay,
+    #bookingApprovalOverlay,
+    #bookingReviewOverlay,
+    #availabilityCorrectionOverlay,
+    #notifPromptOverlay,
+    #iosInstallSheet,
+    #activatedModalOverlay,
+    .fda-overlay,
+    .agic-backdrop {
+      background: transparent !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }

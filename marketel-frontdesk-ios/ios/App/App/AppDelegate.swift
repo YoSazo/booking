@@ -393,12 +393,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)
         }
-        let assistantAction = UIAction(
-            title: "Front Desk Assistant",
-            image: UIImage(systemName: "message.badge")
-        ) { [weak self] _ in
-            self?.presentNativeAssistant()
-        }
         let supportAction = UIAction(
             title: "Message Marketel",
             image: UIImage(systemName: "questionmark.bubble")
@@ -410,12 +404,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             image: UIImage(systemName: "questionmark.circle")
         ) { [weak self] _ in
             self?.sendWebAction("tour")
-        }
-        let switchAction = UIAction(
-            title: "Switch property",
-            image: UIImage(systemName: "building.2")
-        ) { [weak self] _ in
-            self?.openPropertyPicker()
         }
         let accountAction = UIAction(
             title: "Privacy & account",
@@ -437,12 +425,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuButton.configuration = menuConfiguration
         menuButton.menu = UIMenu(
             children: [
-                assistantAction,
                 supportAction,
                 notificationSettingsAction,
                 refreshAction,
                 tourAction,
-                switchAction,
                 accountAction,
                 signOutAction,
             ]

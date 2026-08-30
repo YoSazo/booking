@@ -60,8 +60,6 @@ expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
   'AppDelegate does not keep booking-page previews inside the app');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
-expect(delegate, /title: "Front Desk Assistant"[\s\S]{0,220}presentNativeAssistant\(\)/,
-  'Native menu does not expose the native Front Desk Assistant');
 expect(delegate, /case "openAssistant":[\s\S]{0,120}presentNativeAssistant\(\)/,
   'Web fallback cannot open the native Front Desk Assistant');
 expect(delegate, /sheet\.detents = \[\.medium\(\), \.large\(\)\][\s\S]{0,120}sheet\.selectedDetentIdentifier = \.medium/,

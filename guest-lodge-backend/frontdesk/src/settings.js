@@ -933,16 +933,13 @@ async function loadEditRooms() {
         <input type="text" value="${(hotelRes?.cancellationPolicy || '').replace(/"/g, '&quot;')}" id="edit-hotel-policy" placeholder="e.g. Check-in 3 PM · Check-out 11 AM" style="width:100%;padding:11px 13px;font-size:13px;color:var(--text);border:1.5px solid var(--border);border-radius:10px;background:var(--white);outline:none;font-family:inherit;">
         <button onclick="saveHotelInfo('policy')" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;">Save</button>
       `, { open: !hotelRes?.cancellationPolicy, hint: hotelRes?.cancellationPolicy ? '' : 'Not set yet' })}
-      <div class="booking-card" id="tour-booking-link-card" style="margin-bottom:14px;">
-        <div style="padding:18px;">
-          <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:var(--text);">Your Booking Link</div>
+      ${pageSectionHtml('Your booking link', `
           <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;text-align:center;">
             <div style="font-size:15px;font-weight:600;color:var(--green);word-break:break-all;margin-bottom:10px;">${bookingUrl}</div>
             <button id="tour-copy-link-btn" onclick="copyBookingLink('${bookingUrl.replace(/'/g, "\\'")}')" style="padding:8px 18px;border-radius:8px;border:none;background:var(--green);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Copy Link</button>
           </div>
           <p style="font-size:11px;color:var(--text-muted);text-align:center;margin:0;">Use this link on your website, Google Business Profile, or in a message.</p>
-        </div>
-      </div>
+      `, { open: true, id: 'tour-booking-link-card' })}
       </div>
       <div class="dash-growth">
         <div id="yourPageGrowthPanel" style="scroll-margin-top:96px;">
@@ -1203,7 +1200,7 @@ function openAmenityPicker(roomId) {
   let modal = document.getElementById('amenityPickerModal');
   if (!modal) {
     document.body.insertAdjacentHTML('beforeend', `
-      <div id="amenityPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;align-items:center;justify-content:center;padding:20px;">
+      <div id="amenityPickerModal" style="display:none;position:fixed;inset:0;background:transparent;z-index:10000;align-items:center;justify-content:center;padding:20px;">
         <div style="background:white;border-radius:16px;padding:24px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
           <div style="font-size:16px;font-weight:700;margin-bottom:14px;">Select Amenities</div>
           <div id="amenityPickerGrid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
@@ -1263,7 +1260,7 @@ function ensureCustomAmenityModal() {
   let modal = document.getElementById('amenityCustomModal');
   if (modal) return modal;
   document.body.insertAdjacentHTML('beforeend', `
-    <div id="amenityCustomModal" data-marketel-keyboard-surface style="display:none;position:fixed;left:0;right:0;top:0;height:100vh;background:rgba(0,0,0,0.42);z-index:10020;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
+    <div id="amenityCustomModal" data-marketel-keyboard-surface style="display:none;position:fixed;left:0;right:0;top:0;height:100vh;background:transparent;z-index:10020;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
       <div style="width:100%;max-width:340px;padding:20px;background:white;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.22);" onclick="event.stopPropagation()">
         <div style="font-size:16px;font-weight:750;color:#1a1a2e;margin-bottom:12px;">Custom amenity</div>
         <input type="text" id="amenityCustomInput" maxlength="60" enterkeyhint="done" autocomplete="off" placeholder="e.g. EV charger" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #d9dfdc;border-radius:10px;font-family:inherit;font-size:16px;outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmCustomAmenity();}">

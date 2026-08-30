@@ -17314,9 +17314,19 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
             take: 200,
         }));
         const bookingIds = [...new Set(rows.map((message) => message.bookingId).filter(Boolean))];
-        const threadBookings = bookingIds.length
+        const reservationCodes = [...new Set(rows.map((message) => message.reservationCode).filter(Boolean))];
+        const threadBookings = bookingIds.length || reservationCodes.length
             ? await withRetry(() => prisma.booking.findMany({
-                where: { hotelId, id: { in: bookingIds } },
+                where: {
+                    hotelId,
+                    OR: [
+                        ...(bookingIds.length ? [{ id: { in: bookingIds } }] : []),
+                        ...(reservationCodes.length ? [
+                            { ourReservationCode: { in: reservationCodes } },
+                            { pmsConfirmationCode: { in: reservationCodes } },
+                        ] : []),
+                    ],
+                },
                 select: {
                     id: true,
                     ourReservationCode: true,
@@ -17325,12 +17335,23 @@ app.get('/api/crm/messages', crmAuth, async (req, res) => {
                     checkinDate: true,
                     checkoutDate: true,
                     cancellationReason: true,
+                    ownerMessagesHiddenBefore: true,
                 },
             }))
             : [];
         const bookingById = new Map(threadBookings.map((booking) => [booking.id, booking]));
-        const messages = rows.map((m) => {
-            const threadBooking = bookingById.get(m.bookingId);
+        const bookingByCode = new Map(threadBookings.flatMap((booking) => (
+            guestBookingThreadCodes(booking).map((code) => [code, booking])
+        )));
+        const bookingForMessage = (message) => bookingById.get(message.bookingId)
+            || bookingByCode.get(message.reservationCode);
+        const visibleRows = rows.filter((message) => {
+            const threadBooking = bookingForMessage(message);
+            return !threadBooking?.ownerMessagesHiddenBefore
+                || message.createdAt.getTime() > threadBooking.ownerMessagesHiddenBefore.getTime();
+        });
+        const messages = visibleRows.map((m) => {
+            const threadBooking = bookingForMessage(m);
             let requests = [];
             try { requests = m.requests ? JSON.parse(m.requests) : []; } catch (_) { requests = []; }
             return {
@@ -17390,6 +17411,42 @@ app.post('/api/crm/messages/read-all', crmAuth, async (req, res) => {
     } catch (e) {
         console.error('CRM messages read-all error:', e.message);
         res.status(500).json({ success: false, message: 'Failed to update messages' });
+    }
+});
+
+// Removing a Front Desk conversation is intentionally non-destructive. The
+// reservation and message records remain available for operations/auditing;
+// the owner inbox simply stops returning messages at or before this cutoff.
+// A later guest message falls after the cutoff and makes the thread reappear.
+app.delete('/api/crm/messages/:reservationCode/conversation', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const reservationCode = String(req.params.reservationCode || '').trim();
+        const booking = await findGuestBooking(hotelId, reservationCode);
+        if (!booking) return res.status(404).json({ success: false, message: 'Conversation not found.' });
+
+        const hiddenBefore = new Date();
+        const threadCodes = guestBookingThreadCodes(booking, reservationCode);
+        await prisma.$transaction([
+            prisma.booking.update({
+                where: { id: booking.id },
+                data: { ownerMessagesHiddenBefore: hiddenBefore },
+            }),
+            prisma.guestMessage.updateMany({
+                where: {
+                    hotelId,
+                    reservationCode: { in: threadCodes },
+                    readAt: null,
+                    createdAt: { lte: hiddenBefore },
+                },
+                data: { readAt: hiddenBefore },
+            }),
+        ]);
+        res.json({ success: true, hiddenBefore: hiddenBefore.toISOString() });
+    } catch (e) {
+        console.error('CRM conversation delete error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not delete this conversation.' });
     }
 });
 

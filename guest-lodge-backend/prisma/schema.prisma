@@ -52,6 +52,10 @@ model Booking {
   // property keeps its business record, while the guest no longer downloads
   // messages at or before this point. A later reply starts the thread again.
   guestMessagesHiddenBefore DateTime?
+  // Front Desk uses the same one-sided behavior in reverse: removing a thread
+  // hides the owner's inbox copy without erasing the reservation or the guest's
+  // messages. A later guest reply naturally recreates the conversation.
+  ownerMessagesHiddenBefore DateTime?
   guestAccessRevokedAt      DateTime?
 
   // Owner approval window. While status='pending' the room stays held. The

@@ -142,7 +142,7 @@ struct HotelsView: View {
             get: { pendingHotelRemoval != nil },
             set: { if !$0 { pendingHotelRemoval = nil } }
         )) {
-            Button("Remove Hotel", role: .destructive) {
+            Button("Remove", role: .destructive) {
                 guard let hotel = pendingHotelRemoval else { return }
                 pendingHotelRemoval = nil
                 withAnimation(animation) {
@@ -182,12 +182,38 @@ struct HotelsView: View {
             .allowsHitTesting(isSelected ? isCurrent : true)
             .contextMenu {
                 Button(role: .destructive) {
-                    pendingHotelRemoval = hotel
+                    requestHotelRemoval(hotel)
                 } label: {
-                    Label("Remove Hotel", systemImage: "trash")
+                    Label("Remove", systemImage: "trash")
                 }
             }
-            .accessibilityHint("Opens the hotel. Touch and hold to remove it from Guestel.")
+            .draggable(hotel.id.uuidString) {
+                WalletCard(hotel: hotel, seed: currentIndex, height: 132)
+                    .frame(width: 224)
+            }
+            .dropDestination(for: String.self) { identifiers, location in
+                guard let rawID = identifiers.first,
+                      let movingID = UUID(uuidString: rawID),
+                      movingID != hotel.id else { return false }
+                withAnimation(animation) {
+                    store.moveHotel(
+                        movingID,
+                        relativeTo: hotel.id,
+                        placeAfter: location.y > cardHeight / 2
+                    )
+                }
+                return true
+            }
+            .accessibilityHint("Opens the hotel. Touch and hold to move or remove it from Guestel.")
+    }
+
+    private func requestHotelRemoval(_ hotel: Hotel) {
+        // Let the system context menu finish its dismissal before presenting
+        // the confirmation alert. Presenting both in the same frame leaves an
+        // oversized, half-dismissed menu surface behind the alert.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            pendingHotelRemoval = hotel
+        }
     }
 
     private var isSelected: Bool { selectedHotel != nil }
@@ -291,6 +317,8 @@ struct WalletCard: View {
                     } placeholder: {
                         Color.clear
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
                     // Covers belong to each property, so brightness is
                     // unpredictable. A light uniform shade preserves the photo
                     // while giving the white Wallet text a reliable baseline.
