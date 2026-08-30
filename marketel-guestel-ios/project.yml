@@ -40,7 +40,7 @@ targets:
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: "NO"
         INFOPLIST_KEY_CFBundleDisplayName: Guestel
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
-        INFOPLIST_KEY_NSCameraUsageDescription: "Scan your card to book faster."
+        INFOPLIST_KEY_NSCameraUsageDescription: "Scan a property's Guestel QR code to add it to your hotels."
         # Status pushes carry content-available so a release/confirmation can
         # refresh the saved reservation before the guest reopens Guestel.
         INFOPLIST_KEY_UIBackgroundModes:

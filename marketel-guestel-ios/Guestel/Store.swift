@@ -207,20 +207,6 @@ final class GuestStore {
         upsert(hotel)
     }
 
-    @MainActor
-    func moveHotel(_ movingID: UUID, relativeTo targetID: UUID, placeAfter: Bool) {
-        guard movingID != targetID,
-              let movingIndex = hotels.firstIndex(where: { $0.id == movingID }) else { return }
-        let movingHotel = hotels.remove(at: movingIndex)
-        guard let targetIndex = hotels.firstIndex(where: { $0.id == targetID }) else {
-            hotels.insert(movingHotel, at: min(movingIndex, hotels.endIndex))
-            return
-        }
-        let destination = placeAfter ? targetIndex + 1 : targetIndex
-        hotels.insert(movingHotel, at: min(destination, hotels.endIndex))
-        persistHotels()
-    }
-
     private func upsert(_ hotel: Hotel) {
         hotels.removeAll { $0.hotelId == hotel.hotelId || $0.domain == hotel.domain }
         hotels.insert(hotel, at: 0)

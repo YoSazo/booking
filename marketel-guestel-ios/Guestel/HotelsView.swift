@@ -93,7 +93,7 @@ struct HotelsView: View {
                 Task { await refreshHotelCards() }
             }
             .sheet(isPresented: $showingAdd) {
-                AddHotelView().presentationDetents([.medium])
+                AddHotelView().presentationDetents([.large])
             }
         }
         .sheet(item: animatedHotelSelection) { hotel in
@@ -187,24 +187,7 @@ struct HotelsView: View {
                     Label("Remove", systemImage: "trash")
                 }
             }
-            .draggable(hotel.id.uuidString) {
-                WalletCard(hotel: hotel, seed: currentIndex, height: 132)
-                    .frame(width: 224)
-            }
-            .dropDestination(for: String.self) { identifiers, location in
-                guard let rawID = identifiers.first,
-                      let movingID = UUID(uuidString: rawID),
-                      movingID != hotel.id else { return false }
-                withAnimation(animation) {
-                    store.moveHotel(
-                        movingID,
-                        relativeTo: hotel.id,
-                        placeAfter: location.y > cardHeight / 2
-                    )
-                }
-                return true
-            }
-            .accessibilityHint("Opens the hotel. Touch and hold to move or remove it from Guestel.")
+            .accessibilityHint("Opens the hotel. Touch and hold to remove it from Guestel.")
     }
 
     private func requestHotelRemoval(_ hotel: Hotel) {

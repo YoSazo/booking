@@ -4,8 +4,6 @@ struct MessagesView: View {
     @Environment(GuestStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @State private var selected: ConversationDestination?
-    @State private var pendingDeletion: Reservation?
-    @State private var deletingConversationID: String?
     @State private var deletionError: String?
 
     private var stays: [Reservation] {
@@ -34,7 +32,7 @@ struct MessagesView: View {
                                 .listRowBackground(Color.clear)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
-                                        requestConversationDeletion(stay)
+                                        deleteConversation(stay)
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
@@ -65,19 +63,6 @@ struct MessagesView: View {
         }) { destination in
             NativeMessagesView(hotel: destination.hotel, stay: destination.stay)
         }
-        .alert("Delete this conversation?", isPresented: Binding(
-            get: { pendingDeletion != nil },
-            set: { if !$0 { pendingDeletion = nil } }
-        )) {
-            Button("Delete Conversation", role: .destructive) {
-                guard let stay = pendingDeletion else { return }
-                pendingDeletion = nil
-                deleteConversation(stay)
-            }
-            Button("Cancel", role: .cancel) { pendingDeletion = nil }
-        } message: {
-            Text("This removes the conversation from Guestel. The property keeps its copy.")
-        }
         .alert("Conversation Not Deleted", isPresented: Binding(
             get: { deletionError != nil },
             set: { if !$0 { deletionError = nil } }
@@ -85,15 +70,6 @@ struct MessagesView: View {
             Button("OK", role: .cancel) { deletionError = nil }
         } message: {
             Text(deletionError ?? "Please try again.")
-        }
-    }
-
-    private func requestConversationDeletion(_ stay: Reservation) {
-        // A SwiftUI swipe action needs one beat to close. Showing an alert in
-        // the same transaction makes the next row animate underneath the row
-        // being deleted even though the data has not changed yet.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            pendingDeletion = stay
         }
     }
 
@@ -171,8 +147,6 @@ struct MessagesView: View {
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
-        .opacity(deletingConversationID == stay.id ? 0.45 : 1)
-        .disabled(deletingConversationID == stay.id)
     }
 
     private func deleteConversation(_ stay: Reservation) {
@@ -182,7 +156,13 @@ struct MessagesView: View {
             deletionError = "Restore this stay from Account, then try again."
             return
         }
-        deletingConversationID = stay.id
+
+        // A destructive swipe is the confirmation. Remove the row in the same
+        // transaction as the swipe action so the next conversation moves once,
+        // rather than moving up, back down for an alert, then up again.
+        withAnimation(.snappy(duration: 0.22)) {
+            store.removeConversation(stay)
+        }
         Task {
             do {
                 try await BookingAPI.deleteConversation(
@@ -190,14 +170,10 @@ struct MessagesView: View {
                     code: stay.code,
                     accessToken: accessToken
                 )
-                await MainActor.run {
-                    store.removeConversation(stay)
-                    deletingConversationID = nil
-                }
             } catch {
+                await store.refreshConversations()
                 await MainActor.run {
                     deletionError = error.localizedDescription
-                    deletingConversationID = nil
                 }
             }
         }

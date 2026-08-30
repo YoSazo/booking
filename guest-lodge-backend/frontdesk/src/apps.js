@@ -798,7 +798,7 @@ function renderAppsView() {
     .guestel-wallet-card::after { content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.43),rgba(0,0,0,.02) 62%);pointer-events:none; }
     .guestel-wallet-cover { position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#4e9a72,#235f46);color:rgba(255,255,255,.8);font-size:12px;font-weight:750; }
     .guestel-wallet-cover.has-image { background:#dfe8e2; }
-    .guestel-wallet-cover img { width:calc(100% + 2px);height:calc(100% + 2px);margin:-1px;display:block;object-fit:cover;object-position:center top; }
+    .guestel-wallet-cover img { position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:center center; }
     .guestel-wallet-copy { position:relative;z-index:1;display:grid;gap:3px;padding:17px 18px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5); }
     .guestel-wallet-copy strong { overflow:hidden;color:#fff;font-size:20px;font-weight:850;text-overflow:ellipsis;white-space:nowrap; }
     .guestel-wallet-copy span { overflow:hidden;color:rgba(255,255,255,.9);font-size:12px;font-weight:600;text-overflow:ellipsis;white-space:nowrap; }

@@ -33,7 +33,7 @@ test('Front Desk Guestel covers and custom amenities have production fallbacks',
     assert.match(settings, /id="amenityCustomModal" data-marketel-keyboard-surface/);
     assert.match(settings, /id="amenityCustomModal"[^>]+background:transparent/);
     assert.match(settings, /pageSectionHtml\('Your booking link'/);
-    assert.match(apps, /object-position:center top/);
+    assert.match(apps, /object-position:center center/);
     assert.doesNotMatch(settings, /placeholder="Or type a custom one/);
 });
 
@@ -60,11 +60,12 @@ test('Front Desk owner conversations can be hidden without deleting records', ()
     assert.doesNotMatch(nativeMenu, /assistantAction|switchAction/);
 });
 
-test('Guestel removes stale hotels safely and confirms destructive gestures', () => {
+test('Guestel removes stale hotels safely and keeps destructive gestures direct', () => {
     const api = fs.readFileSync(path.join(guestel, 'BookingAPI.swift'), 'utf8');
     const store = fs.readFileSync(path.join(guestel, 'Store.swift'), 'utf8');
     const hotels = fs.readFileSync(path.join(guestel, 'HotelsView.swift'), 'utf8');
     const messages = fs.readFileSync(path.join(guestel, 'MessagesView.swift'), 'utf8');
+    const addHotel = fs.readFileSync(path.join(guestel, 'AddHotelView.swift'), 'utf8');
 
     assert.match(server, /!hotel \|\| hotel\.active === false/);
     assert.match(api, /case http\(statusCode: Int, message: String\)/);
@@ -72,11 +73,16 @@ test('Guestel removes stale hotels safely and confirms destructive gestures', ()
     assert.match(store, /removeMissingHotel\(hotelId\)/);
     assert.match(store, /guestel\.hidden-hotels\.v1/);
     assert.match(hotels, /\.contextMenu \{/);
-    assert.match(hotels, /\.draggable\(hotel\.id\.uuidString\)/);
-    assert.match(hotels, /\.dropDestination\(for: String\.self\)/);
-    assert.match(store, /func moveHotel\(_ movingID: UUID, relativeTo targetID: UUID, placeAfter: Bool\)/);
+    assert.doesNotMatch(hotels, /\.draggable\(/);
+    assert.doesNotMatch(hotels, /\.dropDestination\(/);
+    assert.doesNotMatch(store, /func moveHotel\(/);
     assert.match(hotels, /\.alert\("Remove this hotel\?"/);
-    assert.match(messages, /\.alert\("Delete this conversation\?"/);
-    assert.match(messages, /asyncAfter\(deadline: \.now\(\) \+ 0\.22\)/);
+    assert.match(messages, /Button\(role: \.destructive\) \{\s*deleteConversation\(stay\)/);
+    assert.match(messages, /withAnimation\(\.snappy\(duration: 0\.22\)\)/);
+    assert.doesNotMatch(messages, /Delete this conversation\?/);
+    assert.doesNotMatch(messages, /requestConversationDeletion/);
     assert.doesNotMatch(messages, /\.confirmationDialog\(/);
+    assert.match(addHotel, /DataScannerViewController/);
+    assert.match(addHotel, /Label\("Scan Guestel QR", systemImage: "qrcode\.viewfinder"\)/);
+    assert.match(addHotel, /parts\[0\]\.lowercased\(\) == "clip"/);
 });

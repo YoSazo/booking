@@ -226,7 +226,8 @@ test('Guestel conversation deletion is guest-only, durable, and native', () => {
     assert.match(api, /static func deleteConversation/);
     assert.match(messages, /\.swipeActions\(edge: \.trailing/);
     assert.match(messages, /Button\(role: \.destructive\)/);
-    assert.match(messages, /The property keeps its copy/);
+    assert.match(messages, /withAnimation\(\.snappy\(duration: 0\.22\)\)/);
+    assert.doesNotMatch(messages, /Delete this conversation\?|confirmationDialog/);
 });
 
 test('Guestel offers in-app account deletion without cancelling hotel records', () => {
