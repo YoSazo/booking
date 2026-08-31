@@ -46,6 +46,7 @@ export default function GuestelQrCode({ value, size = 240, alt = 'Open in Gueste
 const styles = {
   frame: {
     maxWidth: '100%',
+    marginInline: 'auto',
     display: 'grid',
     placeItems: 'center',
     overflow: 'hidden',
