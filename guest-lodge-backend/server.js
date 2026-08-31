@@ -289,14 +289,37 @@ async function buildGuestBookingUrl(hotelId, code, req) {
     return `${base}/booking/${encodeURIComponent(code)}`;
 }
 
+function buildGuestelInvocationUrl({ hotelId, domain, intent = 'add', handoffToken, ref = 'email' }) {
+    const params = new URLSearchParams({ p: 'com.bookmarketel.guestel.Clip' });
+    if (domain) params.set('domain', domain);
+    if (hotelId) params.set('hotelId', hotelId);
+    if (intent) params.set('intent', intent);
+    if (handoffToken) params.set('handoff', handoffToken);
+    if (ref) params.set('ref', ref);
+    return `https://appclip.apple.com/id?${params.toString()}`;
+}
+
 async function buildGuestInstallUrl(hotelId, code, req, ref = 'email') {
     const base = await buildGuestSiteBase(hotelId, req);
-    if (!base) return '';
-    const params = new URLSearchParams();
-    if (code) params.set('code', code);
-    if (ref) params.set('ref', ref);
-    const qs = params.toString();
-    return `${base}/install${qs ? `?${qs}` : ''}`;
+    let domain = '';
+    try { domain = base ? new URL(base).hostname : ''; } catch (_) {}
+    let handoffToken = '';
+    if (code) {
+        const booking = await prisma.booking.findFirst({
+            where: {
+                hotelId,
+                OR: [{ ourReservationCode: code }, { pmsConfirmationCode: code }],
+            },
+        }).catch(() => null);
+        if (booking) handoffToken = await issueGuestAppHandoff(booking);
+    }
+    return buildGuestelInvocationUrl({
+        hotelId,
+        domain,
+        intent: handoffToken ? 'stay' : 'add',
+        handoffToken,
+        ref,
+    });
 }
 
 function guestInstallEmailBlockHtml({ hotelName, installUrl }) {
@@ -304,10 +327,10 @@ function guestInstallEmailBlockHtml({ hotelName, installUrl }) {
     const safeName = escapeXml(hotelName || 'your hotel');
     const safeInstallUrl = escapeXml(installUrl);
     return `<div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:12px;padding:20px;margin:0 0 20px;text-align:center;">
-        <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">📱 Add ${safeName} to your phone</div>
-        <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">Message the front desk, get check-in updates, and book direct next time — like a real app, no app store.</p>
-        <a href="${safeInstallUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Add to Home Screen →</a>
-        <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone: open the link in Safari → Share → Add to Home Screen</div>
+        <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">Keep ${safeName} in Guestel</div>
+        <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">See stay updates, message the Front Desk, and book direct next time without searching again.</p>
+        <a href="${safeInstallUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Open in Guestel →</a>
+        <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone, this opens the property through Apple’s Guestel App Clip.</div>
     </div>`;
 }
 
@@ -376,11 +399,11 @@ async function sendGuestInstallReminderEmail({ guestEmail, guestName, hotelName,
         const checkinStr = new Date(checkin).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
         const phoneStr = hotelPhone ? ` — ${hotelPhone}` : '.';
         const installBlock = guestInstallEmailBlockHtml({ hotelName, installUrl });
-        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Check-in tomorrow at ${hotelName}</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">You're checking in <strong>${checkinStr}</strong>${roomName ? ` in <strong>${roomName}</strong>` : ''}. Add <strong>${hotelName}</strong> to your home screen now — message us for WiFi, early check-in, or anything you need.</p>${installBlock}${bookingUrl ? `<div style="text-align:center;margin:0 0 16px;"><a href="${bookingUrl}" style="display:inline-block;background:#f3f4f6;color:#1a1a2e;text-decoration:none;font-size:13px;font-weight:600;padding:11px 20px;border-radius:10px;">View reservation details</a></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Questions? Contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#1a2b22;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">Check-in tomorrow at ${hotelName}</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 16px;font-size:15px;color:#1a1a2e;">Hi ${guestName},</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">You're checking in <strong>${checkinStr}</strong>${roomName ? ` in <strong>${roomName}</strong>` : ''}. Keep <strong>${hotelName}</strong> in Guestel so stay updates, direct booking, and Front Desk messages stay together.</p>${installBlock}${bookingUrl ? `<div style="text-align:center;margin:0 0 16px;"><a href="${bookingUrl}" style="display:inline-block;background:#f3f4f6;color:#1a1a2e;text-decoration:none;font-size:13px;font-weight:600;padding:11px 20px;border-radius:10px;">View reservation details</a></div>` : ''}<p style="margin:0;font-size:13px;color:#6b7280;line-height:1.5;">Questions? Contact the hotel directly${phoneStr}</p></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
         await emailTransporter.sendMail({
             from: `"${hotelName}" <support@bookmarketel.com>`,
             to: guestEmail,
-            subject: `Add ${hotelName} to your phone before check-in`,
+            subject: `Keep ${hotelName} in Guestel before check-in`,
             html,
         });
         console.log(`✅ Guest install reminder sent to ${guestEmail}`);
@@ -427,7 +450,7 @@ async function markGuestAppInstalled(hotelId, reservationCode) {
     }
 }
 
-/** Send pre-check-in install reminders for bookings checking in within ~36 hours. */
+/** Send pre-check-in Guestel reminders for bookings checking in within ~36 hours. */
 async function runGuestInstallReminders() {
     if (!emailTransporter) return { sent: 0, skipped: 0 };
     const now = new Date();
@@ -486,7 +509,13 @@ async function runGuestInstallReminders() {
         const base = domain ? `https://${domain}` : '';
         if (!base) { skipped++; continue; }
 
-        const installUrl = `${base}/install?code=${encodeURIComponent(code)}&ref=checkin-reminder`;
+        const installUrl = buildGuestelInvocationUrl({
+            hotelId: b.hotelId,
+            domain,
+            intent: 'stay',
+            handoffToken: await issueGuestAppHandoff(b),
+            ref: 'checkin-reminder',
+        });
         const bookingUrl = `${base}/booking/${encodeURIComponent(code)}`;
         const ok = await sendGuestInstallReminderEmail({
             guestEmail: b.guestEmail,
@@ -524,7 +553,8 @@ const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '';
 const META_TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE || ''; // Set in env for testing only; leave unset in production
 
-// Web Push (PWA notifications for new bookings)
+// Web Push remains for the browser-based owner Front Desk and previously
+// connected guest browsers. New guest installs use Guestel/APNs.
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
@@ -4078,7 +4108,7 @@ app.get('/api/booking/lookup', guestBookingLookupRateLimit, async (req, res) => 
     }
 });
 
-// PUBLIC: refresh every reservation connected to one guest PWA in a single
+// PUBLIC: refresh every reservation connected to one guest browser in a single
 // request. This keeps Front Desk decisions, cancellation reasons and property
 // details coherent without multiplying polling traffic for repeat guests.
 app.post('/api/booking/stays', guestBookingSyncGlobalRateLimit, guestBookingSyncRateLimit, async (req, res) => {
@@ -6654,7 +6684,7 @@ app.get('/api/push/native/status', crmAuth, async (req, res) => {
     }
 });
 
-// Guest PWA: register for message notifications (public, no auth).
+// Compatibility route for guest browsers connected before Guestel launched.
 app.post('/api/guest-push-subscribe', guestPushSubscribeGlobalRateLimit, guestPushSubscribeRateLimit, async (req, res) => {
     try {
         const { hotelId, reservationCode, email, subscription } = req.body || {};
@@ -6708,9 +6738,8 @@ app.post('/api/guest-push-subscribe', guestPushSubscribeGlobalRateLimit, guestPu
     }
 });
 
-// Guest PWA install + notification funnel (public). Notification permission is
-// a separate conversion after installation, so measure it separately instead
-// of assuming every installed guest is reachable.
+// Guestel/App Clip handoff funnel (public). Older event names remain accepted
+// so historic clients and reporting rows do not break during the migration.
 app.post('/api/guest-install-event', async (req, res) => {
     try {
         const { hotelId, reservationCode, touchpoint, eventType } = req.body || {};
@@ -6763,7 +6792,7 @@ app.post('/api/guest-install-event', async (req, res) => {
 // resolves the hotel directly rather than requiring an active subscription.
 app.post('/api/hotel/:hotelId/booking-intent', async (req, res) => {
     try {
-        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        const hotel = await resolvePublicHotelConfig(req.params.hotelId);
         if (!hotel) return res.json({ success: true }); // unknown hotel — no-op, never error the guest
         const { roomName, checkin, checkout, nights } = req.body || {};
         await prisma.funnelEvent.create({
@@ -6792,7 +6821,7 @@ app.post('/api/hotel/:hotelId/track', async (req, res) => {
     try {
         const eventName = GROWTH_EVENT_NAMES[String(req.body?.event || '').trim()];
         if (!eventName) return res.json({ success: true }); // unknown event — no-op
-        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        const hotel = await resolvePublicHotelConfig(req.params.hotelId);
         if (!hotel) return res.json({ success: true });
         const { roomName, checkin, checkout, nights, externalId } = req.body || {};
         await prisma.funnelEvent.create({
@@ -7234,7 +7263,7 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppHomeScreenViewed',
     'GuestAppRebookViewed',
     'GuestAppBroadcastViewed',
-    // Guestel replaced the promoted Home Screen/PWA path. Keep the historic
+    // Guestel replaced the retired browser-install path. Keep the historic
     // names above so old sessions remain readable; the current reveal packs
     // the Front Desk, App Clip handoff and Guestel screens into three optional
     // carousels.
@@ -7775,7 +7804,7 @@ app.get('/api/crm/guest-install-stats', crmAuth, async (req, res) => {
         ]);
         // Legacy web endpoints and APNs tokens are different identifiers, so a
         // cross-channel duplicate cannot be safely merged. New iPhone users use
-        // Guestel only; this sum keeps existing PWA users reachable in silence.
+        // Guestel only; this sum keeps previously connected browsers reachable.
         const guestPushSubscribers = legacyGuestPushSubscribers + guestelBroadcastTokens.size;
 
         const byTouchpoint = {};
@@ -7942,7 +7971,7 @@ app.post('/api/push/test', crmAuth, async (req, res) => {
 
 const BIG_BOOKING_USD = Number(process.env.BIG_BOOKING_USD || 250);
 
-// Owner-facing alerts only — guest PWA subscriptions use source='guest'.
+// Owner-facing alerts only — legacy guest-browser subscriptions use source='guest'.
 function ownerPushWhere(hotelId) {
     return { hotelId, NOT: { source: 'guest' } };
 }
@@ -9438,7 +9467,7 @@ async function maybeNudgeOwnerNoAlerts(booking) {
         const ownerCtaUrl = ownerAppReady ? MARKETEL_FRONTDESK_APP_STORE_URL : frontdeskUrl;
         const ownerCtaLabel = ownerAppReady ? 'Download Marketel Front Desk →' : 'Open Web Front Desk →';
         const ownerAppNote = ownerAppReady
-            ? 'Marketel Front Desk is the owner app from the App Store. Guests never download it; they save your property from your booking page.'
+            ? 'Marketel Front Desk is the owner app. Guests use Guestel to keep your property, follow their stay, and book direct again.'
             : 'The Web Front Desk is available now. Connect the Marketel Front Desk App Store listing before launch to receive native iPhone booking alerts.';
 
         const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;"><tr><td align="center" style="padding:40px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);"><tr><td style="background:#2E7D5B;padding:24px 32px;text-align:center;color:white;"><h1 style="margin:0;font-size:20px;font-weight:700;">This booking confirmed without you</h1></td></tr><tr><td style="padding:28px 32px;"><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;"><strong>${booking.roomName}</strong>${stay ? ` · ${stay}` : ''} was just booked at ${hotelName} and went straight to confirmed.</p><p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.55;">With the Marketel Front Desk owner app on your iPhone, you'd get <strong>${minutes} minutes</strong> to release a room you'd already sold somewhere else—one tap from the notification. Right now there's no owner device we can alert, so every booking locks in automatically.</p><div style="text-align:center;margin:0 0 20px;"><a href="${ownerCtaUrl}" style="display:inline-block;background:#2E7D5B;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 26px;border-radius:10px;">${ownerCtaLabel}</a></div><div style="background:#f8f9fa;border-radius:10px;padding:14px 16px;"><p style="margin:0;font-size:12px;color:#6b7280;line-height:1.5;">${ownerAppNote}</p></div></td></tr><tr><td style="padding:16px 32px;border-top:1px solid #f0f0f0;"><p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">Powered by Marketel</p></td></tr></table></td></tr></table></body></html>`;
@@ -12384,7 +12413,7 @@ function productionLaunchReadiness() {
         item('vercel-domains', 'Automatic property domains', present('VERCEL_TOKEN') && present('VERCEL_PROJECT_ID'), 'Set VERCEL_TOKEN and VERCEL_PROJECT_ID.'),
         item('image-storage', 'Durable property image storage', ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'].every(name => present(name)), 'Set all R2 storage values; Render disk is not durable.'),
         item('email', 'Owner and guest email delivery', present('BREVO_SMTP_HOST') && present('BREVO_SMTP_LOGIN') && (present('BREVO_SMTP_KEY') || present('BREVO_SMTP')), 'Set BREVO_SMTP_HOST, BREVO_SMTP_LOGIN, and BREVO_SMTP_KEY (or the supported BREVO_SMTP alias).'),
-        item('guest-web-push', 'Guest Home Screen notifications', present('VAPID_PUBLIC_KEY') && present('VAPID_PRIVATE_KEY'), 'Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY.'),
+        item('guestel-push', 'Guestel native notifications', ['APNS_TEAM_ID', 'APNS_KEY_ID', 'APNS_PRIVATE_KEY'].every(name => present(name)) && present('GUESTEL_APNS_BUNDLE_ID'), 'Set APNs credentials and GUESTEL_APNS_BUNDLE_ID.'),
         item('ios-push', 'Front Desk native push notifications', ['APNS_TEAM_ID', 'APNS_KEY_ID', 'APNS_PRIVATE_KEY'].every(name => present(name)) && clean('APNS_BUNDLE_ID') === 'com.bookmarketel.frontdesk', 'Set APNs team, key, private key, and the exact bundle ID.'),
         item('assistant-sms', 'Front Desk Assistant SMS', present('TWILIO_ACCOUNT_SID') && present('TWILIO_AUTH_TOKEN') && twilioSenderReady && clean('TWILIO_VALIDATE_SIGNATURES') === 'true', 'Set Twilio credentials/sender and keep signature validation true.'),
         item('assistant-intelligence', 'Front Desk Assistant language model', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY.', false),
@@ -13356,7 +13385,7 @@ function isRasterAppIconUrl(url) {
     return ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
 }
 
-async function resolveHotelForManifest(hotelId) {
+async function resolvePublicHotelConfig(hotelId) {
     let hotel = await prisma.hotelConfig.findUnique({ where: { id: hotelId } });
     if (!hotel) {
         const domainGuess = hotelId + '.mktel.co';
@@ -13382,24 +13411,15 @@ async function renderHotelLetterIconPng(letter, size) {
     return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-function buildGuestManifestIcons(hotel, hotelId, baseUrl) {
-    const id = (hotel && hotel.id) || hotelId;
-    const iconBase = `${baseUrl}/api/hotel/${encodeURIComponent(id)}/guest-app-icon.png`;
-    return [
-        { src: `${iconBase}?s=192`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: `${iconBase}?s=512`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-        { src: `${iconBase}?s=512`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    ];
-}
-
-// Per-hotel home-screen icon: uploaded logo, or a generated letter tile (e.g. "M" for Mo's Hotel).
+// Per-hotel square image used by browser identity and Guestel surfaces: an
+// uploaded logo, or a generated letter tile (e.g. "M" for Mo's Hotel).
 app.get('/api/hotel/:hotelId/guest-app-icon.png', async (req, res) => {
     try {
         const allowedSizes = [96, 128, 152, 180, 192, 256, 512];
         let size = parseInt(req.query.s, 10) || 192;
         if (!allowedSizes.includes(size)) size = 192;
 
-        const hotel = await resolveHotelForManifest(req.params.hotelId);
+        const hotel = await resolvePublicHotelConfig(req.params.hotelId);
         const baseUrl = `${req.protocol}://${req.get('host')}`;
 
         let png;
@@ -13427,41 +13447,6 @@ app.get('/api/hotel/:hotelId/guest-app-icon.png', async (req, res) => {
         } catch {
             res.status(500).end();
         }
-    }
-});
-
-// Dynamic per-hotel PWA manifest — lets each hotel be installed to the home
-// screen as "their" app (their name + their icon). Served same-origin via the
-// booking engine's /api proxy so install prompts work.
-app.get('/api/hotel/:hotelId/manifest.webmanifest', async (req, res) => {
-    try {
-        const hotel = await resolveHotelForManifest(req.params.hotelId);
-
-        const name = (hotel && hotel.name) || 'Book Now';
-        const hotelId = (hotel && hotel.id) || req.params.hotelId;
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
-        const icons = buildGuestManifestIcons(hotel, hotelId, baseUrl);
-
-        const manifest = {
-            name,
-            short_name: name.length > 12 ? name.slice(0, 12) : name,
-            description: `Book directly with ${name}`,
-            start_url: '/?homescreen=1',
-            scope: '/',
-            display: 'standalone',
-            background_color: '#ffffff',
-            theme_color: '#2E7D5B',
-            orientation: 'portrait',
-            icons,
-        };
-
-        res.set('Content-Type', 'application/manifest+json');
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Cache-Control', 'public, max-age=300');
-        res.json(manifest);
-    } catch (e) {
-        console.error('Manifest error:', e.message);
-        res.status(500).json({ error: 'Server error' });
     }
 });
 
@@ -17647,7 +17632,7 @@ app.post('/api/crm/messages/:reservationCode/reply', crmAuth, async (req, res) =
 
 // Legacy delete route: never erase a real reservation record. Route it through
 // the same cancellation transaction used by the visible Front Desk action so
-// inventory, the card hold, email, guest PWA and revenue history stay aligned.
+// inventory, the card hold, email, Guestel state and revenue history stay aligned.
 app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
     try {
         const { id } = req.params;

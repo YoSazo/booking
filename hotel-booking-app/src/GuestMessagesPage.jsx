@@ -4,8 +4,6 @@ import { ChevronLeft, Send, Search, MessageSquare } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
-import { isStandalone } from './pwaUtils.js';
-import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { getStayStatusMeta, isDeadBookingStatus, stayStorageSnapshot } from './guestStayState.js';
 import useGuestStayDeepLink from './useGuestStayDeepLink.js';
@@ -536,7 +534,7 @@ export default function GuestMessagesPage({ hotel }) {
           </div>
         )}
 
-        {!deadStay && !isStandalone() && (
+        {!deadStay && (
           <div style={{ marginBottom: 8 }}>
             <GuestInstallCard
               hotelName={hotel?.name}
@@ -546,17 +544,9 @@ export default function GuestMessagesPage({ hotel }) {
               apiBaseUrl={apiBaseUrl}
               touchpoint="messages-card"
               variant="card"
-              subline="Save this property to your Home Screen to receive reply notifications on your phone."
+              subline="Keep this property in Guestel to receive replies and stay updates on your iPhone."
             />
           </div>
-        )}
-
-        {!deadStay && (
-          <GuestNotificationPrompt
-            apiBaseUrl={apiBaseUrl}
-            hotelId={hotelId}
-            guestStay={guestStay}
-          />
         )}
 
         {loading ? (

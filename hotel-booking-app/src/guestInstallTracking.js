@@ -1,4 +1,4 @@
-/** Record guest PWA install and notification-permission funnel events. */
+/** Record Guestel/App Clip handoff funnel events. */
 
 import { isNativeGuestelContext } from './nativeGuestelContext.js';
 
@@ -11,9 +11,7 @@ export function trackGuestInstall(apiBaseUrl, hotelId, { touchpoint, eventType, 
   if (!apiBaseUrl || !hotelId || !touchpoint || !eventType) return;
 
   try {
-    const dedupeEvents = eventType === 'view'
-      || eventType === 'installed'
-      || eventType === 'notification_subscribed';
+    const dedupeEvents = eventType === 'view';
     if (dedupeEvents && sessionStorage.getItem(sessionKey(touchpoint, reservationCode, eventType))) {
       return;
     }

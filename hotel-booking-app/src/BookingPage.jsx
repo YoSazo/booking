@@ -3,9 +3,7 @@ import { PawPrint, Users } from 'lucide-react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import CalendarModal from './CalendarModal.jsx';
-import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
-import { isStandalone } from './pwaUtils.js';
-import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { isAndroid, resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 
@@ -50,7 +48,6 @@ function BookingPage({
     };
   }, []);
   const [savedHighlight, setSavedHighlight] = useState(initialSavedHighlight);
-  const [showInstallQr, setShowInstallQr] = useState(false);
   const [isDesktopBooking, setIsDesktopBooking] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
   ));
@@ -128,7 +125,7 @@ function BookingPage({
     };
   }, [ownerScrollInstall, isLoading, roomData]);
 
-  const showInstallBanner = !isStandalone() && (roomData?.length > 0 || ownerScrollInstall);
+  const showInstallBanner = (!isAndroid() || ownerPreview) && (roomData?.length > 0 || ownerScrollInstall);
   const railRoom = selectedRoom || roomData?.[0] || null;
   const nights = checkinDate && checkoutDate ? Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)) : 0;
   const railPricing = useMemo(() => {
@@ -279,9 +276,7 @@ function BookingPage({
             flush
             touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
             apiBaseUrl={apiBaseUrl}
-            guidedBookingInstall
             hotelSubscribed={hotel.subscribed !== false}
-            onCtaClick={() => setShowInstallQr(true)}
           />
         </div>
       )}
@@ -381,16 +376,9 @@ function BookingPage({
             bottomOffset={14}
             touchpoint={ownerPreview ? 'frontdesk-preview' : 'booking-page'}
             apiBaseUrl={apiBaseUrl}
-            guidedBookingInstall
             hotelSubscribed={hotel.subscribed !== false}
           />
         </div>
-      )}
-      {showInstallQr && (
-        <GuestInstallQrOverlay
-          hotelName={hotel.name}
-          onClose={() => setShowInstallQr(false)}
-        />
       )}
     </div>
   );

@@ -1,444 +1,104 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Share, Smartphone, Loader2, Copy, ArrowRight } from 'lucide-react';
-import { useGuest } from './GuestProvider.jsx';
-import { isStandalone } from './pwaUtils.js';
-import {
-  BRAND,
-  INSTALL_THEME,
-  isIos,
-  isAndroid,
-  qrCodeUrl,
-  HotelIcon,
-  AndroidInstallSteps,
-  InstallBenefits,
-  SuccessCheckIcon,
-} from './guestInstallUi.jsx';
+import React, { useEffect } from 'react';
+import { ArrowRight, QrCode, Smartphone } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { BRAND, HotelIcon, INSTALL_THEME, isAndroid, isIos } from './guestInstallUi.jsx';
 import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
-import BookingInstallCoach from './BookingInstallCoach.jsx';
-import { stayStorageSnapshot } from './guestStayState.js';
+import { guestelInvocationUrl, guestelQrInvocationUrl } from './appClipInstall.js';
+import GuestelQrCode from './GuestelQrCode.jsx';
 
+// Historic /install links remain valid, but now hand off only to Guestel.
 function InstallPage({ hotel, apiBaseUrl = '', hotelId }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setGuestStay, guestStay } = useGuest();
   const resolvedHotelId = hotelId || hotel?.id;
+  const ref = searchParams.get('ref') || 'legacy-install-link';
   const code = searchParams.get('code') || '';
-  const ref = searchParams.get('ref') || 'direct';
-
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showInstallCoach, setShowInstallCoach] = useState(false);
-  const [showAndroidSteps, setShowAndroidSteps] = useState(false);
-  const [installed, setInstalled] = useState(isStandalone());
-  const [installing, setInstalling] = useState(false);
-  const [lookupDone, setLookupDone] = useState(!code);
-  const [copied, setCopied] = useState(false);
-
-  const hotelName = hotel?.name || 'Your Hotel';
-  const appIconUrl = hotel?.appIconUrl || '';
-  const installPageUrl = typeof window !== 'undefined' ? window.location.href.split('#')[0] : '';
   const touchpoint = installTouchpointFromRef(ref);
-  const trackCode = code || guestStay?.code || undefined;
   const ios = isIos();
   const android = isAndroid();
-  const showQr = typeof window !== 'undefined' && window.innerWidth >= 480 && installPageUrl && !ios && !android;
-
-  const markInstalled = useCallback(() => {
-    setInstalled(true);
-    trackGuestInstall(apiBaseUrl, resolvedHotelId, {
-      touchpoint,
-      eventType: 'installed',
-      reservationCode: trackCode,
-    });
-  }, [apiBaseUrl, resolvedHotelId, touchpoint, trackCode]);
+  const hotelName = hotel?.name || 'this property';
+  const appIconUrl = hotel?.appIconUrl || '';
+  const invocationUrl = guestelInvocationUrl({ hotelId: resolvedHotelId, intent: code ? 'stay' : 'add' });
+  const qrUrl = guestelQrInvocationUrl({
+    hotelId: resolvedHotelId,
+    intent: code ? 'stay' : 'book',
+    ref: touchpoint,
+  });
 
   useEffect(() => {
-    if (isStandalone()) {
-      markInstalled();
-      return undefined;
-    }
-
+    if (android) return;
     trackGuestInstall(apiBaseUrl, resolvedHotelId, {
       touchpoint,
       eventType: 'view',
-      reservationCode: trackCode,
+      reservationCode: code || undefined,
     });
+  }, [android, apiBaseUrl, code, resolvedHotelId, touchpoint]);
 
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    const onInstalled = () => {
-      markInstalled();
-      setDeferredPrompt(null);
-      setInstalling(false);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, [apiBaseUrl, resolvedHotelId, touchpoint, trackCode, markInstalled]);
-
-  useEffect(() => {
-    if (!code || !resolvedHotelId || !apiBaseUrl || guestStay?.code === code) {
-      setLookupDone(true);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const params = new URLSearchParams({ hotelId: resolvedHotelId, code });
-        const res = await fetch(`${apiBaseUrl}/api/booking/lookup?${params}`);
-        const data = await res.json().catch(() => ({}));
-        if (!cancelled && res.ok && data.success && data.booking) {
-          setGuestStay(stayStorageSnapshot(data.booking));
-        }
-      } catch (e) { /* ignore */ }
-      if (!cancelled) setLookupDone(true);
-    })();
-    return () => { cancelled = true; };
-  }, [code, resolvedHotelId, apiBaseUrl, guestStay?.code, setGuestStay]);
-
-  const trackCta = () => {
+  const openGuestel = () => {
     trackGuestInstall(apiBaseUrl, resolvedHotelId, {
       touchpoint,
       eventType: 'cta_click',
-      reservationCode: trackCode,
+      reservationCode: code || undefined,
     });
+    window.location.assign(invocationUrl);
   };
-
-  const handleInstall = async () => {
-    trackCta();
-    if (!deferredPrompt) return;
-    setInstalling(true);
-    try {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') markInstalled();
-      setDeferredPrompt(null);
-    } finally {
-      setInstalling(false);
-    }
-  };
-
-  const handleCopyLink = async () => {
-    if (!installPageUrl) return;
-    try {
-      await navigator.clipboard.writeText(installPageUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch (e) { /* ignore */ }
-  };
-
-  const subtitle = ref === 'checkin-reminder'
-    ? "You're almost here—save this property now so you can message us and get updates."
-    : 'Save this property from the booking page. No App Store. Message us anytime and book direct next time.';
-
-  if (!lookupDone) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.body}>
-          <div style={styles.loading}>Loading…</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (installed) {
-    return (
-      <div style={styles.page}>
-        <style>{installKeyframes}</style>
-        <div style={styles.body}>
-          <div style={styles.main}>
-            <SuccessCheckIcon />
-            <h1 style={styles.title}>{hotelName} is on your phone</h1>
-            <p style={{ ...styles.subtitle, marginBottom: 0 }}>Open it anytime from your home screen — no browser needed.</p>
-          </div>
-          <div style={styles.footer}>
-            <button
-              type="button"
-              onClick={() => navigate(guestStay?.code ? '/guest/home' : '/')}
-              style={styles.primaryBtn}
-            >
-              {guestStay?.code ? 'Open Your Stay' : 'Book a room'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  let ctaBlock = null;
-  if (ios) {
-    ctaBlock = (
-      <>
-        <button
-          type="button"
-          onClick={() => { trackCta(); setShowInstallCoach(true); }}
-          style={styles.primaryBtn}
-        >
-          <Share size={18} color="#fff" strokeWidth={2.2} />
-          Show me how
-        </button>
-        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
-      </>
-    );
-  } else if (android && deferredPrompt) {
-    ctaBlock = (
-      <>
-        <button
-          type="button"
-          onClick={handleInstall}
-          style={styles.primaryBtn}
-          disabled={installing}
-        >
-          {installing ? (
-            <>
-              <Loader2 size={18} strokeWidth={2.2} style={{ animation: 'installSpin 0.8s linear infinite' }} />
-              Adding…
-            </>
-          ) : (
-            <>
-              <Smartphone size={18} strokeWidth={2.2} />
-              Add to Home Screen
-            </>
-          )}
-        </button>
-        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
-      </>
-    );
-  } else if (android) {
-    // D10: no browser prompt available — never a disabled button. Show the
-    // manual Chrome steps, which always work.
-    ctaBlock = (
-      <>
-        <button
-          type="button"
-          onClick={() => { trackCta(); setShowAndroidSteps((v) => !v); }}
-          style={styles.primaryBtn}
-        >
-          <Smartphone size={18} strokeWidth={2.2} />
-          {showAndroidSteps ? 'Hide steps' : 'Add to Home Screen'}
-        </button>
-        {showAndroidSteps && (
-          <div style={{ marginTop: 16, textAlign: 'left', background: INSTALL_THEME.bg, border: `1px solid ${INSTALL_THEME.border}`, borderRadius: 14, padding: 16 }}>
-            <AndroidInstallSteps />
-          </div>
-        )}
-        <p style={styles.hint}>Takes 3 seconds · opens from your Home Screen</p>
-      </>
-    );
-  } else if (showQr) {
-    ctaBlock = (
-      <>
-        <div style={styles.qrBlock}>
-          <p style={styles.qrLabel}>Scan with your phone</p>
-          <img src={qrCodeUrl(installPageUrl, 170)} alt="QR code" width={170} height={170} style={{ borderRadius: 12, display: 'block', margin: '0 auto' }} />
-        </div>
-        <div style={styles.copyRow}>
-          <input readOnly value={installPageUrl} style={styles.copyInput} aria-label="Home Screen page link" />
-          <button type="button" onClick={handleCopyLink} style={styles.copyBtn}>
-            {copied ? 'Copied!' : <><Copy size={14} strokeWidth={2.2} /> Copy</>}
-          </button>
-        </div>
-      </>
-    );
-  } else {
-    ctaBlock = (
-      <p style={styles.hint}>
-        Open this booking page on your phone in Chrome or Safari, then add the property to your Home Screen.
-      </p>
-    );
-  }
 
   return (
-    <div style={styles.page}>
-      <style>{installKeyframes}</style>
-      <div style={styles.body}>
-        <div style={styles.main}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-            <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={72} />
+    <main style={styles.page}>
+      <section style={styles.card}>
+        <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={72} style={{ margin: '0 auto 18px' }} />
+        <div style={styles.eyebrow}>Guestel</div>
+        <h1 style={styles.title}>Keep {hotelName} with you</h1>
+        <p style={styles.subtitle}>Book direct, keep your stay details, and message the Front Desk from one guest app.</p>
+
+        {ios ? (
+          <button type="button" onClick={openGuestel} style={styles.primaryButton}>
+            <Smartphone size={18} /> Open in Guestel
+          </button>
+        ) : android ? (
+          <div style={styles.unavailable}>
+            Guestel is currently available on iPhone. You can keep booking on this website.
           </div>
-          <h1 style={styles.title}>Add {hotelName} to your phone</h1>
-          <p style={styles.subtitle}>{subtitle}</p>
+        ) : (
+          <div style={styles.qrPanel}>
+            <GuestelQrCode value={qrUrl} size={220} alt={`Guestel QR code for ${hotelName}`} style={styles.qrImage} />
+            <strong style={styles.qrTitle}><QrCode size={17} /> Scan with an iPhone</strong>
+            <span style={styles.qrCopy}>The Guestel App Clip opens this exact property.</span>
+          </div>
+        )}
 
-          <InstallBenefits />
-        </div>
-
-        <div style={styles.footer}>
-          {ctaBlock}
-          {guestStay?.code && (
-            <button type="button" onClick={() => navigate('/guest/home')} style={styles.secondaryBtn}>
-              Open Your Stay
-              <ArrowRight size={16} strokeWidth={2.2} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {showInstallCoach && (
-        <BookingInstallCoach
-          hotelName={hotelName}
-          appIconUrl={appIconUrl}
-          onClose={() => setShowInstallCoach(false)}
-        />
-      )}
-    </div>
+        <button type="button" onClick={() => navigate(code ? `/booking/${encodeURIComponent(code)}` : '/')} style={styles.secondaryButton}>
+          {code ? 'View reservation' : 'Continue booking'} <ArrowRight size={16} />
+        </button>
+      </section>
+    </main>
   );
 }
 
-const installKeyframes = `
-  @keyframes installPopIn {
-    from { transform: scale(0); }
-    to { transform: scale(1); }
-  }
-  @keyframes installSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-`;
-
 const styles = {
   page: {
-    minHeight: '100dvh',
-    width: '100%',
-    background: INSTALL_THEME.white,
-    fontFamily: "'DM Sans', Inter, -apple-system, BlinkMacSystemFont, sans-serif",
-    boxSizing: 'border-box',
+    minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 'max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))',
+    background: 'linear-gradient(180deg,#edf5f0,#f8faf9)', fontFamily: "'DM Sans',Inter,-apple-system,BlinkMacSystemFont,sans-serif", boxSizing: 'border-box',
   },
-  body: {
-    minHeight: '100dvh',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: 'max(32px, env(safe-area-inset-top)) 22px max(28px, env(safe-area-inset-bottom))',
-    maxWidth: 480,
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box',
-    textAlign: 'center',
+  card: {
+    width: 'min(100%,430px)', padding: '30px 24px 24px', border: `1px solid ${INSTALL_THEME.border}`, borderRadius: 24,
+    background: '#fff', boxShadow: '0 22px 60px rgba(27,65,45,.13)', textAlign: 'center', boxSizing: 'border-box',
   },
-  main: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    textAlign: 'center',
+  eyebrow: { marginBottom: 7, color: BRAND, fontSize: 11, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase' },
+  title: { margin: 0, color: INSTALL_THEME.text, fontSize: 25, lineHeight: 1.18, fontWeight: 850 },
+  subtitle: { margin: '10px auto 22px', maxWidth: 340, color: INSTALL_THEME.textMuted, fontSize: 14, lineHeight: 1.55 },
+  primaryButton: {
+    width: '100%', minHeight: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    padding: '13px 16px', border: 0, borderRadius: 14, background: BRAND, color: '#fff', font: '800 15px inherit', cursor: 'pointer',
   },
-  footer: {
-    flexShrink: 0,
-    paddingTop: 28,
-    textAlign: 'center',
-  },
-  title: {
-    margin: '0 0 10px',
-    fontSize: 22,
-    fontWeight: 800,
-    color: INSTALL_THEME.text,
-    lineHeight: 1.28,
-  },
-  subtitle: {
-    margin: '0 0 24px',
-    fontSize: 14,
-    color: INSTALL_THEME.textMuted,
-    lineHeight: 1.55,
-  },
-  primaryBtn: {
-    width: '100%',
-    padding: 15,
-    borderRadius: 14,
-    border: 'none',
-    background: BRAND,
-    color: 'white',
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    boxShadow: '0 6px 16px rgba(46,125,91,0.25)',
-  },
-  secondaryBtn: {
-    width: '100%',
-    padding: 14,
-    borderRadius: 14,
-    border: `1.5px solid ${BRAND}`,
-    background: INSTALL_THEME.white,
-    color: BRAND,
-    fontSize: 14.5,
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    marginTop: 9,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  qrBlock: {
-    background: INSTALL_THEME.bg,
-    border: `1px solid ${INSTALL_THEME.border}`,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  qrLabel: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: INSTALL_THEME.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    margin: '0 0 12px',
-  },
-  copyRow: {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 4,
-  },
-  copyInput: {
-    flex: 1,
-    minWidth: 0,
-    padding: '10px 12px',
-    borderRadius: 10,
-    border: `1.5px solid ${INSTALL_THEME.border}`,
-    fontFamily: "'DM Mono', ui-monospace, monospace",
-    fontSize: 11.5,
-    color: INSTALL_THEME.textMuted,
-    background: INSTALL_THEME.white,
-    boxSizing: 'border-box',
-  },
-  copyBtn: {
-    flexShrink: 0,
-    padding: '10px 14px',
-    borderRadius: 10,
-    border: 'none',
-    background: BRAND,
-    color: '#fff',
-    fontFamily: 'inherit',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hint: {
-    fontSize: 11.5,
-    color: INSTALL_THEME.textMuted,
-    marginTop: 12,
-    lineHeight: 1.5,
-  },
-  loading: {
-    textAlign: 'center',
-    padding: 48,
-    color: INSTALL_THEME.textMuted,
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+  qrPanel: { display: 'grid', justifyItems: 'center', gap: 7, padding: 15, borderRadius: 18, background: INSTALL_THEME.bg },
+  qrImage: { width: 220, maxWidth: '100%', borderRadius: 14, background: '#fff' },
+  qrTitle: { display: 'flex', alignItems: 'center', gap: 6, color: INSTALL_THEME.text, fontSize: 14 },
+  qrCopy: { color: INSTALL_THEME.textMuted, fontSize: 12 },
+  unavailable: { padding: 15, borderRadius: 14, background: INSTALL_THEME.bg, color: INSTALL_THEME.textMuted, fontSize: 13, lineHeight: 1.5 },
+  secondaryButton: {
+    width: '100%', minHeight: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: 10, padding: '11px 14px', border: 0, background: 'transparent', color: BRAND, font: '750 13px inherit', cursor: 'pointer',
   },
 };
 

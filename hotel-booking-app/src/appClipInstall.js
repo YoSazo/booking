@@ -1,12 +1,6 @@
-// Guestel App Clip install link. iOS recognizes this HTTPS route through the
-// site's AASA file; every other browser simply lands on the same hotel's web
-// booking engine. Keep it gated until the App Clip experience is approved.
-
-// Release gate: do not strand Safari users on Apple's error page before the
-// App Store Connect default experience is approved. Vercel can enable this
-// without a code change via VITE_GUESTEL_APP_CLIP_ENABLED=true.
-export const APP_CLIP_INSTALL_ENABLED = import.meta.env.VITE_GUESTEL_APP_CLIP_ENABLED === 'true';
-
+// Guestel is the single guest-app handoff. Button taps use Apple's hosted URL
+// (the only link that can present the App Clip card); QR codes use the
+// associated clip.mktel.co route so the property identity travels with them.
 // Invocation URL for a Safari button tap.
 //
 // IMPORTANT: navigating to an associated domain (clip.mktel.co / a hotel subdomain)
@@ -28,4 +22,20 @@ export function guestelInvocationUrl({ hotelId, intent = 'add', handoffToken } =
   // Guestel exchanges it for the normal token.
   if (handoffToken) params.set('handoff', handoffToken);
   return `https://appclip.apple.com/id?${params.toString()}`;
+}
+
+export function guestelQrInvocationUrl({
+  hotelId,
+  intent = 'book',
+  handoffToken,
+  ref = 'booking-engine',
+} = {}) {
+  const cleanHotelId = String(hotelId || '').trim();
+  if (!cleanHotelId) return guestelInvocationUrl({ hotelId, intent, handoffToken });
+  const params = new URLSearchParams();
+  if (intent) params.set('intent', intent);
+  if (ref) params.set('ref', ref);
+  if (handoffToken) params.set('handoff', handoffToken);
+  const query = params.toString();
+  return `https://clip.mktel.co/clip/${encodeURIComponent(cleanHotelId)}${query ? `?${query}` : ''}`;
 }

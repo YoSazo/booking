@@ -18,10 +18,8 @@ import {
 } from 'lucide-react';
 import { useGuest } from './GuestProvider.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
-import { isStandalone } from './pwaUtils.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
 import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
-import GuestNotificationPrompt from './GuestNotificationPrompt.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import {
   daysUntilStayDate,
@@ -109,7 +107,7 @@ function PreBookHub({ hotel, onBook, onFindReservation }) {
       <div style={styles.introSection}>
         <h1 style={styles.pageTitle}>Your next stay starts here</h1>
         <p style={styles.pageSubtitle}>
-          {isStandalone() ? 'Book direct or connect an existing reservation.' : subtitle || 'Book direct and save.'}
+          {subtitle || 'Book direct and save.'}
         </p>
       </div>
       {(address || phone) && <PropertyDetails hotel={hotel} compact />}
@@ -549,10 +547,6 @@ export default function GuestHomePage({ hotel: hotelProp }) {
           touchpoint="guest-home"
           variant="card"
         />
-      )}
-
-      {!dead && meta.phase !== 'completed' && (
-        <GuestNotificationPrompt apiBaseUrl={apiBaseUrl} hotelId={hotelId} guestStay={guestStay} />
       )}
 
       <ReservationCard booking={booking} />

@@ -8,7 +8,6 @@ import { calculateTieredPrice } from './priceCalculator.js';
 import getHotelId from './utils/getHotelId';
 import { GuestProvider } from './GuestProvider.jsx';
 import GuestLayout from './GuestLayout.jsx';
-import { isStandalone } from './pwaUtils.js';
 import { readGuestStay } from './guestStayStorage.js';
 import { isDeadBookingStatus } from './guestStayState.js';
 
@@ -161,7 +160,7 @@ function isGuestAppRoute(pathname) {
 }
 
 // Page transition wrapper - slides pages left/right on navigation (booking funnel only).
-// Guest / PWA routes use the router location directly so nav taps actually swap views.
+// Guest reservation routes use the router location directly so nav taps swap views.
 function PageTransition({ children }) {
   const location = useLocation();
   const skipTransition = isGuestAppRoute(location.pathname);
@@ -270,8 +269,8 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // When the user returns to the app (e.g. after the owner activates in an
-  // external browser tab from within the installed PWA), re-check subscription
+  // When the user returns to the page after the owner activates in an
+  // external browser tab, re-check subscription
   // status so the payment paywall clears automatically — no manual restart.
   useEffect(() => {
     if (staticHotel) return;
@@ -306,34 +305,10 @@ function App() {
     }
   }, [currentHotel?.name]);
 
-  // Make this property installable as its own home-screen app (PWA).
-  // Point the manifest at the per-hotel backend endpoint and set the
-  // iOS apple-touch-icon, then register a lightweight service worker.
+  // Keep the browser identity property-specific. Guestel owns the installed
+  // guest-app experience.
   useEffect(() => {
     if (staticHotel || !hotelId) return; // only for dynamic (real) properties
-
-    const manifestHref = `${API_BASE_URL}/api/hotel/${hotelId}/manifest.webmanifest`;
-    let link = document.querySelector('link[rel="manifest"]');
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'manifest';
-      document.head.appendChild(link);
-    }
-    link.href = manifestHref;
-
-    const upsertMetaTag = (name, content) => {
-      let metaTag = document.querySelector(`meta[name="${name}"]`);
-      if (!metaTag) {
-        metaTag = document.createElement('meta');
-        metaTag.name = name;
-        document.head.appendChild(metaTag);
-      }
-      metaTag.content = content;
-    };
-
-    upsertMetaTag('theme-color', '#2E7D5B');
-    upsertMetaTag('apple-mobile-web-app-capable', 'yes');
-    upsertMetaTag('apple-mobile-web-app-title', currentHotel?.name || 'Book Now');
 
     const guestIconUrl = `${API_BASE_URL}/api/hotel/${encodeURIComponent(hotelId)}/guest-app-icon.png?s=180`;
     let favicon = document.querySelector('link[rel~="icon"]');
@@ -345,18 +320,24 @@ function App() {
     favicon.type = 'image/png';
     favicon.href = guestIconUrl;
 
-    let appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
-    if (!appleIcon) {
-      appleIcon = document.createElement('link');
-      appleIcon.rel = 'apple-touch-icon';
-      document.head.appendChild(appleIcon);
-    }
-    appleIcon.href = guestIconUrl;
+  }, [currentHotel?.appIconUrl]);
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/engine-sw.js').catch(() => {});
-    }
-  }, [currentHotel?.appIconUrl, currentHotel?.name]);
+  // Retire guest-browser workers from older releases without disturbing the
+  // separate Front Desk worker on the same origin.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        const scriptUrl = registration.active?.scriptURL
+          || registration.waiting?.scriptURL
+          || registration.installing?.scriptURL
+          || '';
+        if (/\/(?:engine-sw|sw)\.js(?:$|\?)/.test(scriptUrl)) {
+          registration.unregister().catch(() => {});
+        }
+      });
+    }).catch(() => {});
+  }, []);
 
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   // State management
@@ -366,8 +347,6 @@ function App() {
     || window !== window.parent
   );
 
-  // PWA entry: installed app opens to Guest Home. Returning guests with a stay at
-  // this hotel skip the booking page. Other hotels' stays must not hijack the engine.
   const initialRedirectDone = useRef(false);
   useEffect(() => {
     if (initialRedirectDone.current) return;
@@ -389,7 +368,7 @@ function App() {
       && checkoutDate >= startOfToday
     );
 
-    if (!ownerPreview && (hasActiveStay || isStandalone())) {
+    if (!ownerPreview && hasActiveStay) {
       initialRedirectDone.current = true;
       navigate('/guest/home', { replace: true });
       return;
@@ -900,7 +879,7 @@ const handleConfirmBooking = async (bookingDetails) => {
               />
           } />
 
-          {/* A legacy Front Desk PWA once used this origin during local
+          {/* A legacy Front Desk route once used this origin during local
               development. If it reopens /frontdesk on port 5173, keep the
               current property id and repair the URL back to the guest engine. */}
           <Route
@@ -924,8 +903,8 @@ const handleConfirmBooking = async (bookingDetails) => {
               <InstallPage hotel={currentHotel} apiBaseUrl={API_BASE_URL} hotelId={currentHotel.id || hotelId} />
             </Suspense>
           } />
-          {/* Old confirmation emails and previously installed PWAs may still
-              carry this URL. There is now one canonical stay surface. */}
+          {/* Old confirmation emails may still carry this URL. There is now
+              one canonical stay surface. */}
           <Route path="/guest/check-in" element={<Navigate to="/guest/home" replace />} />
 
           <Route path="/guest-info" element={

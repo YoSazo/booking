@@ -1,17 +1,16 @@
 import React, { useEffect } from 'react';
-import { qrCodeUrl } from './guestInstallUi.jsx';
+import { guestelQrInvocationUrl } from './appClipInstall.js';
+import GuestelQrCode from './GuestelQrCode.jsx';
 
-function bookingPageScanUrl() {
-  const url = new URL(window.location.href);
-  url.hash = '';
-  url.searchParams.set('ref', 'desktop-qr');
-  url.searchParams.delete('scroll');
-  url.searchParams.delete('install-preview');
-  return url.toString();
-}
-
-function GuestInstallQrOverlay({ hotelName, onClose }) {
-  const scanUrl = bookingPageScanUrl();
+function GuestInstallQrOverlay({
+  hotelName,
+  hotelId,
+  intent = 'book',
+  handoffToken,
+  ref = 'booking-engine-qr',
+  onClose,
+}) {
+  const guestelUrl = guestelQrInvocationUrl({ hotelId, intent, handoffToken, ref });
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -38,11 +37,15 @@ function GuestInstallQrOverlay({ hotelName, onClose }) {
         ×
       </button>
       <div className="guest-install-qr-overlay__card">
-        <div className="guest-install-qr-overlay__eyebrow">Scan with your phone</div>
-        <h2 id="guest-install-qr-title">Save {hotelName || 'this property'} to your Home Screen</h2>
-        <p>This QR opens this booking page on your phone. Tap Add — no App Store.</p>
-        <img src={qrCodeUrl(scanUrl, 280)} alt="QR code to open this booking page on your phone" width="280" height="280" />
-        <p className="guest-install-qr-overlay__hint">Opens in Safari or Chrome on your phone.</p>
+        <div className="guest-install-qr-overlay__eyebrow">Guestel</div>
+        <h2 id="guest-install-qr-title">Open {hotelName || 'this property'} in Guestel</h2>
+        <p>Scan with an iPhone to open this property instantly and book direct.</p>
+        <GuestelQrCode
+          value={guestelUrl}
+          size={280}
+          alt={`Guestel QR code for ${hotelName || 'this property'}`}
+        />
+        <p className="guest-install-qr-overlay__hint">No code or property search—this QR opens the right place.</p>
       </div>
     </div>
   );

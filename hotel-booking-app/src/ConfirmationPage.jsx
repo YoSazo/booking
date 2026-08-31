@@ -7,7 +7,6 @@ import GuestInstallCard from './GuestInstallCard.jsx';
 import { resolveGuestelWalletImageUrl, resolvePropertyIconUrl } from './guestInstallUi.jsx';
 import { downloadStayIcs } from './guestMessaging.jsx';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
-import { isStandalone } from './pwaUtils.js';
 import { normalizeBookingStatus } from './guestStayState.js';
 
 const formatDateWithSuffix = (date) => {
@@ -347,24 +346,6 @@ function ConfirmationPage({ bookingDetails, guestInfo, reservationCode, hotel, a
             )}
           </div>
           </section>
-
-          {isStandalone() && reservationCode && (
-            <section style={{
-              margin: '0 auto 12px', padding: '14px 15px', borderRadius: 16,
-              border: '1px solid rgba(46,125,91,.16)', background: '#f4faf6',
-              color: '#173226', textAlign: 'left',
-            }}>
-              <strong style={{ display: 'block', fontSize: 14 }}>This stay is connected to your app</strong>
-              <span style={{ display: 'block', marginTop: 3, color: '#5d6e64', fontSize: 12.5, lineHeight: 1.45 }}>
-                Your Stay keeps your booking status, details, and Front Desk messages together.
-              </span>
-              <div style={{ display: 'flex', marginTop: 11 }}>
-                <button type="button" className="stay-summary-card__btn" onClick={() => navigate('/guest/home')}>
-                  <Smartphone size={16} /> Open Your Stay
-                </button>
-              </div>
-            </section>
-          )}
 
           {/* 2. GUESTEL — the post-booking action is now the visual center of
               the page, using the exact Wallet identity configured in Front Desk. */}

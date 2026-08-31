@@ -33,7 +33,7 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
     setIsLoading(false);
   }, [syncGuestStay]);
 
-  // Safari, an installed PWA, and a returning magic-link window can all update
+  // Safari, Guestel handoff, and a returning magic-link window can all update
   // the same guest session. Re-read it whenever this surface becomes active
   // instead of requiring the guest to kill and reopen the app.
   useEffect(() => {

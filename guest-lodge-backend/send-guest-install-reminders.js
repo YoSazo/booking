@@ -1,5 +1,5 @@
 /**
- * Send pre-check-in "add to home screen" reminder emails.
+ * Send pre-check-in Guestel reminder emails.
  * Run manually: node send-guest-install-reminders.js
  * Or schedule hourly on Render cron.
  */
@@ -8,6 +8,7 @@ require('dotenv').config();
 // Re-use server helpers without starting HTTP
 const { PrismaClient } = require('@prisma/client');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const prisma = new PrismaClient();
 
 const emailTransporter = process.env.BREVO_SMTP_LOGIN && process.env.BREVO_SMTP
@@ -22,11 +23,26 @@ const emailTransporter = process.env.BREVO_SMTP_LOGIN && process.env.BREVO_SMTP
 function guestInstallEmailBlockHtml({ hotelName, installUrl }) {
   const safeName = hotelName || 'your hotel';
   return `<div style="background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border-radius:12px;padding:20px;margin:0 0 20px;text-align:center;">
-      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">📱 Add ${safeName} to your phone</div>
-      <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">Message the front desk, get check-in updates, and book direct next time — like a real app, no app store.</p>
-      <a href="${installUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Add to Home Screen →</a>
-      <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone: open the link in Safari → Share → Add to Home Screen</div>
+      <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);margin-bottom:6px;">Keep ${safeName} in Guestel</div>
+      <p style="margin:0 0 16px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.55;">See stay updates, message the Front Desk, and book direct next time without searching again.</p>
+      <a href="${installUrl}" style="display:inline-block;background:#ffffff;color:#1a5c3f;text-decoration:none;font-size:14px;font-weight:700;padding:13px 24px;border-radius:10px;">Open in Guestel →</a>
+      <div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:12px;line-height:1.5;">On iPhone, this opens the property through Apple’s Guestel App Clip.</div>
     </div>`;
+}
+
+async function issueGuestelHandoff(booking) {
+  if (!booking?.id || !booking?.hotelId || !prisma.guestAppHandoff) return '';
+  const token = crypto.randomBytes(24).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  await prisma.guestAppHandoff.create({
+    data: {
+      tokenHash,
+      bookingId: booking.id,
+      hotelId: booking.hotelId,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+  return token;
 }
 
 async function sendReminder({ guestEmail, guestName, hotelName, hotelPhone, roomName, checkin, installUrl, bookingUrl }) {
@@ -37,7 +53,7 @@ async function sendReminder({ guestEmail, guestName, hotelName, hotelPhone, room
   await emailTransporter.sendMail({
     from: `"${hotelName}" <support@bookmarketel.com>`,
     to: guestEmail,
-    subject: `Add ${hotelName} to your phone before check-in`,
+    subject: `Keep ${hotelName} in Guestel before check-in`,
     html,
   });
 }
@@ -80,6 +96,7 @@ async function main() {
 
     const base = `https://${domain.domain}`;
     try {
+      const handoffToken = await issueGuestelHandoff(b).catch(() => '');
       await sendReminder({
         guestEmail: b.guestEmail,
         guestName: [b.guestFirstName, b.guestLastName].filter(Boolean).join(' ') || 'there',
@@ -87,7 +104,14 @@ async function main() {
         hotelPhone: hotel?.phone || '',
         roomName: b.roomName,
         checkin: b.checkinDate,
-        installUrl: `${base}/install?code=${encodeURIComponent(code)}&ref=checkin-reminder`,
+        installUrl: `https://appclip.apple.com/id?${new URLSearchParams({
+          p: 'com.bookmarketel.guestel.Clip',
+          domain: domain.domain,
+          hotelId: b.hotelId,
+          intent: 'stay',
+          ref: 'checkin-reminder',
+          ...(handoffToken ? { handoff: handoffToken } : {}),
+        }).toString()}`,
         bookingUrl: `${base}/booking/${encodeURIComponent(code)}`,
       });
       await prisma.booking.update({ where: { id: b.id }, data: { guestInstallReminderSentAt: new Date() } });

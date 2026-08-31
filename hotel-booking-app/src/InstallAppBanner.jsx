@@ -1,14 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { isStandalone } from './pwaUtils.js';
-import { BRAND, HotelIcon, isIos } from './guestInstallUi.jsx';
+import React, { useEffect, useState } from 'react';
+import { BRAND, HotelIcon, isAndroid, isIos } from './guestInstallUi.jsx';
 import { trackGuestInstall } from './guestInstallTracking.js';
-import BookingInstallCoach from './BookingInstallCoach.jsx';
-import { APP_CLIP_INSTALL_ENABLED, guestelInvocationUrl } from './appClipInstall.js';
+import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
+import { guestelInvocationUrl } from './appClipInstall.js';
 
-// "Tap to Install" — lets a guest add this property to their home screen so
-// they book direct next time (no Safari, no OTA). Android/desktop use the
-// native install prompt; iOS Safari gets a themed Add-to-Home-Screen sheet.
+// The booking engine has one guest-app path: Guestel. iPhone taps invoke the
+// App Clip; desktop taps reveal the exact same experience as a QR code.
 function InstallAppBanner({
   hotelName,
   appIconUrl,
@@ -19,261 +16,109 @@ function InstallAppBanner({
   bottomOffset = 0,
   touchpoint = 'booking-page',
   apiBaseUrl = '',
-  guidedBookingInstall = false,
   hotelSubscribed = true,
-  onCtaClick,
 }) {
-  const navigate = useNavigate();
-  const [installed, setInstalled] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showBookingCoach, setShowBookingCoach] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [showUnavailableInfo, setShowUnavailableInfo] = useState(false);
   const ios = isIos();
+  const android = isAndroid();
   const inGuestelClip = typeof window !== 'undefined'
     && !!window.webkit?.messageHandlers?.guestelClip;
-  // Preview mode identifies an owner viewing their own live page; it must not
-  // replace the real guest handoff with the retired PWA coach. Owners need to
-  // see and test the exact App Clip experience their guests receive.
-  const nativeGuestel = ios && (APP_CLIP_INSTALL_ENABLED || inGuestelClip);
-
-  const markInstalled = useCallback(() => {
-    setInstalled(true);
-    if (!ownerPreview) {
-      trackGuestInstall(apiBaseUrl, hotelId, {
-        touchpoint,
-        eventType: 'installed',
-      });
-    }
-  }, [apiBaseUrl, hotelId, ownerPreview, touchpoint]);
 
   useEffect(() => {
-    if (ownerPreview) return undefined;
+    if (ownerPreview || android) return;
+    trackGuestInstall(apiBaseUrl, hotelId, { touchpoint, eventType: 'view' });
+  }, [android, apiBaseUrl, hotelId, ownerPreview, touchpoint]);
 
-    if (isStandalone()) {
-      markInstalled();
-      return undefined;
-    }
+  // Guestel is currently an Apple experience. Do not replace it with a second,
+  // browser-specific install system on Android.
+  if (android && !ownerPreview) return null;
 
-    trackGuestInstall(apiBaseUrl, hotelId, {
-      touchpoint,
-      eventType: 'view',
-    });
-
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    const onInstalled = () => {
-      markInstalled();
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', onBeforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, [apiBaseUrl, hotelId, markInstalled, ownerPreview, touchpoint]);
-
-  // Hide entirely if already installed as a standalone PWA
-  if (installed || (!ownerPreview && isStandalone())) return null;
-
-  const installPath = `/install?ref=${encodeURIComponent(touchpoint)}`;
-  const handleInstall = async () => {
+  const handleOpenGuestel = () => {
     if (hotelSubscribed !== true) {
       setShowUnavailableInfo(true);
       return;
     }
-
     if (!ownerPreview) {
-      trackGuestInstall(apiBaseUrl, hotelId, {
-        touchpoint,
-        eventType: 'cta_click',
-      });
+      trackGuestInstall(apiBaseUrl, hotelId, { touchpoint, eventType: 'cta_click' });
     }
-
-    if (onCtaClick) {
-      onCtaClick();
+    if (inGuestelClip) {
+      window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
       return;
     }
-
     if (ios) {
-      if (inGuestelClip) {
-        window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
-        return;
-      }
-      if (APP_CLIP_INSTALL_ENABLED) {
-        window.location.href = guestelInvocationUrl({ hotelId, intent: 'add' });
-        return;
-      }
-      setShowBookingCoach(true);
+      window.location.assign(guestelInvocationUrl({ hotelId, intent: 'add' }));
       return;
     }
-
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice.catch(() => null);
-      if (choice?.outcome === 'accepted') markInstalled();
-      setDeferredPrompt(null);
-      return;
-    }
-
-    navigate(installPath);
+    setShowQr(true);
   };
 
   const offset = Number.isFinite(Number(bottomOffset)) ? Number(bottomOffset) : 0;
   const shellStyle = sticky ? {
-    position: 'fixed',
-    left: 0,
-    right: 0,
+    position: 'fixed', left: 0, right: 0,
     bottom: `calc(${offset}px + env(safe-area-inset-bottom, 0px))`,
-    zIndex: 8500,
-    padding: '0 14px',
-    pointerEvents: 'none',
+    zIndex: 8500, padding: '0 14px', pointerEvents: 'none',
   } : {};
-  const cardStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    background: 'white',
-    border: '1px solid #d8e4dc',
-    borderRadius: 16,
-    padding: '12px 12px',
-    boxShadow: sticky ? '0 10px 34px rgba(26,43,34,0.18)' : '0 4px 16px rgba(0,0,0,0.06)',
-    margin: sticky ? '0 auto' : flush ? 0 : '20px 0 8px',
-    maxWidth: sticky ? 520 : undefined,
-    pointerEvents: 'auto',
-  };
-  // `preview=1` only keeps an owner's visit out of guest analytics. It must
-  // not disable a paid property's real install experience.
-  const buttonLocked = hotelSubscribed !== true;
-  // In the Front Desk reveal the owner walks their own (locked) engine, so the
-  // banner must always tell the Guestel story here — never the old PWA one.
-  const showGuestelCopy = nativeGuestel || ownerPreview;
+  const locked = hotelSubscribed !== true;
 
   return (
     <>
-      <div
-        id="guest-install"
-        style={shellStyle}
-      >
-        <div style={cardStyle}>
+      <div id="guest-install" style={shellStyle}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, background: 'white',
+          border: '1px solid #d8e4dc', borderRadius: 16, padding: 12,
+          boxShadow: sticky ? '0 10px 34px rgba(26,43,34,0.18)' : '0 4px 16px rgba(0,0,0,0.06)',
+          margin: sticky ? '0 auto' : flush ? 0 : '20px 0 8px',
+          maxWidth: sticky ? 520 : undefined, pointerEvents: 'auto',
+        }}>
           <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={44} style={{ boxShadow: 'none' }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', lineHeight: 1.25 }}>
-              {showGuestelCopy
-                ? `Keep ${hotelName || 'this property'} in Guestel`
-                : guidedBookingInstall
-                  ? `Save ${hotelName || 'this property'} to your Home Screen`
-                  : `Add ${hotelName || 'us'} to your Home Screen`}
+              Keep {hotelName || 'this property'} in Guestel
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
-              {showGuestelCopy
-                ? 'Book direct, keep your stay, and message the front desk.'
-                : buttonLocked
-                  ? 'Available once this property finishes setup.'
-                  : guidedBookingInstall
-                    ? 'Return to this booking page in one tap. No App Store.'
-                    : 'Book direct in one tap next time.'}
+              {locked ? 'Available once this property finishes setup.' : 'Book direct, keep your stay, and message the Front Desk.'}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleInstall}
-            aria-disabled={buttonLocked}
-            style={{
-              flexShrink: 0,
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: buttonLocked ? '1px solid #cfd7d2' : 'none',
-              background: buttonLocked ? '#e4e8e5' : BRAND,
-              color: buttonLocked ? '#7b8780' : 'white',
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              opacity: 1,
-            }}
-          >
-            {buttonLocked ? '🔒 Add' : 'Add'}
+          <button type="button" onClick={handleOpenGuestel} aria-disabled={locked} style={{
+            flexShrink: 0, padding: '10px 14px', borderRadius: 10,
+            border: locked ? '1px solid #cfd7d2' : 'none',
+            background: locked ? '#e4e8e5' : BRAND,
+            color: locked ? '#7b8780' : 'white', fontSize: 13, fontWeight: 800,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            {locked ? 'Locked' : ios || inGuestelClip ? 'Add' : 'Show QR'}
           </button>
         </div>
       </div>
+
+      {showQr && (
+        <GuestInstallQrOverlay hotelName={hotelName} hotelId={hotelId} intent="book" ref={touchpoint} onClose={() => setShowQr(false)} />
+      )}
+
       {showUnavailableInfo && (
-        <div
-          role="presentation"
-          onClick={() => setShowUnavailableInfo(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            display: 'grid',
-            placeItems: 'center',
-            padding: 20,
-            background: 'rgba(18, 31, 24, 0.46)',
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="owner-install-preview-title"
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: 'min(390px, 100%)',
-              padding: '24px 22px 20px',
-              border: '1px solid #d8e4dc',
-              borderRadius: 20,
-              background: 'white',
-              boxShadow: '0 28px 70px rgba(18, 49, 31, 0.24)',
-              textAlign: 'center',
-            }}
-          >
-            <HotelIcon
-              hotelName={hotelName}
-              appIconUrl={appIconUrl}
-              size={58}
-              style={{ margin: '0 auto 14px' }}
-            />
-            <h2
-              id="owner-install-preview-title"
-              style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}
-            >
+        <div role="presentation" onClick={() => setShowUnavailableInfo(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 10000, display: 'grid', placeItems: 'center',
+          padding: 20, background: 'rgba(18,31,24,.46)', backdropFilter: 'blur(6px)',
+        }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="owner-install-preview-title"
+            onClick={(event) => event.stopPropagation()} style={{
+              width: 'min(390px,100%)', padding: '24px 22px 20px', border: '1px solid #d8e4dc',
+              borderRadius: 20, background: 'white', boxShadow: '0 28px 70px rgba(18,49,31,.24)', textAlign: 'center',
+            }}>
+            <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={58} style={{ margin: '0 auto 14px' }} />
+            <h2 id="owner-install-preview-title" style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}>
               Guestel isn&apos;t live for your property yet.
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              Once you activate, guests tap <strong>Add</strong> and Guestel opens instantly through Apple — they book direct, keep <strong>{hotelName || 'this property'}</strong>, and message your front desk. No App Store hunting, no OTA.
+              Once you activate, this button opens your property through Apple&apos;s Guestel App Clip. Guests can book direct, keep the property, and message your Front Desk.
             </p>
-            <button
-              type="button"
-              onClick={() => setShowUnavailableInfo(false)}
-              style={{
-                width: '100%',
-                minHeight: 48,
-                padding: '12px 16px',
-                border: 0,
-                borderRadius: 12,
-                background: BRAND,
-                color: 'white',
-                fontFamily: 'inherit',
-                fontSize: 14,
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              Got it
-            </button>
+            <button type="button" onClick={() => setShowUnavailableInfo(false)} style={{
+              width: '100%', minHeight: 48, padding: '12px 16px', border: 0, borderRadius: 12,
+              background: BRAND, color: 'white', fontFamily: 'inherit', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            }}>Got it</button>
           </div>
         </div>
-      )}
-      {showBookingCoach && (
-        <BookingInstallCoach
-          hotelName={hotelName}
-          appIconUrl={appIconUrl}
-          onClose={() => setShowBookingCoach(false)}
-        />
       )}
     </>
   );
