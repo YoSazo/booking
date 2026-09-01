@@ -232,7 +232,12 @@ test('QA properties and their sessions never inflate the business dashboard', ()
     for (const hotelId of ['hotel-a39be0df', 'hotel-app-review', 'marketel-review-inn', 'hotel-9dbf11ec']) {
         assert.match(exclusionBlock, new RegExp(hotelId), `${hotelId} is not excluded`);
     }
+    assert.match(exclusionBlock, /FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS/);
+    assert.match(exclusionBlock, /bro2theno@gmail\.com/);
+    assert.match(exclusionBlock, /ownerEmail: \{ equals: email, mode: 'insensitive' \}/);
+    assert.match(exclusionBlock, /guestEmail: \{ equals: email, mode: 'insensitive' \}/);
     assert.match(exclusionBlock, /sessionId: \{ notIn: exclusions\.sessionIds \}/);
+    assert.match(exclusionBlock, /guestEmail: \{ in: exclusions\.guestEmails, mode: 'insensitive' \}/);
     assert.match(server, /buildMarketelFunnelAttribution\(since, until, exclusions/);
     assert.match(server, /const visibleWhere = funnelDashboardWhere\(where, exclusions\)/);
     assert.match(server, /const where = funnelDashboardWhere\(\{[\s\S]{0,180}MARKETEL_ONBOARDING_EVENT_NAMES/);
@@ -240,8 +245,9 @@ test('QA properties and their sessions never inflate the business dashboard', ()
         server.indexOf("app.get('/api/admin/portfolio'"),
         server.indexOf('// FunnelEvent is not only analytics')
     );
-    assert.match(portfolio, /id: \{ notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS \}/);
-    assert.match(portfolio, /hotelId: \{ notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS \}/);
+    assert.match(portfolio, /const exclusions = await funnelDashboardExclusions\(\)/);
+    assert.match(portfolio, /id: \{ notIn: exclusions\.hotelIds \}/);
+    assert.match(portfolio, /hotelId: \{ notIn: exclusions\.hotelIds \}/);
 });
 
 test('funnel dashboard attributes each ad angle and UTM through paid activation', () => {

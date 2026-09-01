@@ -10879,26 +10879,59 @@ const FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS = [
     'marketel-review-inn', // App Review property (legacy ID)
     'hotel-9dbf11ec',      // Studios 17
 ];
-let funnelDashboardExclusionCache = { expiresAt: 0, sessionIds: [] };
+// Salah uses this address to run the real acquisition journey end to end.
+// Resolve it to property IDs instead of hard-coding every disposable test
+// property, so future QA runs remain available in the product without ever
+// inflating /funnel, the portfolio, MRR, or the acquisition report.
+const FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS = [
+    'bro2theno@gmail.com',
+];
+let funnelDashboardExclusionCache = {
+    expiresAt: 0,
+    hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS,
+    guestEmails: FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS,
+    sessionIds: [],
+};
 
 async function funnelDashboardExclusions() {
     if (funnelDashboardExclusionCache.expiresAt > Date.now()) {
         return {
-            hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS,
+            hotelIds: funnelDashboardExclusionCache.hotelIds,
+            guestEmails: funnelDashboardExclusionCache.guestEmails,
             sessionIds: funnelDashboardExclusionCache.sessionIds,
         };
     }
+    const emailFilters = FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.map((email) => ({
+        ownerEmail: { equals: email, mode: 'insensitive' },
+    }));
+    const testHotels = emailFilters.length
+        ? await prisma.hotelConfig.findMany({
+            where: { OR: emailFilters },
+            select: { id: true },
+        }).catch(() => [])
+        : [];
+    const hotelIds = Array.from(new Set([
+        ...FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS,
+        ...testHotels.map((hotel) => hotel.id),
+    ]));
+    const guestEmailFilters = FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.map((email) => ({
+        guestEmail: { equals: email, mode: 'insensitive' },
+    }));
     const rows = await prisma.funnelEvent.findMany({
         where: {
-            hotelId: { in: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS },
+            OR: [
+                { hotelId: { in: hotelIds } },
+                ...guestEmailFilters,
+            ],
             sessionId: { not: null },
         },
         distinct: ['sessionId'],
         select: { sessionId: true },
     }).catch(() => []);
     const sessionIds = rows.map((row) => row.sessionId).filter(Boolean);
-    funnelDashboardExclusionCache = { expiresAt: Date.now() + 15_000, sessionIds };
-    return { hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS, sessionIds };
+    const guestEmails = FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS;
+    funnelDashboardExclusionCache = { expiresAt: Date.now() + 15_000, hotelIds, guestEmails, sessionIds };
+    return { hotelIds, guestEmails, sessionIds };
 }
 
 function funnelDashboardWhere(where, exclusions) {
@@ -10911,6 +10944,14 @@ function funnelDashboardWhere(where, exclusions) {
             OR: [
                 { sessionId: null },
                 { sessionId: { notIn: exclusions.sessionIds } },
+            ],
+        });
+    }
+    if (exclusions?.guestEmails?.length) {
+        filters.push({
+            OR: [
+                { guestEmail: null },
+                { NOT: { guestEmail: { in: exclusions.guestEmails, mode: 'insensitive' } } },
             ],
         });
     }
@@ -12443,15 +12484,16 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
     try {
         const daysBack = Math.max(1, Math.min(365, parseInt(req.query.days, 10) || 30));
         const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+        const exclusions = await funnelDashboardExclusions();
         const [hotels, bookings] = await Promise.all([
             prisma.hotelConfig.findMany({
-                where: { id: { notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS } },
+                where: { id: { notIn: exclusions.hotelIds } },
                 select: { id: true, name: true, marketelSubscriptionStatus: true, createdAt: true },
             }),
             prisma.booking.findMany({
                 where: {
                     createdAt: { gte: since },
-                    hotelId: { notIn: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS },
+                    hotelId: { notIn: exclusions.hotelIds },
                 },
                 select: { hotelId: true, grandTotal: true, nights: true, status: true },
             }),

@@ -11,6 +11,9 @@ const QA_HOTEL_IDS = [
   'marketel-review-inn',
   'hotel-9dbf11ec',
 ];
+const QA_OWNER_EMAILS = [
+  'bro2theno@gmail.com',
+];
 const ANGLES = ['direct', 'guest_app', 'assistant'];
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
 const TOKEN = process.env.MARKETEL_META_ADS_READ_TOKEN || process.env.MARKETEL_META_ACCESS_TOKEN;
@@ -221,8 +224,8 @@ function addProperty(group, property) {
   group.revenue += property.revenue;
 }
 
-function visibleWhere(base, excludedSessionIds) {
-  const filters = [base, { hotelId: { notIn: QA_HOTEL_IDS } }];
+function visibleWhere(base, excludedSessionIds, excludedHotelIds) {
+  const filters = [base, { hotelId: { notIn: excludedHotelIds } }];
   if (excludedSessionIds.length) {
     filters.push({ OR: [{ sessionId: null }, { sessionId: { notIn: excludedSessionIds } }] });
   }
@@ -232,14 +235,34 @@ function visibleWhere(base, excludedSessionIds) {
 async function dbSection() {
   const until = new Date();
   const since = new Date(until.getTime() - DAYS * 86_400_000);
+  const testHotels = await prisma.hotelConfig.findMany({
+    where: {
+      OR: QA_OWNER_EMAILS.map((email) => ({
+        ownerEmail: { equals: email, mode: 'insensitive' },
+      })),
+    },
+    select: { id: true },
+  });
+  const excludedHotelIds = Array.from(new Set([
+    ...QA_HOTEL_IDS,
+    ...testHotels.map((hotel) => hotel.id),
+  ]));
   const qaSessions = await prisma.funnelEvent.findMany({
-    where: { hotelId: { in: QA_HOTEL_IDS }, sessionId: { not: null } },
+    where: {
+      OR: [
+        { hotelId: { in: excludedHotelIds } },
+        ...QA_OWNER_EMAILS.map((email) => ({
+          guestEmail: { equals: email, mode: 'insensitive' },
+        })),
+      ],
+      sessionId: { not: null },
+    },
     distinct: ['sessionId'],
     select: { sessionId: true },
   });
   const excludedSessionIds = qaSessions.map((row) => row.sessionId).filter(Boolean);
   const events = await prisma.funnelEvent.findMany({
-    where: visibleWhere({ createdAt: { gte: since, lte: until } }, excludedSessionIds),
+    where: visibleWhere({ createdAt: { gte: since, lte: until } }, excludedSessionIds, excludedHotelIds),
     select: {
       id: true,
       hotelId: true,
@@ -319,7 +342,7 @@ async function dbSection() {
   }
   const activeAccounts = await prisma.hotelConfig.count({
     where: {
-      id: { notIn: QA_HOTEL_IDS },
+      id: { notIn: excludedHotelIds },
       OR: [{ subscribed: true }, { marketelSubscriptionStatus: 'active' }],
     },
   });
