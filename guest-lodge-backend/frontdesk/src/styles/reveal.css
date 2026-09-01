@@ -1303,14 +1303,13 @@
 .mvr-coverflow-controls {
   min-height: 42px;
   display: grid;
-  grid-template-columns: 40px auto minmax(112px, max-content);
+  grid-template-columns: 40px auto 40px;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
 
 .mvr-coverflow-arrow,
-.mvr-coverflow-next,
 .mvr-coverflow-dots button {
   font: inherit;
   cursor: pointer;
@@ -1329,28 +1328,6 @@
   box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
   font-size: 16px;
   font-weight: 850;
-}
-
-.mvr-coverflow-next {
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 13px;
-  border: 1px solid rgba(49, 102, 75, 0.14);
-  border-radius: 999px;
-  color: #285a43;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: 0 5px 16px rgba(30, 74, 50, 0.06);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.mvr-coverflow-next span {
-  color: var(--mvr-green);
-  font-size: 14px;
 }
 
 .mvr-coverflow-dots {
@@ -1375,8 +1352,7 @@
   background: var(--mvr-green);
 }
 
-.mvr-coverflow-arrow:hover,
-.mvr-coverflow-next:hover {
+.mvr-coverflow-arrow:hover {
   border-color: rgba(40, 128, 88, 0.28);
   background: rgba(255, 255, 255, 0.95);
 }
@@ -2409,13 +2385,8 @@
   }
 
   .mvr-coverflow-controls {
-    grid-template-columns: 38px auto minmax(108px, max-content);
+    grid-template-columns: 38px auto 38px;
     gap: 8px;
-  }
-
-  .mvr-coverflow-next {
-    padding-inline: 11px;
-    font-size: 11.5px;
   }
 
   .mvr-assistant-visual {

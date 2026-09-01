@@ -868,11 +868,11 @@ function appCarouselHtml(showcase) {
       </button>`).join('')}
     </div>
     <div class="mvr-coverflow-controls">
-      <button type="button" class="mvr-coverflow-arrow" data-carousel-prev aria-label="Previous ${esc(subject)}">←</button>
+      <button type="button" class="mvr-coverflow-arrow" data-carousel-prev aria-label="Previous ${esc(subject)}">‹</button>
       <span class="mvr-coverflow-dots" role="group" aria-label="Choose a screen">
         ${showcase.slides.map((slide, index) => `<button type="button" data-carousel-dot="${index}" class="${index === active ? 'is-active' : ''}" aria-label="${esc(slide.label)}" aria-current="${index === active ? 'true' : 'false'}"></button>`).join('')}
       </span>
-      <button type="button" class="mvr-coverflow-next" data-carousel-next>Next: ${esc(showcase.slides[(active + 1) % showcase.slides.length].label)} <span>→</span></button>
+      <button type="button" class="mvr-coverflow-arrow" data-carousel-next aria-label="Next ${esc(subject)}">›</button>
     </div>
   </div>`;
 }
@@ -1020,8 +1020,6 @@ function setAppCarouselSlide(root, requestedIndex, manual = false) {
   const body = root.closest('.mvr-stage')?.querySelector('[data-carousel-body]');
   if (title) title.textContent = showcase.title;
   if (body) body.textContent = showcase.body;
-  const next = root.querySelector('[data-carousel-next]');
-  if (next) next.innerHTML = `Next: ${esc(showcase.slides[(active + 1) % length].label)} <span>→</span>`;
   if (!manual || active === previous) return;
   if (slide.event) trackReveal(slide.event);
   trackJourney('JourneyAppCarouselSlideViewed', {
