@@ -135,7 +135,7 @@ function BookingPage({
       grandTotal = Number(railRoom.totalRate);
     } else {
       const subtotalBeforeTax = calculateTieredPrice(nights, rates);
-      grandTotal = subtotalBeforeTax + subtotalBeforeTax * Number(rates?.taxRate ?? 0.10);
+      grandTotal = subtotalBeforeTax + subtotalBeforeTax * Number(rates?.taxRate ?? 0);
     }
     return { payToday: 0, balanceDue: grandTotal };
   }, [railRoom, nights, rates]);
@@ -207,7 +207,7 @@ function BookingPage({
                 balanceDue = grandTotal;
               } else {
                 const subtotalBeforeTax = calculateTieredPrice(nightsCalc, rates);
-                taxes = subtotalBeforeTax * Number(rates?.taxRate ?? 0.10);
+                taxes = subtotalBeforeTax * Number(rates?.taxRate ?? 0);
                 grandTotal = subtotalBeforeTax + taxes;
                 payToday = 0;
                 balanceDue = grandTotal;

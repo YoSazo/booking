@@ -860,9 +860,12 @@ async function addRoomAndFinish() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nightly,
-        weekly: existingRates.weekly || Math.round(nightly * 6),
-        monthly: existingRates.monthly || Math.round(nightly * 24),
-        taxRate: existingRates.taxRate ?? 0.10,
+        // Setup asks for one price, so the preview must not silently invent a
+        // weekly/monthly discount or a jurisdiction-specific tax. Owners can
+        // explicitly add either later in Front Desk.
+        weekly: existingRates.weekly || Math.round(nightly * 7),
+        monthly: existingRates.monthly || Math.round(nightly * 28),
+        taxRate: existingRates.taxRate ?? 0,
       }),
     });
     if (!ratesRes.ok) throw new Error('Could not save starting price');

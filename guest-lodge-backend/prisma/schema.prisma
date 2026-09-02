@@ -656,9 +656,9 @@ model HotelRates {
   hotel     HotelConfig @relation(fields: [hotelId], references: [id], onDelete: Cascade)
   hotelId   String      @unique
   nightly   Float       @default(69)
-  weekly    Float       @default(299)
-  monthly   Float       @default(999)
-  taxRate   Float       @default(0.10)
+  weekly    Float       @default(483)
+  monthly   Float       @default(1932)
+  taxRate   Float       @default(0)
   updatedAt DateTime    @updatedAt
 }
 

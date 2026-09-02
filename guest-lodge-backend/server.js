@@ -13232,10 +13232,20 @@ app.post('/api/setup/:token/rates', async (req, res) => {
         const hotel = await prisma.hotelConfig.findUnique({ where: { setupToken: req.params.token } });
         if (!hotel) return res.status(404).json({ error: 'Invalid token' });
         const { nightly, weekly, monthly, taxRate } = req.body;
+        const parsedNightly = Number(nightly);
+        const safeNightly = Number.isFinite(parsedNightly) && parsedNightly > 0 ? parsedNightly : 69;
+        const parsedWeekly = Number(weekly);
+        const safeWeekly = Number.isFinite(parsedWeekly) && parsedWeekly > 0 ? parsedWeekly : safeNightly * 7;
+        const parsedMonthly = Number(monthly);
+        const safeMonthly = Number.isFinite(parsedMonthly) && parsedMonthly > 0 ? parsedMonthly : safeNightly * 28;
+        const parsedTaxRate = Number(taxRate);
+        const safeTaxRate = Number.isFinite(parsedTaxRate) && parsedTaxRate >= 0 && parsedTaxRate <= 1
+            ? parsedTaxRate
+            : 0;
         await prisma.hotelRates.upsert({
             where: { hotelId: hotel.id },
-            create: { hotelId: hotel.id, nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
-            update: { nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+            create: { hotelId: hotel.id, nightly: safeNightly, weekly: safeWeekly, monthly: safeMonthly, taxRate: safeTaxRate },
+            update: { nightly: safeNightly, weekly: safeWeekly, monthly: safeMonthly, taxRate: safeTaxRate },
         });
         res.json({ success: true });
     } catch (e) {
@@ -13623,7 +13633,7 @@ app.get('/api/hotel/:hotelId/public', async (req, res) => {
                 }
                 : null,
             subscribed: hotel.subscribed || false,
-            rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 299, MONTHLY: 999, taxRate: 0.10 },
+            rates: hotel.rates ? { NIGHTLY: hotel.rates.nightly, WEEKLY: hotel.rates.weekly, MONTHLY: hotel.rates.monthly, taxRate: hotel.rates.taxRate } : { NIGHTLY: 69, WEEKLY: 483, MONTHLY: 1932, taxRate: 0 },
             rooms: hotel.rooms.map((r, i) => ({
                 id: i + 1,
                 roomId: r.id,
@@ -17044,10 +17054,20 @@ app.post('/api/crm/rates', crmAuth, async (req, res) => {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
         const { nightly, weekly, monthly, taxRate } = req.body;
+        const parsedNightly = Number(nightly);
+        const safeNightly = Number.isFinite(parsedNightly) && parsedNightly > 0 ? parsedNightly : 69;
+        const parsedWeekly = Number(weekly);
+        const safeWeekly = Number.isFinite(parsedWeekly) && parsedWeekly > 0 ? parsedWeekly : safeNightly * 7;
+        const parsedMonthly = Number(monthly);
+        const safeMonthly = Number.isFinite(parsedMonthly) && parsedMonthly > 0 ? parsedMonthly : safeNightly * 28;
+        const parsedTaxRate = Number(taxRate);
+        const safeTaxRate = Number.isFinite(parsedTaxRate) && parsedTaxRate >= 0 && parsedTaxRate <= 1
+            ? parsedTaxRate
+            : 0;
         await prisma.hotelRates.upsert({
             where: { hotelId },
-            create: { hotelId, nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
-            update: { nightly: nightly || 69, weekly: weekly || 299, monthly: monthly || 999, taxRate: taxRate || 0.10 },
+            create: { hotelId, nightly: safeNightly, weekly: safeWeekly, monthly: safeMonthly, taxRate: safeTaxRate },
+            update: { nightly: safeNightly, weekly: safeWeekly, monthly: safeMonthly, taxRate: safeTaxRate },
         });
         res.json({ success: true });
     } catch (e) {

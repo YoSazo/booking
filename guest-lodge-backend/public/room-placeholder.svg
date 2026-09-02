@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
   <title id="title">Room photo placeholder</title>
-  <desc id="desc">A neutral illustration shown until the property uploads a room photo.</desc>
+  <desc id="desc">A neutral room illustration.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#edf3ef"/>
@@ -14,5 +14,4 @@
     <path d="M300 535v88m600-88v88"/>
     <path d="M350 430h210v105H350zm290 0h210v105H640z"/>
   </g>
-  <text x="600" y="704" text-anchor="middle" fill="#60766a" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="34" font-weight="650">Add your room photo</text>
 </svg>

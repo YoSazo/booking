@@ -129,7 +129,7 @@ function getBookingTotals(room, nights, fallbackRates) {
   const taxes =
     toFiniteNumber(room?.taxes) ??
     toFiniteNumber(room?.apiTaxes) ??
-    subtotal * (toFiniteNumber(fallbackRates?.taxRate) ?? 0.10);
+    subtotal * (toFiniteNumber(fallbackRates?.taxRate) ?? 0);
   const total =
     toFiniteNumber(room?.totalRate) ??
     toFiniteNumber(room?.total) ??
@@ -574,12 +574,12 @@ function App() {
             id: idx + 1,
             name: apiRoom.roomName,
             roomName: apiRoom.roomName,
-            amenities: 'Free WiFi • TV • Free Parking',
-            description: 'Comfortable room available for your selected dates.',
             maxOccupancy: 4,
             imageUrls: [`${API_BASE_URL}/room-placeholder.svg`],
             imageUrl: `${API_BASE_URL}/room-placeholder.svg`,
             ...apiRoom,
+            amenities: apiRoom.amenities || '',
+            description: apiRoom.description || '',
           }));
           setAvailableRooms(genericRooms);
           setIsLoading(false);

@@ -2050,6 +2050,25 @@
   min-width: min(330px, 48vw);
 }
 
+.mvr-payment-flow {
+  display: grid;
+  gap: 3px;
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  color: #506259;
+  border: 1px solid #d7e5dc;
+  border-radius: 13px;
+  background: #f3f8f5;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.mvr-payment-flow strong {
+  color: #214b37;
+  font-size: 13px;
+}
+
 .mvr-live-continue {
   min-height: 40px;
   padding: 9px 13px;

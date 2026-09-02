@@ -271,20 +271,12 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
     'dog': { icon: PawPrint, label: 'Pet Friendly' },
   };
 
-  // Extract amenities from room.amenities string
+  // Only show amenities the property actually supplied. Inventing plausible
+  // defaults here is especially damaging in an owner preview: it makes a
+  // personalized page look polished by making claims the owner never made.
   const getAmenityList = () => {
     const amenitiesText = (localAmenities || '');
-    if (!amenitiesText.trim()) {
-      // In edit mode, show nothing so owner can add their own
-      if (isEditMode) return [];
-      // For guests, show defaults
-      return [
-        { icon: Wifi, label: 'Free WiFi' },
-        { icon: Tv, label: 'Smart TV' },
-        { icon: Car, label: 'Free Parking' },
-        { icon: Sparkles, label: 'Weekly Cleaning' }
-      ];
-    }
+    if (!amenitiesText.trim()) return [];
 
     // Split by bullet separator and map each to an icon
     const items = amenitiesText.split(/\s*[\u2022\u2023\u25E6•]\s*/).map(a => a.trim()).filter(Boolean);
@@ -300,6 +292,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
   };
 
   const amenityList = getAmenityList();
+  const nightlyPrice = Number(rates?.NIGHTLY ?? rates?.nightly);
 
   return (
   <div
@@ -371,14 +364,14 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
             ) : (
               <>
                 <h3>{room.name}</h3>
-                <p className="room-subtitle">Spacious • Fully Furnished</p>
+                {room.subtitle && <p className="room-subtitle">{room.subtitle}</p>}
               </>
             )}
           </div>
         </div>
 
         {/* Amenities Grid */}
-        <div className="amenities-grid">
+        {(amenityList.length > 0 || isEditMode) && <div className="amenities-grid">
           {amenityList.map((amenity, idx) => (
             <div key={idx} className="amenity-item" style={{ position: 'relative' }}>
               <div className="amenity-icon-box">
@@ -410,7 +403,7 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
               <span className="amenity-label" style={{ color: '#6B7D72' }}>Add</span>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Room Description */}
         {room.description && !isEditMode && (
@@ -462,9 +455,13 @@ function RoomCard({ room, onOpenLightbox, rates, onSelect, onChangeDates, isSele
           </div>
         ) : (
           <div className="premium-pricing-card premium-pricing-card--empty">
-            <p className="pricing-empty-title">Choose dates to see rates</p>
+            <p className="pricing-empty-title">
+              {Number.isFinite(nightlyPrice) && nightlyPrice > 0
+                ? `From $${nightlyPrice.toFixed(0)} / night`
+                : 'Choose dates to see rates'}
+            </p>
             <p className="pricing-subtitle">
-              Pick your check-in and check-out to see the price for this room.
+              Choose dates to see your exact stay total.
             </p>
           </div>
         )}

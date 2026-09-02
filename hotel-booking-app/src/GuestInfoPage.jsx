@@ -1227,7 +1227,7 @@ const handlePayLaterBooking = async (e) => {
                             <span className="price-value">${bookingDetails.subtotal.toFixed(2)}</span>
                         </div>
                     )}
-                    <div className="price-row">
+                    {Number(bookingDetails.taxes) > 0 && <div className="price-row">
                         <div className="price-label-with-info">
                             <span>Taxes & Fees</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1237,7 +1237,7 @@ const handlePayLaterBooking = async (e) => {
                             </svg>
                         </div>
                         <span className="price-value">${bookingDetails.taxes.toFixed(2)}</span>
-                    </div>
+                    </div>}
                     <div className="price-total-row">
                         <span className="total-label">Total</span>
                         <span className="total-value">${bookingDetails.total.toFixed(2)}</span>

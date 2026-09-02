@@ -401,7 +401,10 @@ function startBookingChallenge(challenge) {
   challenge.status = 'running';
   challenge.startedAt = Date.now();
   hideBookingChallengeLayer(challenge);
-  setLivePreviewActionsVisible(challenge.modal, true);
+  // Once they opt into the timed proof, keep the booking flow as the only
+  // dominant task. The editor CTA used to compete with the very challenge we
+  // asked them to complete; the close control remains available as an exit.
+  setLivePreviewActionsVisible(challenge.modal, false);
   challenge.timer.classList.add('is-live');
   updateBookingChallengeTimer(challenge);
   challenge.timerId = window.setInterval(() => updateBookingChallengeTimer(challenge), 500);
@@ -1129,6 +1132,10 @@ function finaleHtml() {
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
           <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">${isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
           ${activationRateCalculatorHtml()}
+          <div class="mvr-payment-flow">
+            <strong>Your room money stays yours.</strong>
+            <span>Guests use a temporary $1 card verification, then pay your property directly at check-in. Marketel never holds the room payment.</span>
+          </div>
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
           <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>

@@ -60,6 +60,9 @@ function InstallAppBanner({
     zIndex: 8500, padding: '0 14px', pointerEvents: 'none',
   } : {};
   const locked = hotelSubscribed !== true;
+  const lockedCopy = ownerPreview
+    ? 'Included with Marketel: direct rebooking, stays, and guest messages.'
+    : 'Guestel connects when this Marketel property is activated.';
 
   return (
     <>
@@ -77,17 +80,17 @@ function InstallAppBanner({
               Keep {hotelName || 'this property'} in Guestel
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.35 }}>
-              {locked ? 'Available once this property finishes setup.' : 'Book direct, keep your stay, and message the Front Desk.'}
+              {locked ? lockedCopy : 'Book direct, keep your stay, and message the Front Desk.'}
             </div>
           </div>
           <button type="button" onClick={handleOpenGuestel} aria-disabled={locked} style={{
             flexShrink: 0, padding: '10px 14px', borderRadius: 10,
-            border: locked ? '1px solid #cfd7d2' : 'none',
-            background: locked ? '#e4e8e5' : BRAND,
-            color: locked ? '#7b8780' : 'white', fontSize: 13, fontWeight: 800,
+            border: locked ? '1px solid #b9d3c4' : 'none',
+            background: locked ? '#edf7f1' : BRAND,
+            color: locked ? '#276648' : 'white', fontSize: 13, fontWeight: 800,
             cursor: 'pointer', fontFamily: 'inherit',
           }}>
-            {locked ? 'Locked' : ios || inGuestelClip ? 'Add' : 'Show QR'}
+            {locked ? (ownerPreview ? 'Preview' : 'Not live') : ios || inGuestelClip ? 'Add' : 'Show QR'}
           </button>
         </div>
       </div>
@@ -108,10 +111,10 @@ function InstallAppBanner({
             }}>
             <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={58} style={{ margin: '0 auto 14px' }} />
             <h2 id="owner-install-preview-title" style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}>
-              Guestel isn&apos;t live for your property yet.
+              Guestel is included when you activate Marketel.
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              Once you activate, this button opens your property through Apple&apos;s Guestel App Clip. Guests can book direct, keep the property, and message your Front Desk.
+              This button will open your property through Apple&apos;s Guestel App Clip. Guests can book direct, keep the property, and message your Front Desk.
             </p>
             <button type="button" onClick={() => setShowUnavailableInfo(false)} style={{
               width: '100%', minHeight: 48, padding: '12px 16px', border: 0, borderRadius: 12,

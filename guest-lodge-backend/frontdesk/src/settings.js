@@ -896,7 +896,7 @@ async function loadEditRooms() {
     updateFrontdeskManifestLink();
 
     // Fetch rates
-    let rates = { nightly: 69, weekly: 299, monthly: 999, taxRate: 0.10 };
+    let rates = { nightly: 69, weekly: 483, monthly: 1932, taxRate: 0 };
     if (res.rates) rates = res.rates;
     crm.editRates = rates;
 
