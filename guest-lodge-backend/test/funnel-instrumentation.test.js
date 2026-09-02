@@ -222,6 +222,7 @@ test('reveal completion survives return visits without marking pricing as paid',
     assert.match(reveal, /if \(opened && id !== 'activation'\)/);
     assert.match(reveal, /localStorage\.removeItem\(visitedStorageKey\(\)\)/);
     assert.doesNotMatch(reveal, /id="mvrHubPrimary"/);
+    assert.doesNotMatch(reveal, /mvr-hub-hero\.is-done/);
 });
 
 test('Marketel CAPI uses a configurable current Graph API version', () => {

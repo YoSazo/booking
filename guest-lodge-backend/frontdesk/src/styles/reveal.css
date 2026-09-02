@@ -2946,8 +2946,8 @@
 /* The one non-green accent in the system, spent on the single moment that
    deserves it: an item completing. */
 .mvr-row.is-done .mvr-row-mark {
-  border-color: var(--mvr-accent);
-  background: var(--mvr-accent);
+  border-color: var(--mvr-green);
+  background: var(--mvr-green);
   color: #fff;
   animation: mvr-mark-in 320ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
 }
@@ -2969,20 +2969,6 @@
 .mvr-row.is-activation.is-next .mvr-row-text strong,
 .mvr-row.is-activation.is-next .mvr-row-text small,
 .mvr-row.is-activation.is-next .mvr-row-chevron { color: #fff; }
-
-.mvr-hub-hero.is-done .mvr-expand-cue::before {
-  content: '✓';
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  margin: 0 auto 7px;
-  border-radius: 50%;
-  background: var(--mvr-accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-}
 
 /* ---------------------------------------------------------------- sheets */
 

@@ -2,9 +2,14 @@ import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import frontdeskYourPageUrl from './assets/frontdesk-your-page.webp';
-import guestelChatUrl from './assets/guestel-chat.webp';
 import guestelAddBookingPageUrl from './assets/guestel-add-booking-page.webp';
+import guestelAppClipCardUrl from './assets/guestel-app-clip-card.webp';
+import guestelAppClipInviteUrl from './assets/guestel-app-clip-invite.webp';
+import guestelChatUrl from './assets/guestel-chat.webp';
+import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
+import guestelHotelsUrl from './assets/guestel-hotels.webp';
 import guestelPropertySavedUrl from './assets/guestel-property-saved.webp';
+import guestelWalletReadyUrl from './assets/guestel-wallet-ready.webp';
 
 // The hub shows these only after someone opens a sheet, which gives us a
 // useful preload window. Warming them as soon as this chunk is requested makes
@@ -12,7 +17,12 @@ import guestelPropertySavedUrl from './assets/guestel-property-saved.webp';
 const CAROUSEL_SCREEN_URLS = [
   frontdeskYourPageUrl,
   guestelAddBookingPageUrl,
+  guestelAppClipCardUrl,
+  guestelAppClipInviteUrl,
   guestelPropertySavedUrl,
+  guestelWalletReadyUrl,
+  guestelHotelsUrl,
+  guestelChooseRoomUrl,
   guestelChatUrl,
 ];
 const carouselImageWarmups = new Map();
@@ -412,9 +422,9 @@ function appShowcases() {
   return {
     guestel: {
       id: 'guestel',
-      eyebrow: 'KEEP YOUR GUESTS',
-      title: 'Keep every guest one tap away.',
-      body: 'They add your property from your booking page, keep it in Guestel, and come back direct.',
+      eyebrow: 'FROM YOUR PAGE TO THEIR PHONE',
+      title: 'Your property stays with every guest.',
+      body: 'They tap Add on your booking page, open Apple’s instant App Clip, save your property in Guestel, and return direct next time.',
       slides: [
         {
           label: 'Tap Add',
@@ -424,11 +434,47 @@ function appShowcases() {
           alt: 'A booking page showing the Add control that starts the Guestel handoff.',
         },
         {
-          label: 'Property Saved',
+          label: 'Open Guestel',
+          url: guestelAppClipCardUrl,
+          width: 900,
+          height: 1786,
+          alt: 'Apple’s Guestel App Clip card opening over the property booking page.',
+        },
+        {
+          label: 'See the Benefits',
+          url: guestelAppClipInviteUrl,
+          width: 900,
+          height: 1787,
+          alt: 'The personalized Guestel invitation explaining direct rates, property messaging, and faster rebooking.',
+        },
+        {
+          label: 'Save the Property',
           url: guestelPropertySavedUrl,
           width: 900,
           height: 1787,
           alt: 'The property saved to Guestel with direct rates, Front Desk messaging and faster rebooking.',
+        },
+        {
+          label: 'Kept for Next Time',
+          url: guestelWalletReadyUrl,
+          width: 900,
+          height: 1787,
+          alt: 'The completed Guestel hotel wallet with the property kept for the guest’s next direct stay.',
+        },
+        {
+          label: 'Your Hotels',
+          url: guestelHotelsUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel showing an upcoming stay and the property saved for direct rebooking.',
+          event: 'GuestelWalletViewed',
+        },
+        {
+          label: 'Book Again',
+          url: guestelChooseRoomUrl,
+          width: 900,
+          height: 1764,
+          alt: 'Guestel showing the property room picker and direct stay dates.',
         },
         {
           label: 'Book and Message',
@@ -436,6 +482,7 @@ function appShowcases() {
           width: 900,
           height: 1762,
           alt: 'Guestel Messages showing a direct conversation between a guest and the property Front Desk.',
+          event: 'GuestelReachViewed',
         },
       ],
     },
@@ -639,7 +686,7 @@ function hubHtml() {
       </button>
       ${bookingPageStatusHtml()}
     </header>
-    <div class="mvr-hub-hero${visitedItems.has('booking') ? ' is-done' : ' is-next'}">${bookingPreviewCardHtml()}</div>
+    <div class="mvr-hub-hero${visitedItems.has('booking') ? '' : ' is-next'}">${bookingPreviewCardHtml()}</div>
     <div class="mvr-hub-rows">
       ${HUB_ITEMS.filter((item) => item.id !== 'booking').map((item) => hubRowHtml(item, nextId)).join('')}
     </div>
@@ -682,7 +729,6 @@ function refreshHubState() {
   });
   const hero = layer.querySelector('.mvr-hub-hero');
   if (hero) {
-    hero.classList.toggle('is-done', visitedItems.has('booking'));
     hero.classList.toggle('is-next', nextId === 'booking');
   }
   lastRenderedRevealHtml = hubHtml();

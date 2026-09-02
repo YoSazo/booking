@@ -46,10 +46,15 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.ok(ownerApp >= 0, 'the Front Desk app proof is missing');
     assert.ok(guestel >= 0, 'the Guestel proof is missing');
     assert.match(revealCopy, /Edit your booking page and manage bookings and availability from your phone/);
-    assert.match(revealCopy, /They add your property from your booking page, keep it in Guestel, and come back direct/);
+    assert.match(revealCopy, /tap Add on your booking page, open Apple’s instant App Clip, save your property in Guestel/);
     assert.match(revealCopy, /frontdeskYourPageUrl/);
     assert.match(revealCopy, /guestelAddBookingPageUrl/);
+    assert.match(revealCopy, /guestelAppClipCardUrl/);
+    assert.match(revealCopy, /guestelAppClipInviteUrl/);
     assert.match(revealCopy, /guestelPropertySavedUrl/);
+    assert.match(revealCopy, /guestelWalletReadyUrl/);
+    assert.match(revealCopy, /guestelHotelsUrl/);
+    assert.match(revealCopy, /guestelChooseRoomUrl/);
     assert.match(revealCopy, /guestelChatUrl/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);
