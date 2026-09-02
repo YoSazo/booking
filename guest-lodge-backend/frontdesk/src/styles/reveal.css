@@ -2839,3 +2839,247 @@
 #marketelValueReveal.mvr-no-enter .mvr-value-list > div {
   animation: none !important;
 }
+
+/* ==========================================================================
+   Hub + sheets
+   The reveal is a home screen, not a tour: one hero (their real page), four
+   rows, and exactly one green pill pointing at whatever is still unopened.
+   Everything here reuses the app tokens in core.css — no new palette.
+   ========================================================================== */
+
+/* Self-hosted DM Sans ships 400/500/600/700 only; 800 was being synthesized. */
+.mvr-root .mvr-primary { font-weight: 700; }
+/* A CTA that glints forever is the opposite of "simple". */
+.mvr-root .mvr-primary::after { content: none; }
+
+.mvr-hub-layer {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mvr-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top, 0px)) 18px
+           calc(28px + env(safe-area-inset-bottom, 0px));
+  animation: mvr-stage-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mvr-hub-head { display: flex; flex-direction: column; gap: 10px; }
+.mvr-hub-head .mvr-brand { display: flex; align-items: center; gap: 7px; opacity: 0.75; }
+.mvr-hub-head .mvr-brand img { width: 20px; height: 20px; }
+.mvr-hub-head .mvr-brand span {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--mvr-muted);
+}
+.mvr-hub-head h1 {
+  margin: 2px 0 0;
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--mvr-text);
+  text-wrap: balance;
+}
+
+.mvr-hub-domain {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 11px 14px;
+  border: 1.5px solid var(--mvr-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: border-color var(--dur-base, 0.22s) var(--ease-out, ease),
+              background var(--dur-base, 0.22s) var(--ease-out, ease);
+}
+.mvr-hub-domain:hover { border-color: var(--mvr-green); background: #fff; }
+.mvr-hub-domain span {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 13px; color: var(--mvr-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mvr-hub-domain b {
+  flex: none;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--mvr-green);
+}
+
+.mvr-hub-hero { position: relative; }
+
+.mvr-hub-rows { display: flex; flex-direction: column; gap: 8px; }
+
+.mvr-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 15px;
+  text-align: left;
+  border: 1.5px solid var(--mvr-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: border-color var(--dur-base, 0.22s) var(--ease-out, ease),
+              background var(--dur-base, 0.22s) var(--ease-out, ease),
+              transform var(--dur-fast, 0.14s) var(--ease-out, ease);
+}
+.mvr-row:hover { background: #fff; border-color: #c6d5cc; }
+.mvr-row:active { transform: scale(0.995); }
+.mvr-row.is-next { border-color: rgba(46, 125, 91, 0.42); background: #fff; }
+
+.mvr-row-mark {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border: 1.5px solid var(--mvr-line);
+  border-radius: 50%;
+  font-size: 13px; font-weight: 700; line-height: 1;
+  color: transparent;
+  transition: border-color var(--dur-base, 0.22s) var(--ease-out, ease),
+              background var(--dur-base, 0.22s) var(--ease-out, ease),
+              color var(--dur-base, 0.22s) var(--ease-out, ease);
+}
+/* The one non-green accent in the system, spent on the single moment that
+   deserves it: an item completing. */
+.mvr-row.is-done .mvr-row-mark {
+  border-color: var(--mvr-accent);
+  background: var(--mvr-accent);
+  color: #fff;
+  animation: mvr-mark-in 320ms var(--ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+
+.mvr-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mvr-row-text strong {
+  font-size: 15px; font-weight: 600; letter-spacing: -0.012em; color: var(--mvr-text);
+}
+.mvr-row-text small { font-size: 12.5px; line-height: 1.4; color: var(--mvr-muted); }
+.mvr-row.is-done .mvr-row-text strong { color: var(--mvr-muted); }
+.mvr-row-chevron { font-size: 17px; color: #b3c2b9; }
+
+.mvr-row.is-activation.is-next {
+  border-color: var(--mvr-green);
+  background: var(--mvr-green);
+  box-shadow: 0 10px 24px rgba(46, 125, 91, 0.18);
+}
+.mvr-row.is-activation.is-next .mvr-row-mark { border-color: rgba(255, 255, 255, 0.55); }
+.mvr-row.is-activation.is-next .mvr-row-text strong,
+.mvr-row.is-activation.is-next .mvr-row-text small,
+.mvr-row.is-activation.is-next .mvr-row-chevron { color: #fff; }
+
+.mvr-hub-hero.is-done .mvr-expand-cue::before {
+  content: '✓';
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 7px;
+  border-radius: 50%;
+  background: var(--mvr-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- sheets */
+
+.mvr-sheet { position: absolute; inset: 0; z-index: 8; display: grid; }
+.mvr-sheet-scrim {
+  position: absolute; inset: 0;
+  background: rgba(16, 30, 23, 0.42);
+  animation: mvr-copy-in 200ms var(--ease-out, ease) both;
+}
+.mvr-sheet-card {
+  position: relative;
+  align-self: end;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(620px, 100%);
+  max-height: calc(100% - max(24px, env(safe-area-inset-top, 0px)));
+  margin: 0 auto;
+  background: var(--bg, #eff4f0);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -12px 44px rgba(16, 30, 23, 0.22);
+  animation: mvr-sheet-up 340ms var(--ease-sheet, cubic-bezier(0.32, 0.72, 0, 1)) both;
+  overflow: hidden;
+}
+@keyframes mvr-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.mvr-sheet-grab {
+  width: 38px; height: 4px; margin: 9px auto 0;
+  border-radius: 999px; background: #c3d1c8;
+}
+.mvr-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 18px 6px;
+}
+.mvr-sheet-foot {
+  padding: 10px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--mvr-line);
+  background: rgba(255, 255, 255, 0.6);
+}
+.mvr-sheet-close {
+  width: 100%;
+  min-height: 46px;
+  border: 1.5px solid var(--mvr-line);
+  border-radius: 14px;
+  background: #fff;
+  font-size: 14px; font-weight: 600; color: var(--mvr-text);
+  cursor: pointer;
+  transition: border-color var(--dur-base, 0.22s) var(--ease-out, ease);
+}
+.mvr-sheet-close:hover { border-color: #b9cabf; }
+
+.mvr-sheet-lede { margin: 0 0 14px; }
+.mvr-sheet-lede h2 {
+  margin: 0 0 6px;
+  font-size: 21px; font-weight: 700; line-height: 1.18; letter-spacing: -0.022em;
+  color: var(--mvr-text); text-wrap: balance;
+}
+.mvr-sheet-lede p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--mvr-muted); }
+
+.mvr-sheet-shot { margin: 0; display: flex; justify-content: center; }
+.mvr-sheet-shot img {
+  width: min(280px, 78%);
+  height: auto;
+  border-radius: 22px;
+  box-shadow: 0 10px 30px rgba(26, 43, 34, 0.14), 0 2px 10px rgba(26, 43, 34, 0.08);
+}
+
+/* The activation sheet reuses the finale card, which was built to be a full
+   stage — inside a sheet it only needs to stop painting its own background. */
+.mvr-sheet.is-activation .mvr-stage-finale { padding: 0; min-height: 0; background: none; }
+
+/* --------------------------------------------------- booking-page preview */
+
+/* Two rows now (stage + footer): the toolbar, timer and mode switch are gone. */
+.mvr-live-preview { grid-template-rows: minmax(0, 1fr) auto; z-index: 8; }
+.mvr-live-foot {
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 12px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--mvr-line);
+  background: #fff;
+}
+.mvr-live-foot p {
+  margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--mvr-muted); text-align: center;
+}
+
+@media (max-width: 480px) {
+  .mvr-sheet-shot img { width: min(240px, 72%); }
+  .mvr-hub { gap: 15px; }
+}
+
+/* The hero is a teaser, not the page. Keeping it short means the rows and the
+   single green action are visible without scrolling on a phone. */
+.mvr-hub-hero .mvr-preview-teaser { height: 232px; }
+
+/* The coverflow was sized for a full-height stage. Inside a sheet it has to
+   leave room for its own controls and the Close button below. */
+.mvr-sheet .mvr-coverflow { height: auto; }
+.mvr-sheet .mvr-coverflow-viewport { min-height: 0; height: 46vh; max-height: 420px; }
+.mvr-sheet .mvr-coverflow-controls { padding-bottom: 4px; }

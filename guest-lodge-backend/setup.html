@@ -616,18 +616,16 @@ function answerQualityQ(answer) {
   });
   if (isQualifiedLead && !qualifiedLeadTracked) {
     qualifiedLeadTracked = true;
-    // Keep this ID stable for the setup so repeat clicks/reloads do not create
-    // additional leads, and share it with CAPI for browser/server deduplication.
-    const eventId = 'marketel-lead.' + (hotelData.id || TOKEN);
-    if (typeof fbq === 'function') {
-      fbq('track', 'Lead', { content_name: answer }, { eventID: eventId });
-    }
+    // Lead now fires on the landing page the moment an email is submitted.
+    // This is the deeper first-party signal: the owner answered, and answered
+    // in a way that says they already have demand to redirect. It is not sent
+    // to Meta — CompleteRegistration is the deep event the ad account uses.
     fetch('/api/funnel/onboarding', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        eventName: 'Lead',
-        eventId,
+        eventName: 'QualifiedLead',
+        eventId: 'marketel-qualified.' + (hotelData.id || TOKEN),
         setupToken: TOKEN,
         contentName: answer,
         ...journeyLinkage(),

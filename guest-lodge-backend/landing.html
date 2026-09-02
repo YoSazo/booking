@@ -241,6 +241,12 @@ async function startFreeSetup() {
     if (!response.ok || !data.success) throw new Error(data.error || 'Could not start setup');
     if (data.setupUrl) {
       window.MarketelJourney?.configure({ setupToken: data.token || '', hotelId: data.hotelId || '' });
+      // The email is the conversion now. The server fires the Conversions API
+      // copy with this same event_id from /api/setup/start, so Meta collapses
+      // the two into one lead instead of counting it twice.
+      if (typeof fbq === 'function' && data.hotelId) {
+        fbq('track', 'Lead', { content_name: ACQUISITION_ANGLE }, { eventID: 'marketel-lead.' + data.hotelId });
+      }
       window.MarketelJourney?.track('JourneyRequestCompleted', {
         request: 'setup-start',
         outcome: 'success',

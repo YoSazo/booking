@@ -1,44 +1,19 @@
 import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
-import assistantAlertStackUrl from './assets/assistant-alert-stack.webp';
-import assistantBookingRequestUrl from './assets/assistant-booking-request.webp';
-import assistantTextResolutionUrl from './assets/assistant-text-resolution.webp';
-import bookingPageStudios17Url from './assets/booking-page-studios17.webp';
 import frontdeskYourPageUrl from './assets/frontdesk-your-page.webp';
-import frontdeskBookingsUrl from './assets/frontdesk-bookings.webp';
-import frontdeskAvailabilityUrl from './assets/frontdesk-availability.webp';
-import frontdeskGuestAppUrl from './assets/frontdesk-guest-app.webp';
-import guestelHotelsUrl from './assets/guestel-hotels.webp';
-import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
 import guestelChatUrl from './assets/guestel-chat.webp';
 import guestelAddBookingPageUrl from './assets/guestel-add-booking-page.webp';
-import guestelAppClipCardUrl from './assets/guestel-app-clip-card.webp';
-import guestelAppClipInviteUrl from './assets/guestel-app-clip-invite.webp';
 import guestelPropertySavedUrl from './assets/guestel-property-saved.webp';
-import guestelWalletReadyUrl from './assets/guestel-wallet-ready.webp';
 
-// The owner reaches these carousels only after inspecting the live booking
-// page, which gives us a useful preload window. Warm every carousel screenshot
-// as soon as this reveal chunk is requested so changing slides is a transition,
-// not the moment the browser starts fetching or decoding the next screen.
+// The hub shows these only after someone opens a sheet, which gives us a
+// useful preload window. Warming them as soon as this chunk is requested makes
+// opening a sheet a transition rather than the start of a download.
 const CAROUSEL_SCREEN_URLS = [
   frontdeskYourPageUrl,
-  frontdeskBookingsUrl,
-  frontdeskAvailabilityUrl,
-  frontdeskGuestAppUrl,
-  guestelHotelsUrl,
-  guestelChooseRoomUrl,
-  guestelChatUrl,
   guestelAddBookingPageUrl,
-  guestelAppClipCardUrl,
-  guestelAppClipInviteUrl,
   guestelPropertySavedUrl,
-  guestelWalletReadyUrl,
-  assistantAlertStackUrl,
-  assistantTextResolutionUrl,
-  assistantBookingRequestUrl,
-  bookingPageStudios17Url,
+  guestelChatUrl,
 ];
 const carouselImageWarmups = new Map();
 
@@ -59,9 +34,21 @@ preloadCarouselScreens();
 const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
 const BILLING_KEY = 'marketelBillingIntervalV1';
+const VISITED_KEY = 'marketelValueRevealVisitedV1';
 
+// `currentStep` is no longer a screen index — the reveal is a hub, not a tour.
+// It survives only as "furthest depth reached", because the server's
+// revealProgressStep and the emailed resume links are keyed to it.
 let currentStep = 0;
-let livePreviewMode = 'guest';
+// Which hub items the owner has opened, and which sheet is up right now.
+let visitedItems = new Set();
+let openSheetId = null;
+// ActivationOfferViewed queues a Meta CAPI ViewContent on every call, and the
+// hub lets someone reopen the offer freely. Fire it once per reveal so the one
+// metric this redesign exists to move stays countable.
+let activationOfferTracked = false;
+let bookingCheckoutReachedTracked = false;
+let guestelAutoplayId = 0;
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
@@ -71,24 +58,16 @@ let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, 
 let bookingPageCheckFailed = false;
 let bookingPageTimer = 0;
 let revealOpening = false;
-// Which beat each beat-driven stage is showing. Keyed by reveal step.
-let stageBeatIndex = { 1: 0, 2: 0 };
 // The app proof is deliberately optional exploration inside each beat. Keeping
 // its position separate from the funnel beat means someone can inspect every
 // screen or move to the next subject after seeing only one.
-let appCarouselIndex = { frontdesk: 0, guestelInstall: 0, guestel: 0, assistant: 0, system: 0 };
+let appCarouselIndex = { guestel: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
 let activationNightlyRate = null;
 let activationPreviewMode = false;
-let activeBookingChallenge = null;
-let bookingPreviewOpened = false;
 let bookingPreviewUnavailable = false;
-// Saving in the editor returns to the booking page to show the highlighted
-// change, so mode alone can't drive the CTA — it would offer "edit" a second
-// time. Once the editor has been seen, the only way on is the Guestel stage.
-let bookingEditorVisited = false;
 let nextStageViewIsResume = false;
 
 
@@ -128,32 +107,8 @@ function propertyName() {
   return crm.activeHotelName || 'Your Property';
 }
 
-function firstRoom() {
-  return revealData.rooms[0] || crm.editRooms[0] || {
-    name: 'Your first room',
-    totalUnits: 1,
-    images: [],
-  };
-}
-
-function firstRoomImage() {
-  const room = firstRoom();
-  return room.images?.[0]?.url || room.imageUrl || '';
-}
-
 function nightlyRate() {
   return revealData.rates?.nightly || 99;
-}
-
-// The earlier Guestel chapter uses the saved setup rate. The activation screen
-// has its own editable calculator below because an owner may have skipped that
-// field or may want to test a different room rate before paying.
-function breakEvenEstimate() {
-  const rate = Number(revealData.rates?.nightly);
-  if (!Number.isFinite(rate) || rate <= 0) return null;
-  const commissionPerNight = rate * 0.15;
-  const roomNights = Math.max(1, Math.ceil(199 / commissionPerNight));
-  return { rate, roomNights, savings: commissionPerNight * roomNights };
 }
 
 function normalizedActivationRate(value, fallback = 99) {
@@ -277,21 +232,63 @@ function bookingDisplayDomain() {
   return `${propertySlug || 'your-property'}.mktel.co`;
 }
 
-function frontdeskEditorUrl() {
-  const url = new URL(window.location.href);
-  url.search = '';
-  url.hash = '';
-  if (crm.activeHotelId) url.searchParams.set('hotelId', crm.activeHotelId);
-  url.searchParams.set('previewEditor', '1');
-  return url.toString();
+// The hub, in the order it is shown. `step` is the legacy depth this item
+// writes to revealProgressStep; it deliberately no longer matches visual order,
+// because the hub is not a sequence. `event` must stay inside
+// MARKETEL_VALUE_REVEAL_EVENTS or the server rejects it with a 400.
+const HUB_ITEMS = [
+  {
+    id: 'booking',
+    step: 1,
+    event: 'BookingEngineRevealViewed',
+    title: 'Your booking page',
+    body: 'The page your guests book on.',
+    cta: 'Open your booking page',
+  },
+  {
+    id: 'frontdesk',
+    step: 2,
+    event: 'AssistantRevealViewed',
+    title: 'Marketel Front Desk',
+    body: 'Run your property from your phone.',
+    cta: 'See Marketel Front Desk',
+  },
+  {
+    id: 'guestel',
+    step: 3,
+    event: 'GuestAppRevealViewed',
+    title: 'Guestel',
+    body: 'Keep guests coming back direct.',
+    cta: 'See the Guestel experience',
+  },
+  {
+    id: 'activation',
+    step: 3,
+    event: 'ActivationOfferViewed',
+    title: 'Activate everything',
+    body: 'Your page, Front Desk and Guestel together.',
+    cta: '',
+  },
+];
+
+function hubItem(id) {
+  return HUB_ITEMS.find((item) => item.id === id) || null;
 }
 
-function appIconHtml(className = '') {
-  const appImage = crm.activeHotelAppIcon || firstRoomImage();
-  const initial = propertyName().trim().charAt(0).toUpperCase() || 'M';
-  return appImage
-    ? `<img class="${className}" src="${esc(appImage)}" alt="">`
-    : `<span class="${className}">${esc(initial)}</span>`;
+function visitedStorageKey() {
+  return `${VISITED_KEY}.${crm.activeHotelId || 'property'}`;
+}
+
+function persistVisitedItems() {
+  try {
+    localStorage.setItem(visitedStorageKey(), JSON.stringify([...visitedItems]));
+  } catch (_) {}
+}
+
+// Exactly one item is emphasized at a time, and this decides which one.
+function nextHubItemId() {
+  const pending = HUB_ITEMS.find((item) => !visitedItems.has(item.id));
+  return (pending || HUB_ITEMS[HUB_ITEMS.length - 1]).id;
 }
 
 function persistStep() {
@@ -314,7 +311,7 @@ function trackReveal(eventName, contentName = '') {
 function trackJourney(eventName, metadata = {}, options = {}) {
   return window.MarketelJourney?.track(eventName, {
     revealStep: currentStep,
-    stageName: ['booking-page', 'guest-app', 'front-desk-assistant', 'activation'][currentStep] || 'unknown',
+    stageName: openSheetId || 'hub',
     ...metadata,
   }, options);
 }
@@ -334,249 +331,22 @@ function shellVisible(visible) {
   }
 }
 
-function challengeSeconds(elapsedMs) {
-  return Math.max(0, Math.floor(Number(elapsedMs || 0) / 1000));
-}
-
-// The dial counts straight up in seconds — 01, 02 … 60, 61 — rather than
-// rolling over to mm:ss, so a sub-minute checkout reads as one number.
-function formatChallengeTicks(elapsedMs) {
-  return String(challengeSeconds(elapsedMs)).padStart(2, '0');
-}
-
-function formatChallengeTime(elapsedMs) {
-  return `${challengeSeconds(elapsedMs)}s`;
-}
-
-function hideBookingChallengeLayer(challenge) {
-  if (!challenge?.layer) return;
-  challenge.layer.classList.remove('is-visible', 'is-prompt');
-  challenge.layer.setAttribute('aria-hidden', 'true');
-  challenge.layer.innerHTML = '';
-}
-
-function setLivePreviewActionsVisible(modal, visible) {
-  const actions = modal?.querySelector('#mvrLiveActions');
-  if (actions) actions.hidden = !visible;
-}
-
-function stopBookingChallenge(reason = '', shouldTrack = false) {
-  const challenge = activeBookingChallenge;
-  if (!challenge) return;
-  if (challenge.timerId) {
-    window.clearInterval(challenge.timerId);
-    challenge.timerId = 0;
-  }
-  if (challenge.promptFallbackId) {
-    window.clearTimeout(challenge.promptFallbackId);
-    challenge.promptFallbackId = 0;
-  }
-  if (challenge.promptDelayId) {
-    window.clearTimeout(challenge.promptDelayId);
-    challenge.promptDelayId = 0;
-  }
-  if (shouldTrack && challenge.status === 'running') {
-    const elapsedMs = Date.now() - challenge.startedAt;
-    trackReveal('BookingChallengeAbandoned', reason);
-    trackJourney('JourneyBookingChallengeAbandoned', {
-      reason,
-      elapsedMs,
-    }, { durationMs: elapsedMs });
-  }
-  challenge.timer?.classList.remove('is-live');
-  if (challenge.status === 'running') challenge.status = 'abandoned';
-  hideBookingChallengeLayer(challenge);
-}
-
-function updateBookingChallengeTimer(challenge) {
-  if (!challenge || challenge.status !== 'running' || !challenge.timer) return;
-  const elapsedMs = Date.now() - challenge.startedAt;
-  const time = challenge.timer.querySelector('[data-challenge-time]');
-  if (time) time.textContent = formatChallengeTicks(elapsedMs);
-  challenge.timer.classList.toggle('is-over-minute', elapsedMs >= 60000);
-}
-
-function startBookingChallenge(challenge) {
-  if (!challenge || challenge !== activeBookingChallenge || challenge.status !== 'prompted') return;
-  challenge.status = 'running';
-  challenge.startedAt = Date.now();
-  hideBookingChallengeLayer(challenge);
-  // Once they opt into the timed proof, keep the booking flow as the only
-  // dominant task. The editor CTA used to compete with the very challenge we
-  // asked them to complete; the close control remains available as an exit.
-  setLivePreviewActionsVisible(challenge.modal, false);
-  challenge.timer.classList.add('is-live');
-  updateBookingChallengeTimer(challenge);
-  challenge.timerId = window.setInterval(() => updateBookingChallengeTimer(challenge), 500);
-  trackReveal('BookingChallengeStarted');
-  trackJourney('JourneyBookingChallengeStarted', {
-    targetSeconds: 60,
-    bookingDomain: bookingDisplayDomain(),
-  });
-}
-
-function showBookingChallengePrompt(challenge) {
-  if (!challenge || challenge !== activeBookingChallenge || challenge.hasPrompted || livePreviewMode !== 'guest') return;
-  challenge.hasPrompted = true;
-  challenge.status = 'prompted';
-  if (challenge.promptFallbackId) {
-    window.clearTimeout(challenge.promptFallbackId);
-    challenge.promptFallbackId = 0;
-  }
-  setLivePreviewActionsVisible(challenge.modal, false);
-  challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-intro" role="dialog" aria-labelledby="mvrChallengeTitle">
-    <span class="mvr-challenge-eyebrow">Optional · Test the guest experience</span>
-    <h2 id="mvrChallengeTitle">Can you reach payment in under 60 seconds?</h2>
-    <p>Try the booking flow yourself. Nothing you do here creates a real booking.</p>
-    <div class="mvr-challenge-actions">
-      <button type="button" class="mvr-challenge-start">Start challenge</button>
-      <button type="button" class="mvr-challenge-skip">Not now</button>
-    </div>
-  </section>`;
-  challenge.layer.classList.add('is-visible', 'is-prompt');
-  challenge.layer.setAttribute('aria-hidden', 'false');
-  challenge.layer.querySelector('.mvr-challenge-start')?.addEventListener('click', () => startBookingChallenge(challenge));
-  challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
-    challenge.status = 'dismissed';
-    hideBookingChallengeLayer(challenge);
-    setLivePreviewActionsVisible(challenge.modal, true);
-    trackReveal('BookingChallengeDismissed');
-    trackJourney('JourneyBookingChallengeDismissed');
-  });
-  trackReveal('BookingChallengeShown');
-  trackJourney('JourneyBookingChallengeShown', {
-    bookingDomain: bookingDisplayDomain(),
-  });
-}
-
-function completeBookingChallenge(challenge) {
-  if (!challenge || challenge !== activeBookingChallenge) return;
-  if (challenge.status !== 'running') {
-    trackJourney('JourneyBookingPreviewCheckoutReached', {
-      challengeRunning: false,
-    });
-    return;
-  }
-  const elapsedMs = Date.now() - challenge.startedAt;
-  if (challenge.timerId) {
-    window.clearInterval(challenge.timerId);
-    challenge.timerId = 0;
-  }
-  challenge.status = 'completed';
-  challenge.timer.classList.remove('is-live');
-  setLivePreviewActionsVisible(challenge.modal, false);
-  challenge.layer.innerHTML = `<section class="mvr-challenge-card mvr-challenge-complete" role="dialog" aria-labelledby="mvrChallengeCompleteTitle">
-    <span class="mvr-challenge-check" aria-hidden="true">✓</span>
-    <span class="mvr-challenge-eyebrow">Checkout reached in ${esc(formatChallengeTime(elapsedMs))}</span>
-    <h2 id="mvrChallengeCompleteTitle">That is the direct-booking experience your guests get.</h2>
-    <p>Now see where you change rooms, prices, photos, and availability.</p>
-    <div class="mvr-challenge-actions">
-      <button type="button" class="mvr-challenge-edit">See how you edit it</button>
-      <button type="button" class="mvr-challenge-skip">Keep exploring</button>
-    </div>
-  </section>`;
-  challenge.layer.classList.add('is-visible');
-  challenge.layer.setAttribute('aria-hidden', 'false');
-  challenge.layer.querySelector('.mvr-challenge-edit')?.addEventListener('click', () => {
-    hideBookingChallengeLayer(challenge);
-    setLivePreviewMode(challenge.modal, 'edit', challenge.previewOpenedAt, 'challenge-completed');
-  });
-  challenge.layer.querySelector('.mvr-challenge-skip')?.addEventListener('click', () => {
-    hideBookingChallengeLayer(challenge);
-    setLivePreviewActionsVisible(challenge.modal, true);
-  });
-  trackReveal('BookingChallengeCheckoutReached', formatChallengeTime(elapsedMs));
-  trackJourney('JourneyBookingChallengeCompleted', {
-    elapsedMs,
-    completedWithin60Seconds: elapsedMs <= 60000,
-  }, { durationMs: elapsedMs });
-}
-
+// The booking sheet is the owner's real engine, so reaching checkout inside it
+// is the strongest engagement signal this screen can produce. That is all this
+// listener is for now — the timed challenge and the embedded editor are gone.
 function handleBookingPreviewMessage(event) {
-  const messageType = event?.data?.type;
-  if (
-    messageType !== 'marketel:show-guest-app'
-    && messageType !== 'marketel:continue-owner-tour'
-    && messageType !== 'marketel:checkout-reached'
-    && messageType !== 'marketel:editor-saved'
-  ) return;
+  if (event?.data?.type !== 'marketel:checkout-reached') return;
   const reveal = document.getElementById('marketelValueReveal');
   if (!reveal) return;
   const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
     .some((frame) => frame.contentWindow === event.source);
   if (!knownFrame) return;
-  if (messageType === 'marketel:editor-saved') {
-    if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'edit') return;
-    if (event.data?.hotelName) crm.activeHotelName = String(event.data.hotelName);
-    activeBookingChallenge.modal.dataset.editorSaved = '1';
-    const changedFields = Array.isArray(event.data?.changedFields)
-      ? event.data.changedFields.map((field) => String(field))
-      : [];
-    const kind = String(event.data?.kind || 'booking-page');
-    let highlightTarget = 'header';
-    if (kind === 'header') {
-      const exactHeaderTargets = new Set(['name', 'subtitle', 'address', 'phone']);
-      highlightTarget = changedFields.length === 1 && exactHeaderTargets.has(changedFields[0])
-        ? `header-${changedFields[0]}`
-        : 'header';
-    } else if (kind.includes('photo')) {
-      highlightTarget = 'room-photo';
-    } else if (kind === 'room') {
-      highlightTarget = 'room';
-    } else if (kind === 'checkout-policy') {
-      highlightTarget = 'checkout-policy';
-      activeBookingChallenge.modal.dataset.editorPreviewTarget = 'checkout';
-    }
-    activeBookingChallenge.modal.dataset.editorHighlight = highlightTarget;
-    if (event.data?.roomId) {
-      activeBookingChallenge.modal.dataset.editorHighlightRoom = String(event.data.roomId);
-    } else {
-      delete activeBookingChallenge.modal.dataset.editorHighlightRoom;
-    }
-    trackJourney('JourneyBookingPreviewEdited', {
-      kind,
-      changedFields,
-      highlightTarget,
-    });
-    void loadRevealData();
-    setLivePreviewMode(
-      activeBookingChallenge.modal,
-      'guest',
-      activeBookingChallenge.previewOpenedAt,
-      'saved-and-returned-to-booking-page'
-    );
-    return;
-  }
-  if (messageType === 'marketel:checkout-reached') {
-    if (activeBookingChallenge?.iframe?.contentWindow !== event.source || livePreviewMode !== 'guest') return;
-    completeBookingChallenge(activeBookingChallenge);
-    return;
-  }
-  if (activeBookingChallenge?.iframe?.contentWindow !== event.source) return;
-  trackReveal('GuestAppPreviewRequestedFromBookingEngine');
-  setLivePreviewMode(
-    activeBookingChallenge.modal,
-    'edit',
-    activeBookingChallenge.previewOpenedAt,
-    'booking-install-explainer-continued'
-  );
-}
-
-function progressHtml() {
-  const labels = ['Booking page', 'Your apps', 'Front Desk', crm.hotelSubscribed ? 'Complete' : 'Activate'];
-  return `<div class="mvr-progress" aria-label="Marketel overview progress">
-    ${labels.map((label, index) => `<div class="mvr-progress-item ${index === currentStep ? 'is-active' : ''} ${index < currentStep ? 'is-done' : ''}">
-      <span></span><small>${esc(label)}</small>
-    </div>`).join('')}
-  </div>`;
-}
-
-function roomPhotoHtml(className = '') {
-  const image = firstRoomImage();
-  if (image) {
-    return `<img class="${className}" src="${esc(image)}" alt="${esc(firstRoom().name || 'Room')}">`;
-  }
-  return `<div class="${className} mvr-photo-placeholder"><span>${esc((firstRoom().name || 'R').trim().charAt(0).toUpperCase())}</span></div>`;
+  if (bookingCheckoutReachedTracked) return;
+  bookingCheckoutReachedTracked = true;
+  trackReveal('BookingChallengeCheckoutReached');
+  trackJourney('JourneyBookingPreviewCheckoutReached', {
+    bookingPageReady: !!bookingPageState.ready,
+  });
 }
 
 // The wildcard guest domain serves a property the moment its row exists, so the
@@ -635,212 +405,37 @@ function bookingPreviewCardHtml() {
   </div>`;
 }
 
-function bookingRevealHtml() {
-  return `<section class="mvr-stage mvr-stage-booking">
-    <div class="mvr-copy">
-      <div class="mvr-eyebrow">1 · Your direct booking page</div>
-      <h1>Your booking page is ready.</h1>
-      <p>Guests can choose <strong>${esc(firstRoom().name || 'a room')}</strong> and book directly in under 60 seconds.</p>
-      <div class="mvr-control-proof">
-        <span>See what guests will use.</span>
-        Open the booking page built for your property. Then see how Front Desk runs it and Guestel keeps guests coming back.
-      </div>
-      ${bookingPageStatusHtml()}
-    </div>
-    <div class="mvr-visual mvr-visual-booking">
-      ${bookingPreviewCardHtml()}
-    </div>
-  </section>`;
-}
-
-
-function guestAppRevealHtml() {
-  return beatStageHtml(
-    'mvr-stage-app',
-    '2 · Your app and theirs',
-    guestAppBeats(),
-    stageBeatIndex[1] || 0
-  );
-}
-
-// These are real screens, not feature illustrations. The active screen comes
-// forward while the neighboring screens remain visible behind it, making the
-// breadth of each app obvious without forcing seven separate funnel steps.
+// The reveal now shows one sequence only: how a guest keeps the property in
+// Guestel. Front Desk is a single screenshot and the booking page is the real
+// thing, so neither needs a carousel.
 function appShowcases() {
-  const estimate = breakEvenEstimate();
-  const rebookBody = estimate
-    ? `They save your property and book direct again. About ${estimate.roomNights} room-night${estimate.roomNights === 1 ? '' : 's'} could cover Marketel.`
-    : 'They save your property, book direct again and message you in Guestel.';
   return {
-    frontdesk: {
-      id: 'frontdesk',
-      eyebrow: 'CONTROL YOUR ENGINE',
-      title: 'Control your engine from one app.',
-      body: 'Your page, bookings, rooms and guest reach all live in Front Desk.',
-      slides: [
-        {
-          label: 'Your Page',
-          url: frontdeskYourPageUrl,
-          width: 900,
-          height: 1721,
-          alt: 'Marketel Front Desk Your Page showing the live booking-page editor.',
-          event: 'GuestAppOwnerEditorViewed',
-        },
-        {
-          label: 'Bookings',
-          url: frontdeskBookingsUrl,
-          width: 900,
-          height: 1728,
-          alt: 'Marketel Front Desk Bookings showing a complete reservation and availability decision.',
-        },
-        {
-          label: 'Availability',
-          url: frontdeskAvailabilityUrl,
-          width: 900,
-          height: 1734,
-          alt: 'Marketel Front Desk Availability showing a room calendar and remaining inventory.',
-        },
-        {
-          label: 'Guest Reach',
-          url: frontdeskGuestAppUrl,
-          width: 900,
-          height: 1734,
-          alt: 'Marketel Front Desk Guest Reach showing a live guest notification preview and composer.',
-        },
-      ],
-    },
-    guestelInstall: {
-      id: 'guestelInstall',
-      eyebrow: 'HOW GUESTS ADD YOU',
-      title: 'One tap keeps your property on their phone.',
-      body: 'They tap Add on your booking page, open Apple\'s instant App Clip, and keep your property, their stay and a direct way back in Guestel.',
+    guestel: {
+      id: 'guestel',
+      eyebrow: 'KEEP YOUR GUESTS',
+      title: 'Keep every guest one tap away.',
+      body: 'They add your property from your booking page, keep it in Guestel, and come back direct.',
       slides: [
         {
           label: 'Tap Add',
           url: guestelAddBookingPageUrl,
           width: 900,
           height: 1786,
-          alt: 'The Studios 17 booking page showing the Add control that starts the Guestel handoff.',
+          alt: 'A booking page showing the Add control that starts the Guestel handoff.',
         },
         {
-          label: 'Open Guestel',
-          url: guestelAppClipCardUrl,
-          width: 900,
-          height: 1786,
-          alt: 'Apple\'s Guestel App Clip card opening over the property booking page.',
-        },
-        {
-          label: 'See the Benefits',
-          url: guestelAppClipInviteUrl,
-          width: 900,
-          height: 1787,
-          alt: 'The personalized Guestel invitation explaining direct rates, property messaging and faster rebooking.',
-        },
-        {
-          label: 'Save the Property',
+          label: 'Property Saved',
           url: guestelPropertySavedUrl,
           width: 900,
           height: 1787,
-          alt: 'Studios 17 saved to Guestel with direct rates, Front Desk messaging and faster rebooking enabled.',
+          alt: 'The property saved to Guestel with direct rates, Front Desk messaging and faster rebooking.',
         },
         {
-          label: 'Kept for Next Time',
-          url: guestelWalletReadyUrl,
-          width: 900,
-          height: 1787,
-          alt: 'The completed Guestel hotel wallet with Studios 17 kept for the guest\'s next direct stay.',
-        },
-      ],
-    },
-    guestel: {
-      id: 'guestel',
-      eyebrow: 'KEEP YOUR GUESTS',
-      title: 'Keep every guest one tap away.',
-      body: rebookBody,
-      slides: [
-        {
-          label: 'Your Hotels',
-          url: guestelHotelsUrl,
-          width: 900,
-          height: 1764,
-          alt: 'Guestel Your Hotels showing an upcoming stay and the property saved for direct rebooking.',
-          event: 'GuestelWalletViewed',
-        },
-        {
-          label: 'Book Again',
-          url: guestelChooseRoomUrl,
-          width: 900,
-          height: 1764,
-          alt: 'Guestel showing a property room picker and direct stay dates.',
-        },
-        {
-          label: 'Messages',
+          label: 'Book and Message',
           url: guestelChatUrl,
           width: 900,
           height: 1762,
           alt: 'Guestel Messages showing a direct conversation between a guest and the property Front Desk.',
-          event: 'GuestelReachViewed',
-        },
-      ],
-    },
-    assistant: {
-      id: 'assistant',
-      eyebrow: 'PROTECT YOUR SETUP',
-      title: 'Nothing slips through the cracks.',
-      body: 'The moment a request lands, Front Desk alerts you three ways — Live Activity, text, and push. Reply in plain words or tap once in the app, and it checks the request and updates availability for you.',
-      slides: [
-        {
-          label: 'Booking Alert',
-          url: assistantAlertStackUrl,
-          width: 900,
-          height: 1748,
-          alt: 'A Marketel booking request reaching the owner through a Front Desk Live Activity, text message and push notification.',
-        },
-        {
-          label: 'Reply by Text',
-          url: assistantTextResolutionUrl,
-          width: 780,
-          height: 1528,
-          alt: 'A real text conversation where an owner tells Marketel a walk-in took the room, and Front Desk handles the online request and availability.',
-          event: 'AssistantTextProofViewed',
-        },
-        {
-          label: 'Answer in App',
-          url: assistantBookingRequestUrl,
-          width: 780,
-          height: 1528,
-          alt: 'A Marketel Front Desk booking request with a push notification and buttons to keep or release the booking.',
-          event: 'AssistantAppProofViewed',
-        },
-      ],
-    },
-    system: {
-      id: 'system',
-      eyebrow: 'THE COMPLETE LOOP',
-      title: 'The full direct-booking loop.',
-      body: 'Your page converts. Front Desk runs it. Guestel keeps them forever.',
-      compact: true,
-      slides: [
-        {
-          label: 'Booking Page',
-          url: bookingPageStudios17Url,
-          width: 900,
-          height: 1724,
-          alt: 'The Studios 17 direct booking page showing its property details, room and Add control.',
-        },
-        {
-          label: 'Front Desk',
-          url: frontdeskYourPageUrl,
-          width: 900,
-          height: 1721,
-          alt: 'Marketel Front Desk showing the page editor used to run the property.',
-        },
-        {
-          label: 'Guestel',
-          url: guestelHotelsUrl,
-          width: 900,
-          height: 1764,
-          alt: 'Guestel showing the property kept in the guest’s hotel wallet.',
         },
       ],
     },
@@ -878,123 +473,6 @@ function appCarouselHtml(showcase) {
       <button type="button" class="mvr-coverflow-arrow" data-carousel-next aria-label="Next ${esc(subject)}">›</button>
     </div>
   </div>`;
-}
-
-function guestAppBeats() {
-  const showcases = appShowcases();
-  return [
-    {
-      next: 'See how guests add you',
-      event: 'GuestAppOwnerEditorViewed',
-      carousel: showcases.frontdesk,
-    },
-    {
-      next: 'See what Guestel does next',
-      event: 'GuestelInstallFlowViewed',
-      carousel: showcases.guestelInstall,
-    },
-    {
-      next: 'See how Front Desk protects you',
-      event: 'GuestelWalletViewed',
-      carousel: showcases.guestel,
-    },
-  ];
-}
-
-// The assistant's two response surfaces belong to one idea, so they swipe
-// inside one beat. The second beat then closes the story with the complete
-// booking-page → Front Desk → Guestel loop.
-function assistantBeats() {
-  const showcases = appShowcases();
-  return [
-    {
-      next: 'See the complete loop',
-      event: 'AssistantTextProofViewed',
-      carousel: showcases.assistant,
-    },
-    {
-      next: 'Review plans and activation',
-      event: 'MarketelSystemViewed',
-      systemShowcase: true,
-      carousel: showcases.system,
-    },
-  ];
-}
-
-function stageBeats(step = currentStep) {
-  if (step === 1) return guestAppBeats();
-  if (step === 2) return assistantBeats();
-  return null;
-}
-
-// A proof may carry one frame or a pair. A pair cross-fades on its own so the
-// beat can show both halves of a loop — sent and received, stay and rebook —
-// without a second control competing with the footer.
-function proofFrames(proof) {
-  if (!proof) return [];
-  return proof.frames || [{ url: proof.url, alt: proof.alt }];
-}
-
-function beatStageHtml(stageClass, eyebrow, beats, index) {
-  const beat = beats[Math.max(0, Math.min(beats.length - 1, index))] || beats[0];
-  const carousel = beat.carousel;
-  const frames = proofFrames(beat.proof);
-  const paired = frames.length > 1;
-  return `<section class="mvr-stage mvr-stage-beats ${stageClass}${beat.systemShowcase ? ' is-system-showcase' : ''}">
-    <div class="mvr-beat-band">
-      <div class="mvr-eyebrow">${carousel ? carousel.eyebrow : eyebrow}</div>
-      <h1 class="mvr-beat-title"${carousel ? ' data-carousel-title' : ''}>${carousel ? carousel.title : beat.title}</h1>
-      <p class="mvr-beat-body"${carousel ? ' data-carousel-body' : ''}>${carousel ? carousel.body : beat.body}</p>
-    </div>
-    <div class="mvr-beat-stage">
-      ${carousel ? appCarouselHtml(carousel) : beat.proof ? `<figure class="mvr-beat-proof${paired ? ' is-paired' : ''}">
-        ${frames.map((frame, i) => `<img class="mvr-beat-frame${i === 0 ? ' is-active' : ''}" src="${frame.url}" width="780" height="1528" decoding="async" alt="${esc(frame.alt)}">`).join('')}
-        ${paired ? `<span class="mvr-beat-frame-dots" aria-hidden="true">${frames.map((_, i) => `<i${i === 0 ? ' class="is-active"' : ''}></i>`).join('')}</span>` : ''}
-      </figure>` : `<div class="mvr-beat-settings">${beat.render ? beat.render() : ''}</div>`}
-    </div>
-  </section>`;
-}
-
-// The first swap comes fast so a paired beat announces itself before she taps
-// on; after that it settles into a slower loop that is readable rather than busy.
-const BEAT_FRAME_FIRST_MS = 850;
-const BEAT_FRAME_MS = 2600;
-let beatFrameTimer = 0;
-let beatFrameDelay = 0;
-
-function clearBeatFrames() {
-  if (beatFrameTimer) {
-    window.clearInterval(beatFrameTimer);
-    beatFrameTimer = 0;
-  }
-  if (beatFrameDelay) {
-    window.clearTimeout(beatFrameDelay);
-    beatFrameDelay = 0;
-  }
-}
-
-// Runs after every render; a paired proof advances itself and loops. Restarting
-// from scratch each render is what keeps the timer from outliving its beat.
-function startBeatFrames() {
-  clearBeatFrames();
-  const figure = document.querySelector('.mvr-beat-proof.is-paired');
-  if (!figure) return;
-  const frames = [...figure.querySelectorAll('.mvr-beat-frame')];
-  const dots = [...figure.querySelectorAll('.mvr-beat-frame-dots i')];
-  if (frames.length < 2) return;
-  let shown = 0;
-  const advance = () => {
-    if (!figure.isConnected) return clearBeatFrames();
-    shown = (shown + 1) % frames.length;
-    frames.forEach((frame, i) => frame.classList.toggle('is-active', i === shown));
-    dots.forEach((dot, i) => dot.classList.toggle('is-active', i === shown));
-    return undefined;
-  };
-  beatFrameDelay = window.setTimeout(() => {
-    beatFrameDelay = 0;
-    advance();
-    beatFrameTimer = window.setInterval(advance, BEAT_FRAME_MS);
-  }, BEAT_FRAME_FIRST_MS);
 }
 
 function setAppCarouselSlide(root, requestedIndex, manual = false) {
@@ -1078,29 +556,6 @@ function bindAppCarousels() {
   });
 }
 
-function setStageBeat(nextBeat, manual = false) {
-  const beats = stageBeats();
-  if (!beats) return;
-  const clamped = Math.max(0, Math.min(beats.length - 1, Number(nextBeat) || 0));
-  if (clamped === (stageBeatIndex[currentStep] || 0)) return;
-  stageBeatIndex[currentStep] = clamped;
-  renderReveal();
-  document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
-  if (!manual) return;
-  const beat = beats[clamped];
-  if (beat.event) trackReveal(beat.event);
-  trackJourney('JourneyRevealBeatViewed', { revealStep: currentStep, beat: clamped });
-}
-
-function assistantRevealHtml() {
-  return beatStageHtml(
-    'mvr-stage-assistant',
-    '3 · Marketel Front Desk',
-    assistantBeats(),
-    stageBeatIndex[2] || 0
-  );
-}
-
 function finaleHtml() {
   const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
@@ -1115,7 +570,6 @@ function finaleHtml() {
     <div style="--stagger:2"><span>3</span><p><strong>Guestel</strong><small>Keep repeat direct bookings and guest messages one tap away</small></p></div>
   </div>`;
   return `<section class="mvr-stage mvr-stage-finale">
-    <button type="button" class="mvr-finale-back" id="mvrBack">← Back</button>
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
       <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
@@ -1150,74 +604,95 @@ function finaleHtml() {
   </section>`;
 }
 
-function stepHtml() {
-  if (currentStep === 0) return bookingRevealHtml();
-  if (currentStep === 1) return guestAppRevealHtml();
-  if (currentStep === 2) return assistantRevealHtml();
-  return finaleHtml();
-}
-
-function footerHtml() {
-  if (currentStep === 0) {
-    if (!bookingPreviewOpened && !bookingPreviewUnavailable) return '';
-    return `<div class="mvr-footer mvr-footer-booking">
-      <button type="button" class="mvr-primary" id="mvrNext">See your Front Desk app →</button>
-    </div>`;
-  }
-  // The activation screen carries its own Back pill so the page can run the
-  // full height. A footer row here cropped the card at a hard edge, which read
-  // as the end of the content and hid the fact that it scrolls.
-  if (currentStep === 3) return '';
-  // One forward affordance for the whole reveal. Inside the Assistant stage it
-  // walks the beats before advancing the stage, so the progress bar never lies
-  // and there is never a second "next" competing with this one.
-  const beats = stageBeats();
-  const label = beats
-    ? (beats[stageBeatIndex[currentStep] || 0] || beats[0]).next
-    : 'See how Front Desk protects you';
-  return `<div class="mvr-footer">
-    ${currentStep > 0 ? '<button type="button" class="mvr-back" id="mvrBack">← Back</button>' : '<span></span>'}
-    <button type="button" class="mvr-primary" id="mvrNext">${label} →</button>
-  </div>`;
-}
-
 // Stage 0 embeds a live iframe of the booking page, and this function replaces
 // the whole subtree — so every redundant render tore that frame down and made
 // the page load again. Boot fires several renders (data load, status checks),
 // which is the visible "refreshes itself three times". Skipping renders whose
 // output is byte-identical keeps the frame alive.
 let lastRenderedRevealHtml = '';
-let lastRenderedStep = -1;
-let lastRenderedBeat = -1;
 
+function hubRowHtml(item, nextId) {
+  const done = visitedItems.has(item.id);
+  const classes = ['mvr-row', `is-${item.id}`];
+  if (done) classes.push('is-done');
+  if (item.id === nextId) classes.push('is-next');
+  return `<button type="button" class="${classes.join(' ')}" data-hub-item="${item.id}">
+    <span class="mvr-row-mark" aria-hidden="true">${done ? '✓' : ''}</span>
+    <span class="mvr-row-text">
+      <strong>${esc(item.title)}</strong>
+      <small>${esc(item.body)}</small>
+    </span>
+    <span class="mvr-row-chevron" aria-hidden="true">›</span>
+  </button>`;
+}
+
+function hubHtml() {
+  const nextId = nextHubItemId();
+  return `<div class="mvr-hub">
+    <header class="mvr-hub-head">
+      <div class="mvr-brand"><img src="/marketellogo.svg" alt=""><span>Marketel</span></div>
+      <h1>${crm.hotelSubscribed && !activationPreviewMode
+        ? `${esc(propertyName())} is live.`
+        : 'Your Marketel is ready.'}</h1>
+      <button type="button" class="mvr-hub-domain" id="mvrCopyDomain" aria-label="Copy your booking link">
+        <span>${esc(bookingDisplayDomain())}</span><b aria-hidden="true">Copy</b>
+      </button>
+      ${bookingPageStatusHtml()}
+    </header>
+    <div class="mvr-hub-hero${visitedItems.has('booking') ? ' is-done' : ' is-next'}">${bookingPreviewCardHtml()}</div>
+    <div class="mvr-hub-rows">
+      ${HUB_ITEMS.filter((item) => item.id !== 'booking').map((item) => hubRowHtml(item, nextId)).join('')}
+    </div>
+  </div>`;
+}
+
+// The hub owns its own subtree so presenting a sheet never re-renders — and
+// never reloads — the live preview iframe behind it.
 function renderReveal() {
   const root = document.getElementById('marketelValueReveal');
   if (!root) return;
-  const nextHtml = `<div class="mvr-shell">
-    <header class="mvr-header">
-      <div class="mvr-brand"><img src="/marketellogo.svg" alt="Marketel"><span>Marketel</span></div>
-      ${progressHtml()}
-    </header>
-    <main class="mvr-main">${stepHtml()}</main>
-    ${footerHtml()}
-  </div>`;
-  if (nextHtml === lastRenderedRevealHtml && root.firstElementChild) return;
-  // Entrance animations belong to moving through the reveal, not to content
-  // arriving. Boot re-renders when the property name and the page status land,
-  // and replaying the stage slide each time reads as the page rebuilding itself.
-  const beatNow = stageBeatIndex[currentStep] || 0;
-  const advanced = currentStep !== lastRenderedStep || beatNow !== lastRenderedBeat;
-  root.classList.toggle('mvr-no-enter', !advanced && lastRenderedStep !== -1);
-  lastRenderedStep = currentStep;
-  lastRenderedBeat = beatNow;
+  let layer = root.querySelector('.mvr-hub-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'mvr-hub-layer';
+    root.prepend(layer);
+  }
+  const nextHtml = hubHtml();
+  if (nextHtml === lastRenderedRevealHtml && layer.firstElementChild) return;
   lastRenderedRevealHtml = nextHtml;
-  root.innerHTML = nextHtml;
+  layer.innerHTML = nextHtml;
   bindRevealEvents();
 }
 
+// Visited/next state changes in place. Re-rendering the hub for a checkmark
+// would tear down the hero iframe, which is exactly the "page rebuilds itself"
+// bug the old render guard existed to stop.
+function refreshHubState() {
+  const layer = document.querySelector('.mvr-hub');
+  if (!layer) return;
+  const nextId = nextHubItemId();
+  HUB_ITEMS.forEach((item) => {
+    const row = layer.querySelector(`[data-hub-item="${item.id}"]`);
+    if (!row) return;
+    const done = visitedItems.has(item.id);
+    row.classList.toggle('is-done', done);
+    row.classList.toggle('is-next', item.id === nextId);
+    const mark = row.querySelector('.mvr-row-mark');
+    if (mark) mark.textContent = done ? '✓' : '';
+  });
+  const hero = layer.querySelector('.mvr-hub-hero');
+  if (hero) {
+    hero.classList.toggle('is-done', visitedItems.has('booking'));
+    hero.classList.toggle('is-next', nextId === 'booking');
+  }
+  lastRenderedRevealHtml = hubHtml();
+}
+
+// The booking sheet is their real engine and nothing else: no timer, no
+// simulated address bar, no challenge, no embedded editor. One control, Close.
 function showExpandedPreview() {
   const url = bookingUrl();
-  if (document.getElementById('mvrLivePreview')) return;
+  if (document.getElementById('mvrLivePreview')) return false;
   if (!url) {
     bookingPreviewUnavailable = true;
     trackJourney('JourneyBookingPreviewOpened', {
@@ -1225,95 +700,31 @@ function showExpandedPreview() {
       bookingPageReady: false,
       bookingPageReason: bookingPageState.reason || 'missing-url',
     });
+    openSheetId = null;
     renderReveal();
-    return;
+    return false;
   }
-  bookingPreviewOpened = true;
-  livePreviewMode = 'guest';
   const previewOpenedAt = Date.now();
   const modal = document.createElement('div');
   modal.id = 'mvrLivePreview';
   modal.className = 'mvr-live-preview';
-  modal.innerHTML = `<div class="mvr-live-toolbar">
-    <div class="mvr-live-topline">
-      <button type="button" class="mvr-live-exit" id="mvrClosePreview" aria-label="Exit preview">×</button>
-      <div class="mvr-live-address" id="mvrLiveLocation" aria-label="Your live booking address">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 8V6a3.5 3.5 0 0 1 7 0v2M5 8h10v8H5z"/></svg>
-        <strong data-live-location-text>${esc(bookingDisplayDomain())}</strong>
-      </div>
-      <span class="mvr-challenge-timer" aria-live="polite" aria-label="Seconds elapsed">
-        <strong data-challenge-time>00</strong>
-      </span>
-    </div>
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.innerHTML = `<div class="mvr-live-stage">
+    <iframe data-preview-frame="guest" title="${esc(propertyName())} live booking page" src="${esc(url)}"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
   </div>
-  <div class="mvr-live-stage">
-    <iframe data-preview-frame="guest" title="${esc(propertyName())} live preview" src="${esc(url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
-    <iframe data-preview-frame="editor" title="${esc(propertyName())} Front Desk editor" hidden sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
-    <div class="mvr-challenge-layer" aria-hidden="true"></div>
-  </div>
-  <div class="mvr-live-actions" id="mvrLiveActions" hidden>
-    <button type="button" class="mvr-live-back" id="mvrLiveBack" hidden>← Back</button>
-    <button type="button" class="mvr-live-forward" id="mvrLiveForward">
-      <span data-live-forward-long>See how you edit it in Front Desk</span>
-      <b aria-hidden="true">→</b>
-    </button>
-    <button type="button" class="mvr-live-continue" id="mvrContinueGuestApp" hidden>See your Front Desk app</button>
+  <div class="mvr-live-foot">
+    <p>Guests verify their card with a temporary $1 hold, then pay your property directly. Marketel never holds your room revenue.</p>
+    <button type="button" class="mvr-sheet-close" id="mvrClosePreview">Close</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
-  const iframe = modal.querySelector('[data-preview-frame="guest"]');
-  // Front Desk cold-booting in front of the owner is not part of the pitch.
-  // The editor loads behind the booking page so that by the time they ask to
-  // see it, it is already up — they get the product, not its loading screen.
-  // It starts after the booking page so the two are not racing for the network.
-  window.setTimeout(() => {
-    const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
-    if (!editorFrame?.isConnected || editorFrame.getAttribute('src')) return;
-    editorFrame.src = frontdeskEditorUrl();
-  }, 1200);
-  activeBookingChallenge = {
-    modal,
-    iframe,
-    layer: modal.querySelector('.mvr-challenge-layer'),
-    timer: modal.querySelector('.mvr-challenge-timer'),
-    previewOpenedAt,
-    status: 'waiting',
-    hasPrompted: false,
-    startedAt: 0,
-    timerId: 0,
-    promptFallbackId: 0,
-    promptDelayId: 0,
-  };
-  activeBookingChallenge.promptFallbackId = window.setTimeout(() => {
-    if (activeBookingChallenge?.modal !== modal || activeBookingChallenge.status !== 'waiting') return;
-    setLivePreviewActionsVisible(modal, true);
-  }, 4000);
-  iframe?.addEventListener('load', () => {
-    const challenge = activeBookingChallenge;
-    if (challenge?.modal !== modal || livePreviewMode !== 'guest') return;
-    if (challenge.promptDelayId) window.clearTimeout(challenge.promptDelayId);
-    challenge.promptDelayId = window.setTimeout(() => {
-      challenge.promptDelayId = 0;
-      showBookingChallengePrompt(challenge);
-    }, 1500);
-  });
   modal.querySelector('#mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {
       action: 'closed',
-      mode: livePreviewMode,
+      mode: 'guest',
     }, { durationMs: Date.now() - previewOpenedAt });
-    stopBookingChallenge('preview-closed', true);
-    activeBookingChallenge = null;
-    modal.remove();
-    renderReveal();
-  });
-  modal.querySelector('#mvrContinueGuestApp')?.addEventListener('click', () => {
-    continueFromBookingPreview(modal, previewOpenedAt, 'continued-without-editor');
-  });
-  modal.querySelector('#mvrLiveForward')?.addEventListener('click', () => {
-    setLivePreviewMode(modal, 'edit', previewOpenedAt, 'guided-forward');
-  });
-  modal.querySelector('#mvrLiveBack')?.addEventListener('click', () => {
-    setLivePreviewMode(modal, 'guest', previewOpenedAt, 'returned-to-booking-page');
+    closeSheet('preview-closed');
   });
   trackReveal('BookingEngineFullPreviewOpened');
   trackJourney('JourneyBookingPreviewOpened', {
@@ -1321,132 +732,119 @@ function showExpandedPreview() {
     bookingPageReady: !!bookingPageState.ready,
     bookingPageReason: bookingPageState.reason || '',
   });
+  return true;
 }
 
-function continueFromBookingPreview(modal, previewOpenedAt, action) {
-  if (!modal?.isConnected) return;
-  trackJourney('JourneyRevealNavigation', {
-    action,
-    toStep: 1,
-    editorViewed: livePreviewMode === 'edit',
-  }, { durationMs: Date.now() - previewOpenedAt });
-  stopBookingChallenge('continued-to-guest-app', false);
-  activeBookingChallenge = null;
-  modal.remove();
-  moveToStep(1);
-}
-
-function setPreviewFrameSrc(iframe, nextSrc) {
-  if (!iframe || !nextSrc) return;
-  let current = '';
-  try { current = new URL(iframe.getAttribute('src') || '', window.location.href).toString(); }
-  catch (_) { current = iframe.getAttribute('src') || ''; }
-  if (current === nextSrc) return;
-  iframe.src = nextSrc;
-}
-
-function setLivePreviewMode(modal, nextMode, previewOpenedAt, action = 'mode-selected') {
-  if (!modal?.isConnected) return;
-  if (nextMode === 'edit') stopBookingChallenge('edit-mode-selected', true);
-  livePreviewMode = nextMode === 'edit' ? 'edit' : 'guest';
-  const location = modal.querySelector('#mvrLiveLocation');
-  const locationText = modal.querySelector('[data-live-location-text]');
-  const forward = modal.querySelector('#mvrLiveForward');
-  const continueGuestApp = modal.querySelector('#mvrContinueGuestApp');
-  const back = modal.querySelector('#mvrLiveBack');
-  const editing = livePreviewMode === 'edit';
-  if (editing) bookingEditorVisited = true;
-  location?.classList.toggle('is-editor', editing);
-  if (locationText) locationText.textContent = editing ? 'Front Desk editor' : bookingDisplayDomain();
-  if (location) location.setAttribute('aria-label', editing ? 'Front Desk editor' : 'Your live booking address');
-  // Exactly one green CTA, and it always names where you are not.
-  //   engine            → "See how to edit your booking page"
-  //   editor            → Back + "See your Front Desk app"
-  //   engine after save → forward, because re-offering the step just completed
-  //                       reads as though the save did not take.
-  // Returning via Back is deliberately *not* a save, so the editor stays one
-  // tap away instead of stranding the owner on the engine.
-  const savedReturn = !editing && String(action || '').startsWith('saved-');
-  const showContinue = editing || savedReturn;
-  if (forward) forward.hidden = showContinue;
-  if (continueGuestApp) continueGuestApp.hidden = !showContinue;
-  if (back) back.hidden = !editing;
-  setLivePreviewActionsVisible(modal, true);
-  const guestFrame = modal.querySelector('[data-preview-frame="guest"]');
-  const editorFrame = modal.querySelector('[data-preview-frame="editor"]');
-  if (guestFrame && editorFrame) {
-    if (editing) {
-      // Normally already loaded from the preload above; this only covers a jump
-      // to the editor faster than the preload timer.
-      if (!editorFrame.getAttribute('src')) editorFrame.src = frontdeskEditorUrl();
-    } else {
-      const guestUrl = new URL(bookingUrl());
-      if (modal.dataset.editorSaved === '1') {
-        guestUrl.searchParams.set('previewRefresh', String(Date.now()));
-        const checkoutPreview = modal.dataset.editorPreviewTarget === 'checkout';
-        guestUrl.searchParams.set('previewHighlight', checkoutPreview
-          ? 'checkout-policy'
-          : (modal.dataset.editorHighlight || 'header'));
-        if (checkoutPreview) {
-          guestUrl.searchParams.set('previewCheckout', '1');
-        } else if (modal.dataset.editorHighlightRoom) {
-          guestUrl.searchParams.set('previewHighlightRoom', modal.dataset.editorHighlightRoom);
-        }
-        delete modal.dataset.editorSaved;
-        delete modal.dataset.editorHighlight;
-        delete modal.dataset.editorHighlightRoom;
-        delete modal.dataset.editorPreviewTarget;
-      }
-      // A save-return deliberately carries a fresh previewRefresh, so this
-      // still reloads when it should; it only skips a genuinely identical URL.
-      setPreviewFrameSrc(guestFrame, guestUrl.toString());
-    }
-    // Both pages stay loaded and only their visibility changes, so moving
-    // between the booking page and the editor never costs a page load.
-    guestFrame.hidden = editing;
-    editorFrame.hidden = !editing;
-    if (activeBookingChallenge?.modal === modal) {
-      activeBookingChallenge.iframe = editing ? editorFrame : guestFrame;
-    }
-  }
-  trackJourney('JourneyBookingPreviewModeChanged', {
-    action,
-    mode: livePreviewMode,
-  }, { durationMs: Date.now() - previewOpenedAt });
-  if (livePreviewMode === 'edit') trackReveal('BookingEngineEditPreviewViewed');
-}
-
-function moveToStep(nextStep) {
-  const previousStep = currentStep;
-  const normalizedStep = Math.max(0, Math.min(3, nextStep));
-  const now = Date.now();
-  if (stageStartedAt && normalizedStep !== previousStep) {
-    trackJourney('JourneyRevealStageCompleted', {
-      revealStep: previousStep,
-      stageName: ['booking-page', 'guest-app', 'front-desk-assistant', 'activation'][previousStep] || 'unknown',
-      nextStep: normalizedStep,
-      direction: normalizedStep > previousStep ? 'forward' : 'back',
-    }, { durationMs: now - stageStartedAt });
-  }
-  currentStep = normalizedStep;
-  stageStartedAt = now;
+// Records depth for the server and the emailed resume links. The hub is not a
+// sequence, so this only ever moves forward.
+function recordHubDepth(step) {
+  const normalized = Math.max(0, Math.min(3, step));
+  if (normalized <= currentStep && stageStartedAt) return;
+  currentStep = Math.max(currentStep, normalized);
   persistStep();
-  const events = [
-    'BookingEngineRevealViewed',
-    'GuestAppRevealViewed',
-    'AssistantRevealViewed',
-    'ActivationOfferViewed',
-  ];
-  trackReveal(events[currentStep]);
+}
+
+function openHubItem(id) {
+  const item = hubItem(id);
+  if (!item || openSheetId) return;
+  const now = Date.now();
+  openSheetId = id;
+  stageStartedAt = now;
+
+  // Only fire the stage event on open. The server writes revealProgressStep on
+  // every call and follows backward moves, so firing on close would rewrite a
+  // lower step.
+  if (item.id === 'activation') {
+    if (!activationOfferTracked) {
+      activationOfferTracked = true;
+      trackReveal(item.event);
+    }
+  } else {
+    trackReveal(item.event);
+  }
+  recordHubDepth(item.step);
   trackJourney('JourneyRevealStageViewed', {
     resumed: nextStageViewIsResume,
-    bookingPageReady: currentStep === 0 ? !!bookingPageState.ready : undefined,
+    bookingPageReady: id === 'booking' ? !!bookingPageState.ready : undefined,
   });
-  const openingBeat = stageBeats(currentStep)?.[stageBeatIndex[currentStep] || 0];
-  if (openingBeat?.event) trackReveal(openingBeat.event);
   nextStageViewIsResume = false;
-  renderReveal();
-  document.querySelector('.mvr-main')?.scrollTo({ top: 0, behavior: 'auto' });
+
+  let opened = true;
+  if (id === 'booking') {
+    opened = showExpandedPreview();
+  } else {
+    presentSheet(id);
+  }
+  // Viewing pricing is not completion. Activation remains the one unchecked
+  // item until Stripe succeeds, so closing the offer never creates a false ✓.
+  if (opened && id !== 'activation') {
+    visitedItems.add(id);
+    persistVisitedItems();
+  }
+  refreshHubState();
+}
+
+function closeSheet(reason = 'closed') {
+  if (!openSheetId) return;
+  const closed = openSheetId;
+  trackJourney('JourneyRevealStageCompleted', {
+    action: reason,
+    stageName: closed,
+  }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : undefined });
+  openSheetId = null;
+  stageStartedAt = 0;
+  stopGuestelAutoplay();
+  document.getElementById('mvrSheet')?.remove();
+  document.getElementById('mvrLivePreview')?.remove();
+  refreshHubState();
+}
+
+function frontdeskSheetBodyHtml() {
+  return `<div class="mvr-sheet-lede">
+    <h2>Marketel Front Desk is a real App Store app.</h2>
+    <p>Edit your booking page and manage bookings and availability from your phone. You download it after you activate.</p>
+  </div>
+  <figure class="mvr-sheet-shot">
+    <img src="${frontdeskYourPageUrl}" width="900" height="1721" loading="eager" decoding="async"
+      alt="Marketel Front Desk showing the live booking-page editor for a property.">
+  </figure>`;
+}
+
+function guestelSheetBodyHtml() {
+  const showcase = appShowcases().guestel;
+  return `<div class="mvr-sheet-lede">
+    <h2>${esc(showcase.title)}</h2>
+    <p>${esc(showcase.body)}</p>
+  </div>
+  ${appCarouselHtml(showcase)}`;
+}
+
+function presentSheet(id) {
+  const root = document.getElementById('marketelValueReveal');
+  if (!root || document.getElementById('mvrSheet')) return;
+  const body = id === 'frontdesk'
+    ? frontdeskSheetBodyHtml()
+    : id === 'guestel'
+      ? guestelSheetBodyHtml()
+      : finaleHtml();
+  const sheet = document.createElement('div');
+  sheet.id = 'mvrSheet';
+  sheet.className = `mvr-sheet is-${id}`;
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.innerHTML = `<div class="mvr-sheet-scrim" data-sheet-dismiss></div>
+    <div class="mvr-sheet-card">
+      <div class="mvr-sheet-grab" aria-hidden="true"></div>
+      <div class="mvr-sheet-body">${body}</div>
+      <div class="mvr-sheet-foot">
+        <button type="button" class="mvr-sheet-close" data-sheet-dismiss>Close</button>
+      </div>
+    </div>`;
+  root.appendChild(sheet);
+  sheet.querySelectorAll('[data-sheet-dismiss]').forEach((control) => {
+    control.addEventListener('click', () => closeSheet('sheet-closed'));
+  });
+  bindSheetEvents();
 }
 
 function finishReveal() {
@@ -1460,12 +858,9 @@ function finishReveal() {
     window.clearTimeout(bookingPageTimer);
     bookingPageTimer = 0;
   }
-  stopBookingChallenge('reveal-finished', true);
-  activeBookingChallenge = null;
-  clearBeatFrames();
+  openSheetId = null;
+  stopGuestelAutoplay();
   lastRenderedRevealHtml = '';
-  lastRenderedStep = -1;
-  lastRenderedBeat = -1;
   document.getElementById('marketelValueReveal')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
@@ -1474,6 +869,7 @@ function finishReveal() {
   try {
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(STEP_KEY);
+    localStorage.removeItem(visitedStorageKey());
     localStorage.setItem('settingsTourDone', '1');
     localStorage.setItem('onboardingDone', '1');
   } catch (_) {}
@@ -1516,33 +912,35 @@ async function activateMarketel(button) {
 }
 
 function bindRevealEvents() {
-  document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
-    window.openMarketelSupport?.();
+  document.querySelectorAll('[data-hub-item]').forEach((row) => {
+    row.addEventListener('click', () => {
+      trackJourney('JourneyRevealNavigation', { action: 'hub-row', target: row.dataset.hubItem });
+      openHubItem(row.dataset.hubItem);
+    });
   });
-  document.getElementById('mvrNext')?.addEventListener('click', () => {
-    const beats = stageBeats();
-    const beatIndex = stageBeatIndex[currentStep] || 0;
-    if (beats && beatIndex < beats.length - 1) {
-      setStageBeat(beatIndex + 1, true);
-      return;
-    }
-    trackJourney('JourneyRevealNavigation', { action: 'next', toStep: currentStep + 1 });
-    moveToStep(currentStep + 1);
-  });
-  document.getElementById('mvrBack')?.addEventListener('click', () => {
-    const beats = stageBeats();
-    const beatIndex = stageBeatIndex[currentStep] || 0;
-    if (beats && beatIndex > 0) {
-      setStageBeat(beatIndex - 1, true);
-      return;
-    }
-    trackJourney('JourneyRevealNavigation', { action: 'back', toStep: currentStep - 1 });
-    moveToStep(currentStep - 1);
-  });
-  document.getElementById('mvrExpandPreview')?.addEventListener('click', showExpandedPreview);
+  document.getElementById('mvrExpandPreview')?.addEventListener('click', () => openHubItem('booking'));
   document.querySelector('.mvr-preview-teaser-veil')?.addEventListener('click', () => {
     if (bookingPreviewUnavailable) return;
-    showExpandedPreview();
+    openHubItem('booking');
+  });
+  document.getElementById('mvrCopyDomain')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    const link = `https://${bookingDisplayDomain()}`;
+    navigator.clipboard?.writeText(link).then(() => {
+      const flag = button.querySelector('b');
+      if (!flag) return;
+      flag.textContent = 'Copied';
+      window.setTimeout(() => { flag.textContent = 'Copy'; }, 1600);
+    }).catch(() => {});
+    trackJourney('JourneyControlActivated', { controlName: 'copy-booking-link' });
+  });
+}
+
+// Activation lives in a sheet now, so its controls bind when that sheet is
+// presented rather than with the hub.
+function bindSheetEvents() {
+  document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
+    window.openMarketelSupport?.();
   });
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.querySelectorAll('[data-mvr-billing]').forEach((button) => {
@@ -1557,7 +955,12 @@ function bindRevealEvents() {
         price: billingInterval === 'year' ? 1990 : 199,
         currency: 'USD',
       });
-      renderReveal();
+      const body = document.querySelector('#mvrSheet .mvr-sheet-body');
+      if (body) {
+        body.innerHTML = finaleHtml();
+        bindSheetEvents();
+      }
+      refreshHubState();
     });
   });
   const rateInput = document.getElementById('mvrActivationRate');
@@ -1578,7 +981,32 @@ function bindRevealEvents() {
     });
   });
   bindAppCarousels();
-  startBeatFrames();
+  startGuestelAutoplay();
+}
+
+// Owners skip carousels — the one recorded traversal of the old reveal clicked
+// past every slide without opening any. So the Guestel sequence advances on its
+// own, and stops the moment someone takes over.
+function startGuestelAutoplay() {
+  stopGuestelAutoplay();
+  const root = document.querySelector('#mvrSheet [data-mvr-carousel="guestel"]');
+  if (!root) return;
+  const slides = appShowcases().guestel.slides.length;
+  guestelAutoplayId = window.setInterval(() => {
+    if (!root.isConnected) return stopGuestelAutoplay();
+    const next = ((appCarouselIndex.guestel || 0) + 1) % slides;
+    setAppCarouselSlide(root, next, false);
+  }, 2600);
+  root.addEventListener('pointerdown', stopGuestelAutoplay, { once: true });
+  root.querySelectorAll('button').forEach((control) => {
+    control.addEventListener('click', stopGuestelAutoplay, { once: true });
+  });
+}
+
+function stopGuestelAutoplay() {
+  if (!guestelAutoplayId) return;
+  window.clearInterval(guestelAutoplayId);
+  guestelAutoplayId = 0;
 }
 
 async function loadRevealData() {
@@ -1590,7 +1018,7 @@ async function loadRevealData() {
         rates: result?.rates || null,
       };
       if (revealData.rooms.length) crm.editRooms = revealData.rooms;
-      if (document.getElementById('marketelValueReveal') && !document.getElementById('mvrLivePreview')) renderReveal();
+      if (document.getElementById('marketelValueReveal') && !openSheetId) renderReveal();
       return revealData;
     })
     .catch(() => revealData)
@@ -1617,7 +1045,7 @@ async function checkBookingPageStatus() {
       reason: bookingPageState.reason,
       attempts: bookingPageState.attempts,
     });
-    if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
+    if (!openSheetId) renderReveal();
     return;
   }
   bookingPageState.checking = true;
@@ -1647,20 +1075,39 @@ async function checkBookingPageStatus() {
     attempts: bookingPageState.attempts,
   });
 
-  if (currentStep === 0 && !document.getElementById('mvrLivePreview')) renderReveal();
+  if (!openSheetId) renderReveal();
   if (bookingPageState.ready || bookingPageState.reason === 'deployment-disabled') return;
   if (bookingPageState.attempts < 10 && document.getElementById('marketelValueReveal')) {
     bookingPageTimer = window.setTimeout(checkBookingPageStatus, 6000);
   }
 }
 
+// revealProgressStep is a depth, not a screen. Resuming therefore reopens the
+// hub with that many items already ticked, rather than dropping someone back
+// into the middle of a tour that no longer exists.
+function seedVisitedFromStep(step) {
+  visitedItems = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(visitedStorageKey()) || '[]');
+    if (Array.isArray(saved)) {
+      const allowed = new Set(HUB_ITEMS.filter((item) => item.id !== 'activation').map((item) => item.id));
+      saved.forEach((id) => { if (allowed.has(id)) visitedItems.add(id); });
+    }
+  } catch (_) {}
+  if (visitedItems.size) return;
+  const depth = Math.max(0, Math.min(HUB_ITEMS.length, Number(step) || 0));
+  for (let index = 0; index < depth; index += 1) {
+    const id = HUB_ITEMS[index].id;
+    if (id !== 'activation') visitedItems.add(id);
+  }
+}
+
 export async function showMarketelValueReveal(options = {}) {
   if (document.getElementById('marketelValueReveal') || revealOpening) return;
   revealOpening = true;
-  // Stage 0 embeds the live booking page, and opening before the room data
-  // lands forces a second render once it arrives — which replaces the subtree
-  // and makes the frame load again. Waiting here costs one request; the cap
-  // stops a slow API from holding the reveal shut.
+  // The hub's hero embeds the live booking page, and opening before the room
+  // data lands forces a second render once it arrives. Waiting here costs one
+  // request; the cap stops a slow API from holding the reveal shut.
   let preloadedRevealData = false;
   if (!crm.editRooms?.length && typeof window.api === 'function') {
     await Promise.race([
@@ -1683,16 +1130,14 @@ export async function showMarketelValueReveal(options = {}) {
     ? Math.max(0, Math.min(3, requestedStep))
     : Math.max(0, Math.min(3, Number.isFinite(storedStep) ? storedStep : 0));
   if (crm.hotelSubscribed && !activationPreviewMode && currentStep === 3) currentStep = 0;
-  livePreviewMode = 'guest';
-  stageBeatIndex = { 1: 0, 2: 0 };
-  appCarouselIndex = { frontdesk: 0, guestelInstall: 0, guestel: 0, assistant: 0, system: 0 };
+  seedVisitedFromStep(currentStep);
+  openSheetId = null;
+  activationOfferTracked = false;
+  bookingCheckoutReachedTracked = false;
+  appCarouselIndex = { guestel: 0 };
   activationNightlyRate = null;
-  bookingPreviewOpened = false;
   bookingPreviewUnavailable = false;
-  bookingEditorVisited = false;
   lastRenderedRevealHtml = '';
-  lastRenderedStep = -1;
-  lastRenderedBeat = -1;
   revealStartedAt = Date.now();
   stageStartedAt = 0;
   nextStageViewIsResume = !Number.isFinite(requestedStep) && hadPendingReveal;
@@ -1729,7 +1174,9 @@ export async function showMarketelValueReveal(options = {}) {
     replay: !!crm.hotelSubscribed,
     pendingResume: nextStageViewIsResume,
   });
-  moveToStep(currentStep);
+  // A checkout return (reveal=checkout) or an activation replay lands straight
+  // on the offer; everything else opens the hub and lets them choose.
+  if (currentStep >= 3 || activationPreviewMode) openHubItem('activation');
   if (!preloadedRevealData) void loadRevealData();
   void checkBookingPageStatus();
 }
@@ -1746,6 +1193,7 @@ export function clearPendingMarketelValueReveal() {
   try {
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(STEP_KEY);
+    localStorage.removeItem(visitedStorageKey());
   } catch (_) {}
 }
 

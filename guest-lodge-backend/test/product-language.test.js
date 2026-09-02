@@ -40,27 +40,23 @@ test('walk-in handling states the action and booking-page outcome', () => {
     assert.match(productCopy, /reduces? (?:the )?remaining availability/i);
 });
 
-test('the reveal establishes the owner app before switching to Guestel', () => {
-    const ownerApp = revealCopy.indexOf('Control your engine from one app.');
-    const guestelInstall = revealCopy.indexOf('One tap keeps your property on their phone.');
-    const guestel = revealCopy.indexOf('Keep every guest one tap away.');
-    const assistant = revealCopy.indexOf('Nothing slips through the cracks.');
-    const system = revealCopy.indexOf('The full direct-booking loop.');
-    assert.ok(ownerApp >= 0, 'the Front Desk app bridge is missing');
-    assert.ok(guestelInstall > ownerApp, 'the App Clip handoff appears before Front Desk is established as the owner app');
-    assert.ok(guestel > guestelInstall, 'Guestel value appears before the guest handoff is explained');
-    assert.ok(assistant > guestel, 'setup protection appears before the guest relationship is established');
-    assert.ok(system > assistant, 'the complete loop appears before its parts are established');
-    assert.match(revealCopy, /Your page, bookings, rooms and guest reach all live in Front Desk/);
-    assert.match(revealCopy, /open Apple\\'s instant App Clip/);
-    assert.match(revealCopy, /They save your property, book direct again/);
-    assert.match(revealCopy, /The moment a request lands, Front Desk alerts you three ways/);
-    assert.match(revealCopy, /Your page converts\. Front Desk runs it\. Guestel keeps them forever/);
+test('the reveal makes the owner app and Guestel distinct, optional proofs', () => {
+    const ownerApp = revealCopy.indexOf('Marketel Front Desk is a real App Store app.');
+    const guestel = revealCopy.indexOf("id: 'guestel'");
+    assert.ok(ownerApp >= 0, 'the Front Desk app proof is missing');
+    assert.ok(guestel >= 0, 'the Guestel proof is missing');
+    assert.match(revealCopy, /Edit your booking page and manage bookings and availability from your phone/);
+    assert.match(revealCopy, /They add your property from your booking page, keep it in Guestel, and come back direct/);
+    assert.match(revealCopy, /frontdeskYourPageUrl/);
+    assert.match(revealCopy, /guestelAddBookingPageUrl/);
+    assert.match(revealCopy, /guestelPropertySavedUrl/);
+    assert.match(revealCopy, /guestelChatUrl/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
-    assert.match(revealCopy, /id: 'assistant'/);
-    assert.match(revealCopy, /id: 'system'/);
+    assert.match(revealCopy, /startGuestelAutoplay/);
+    assert.match(revealCopy, /data-sheet-dismiss>Close/);
+    assert.doesNotMatch(revealCopy, /startBookingChallenge|showBookingChallengePrompt/);
     assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });

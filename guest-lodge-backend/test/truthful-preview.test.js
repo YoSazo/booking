@@ -47,9 +47,13 @@ test('the owner preview explains activation and the room-money flow honestly', (
     assert.match(reveal, /temporary \$1 card verification/);
     assert.match(reveal, /Marketel never holds the room payment/);
 
-    const challengeStart = reveal.slice(
-        reveal.indexOf('function startBookingChallenge'),
-        reveal.indexOf('function showBookingChallengePrompt')
+    assert.doesNotMatch(reveal, /function startBookingChallenge|function showBookingChallengePrompt/);
+    const livePreview = reveal.slice(
+        reveal.indexOf('function showExpandedPreview'),
+        reveal.indexOf('function recordHubDepth')
     );
-    assert.match(challengeStart, /setLivePreviewActionsVisible\(challenge\.modal, false\)/);
+    assert.match(livePreview, /live booking page/);
+    assert.match(livePreview, /temporary \$1 hold/);
+    assert.match(livePreview, /id="mvrClosePreview">Close/);
+    assert.doesNotMatch(livePreview, /challenge|timer|editor/);
 });

@@ -150,7 +150,7 @@ function renderMetaRows(rows) {
   out.push(
     `    ── total ${money(total.spend)} | ${total.impressions} imp | ${total.links} links | ` +
     `link CTR ${pct(total.links, total.impressions)} | link CPC ${total.links ? money(total.spend / total.links) : '—'} | ` +
-    `${total.leads} qualified Leads | CPL ${total.leads ? money(total.spend / total.leads) : '—'} | ` +
+    `${total.leads} Leads (email) | CPL ${total.leads ? money(total.spend / total.leads) : '—'} | ` +
     `${total.registrations} registrations`
   );
   return out;
@@ -202,6 +202,7 @@ function emptyGroup(label) {
     landingViews: 0,
     started: 0,
     leads: 0,
+    qualified: 0,
     completed: 0,
     revealEntered: 0,
     revealEngaged: 0,
@@ -215,6 +216,7 @@ function emptyGroup(label) {
 function addProperty(group, property) {
   group.started += 1;
   if (property.events.has('Lead')) group.leads += 1;
+  if (property.events.has('QualifiedLead')) group.qualified += 1;
   if (property.events.has('SetupCompleted')) group.completed += 1;
   if (property.events.has('ValueRevealStarted')) group.revealEntered += 1;
   if (property.events.has('JourneyRevealStageCompleted')) group.revealEngaged += 1;
@@ -350,7 +352,8 @@ async function dbSection() {
   const renderGroup = (group) =>
     `  ${group.label.padEnd(44).slice(0, 44)} ` +
     `${String(group.landingViews).padStart(3)} land | ${String(group.started).padStart(3)} start | ` +
-    `${String(group.leads).padStart(3)} Lead | ${String(group.completed).padStart(3)} setup | ` +
+    `${String(group.leads).padStart(3)} Lead | ${String(group.qualified).padStart(3)} qual | ` +
+    `${String(group.completed).padStart(3)} setup | ` +
     `${String(group.revealEntered).padStart(3)} reveal | ${String(group.revealEngaged).padStart(3)} engaged | ` +
     `${String(group.offerViewed).padStart(3)} offer | ${String(group.checkoutStarted).padStart(3)} checkout | ` +
     `${String(group.paid).padStart(3)} paid | ${money(group.revenue)}`;

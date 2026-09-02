@@ -7291,18 +7291,19 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Unknown reveal event.' });
         }
         const revealStepByEvent = {
-            BookingEngineRevealViewed: 0,
-            GuestAppRevealViewed: 1,
+            BookingEngineRevealViewed: 1,
             AssistantRevealViewed: 2,
+            GuestAppRevealViewed: 3,
             ActivationOfferViewed: 3,
             ActivationCtaClicked: 3,
         };
         if (Object.prototype.hasOwnProperty.call(revealStepByEvent, eventName)) {
-            // This intentionally follows backward navigation too: a recovery
-            // link should return to the screen the owner was actually viewing,
-            // not merely the furthest screen they once touched.
-            await prisma.hotelConfig.update({
-                where: { id: hotelId },
+            const revealDepth = revealStepByEvent[eventName];
+            // The reveal is a hub now, not a sequence of screens. Preserve the
+            // furthest completed depth so opening an earlier item cannot make a
+            // recovery email forget the items the owner already inspected.
+            await prisma.hotelConfig.updateMany({
+                where: { id: hotelId, revealProgressStep: { lt: revealDepth } },
                 data: { revealProgressStep: revealStepByEvent[eventName] },
             }).catch(() => {});
         }
@@ -10677,6 +10678,7 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'PreviewReadyEmailSending',
     'PreviewReadyEmailSent',
     'CheckoutCancelled',
+    'QualifiedLead',
     'CheckoutRecoveryEmailSending',
     'CheckoutRecoveryEmailSent',
     'LegacyComebackEmailSent',
@@ -10696,6 +10698,7 @@ const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
     'Step5Reached',
     'QualityAnswer',
     'Lead',
+    'QualifiedLead',
 ]);
 
 // Onboarding funnel tracking (landing page + setup wizard)
@@ -10769,7 +10772,11 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             setupHotel.setupProgressStep = durableSetupStep;
         }
 
-        if (eventName === 'Lead') {
+        // Lead now fires server-side the moment an email is submitted, so this
+        // gate guards the deeper qualified signal instead. Same standard, same
+        // once-per-setup rule — it just no longer competes to be the ad
+        // optimization event.
+        if (eventName === 'QualifiedLead') {
             const qualifiedAnswers = new Set([
                 'online_ota_leakage',
                 'direct_calls_messages',
@@ -10785,10 +10792,10 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             }
 
             // A setup can qualify only once. The browser also uses a stable
-            // event_id, while this protects the database and CAPI from replays.
+            // event_id, while this protects the database from replays.
             const existingLead = await prisma.funnelEvent.findFirst({
                 where: {
-                    eventName: 'Lead',
+                    eventName: 'QualifiedLead',
                     OR: [
                         { hotelId: trackedHotelId },
                         ...(trackedEmail ? [{
@@ -10832,27 +10839,14 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
                 externalId: linkedExternalId,
             },
         });
-        if (eventName === 'Lead') {
-            void sendAdminPush('Lead', { property: trackedEmail || trackedHotelId });
+        if (eventName === 'QualifiedLead') {
+            void sendAdminPush('QualifiedLead', { property: trackedEmail || trackedHotelId });
         }
 
-        // Match the browser's standard Lead event and event_id. Meta uses the
-        // pair to deduplicate Pixel and Conversions API copies of the same lead.
-        if (eventName === 'Lead') {
-            const meta = marketelMetaContext(req);
-            await queueMarketelCAPI('Lead', {
-                hotelId: trackedHotelId,
-                email: trackedEmail || '',
-                externalId: trackedHotelId,
-                ip: req.ip,
-                userAgent: req.headers['user-agent'],
-                sourceUrl: meta.sourceUrl,
-                fbp: meta.fbp,
-                fbc: meta.fbc,
-                eventId: cleanEventId || `marketel-lead.${trackedHotelId}`,
-                contentName: cleanContentName || undefined,
-            }).catch((error) => console.error('Lead CAPI queue failed:', error.message));
-        }
+        // QualifiedLead stays first-party on purpose. Meta already gets the
+        // shallow signal (Lead, on email submit) and a deeper standard one
+        // (CompleteRegistration, on setup completion); adding a third would
+        // split an already thin conversion volume across more events.
         res.json({ success: true });
     } catch (e) {
         console.error('Onboarding funnel event error:', e.message);
@@ -11319,7 +11313,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             property.lastSeenAt = timestamp;
             property.eventCount += 1;
             if (row.sessionId) property.sessions.add(row.sessionId);
-            if (['Lead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
+            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
                 property.milestones[row.eventName] = timestamp;
             }
             propertyMap.set(row.hotelId, property);
@@ -11421,7 +11415,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
                 identity: 'Anonymous visitor and per-tab session IDs are used to join events.',
             },
             interpretation: {
-                conversionEvents: ['Lead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
+                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
                 journeyEvents: 'Journey* rows are high-resolution behavior. Conversion rows remain the authoritative business milestones.',
                 duration: 'JourneyRevealStageCompleted.durationMs is time spent on a reveal stage. JourneyPageExited.durationMs is page residence time.',
                 ordering: 'Within a session, sort by sequence first and timestamp second.',
@@ -11889,6 +11883,62 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
                     ipAddress: req.ip || req.socket?.remoteAddress || null,
                 },
             }).catch(() => {});
+        }
+
+        // Lead fires here — the moment an email is submitted — rather than at
+        // setup step 3. The funnel is short enough now that email submission is
+        // the honest top-of-funnel conversion, and Meta needs the volume to
+        // leave learning: the deeper qualified signal is kept as QualifiedLead
+        // and setup completion still reports CompleteRegistration.
+        if (funnelTrackingEnabled) {
+            const leadEventId = `marketel-lead.${hotelSlug}`;
+            // A new property row already means this browser had no prior setup,
+            // but an email can still repeat across deleted or abandoned rows.
+            const recentLead = await prisma.funnelEvent.findFirst({
+                where: {
+                    eventName: 'Lead',
+                    guestEmail: email,
+                    createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                },
+                select: { id: true },
+            }).catch(() => null);
+            if (!recentLead) {
+                const leadSessionId = sanitizeJourneyIdentifier(req.body?.journeySessionId, 'mjs_');
+                const leadMetadata = marketelAttributionMetadata(req.body, { linkedJourney: !!leadSessionId });
+                await prisma.funnelEvent.create({
+                    data: {
+                        hotelId: hotelSlug,
+                        eventName: 'Lead',
+                        eventId: leadEventId,
+                        guestEmail: email,
+                        contentName: acquisitionAngle,
+                        occurredAt: leadSessionId ? journeyOccurredAt(req.body?.journeyOccurredAt) : null,
+                        sessionId: leadSessionId,
+                        surface: leadSessionId ? redactJourneyString(req.body?.journeySurface || 'landing', 40) : null,
+                        pagePath: leadSessionId ? sanitizeJourneyPath(req.body?.journeyPagePath || '/landing') : null,
+                        metadata: Object.keys(leadMetadata).length ? leadMetadata : undefined,
+                        externalId: sanitizeJourneyIdentifier(req.body?.journeyVisitorId, 'mjv_'),
+                        userAgent: req.headers['user-agent'] || null,
+                        ipAddress: req.ip || req.socket?.remoteAddress || null,
+                    },
+                }).catch(() => {});
+                void sendAdminPush('Lead', { property: email });
+                // landing.html fires the Pixel copy with this same event_id, so
+                // Meta collapses the browser and server events into one lead.
+                const leadMeta = marketelMetaContext(req);
+                await queueMarketelCAPI('Lead', {
+                    hotelId: hotelSlug,
+                    email,
+                    externalId: hotelSlug,
+                    ip: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    sourceUrl: leadMeta.sourceUrl,
+                    fbp: leadMeta.fbp,
+                    fbc: leadMeta.fbc,
+                    eventId: leadEventId,
+                    contentName: acquisitionAngle,
+                }).catch((error) => console.error('Lead CAPI queue failed:', error.message));
+            }
         }
 
         const setupUrl = `${marketelFrontdeskOrigin(req)}/setup/${setupToken}?angle=${encodeURIComponent(acquisitionAngle)}`;

@@ -40,7 +40,21 @@ test('every reveal event the client fires is accepted by the server', () => {
         for (const match of stageArray[1].matchAll(/'([A-Za-z]+)'/g)) fired.add(match[1]);
     }
 
-    assert.ok(fired.size >= 15, `expected the reveal to fire many events, saw ${fired.size}`);
+    // The hub deliberately removed the old challenge and multi-beat tour. Keep
+    // this threshold aligned with the compact set of commercial milestones so
+    // subtraction does not look like missing instrumentation.
+    assert.ok(fired.size >= 8, `expected the complete reveal hub event set, saw ${fired.size}`);
+    for (const required of [
+        'ValueRevealStarted',
+        'BookingEngineRevealViewed',
+        'BookingEngineFullPreviewOpened',
+        'AssistantRevealViewed',
+        'GuestAppRevealViewed',
+        'ActivationOfferViewed',
+        'ActivationCtaClicked',
+    ]) {
+        assert.ok(fired.has(required), `${required} is no longer fired by the reveal`);
+    }
     const rejected = [...fired].filter((name) => !revealEvents.has(name));
     assert.deepEqual(rejected, [], `reveal events rejected at ingest: ${rejected.join(', ')}`);
 });
@@ -117,11 +131,12 @@ test('Meta CAPI uses one hashed first-party external ID across the commercial fu
     assert.match(metaCapi, /externalId/);
     assert.match(metaCapi, /userData\.external_id = \[hashMetaValue\(externalId\)\]/);
 
-    const lead = server.slice(
-        server.indexOf("if (eventName === 'Lead') {", server.indexOf('// Match the browser')),
-        server.indexOf('res.json({ success: true });', server.indexOf('// Match the browser'))
+    const setupStart = server.slice(
+        server.indexOf("app.post('/api/setup/start'"),
+        server.indexOf('// Serve setup wizard')
     );
-    assert.match(lead, /externalId: trackedHotelId/);
+    assert.match(setupStart, /queueMarketelCAPI\('Lead'/);
+    assert.match(setupStart, /externalId: hotelSlug/);
 
     const subscribeStart = server.indexOf("queueMarketelCAPI('Subscribe'");
     const subscribe = server.slice(
@@ -165,11 +180,48 @@ test('Lead qualification describes a current monetizable problem and is identica
         'building demand must remain tracked but unqualified'
     );
     const leadValidation = server.slice(
-        server.indexOf("if (eventName === 'Lead')"),
+        server.indexOf("if (eventName === 'QualifiedLead')"),
         server.indexOf('// A setup can qualify only once')
     );
     assert.doesNotMatch(leadValidation, /acquisitionAngle|AcquisitionAngle/);
     assert.doesNotMatch(leadValidation, /building_demand/);
+});
+
+test('email submission is the deduplicated Meta Lead while qualification remains first-party', () => {
+    const setupStart = server.slice(
+        server.indexOf("app.post('/api/setup/start'"),
+        server.indexOf('// Serve setup wizard')
+    );
+    assert.match(setupStart, /eventName: 'Lead'/);
+    assert.match(setupStart, /const leadEventId = `marketel-lead\.\$\{hotelSlug\}`/);
+    assert.match(setupStart, /queueMarketelCAPI\('Lead'/);
+    assert.match(setupStart, /eventId: leadEventId/);
+
+    const landing = fs.readFileSync(path.join(root, 'landing.html'), 'utf8');
+    assert.match(landing, /fbq\('track', 'Lead'/);
+    assert.match(landing, /eventID: 'marketel-lead\.' \+ data\.hotelId/);
+
+    const answer = setup.slice(
+        setup.indexOf('function answerQualityQ'),
+        setup.indexOf('// Load existing data')
+    );
+    assert.match(answer, /eventName: 'QualifiedLead'/);
+    assert.doesNotMatch(answer, /fbq\('track', 'Lead'/);
+
+    const onboarding = server.slice(
+        server.indexOf("app.post('/api/funnel/onboarding'"),
+        server.indexOf('const MARKETEL_ATTRIBUTION_MILESTONES', server.indexOf("app.post('/api/funnel/onboarding'"))
+    );
+    assert.match(onboarding, /if \(eventName === 'QualifiedLead'\)/);
+    assert.doesNotMatch(onboarding, /queueMarketelCAPI\('QualifiedLead'/);
+});
+
+test('reveal completion survives return visits without marking pricing as paid', () => {
+    assert.match(reveal, /const VISITED_KEY = 'marketelValueRevealVisitedV1'/);
+    assert.match(reveal, /persistVisitedItems\(\)/);
+    assert.match(reveal, /if \(opened && id !== 'activation'\)/);
+    assert.match(reveal, /localStorage\.removeItem\(visitedStorageKey\(\)\)/);
+    assert.doesNotMatch(reveal, /id="mvrHubPrimary"/);
 });
 
 test('Marketel CAPI uses a configurable current Graph API version', () => {

@@ -61,7 +61,9 @@ test('the exact setup and reveal stages are durable', () => {
     }
     assert.match(setup, /data\.resumeStep/);
     assert.match(core, /\^step-\(\[0-2\]\)\$/);
-    assert.match(server, /revealProgressStep: revealStepByEvent\[eventName\]/);
+    assert.match(server, /const revealDepth = revealStepByEvent\[eventName\]/);
+    assert.match(server, /revealProgressStep: \{ lt: revealDepth \}/);
+    assert.match(server, /data: \{ revealProgressStep: revealStepByEvent\[eventName\] \}/);
 });
 
 test('landing recovery is a visible success state, not a generic error', () => {
