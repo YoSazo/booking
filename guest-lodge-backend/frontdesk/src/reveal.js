@@ -72,6 +72,8 @@ let activationFramingAnswer = null;
 let skipActivationFraming = false;
 let bookingCheckoutReachedTracked = false;
 let guestelAutoplayId = 0;
+// Scroll position of the page underneath, restored when the reveal closes.
+let lockedScrollY = 0;
 let frontdeskAutoplayId = 0;
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
@@ -317,6 +319,40 @@ function persistVisitedItems() {
 function nextHubItemId() {
   const pending = HUB_ITEMS.find((item) => !visitedItems.has(item.id));
   return (pending || HUB_ITEMS[HUB_ITEMS.length - 1]).id;
+}
+
+// `overflow: hidden` does not lock scrolling on iOS. The document behind kept
+// scrolling, which is why the Front Desk page showed through the reveal and —
+// worse — why taps landed low: once the layout viewport scrolls under a fixed
+// overlay, Safari composites the layer where it looks correct but hit-tests the
+// shifted box, so every target sits a finger-width below where it is painted.
+// Pinning the body is the only thing that actually stops it.
+function lockPageBehind() {
+  // Self-healing: if a previous reveal left the page pinned, do not stack a
+  // second lock on top and lose the real scroll position.
+  if (document.body.style.position === 'fixed') releasePageBehind();
+  lockedScrollY = window.scrollY || window.pageYOffset || 0;
+  document.documentElement.classList.add('marketel-reveal-open');
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${lockedScrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
+  document.body.style.overflow = 'hidden';
+}
+
+function releasePageBehind() {
+  const restoreTo = lockedScrollY;
+  lockedScrollY = 0;
+  document.documentElement.classList.remove('marketel-reveal-open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  document.body.style.overflow = '';
+  // Pinning the body scrolled the document to the top; put it back.
+  window.scrollTo(0, restoreTo);
 }
 
 function persistStep() {
@@ -1129,8 +1165,7 @@ function finishReveal() {
   lastRenderedRevealHtml = '';
   document.getElementById('marketelValueReveal')?.remove();
   document.getElementById('mvDebug')?.remove();
-  document.documentElement.classList.remove('marketel-reveal-open');
-  document.body.style.overflow = '';
+  releasePageBehind();
   window.removeEventListener('message', handleBookingPreviewMessage);
   window.removeEventListener('keydown', onRevealKeydown);
   crm.settingsTourActive = false;
@@ -1459,8 +1494,7 @@ export async function showMarketelValueReveal(options = {}) {
   crm.settingsTourActive = true;
   window.addEventListener('message', handleBookingPreviewMessage);
   window.addEventListener('keydown', onRevealKeydown);
-  document.documentElement.classList.add('marketel-reveal-open');
-  document.body.style.overflow = 'hidden';
+  lockPageBehind();
   shellVisible(false);
 
   const root = document.createElement('div');

@@ -1,7 +1,15 @@
+/* The JS pins the body with position:fixed and a negative top; these rules stop
+   the document contributing any scrollable area of its own while it is pinned. */
 .marketel-reveal-open,
 .marketel-reveal-open body {
   height: 100%;
   overflow: hidden !important;
+  overscroll-behavior: none;
+}
+.marketel-reveal-open body {
+  /* Set inline by reveal.js so the scroll offset can be restored on close. */
+  position: fixed;
+  width: 100%;
 }
 
 .mvr-root {
@@ -19,11 +27,19 @@
      dropped and the overlay becomes top:0 plus a dynamic height. When Safari's
      toolbar retracts that height grows and pins the footer onto the screen edge
      — the band where Safari swallows the first tap. Size to the genuinely
-     visible area instead. Fallback is svh (chrome-visible), never dvh. */
+     visible area instead. Fallback is svh (chrome-visible), never dvh.
+
+     `top` stays 0 on purpose. A fixed element is already anchored to the
+     viewport, so adding --mv-vt (visualViewport.offsetTop) double-counts the
+     offset: the box shifts down while iOS still composites the layer where it
+     looks correct, and every tap lands below its target. */
   left: 0;
   right: 0;
-  top: var(--mv-vt, 0px);
+  top: 0;
   height: var(--mv-vh, 100svh);
+  /* Nothing behind this overlay should ever receive a scroll gesture. */
+  overscroll-behavior: none;
+  touch-action: pan-y;
   z-index: 100001;
   overflow: hidden;
   color: var(--mvr-text);
@@ -2881,7 +2897,7 @@
   position: absolute;
   inset: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -2892,7 +2908,7 @@
   width: min(560px, 100%);
   margin: 0 auto;
   padding: max(20px, env(safe-area-inset-top, 0px)) 18px
-           calc(28px + env(safe-area-inset-bottom, 0px));
+           calc(28px + max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard, 0px));
   animation: mvr-stage-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
