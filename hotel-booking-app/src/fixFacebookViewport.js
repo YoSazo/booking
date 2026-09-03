@@ -51,6 +51,9 @@ function bindVisualViewportUnits() {
   if (ua.indexOf('FBAN/FBPageAdmin') > -1) root.classList.add('fb-page-admin');
   root.classList.toggle('mv-retractable-chrome', chromeCanRetract());
 
+  // Largest viewport ever handed to us — converges on "screen with no chrome".
+  let tallestSeen = 0;
+
   const apply = () => {
     frame = 0;
     // window.innerHeight is unreliable in the Facebook in-app browser, which is
@@ -60,6 +63,12 @@ function bindVisualViewportUnits() {
       || window.innerHeight || root.clientHeight || 0;
     const height = Math.max(1, Math.round(viewport?.height || fallback));
     const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
+
+    // The tap-steal band only exists while the toolbar is collapsed; an
+    // expanded toolbar already fills that strip. Guarding against it then just
+    // leaves dead space under the control.
+    tallestSeen = Math.max(tallestSeen, height, window.screen?.height || 0);
+    root.classList.toggle('mv-chrome-hidden', tallestSeen - height <= 35);
 
     root.style.setProperty('--mv-vh', `${height}px`);
     root.style.setProperty('--mv-vt', `${top}px`);

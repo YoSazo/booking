@@ -3172,7 +3172,11 @@
    ========================================================================== */
 
 :root { --mv-tap-guard: 0px; }
-html.mv-retractable-chrome { --mv-tap-guard: 44px; }
+/* Only while the toolbar is actually collapsed. An expanded toolbar already
+   fills that strip, so guarding then is pure dead space under the button. The
+   reveal locks page scrolling, so the toolbar cannot retract mid-session and
+   this never causes a layout shift. */
+html.mv-retractable-chrome.mv-chrome-hidden { --mv-tap-guard: 44px; }
 
 .mvr-sheet-foot,
 .mvr-live-foot {

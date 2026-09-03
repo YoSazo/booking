@@ -44,12 +44,27 @@ export function bindVisualViewportUnits() {
 
   root.classList.toggle('mv-retractable-chrome', chromeCanRetract());
 
+  // The largest viewport we have ever been given. Safari's toolbar only shrinks
+  // the visible area, so this converges on "the screen with no chrome".
+  let tallestSeen = 0;
+
   const apply = () => {
     frame = 0;
     const height = Math.max(1, Math.round(
       viewport?.height || window.innerHeight || root.clientHeight || 0
     ));
     const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
+
+    // The tap-steal band only exists while the toolbar is *collapsed*: an
+    // expanded toolbar already occupies that strip, so guarding against it
+    // leaves dead space under the button for no reason. Compare the visible
+    // height against the screen — if the browser is currently eating a
+    // meaningful slice, its chrome is showing and no guard is needed.
+    tallestSeen = Math.max(tallestSeen, height, window.screen?.height || 0);
+    const eaten = tallestSeen - height;
+    // Err toward guarding: a false "expanded" would break the button, whereas a
+    // false "collapsed" only costs a little padding.
+    root.classList.toggle('mv-chrome-hidden', eaten <= 35);
     // The layout viewport is the tallest thing the page can be laid out into.
     // Whatever the visual viewport is missing from it is chrome sitting on top.
     const layout = Math.max(
@@ -90,5 +105,6 @@ export function bindVisualViewportUnits() {
     root.style.removeProperty('--mv-vh');
     root.style.removeProperty('--mv-vt');
     root.style.removeProperty('--mv-chrome');
+    root.classList.remove('mv-chrome-hidden');
   };
 }
