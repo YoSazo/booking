@@ -460,7 +460,6 @@ try {
           _cleanUrl.searchParams.delete('welcome');
           if (!data.subscribed) {
             const revealStep = Math.max(0, Math.min(3, Number(data.revealStep) || 0));
-            _cleanUrl.searchParams.set('welcome', '1');
             _cleanUrl.searchParams.set('reveal', revealStep === 3 ? 'checkout' : `step-${revealStep}`);
           }
           window.history.replaceState({}, '', _cleanUrl);
@@ -2531,9 +2530,19 @@ async function startCrmApp(verification, options = {}) {
   } else {
     try { sessionStorage.removeItem('frontdeskSimulatePwa'); } catch (_) {}
   }
-  const isFirstWelcome = urlParams.has('welcome');
   const revealRequest = urlParams.get('reveal');
   const revealStepMatch = /^step-([0-2])$/.exec(String(revealRequest || ''));
+  const isSavedValueReveal = revealRequest === 'checkout' || !!revealStepMatch;
+  // Old setup/recovery links can contain both `welcome=1` and a saved reveal
+  // stage. The reveal is the setup payoff; the welcome flag belongs to the
+  // retired owner-dashboard walkthrough and must never win that conflict.
+  const isFirstWelcome = urlParams.has('welcome') && !isSavedValueReveal;
+  if (isSavedValueReveal && urlParams.has('welcome')) {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('welcome');
+    window.history.replaceState({}, '', cleanUrl);
+    urlParams.delete('welcome');
+  }
   let hasPendingValueReveal = false;
   try { hasPendingValueReveal = localStorage.getItem('marketelValueRevealPendingV1') === '1'; } catch (_) {}
   const shouldResumeValueReveal = !(verification && verification.subscribed) && hasPendingValueReveal;
@@ -2555,7 +2564,7 @@ async function startCrmApp(verification, options = {}) {
   );
   if (isFirstWelcome) resetWalkthroughProgress();
 
-  if (isEmbeddedEditorPreview || urlParams.has('welcome') || urlParams.get('tab') === 'settings') {
+  if (isEmbeddedEditorPreview || isFirstWelcome || urlParams.get('tab') === 'settings') {
     crm.currentFilter = 'settings';
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
@@ -2577,7 +2586,7 @@ async function startCrmApp(verification, options = {}) {
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('tab');
     window.history.replaceState({}, '', cleanUrl);
-  } else if (!urlParams.has('welcome') && verification && verification.subscribed) {
+  } else if (!isFirstWelcome && verification && verification.subscribed) {
     // D6: live hotels open on Bookings — the daily-loop default ("anything new?").
     // Pre-activation hotels fall through to 'settings' so setup stays first.
     crm.currentFilter = 'bookings';
