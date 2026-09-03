@@ -429,7 +429,7 @@ function appShowcases() {
   return {
     frontdesk: {
       id: 'frontdesk',
-      title: 'Marketel Front Desk is your real owner app.',
+      title: 'Marketel Front Desk is your real App Store app.',
       body: 'Run your booking page, reservations, availability, and guest relationships from your phone.',
       slides: [
         {

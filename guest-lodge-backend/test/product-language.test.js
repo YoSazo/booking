@@ -41,7 +41,7 @@ test('walk-in handling states the action and booking-page outcome', () => {
 });
 
 test('the reveal makes the owner app and Guestel distinct, optional proofs', () => {
-    const ownerApp = revealCopy.indexOf('Marketel Front Desk is your real owner app.');
+    const ownerApp = revealCopy.indexOf('Marketel Front Desk is your real App Store app.');
     const guestel = revealCopy.indexOf("id: 'guestel'");
     assert.ok(ownerApp >= 0, 'the Front Desk app proof is missing');
     assert.ok(guestel >= 0, 'the Guestel proof is missing');
