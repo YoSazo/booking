@@ -867,7 +867,8 @@ function showExpandedPreview() {
   modal.className = 'mvr-live-preview';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
-  modal.innerHTML = `<div class="mvr-live-stage">
+  modal.innerHTML = `<button type="button" class="mvr-sheet-x" id="mvrClosePreviewTop" aria-label="Close">&times;</button>
+  <div class="mvr-live-stage">
     <iframe data-preview-frame="guest" title="${esc(propertyName())} live booking page" src="${esc(url)}"
       sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
   </div>
@@ -876,6 +877,7 @@ function showExpandedPreview() {
     <button type="button" class="mvr-sheet-close" id="mvrClosePreview">Close</button>
   </div>`;
   document.getElementById('marketelValueReveal')?.appendChild(modal);
+  modal.querySelector('#mvrClosePreviewTop')?.addEventListener('click', () => closeSheet('preview-closed-top'));
   modal.querySelector('#mvrClosePreview')?.addEventListener('click', () => {
     trackJourney('JourneyBookingPreviewModeChanged', {
       action: 'closed',
@@ -969,6 +971,105 @@ function guestelSheetBodyHtml() {
   ${appCarouselHtml(showcase)}`;
 }
 
+// ?vpdebug=1 — on-device readout. Query-gated so it ships harmlessly and stays
+// available next time a viewport question comes up. The number that decides
+// everything is the gap between the Close button and the true viewport bottom:
+// under ~44px and Safari will eat the first tap.
+function mountViewportDebug() {
+  if (!new URLSearchParams(window.location.search).has('vpdebug')) return;
+  if (document.getElementById('mvDebug')) return;
+  const panel = document.createElement('div');
+  panel.id = 'mvDebug';
+  panel.className = 'mv-debug';
+  document.body.appendChild(panel);
+
+  // env() is only readable through a probe element.
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;'
+    + 'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);';
+  document.body.appendChild(probe);
+
+  const px = (v) => Math.round(parseFloat(v) || 0);
+  const render = () => {
+    const root = document.documentElement;
+    const cs = getComputedStyle(root);
+    const probeCs = getComputedStyle(probe);
+    const vv = window.visualViewport;
+    const close = document.querySelector('.mvr-sheet-close, #mvrClosePreview');
+    const trueBottom = (vv?.height || window.innerHeight) + (vv?.offsetTop || 0);
+    const gap = close ? Math.round(trueBottom - close.getBoundingClientRect().bottom) : null;
+    const guard = px(cs.getPropertyValue('--mv-tap-guard'));
+    const verdict = gap === null ? '' : (gap >= 44 ? 'ok' : 'bad');
+    panel.innerHTML = [
+      `innerHeight ${window.innerHeight}  clientH ${root.clientHeight}`,
+      `visualViewport h ${Math.round(vv?.height || 0)} top ${Math.round(vv?.offsetTop || 0)} scale ${(vv?.scale || 1).toFixed(2)}`,
+      `env safe-area  top ${px(probeCs.paddingTop)}  bottom ${px(probeCs.paddingBottom)}`,
+      `--mv-vh ${px(cs.getPropertyValue('--mv-vh'))}  --mv-vt ${px(cs.getPropertyValue('--mv-vt'))}  --mv-chrome ${px(cs.getPropertyValue('--mv-chrome'))}`,
+      `--mv-tap-guard <b>${guard}px</b>   retractable ${root.classList.contains('mv-retractable-chrome')}`,
+      `standalone ${!!window.navigator.standalone}  capacitor ${!!window.Capacitor}  fb/ig ${/FBAN|FBAV|Instagram/.test(navigator.userAgent)}`,
+      close
+        ? `close gap to viewport bottom <span class="${verdict}">${gap}px</span> ${gap >= 44 ? '(clear)' : '(IN TAP-STEAL BAND)'}`
+        : 'close button not mounted',
+    ].join('\n');
+  };
+
+  render();
+  const schedule = () => requestAnimationFrame(render);
+  window.visualViewport?.addEventListener('resize', schedule);
+  window.visualViewport?.addEventListener('scroll', schedule);
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  window.setInterval(render, 500);
+}
+
+// Safari's tap-steal band is browser behaviour the page cannot override, so a
+// sheet must never depend on one bottom-anchored control. Three ways out: the
+// bottom Close, a top-right X that can never sit in the band, and the drag
+// gesture people already try.
+function bindSheetDragToDismiss(card, handle) {
+  if (!card || !handle) return;
+  let startY = 0;
+  let offset = 0;
+  let dragging = false;
+
+  const move = (event) => {
+    if (!dragging) return;
+    offset = Math.max(0, event.clientY - startY);
+    card.style.transform = `translateY(${offset}px)`;
+  };
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.releasePointerCapture?.(handle.dataset.pointerId);
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+    card.classList.remove('is-dragging');
+    card.style.transform = '';
+    if (offset > 96) closeSheet('sheet-swiped');
+  };
+
+  handle.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    dragging = true;
+    startY = event.clientY;
+    offset = 0;
+    handle.dataset.pointerId = String(event.pointerId);
+    handle.setPointerCapture?.(event.pointerId);
+    card.classList.add('is-dragging');
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  });
+}
+
+function onRevealKeydown(event) {
+  if (event.key !== 'Escape' && event.key !== 'Esc') return;
+  if (!openSheetId) return;
+  event.preventDefault();
+  closeSheet('escape-key');
+}
+
 function presentSheet(id) {
   const root = document.getElementById('marketelValueReveal');
   if (!root || document.getElementById('mvrSheet')) return;
@@ -990,7 +1091,10 @@ function presentSheet(id) {
   sheet.setAttribute('aria-modal', 'true');
   sheet.innerHTML = `<div class="mvr-sheet-scrim" data-sheet-dismiss></div>
     <div class="mvr-sheet-card">
-      <div class="mvr-sheet-grab" aria-hidden="true"></div>
+      <button type="button" class="mvr-sheet-grabber" data-sheet-grab aria-label="Drag down to close">
+        <span class="mvr-sheet-grab" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="mvr-sheet-x" data-sheet-dismiss aria-label="Close">&times;</button>
       <div class="mvr-sheet-body">${body}</div>
       <div class="mvr-sheet-foot">
         <button type="button" class="mvr-sheet-close" data-sheet-dismiss>Close</button>
@@ -1004,6 +1108,7 @@ function presentSheet(id) {
   sheet.querySelectorAll('[data-sheet-dismiss]').forEach((control) => {
     control.addEventListener('click', () => closeSheet('sheet-closed'));
   });
+  bindSheetDragToDismiss(sheet.querySelector('.mvr-sheet-card'), sheet.querySelector('[data-sheet-grab]'));
   bindSheetEvents();
 }
 
@@ -1023,9 +1128,11 @@ function finishReveal() {
   stopGuestelAutoplay();
   lastRenderedRevealHtml = '';
   document.getElementById('marketelValueReveal')?.remove();
+  document.getElementById('mvDebug')?.remove();
   document.documentElement.classList.remove('marketel-reveal-open');
   document.body.style.overflow = '';
   window.removeEventListener('message', handleBookingPreviewMessage);
+  window.removeEventListener('keydown', onRevealKeydown);
   crm.settingsTourActive = false;
   try {
     localStorage.removeItem(PENDING_KEY);
@@ -1351,6 +1458,7 @@ export async function showMarketelValueReveal(options = {}) {
 
   crm.settingsTourActive = true;
   window.addEventListener('message', handleBookingPreviewMessage);
+  window.addEventListener('keydown', onRevealKeydown);
   document.documentElement.classList.add('marketel-reveal-open');
   document.body.style.overflow = 'hidden';
   shellVisible(false);
@@ -1360,6 +1468,7 @@ export async function showMarketelValueReveal(options = {}) {
   root.className = 'mvr-root';
   document.body.appendChild(root);
   renderReveal();
+  mountViewportDebug();
   trackReveal('ValueRevealStarted', crm.hotelSubscribed ? 'subscribed-replay' : 'pre-activation');
   trackJourney('JourneyRevealStarted', {
     startStep: currentStep,

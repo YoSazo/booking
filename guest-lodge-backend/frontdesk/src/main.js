@@ -6,8 +6,12 @@ import '@fontsource/dm-mono/400.css';
 import '@fontsource/dm-mono/500.css';
 import './styles/core.css';
 import { bindFormKeyboardViewport, enableNativeKeyboardAccessoryBar } from './formKeyboard.js';
+import { bindVisualViewportUnits } from './viewportUnits.js';
 import './core.js';
 
+// Publish the visible area before anything paints, so overlays never size
+// themselves against a viewport unit that includes the browser's own chrome.
+bindVisualViewportUnits();
 enableNativeKeyboardAccessoryBar();
 bindFormKeyboardViewport();
 

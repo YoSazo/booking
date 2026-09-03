@@ -5486,13 +5486,16 @@ padding: 6px 16px;
 
 .calendar-modal-fullscreen {
   position: fixed;
-  top: 0;
+  /* Not top+bottom+height: `bottom` is dropped when all three are set, leaving
+     a dynamic height that grows as Safari's toolbar retracts and pushes Apply
+     onto the screen edge, where Safari eats the first tap. Size to the actually
+     visible area. Fallback is svh (chrome-visible), never dvh. */
+  top: var(--mv-vt, 0px);
   left: 0;
   right: 0;
-  bottom: 0;
   width: 100%;
-  height: 100vh; /* Fallback */
-  height: 100dvh; /* Dynamic viewport height - adjusts for iOS browser chrome */
+  height: 100svh; /* Fallback */
+  height: var(--mv-vh, 100svh);
   z-index: 1000;
   display: none;
   opacity: 0;
@@ -6959,4 +6962,31 @@ padding: 6px 16px;
 @keyframes slideDown {
   from { opacity: 0; transform: translate(-50%, -10px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+
+/* ==========================================================================
+   Tap-steal guard
+   With its toolbar collapsed, Safari spends the first tap near the bottom edge
+   restoring its own chrome rather than delivering it to the page. Nothing on
+   the page can override that, so controls have to stay out of the band. The
+   class is set from fixFacebookViewport.js and is absent in an installed PWA,
+   which has no retractable chrome to guard against.
+   ========================================================================== */
+
+:root { --mv-tap-guard: 0px; }
+html.mv-retractable-chrome { --mv-tap-guard: 44px; }
+
+/* Apply / Book 1 Week sit at the end of the scrollable body, so the clearance
+   belongs to the body rather than to a footer. */
+.calendar-modal-fullscreen .calendar-modal-body {
+  padding-bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard));
+}
+
+.checkout-install-mobile-only {
+  bottom: calc(14px + max(env(safe-area-inset-bottom, 0px), 0px) + var(--mv-tap-guard));
+}
+
+.help-widget-container {
+  bottom: calc(20px + var(--mv-tap-guard));
 }

@@ -15,8 +15,15 @@
   --mvr-glass: rgba(255, 255, 255, 0.55);
   --mvr-glass-border: rgba(255, 255, 255, 0.35);
   position: fixed;
-  inset: 0;
-  height: 100dvh;
+  /* Not `inset: 0` + `height`: with top, bottom and height all set, `bottom` is
+     dropped and the overlay becomes top:0 plus a dynamic height. When Safari's
+     toolbar retracts that height grows and pins the footer onto the screen edge
+     — the band where Safari swallows the first tap. Size to the genuinely
+     visible area instead. Fallback is svh (chrome-visible), never dvh. */
+  left: 0;
+  right: 0;
+  top: var(--mv-vt, 0px);
+  height: var(--mv-vh, 100svh);
   z-index: 100001;
   overflow: hidden;
   color: var(--mvr-text);
@@ -3134,3 +3141,95 @@
   animation: mvr-copy-in 320ms var(--ease-out, ease) both;
 }
 .mvr-framing-line strong { font-weight: 700; }
+
+
+/* ==========================================================================
+   Tap-steal guard
+   Sizing alone is not enough: with its toolbar collapsed, Safari spends the
+   first tap near the bottom edge restoring its own chrome rather than
+   delivering it to the page. Nothing on the page can override that, so the
+   only fix is to keep controls out of the band. Set from JS in
+   viewportUnits.js — an installed PWA and the native shell have no retractable
+   chrome and must not pay for the guard.
+   ========================================================================== */
+
+:root { --mv-tap-guard: 0px; }
+html.mv-retractable-chrome { --mv-tap-guard: 44px; }
+
+.mvr-sheet-foot,
+.mvr-live-foot {
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard));
+}
+
+/* ---------------------------------------------------------- top-right close */
+
+/* Structurally immune to bottom chrome, whatever Safari decides to do with its
+   toolbar. The bottom Close stays; this is the guarantee behind it. */
+.mvr-sheet-x {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1.5px solid var(--mvr-line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--mvr-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: color var(--dur-fast, 0.14s) var(--ease-out, ease),
+              border-color var(--dur-fast, 0.14s) var(--ease-out, ease);
+}
+.mvr-sheet-x:hover { color: var(--mvr-text); border-color: #b9cabf; }
+.mvr-sheet-x:active { transform: scale(0.94); }
+
+/* The live preview is a bare iframe with no card, so its X needs its own ground. */
+.mvr-live-preview .mvr-sheet-x {
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  box-shadow: 0 2px 10px rgba(16, 30, 23, 0.18);
+}
+
+/* The grabber becomes a real target once it is draggable. */
+.mvr-sheet-grabber {
+  display: block;
+  width: 100%;
+  padding: 7px 0 5px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mvr-sheet-grabber:active { cursor: grabbing; }
+.mvr-sheet-grabber .mvr-sheet-grab { margin: 0 auto; }
+.mvr-sheet-card.is-dragging { animation: none; transition: none; }
+
+/* ------------------------------------------------------------- vpdebug=1 */
+
+.mv-debug {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  top: calc(6px + env(safe-area-inset-top, 0px));
+  z-index: 100002;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(11, 22, 17, 0.92);
+  color: #d8f0e2;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  pointer-events: none;
+}
+.mv-debug b { color: #ffd479; font-weight: 500; }
+.mv-debug .bad { color: #ff8f7a; }
+.mv-debug .ok { color: #7ee0a8; }

@@ -35,7 +35,10 @@ test('the booking web app contains no guest PWA install machinery', () => {
     .filter((file) => /\.(?:js|jsx)$/.test(file))
     .map((file) => fs.readFileSync(path.join(root, 'src', file), 'utf8'))
     .join('\n');
-  assert.doesNotMatch(sourceFiles, /beforeinstallprompt|appinstalled|display-mode:\s*standalone|Add to Home Screen/i);
+  // display-mode/standalone may still be used to distinguish browser chrome
+  // from an installed or native viewport. The retired behavior is prompting,
+  // installing, or teaching a guest to add this website as a PWA.
+  assert.doesNotMatch(sourceFiles, /beforeinstallprompt|appinstalled|Add to Home Screen/i);
   assert.equal(fs.existsSync(path.join(root, 'public', 'engine-sw.js')), false);
   assert.equal(fs.existsSync(path.join(root, 'public', 'sw.js')), false);
   assert.equal(fs.existsSync(path.join(root, 'public', 'manifest-simple-crm.json')), false);
