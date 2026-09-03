@@ -41,13 +41,16 @@ test('walk-in handling states the action and booking-page outcome', () => {
 });
 
 test('the reveal makes the owner app and Guestel distinct, optional proofs', () => {
-    const ownerApp = revealCopy.indexOf('Marketel Front Desk is a real App Store app.');
+    const ownerApp = revealCopy.indexOf('Marketel Front Desk is your real owner app.');
     const guestel = revealCopy.indexOf("id: 'guestel'");
     assert.ok(ownerApp >= 0, 'the Front Desk app proof is missing');
     assert.ok(guestel >= 0, 'the Guestel proof is missing');
-    assert.match(revealCopy, /Edit your booking page and manage bookings and availability from your phone/);
+    assert.match(revealCopy, /Run your booking page, reservations, availability, and guest relationships from your phone/);
     assert.match(revealCopy, /tap Add on your booking page, open Apple’s instant App Clip, save your property in Guestel/);
     assert.match(revealCopy, /frontdeskYourPageUrl/);
+    assert.match(revealCopy, /frontdeskBookingsUrl/);
+    assert.match(revealCopy, /frontdeskAvailabilityUrl/);
+    assert.match(revealCopy, /frontdeskGuestAppUrl/);
     assert.match(revealCopy, /guestelAddBookingPageUrl/);
     assert.match(revealCopy, /guestelAppClipCardUrl/);
     assert.match(revealCopy, /guestelAppClipInviteUrl/);
@@ -60,10 +63,19 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.match(revealCopy, /loading="eager"/);
     assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
     assert.match(revealCopy, /startGuestelAutoplay/);
+    assert.match(revealCopy, /startFrontdeskAutoplay/);
+    assert.match(revealCopy, /current >= lastIndex/);
     assert.match(revealCopy, /data-sheet-dismiss>Close/);
     assert.doesNotMatch(revealCopy, /startBookingChallenge|showBookingChallengePrompt/);
     assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
+});
+
+test('activation pairs the upfront price with a visible risk reversal', () => {
+    assert.match(revealCopy, /Activate everything — \$199\/month/);
+    assert.match(revealCopy, /Protected by a 7-day money-back guarantee\. Cancel anytime\./);
+    assert.match(revealCopy, /Try Marketel for 7 days\./);
+    assert.match(revealCopy, /If it isn't right, get your money back\./);
 });
 
 test('activation turns the nightly rate into an editable break-even decision', () => {

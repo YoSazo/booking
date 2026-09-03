@@ -2,6 +2,9 @@ import './styles/reveal.css';
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
 import frontdeskYourPageUrl from './assets/frontdesk-your-page.webp';
+import frontdeskBookingsUrl from './assets/frontdesk-bookings.webp';
+import frontdeskAvailabilityUrl from './assets/frontdesk-availability.webp';
+import frontdeskGuestAppUrl from './assets/frontdesk-guest-app.webp';
 import guestelAddBookingPageUrl from './assets/guestel-add-booking-page.webp';
 import guestelAppClipCardUrl from './assets/guestel-app-clip-card.webp';
 import guestelAppClipInviteUrl from './assets/guestel-app-clip-invite.webp';
@@ -16,6 +19,9 @@ import guestelWalletReadyUrl from './assets/guestel-wallet-ready.webp';
 // opening a sheet a transition rather than the start of a download.
 const CAROUSEL_SCREEN_URLS = [
   frontdeskYourPageUrl,
+  frontdeskBookingsUrl,
+  frontdeskAvailabilityUrl,
+  frontdeskGuestAppUrl,
   guestelAddBookingPageUrl,
   guestelAppClipCardUrl,
   guestelAppClipInviteUrl,
@@ -59,6 +65,7 @@ let openSheetId = null;
 let activationOfferTracked = false;
 let bookingCheckoutReachedTracked = false;
 let guestelAutoplayId = 0;
+let frontdeskAutoplayId = 0;
 let revealData = { rooms: [], rates: null };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
@@ -71,7 +78,7 @@ let revealOpening = false;
 // The app proof is deliberately optional exploration inside each beat. Keeping
 // its position separate from the funnel beat means someone can inspect every
 // screen or move to the next subject after seeing only one.
-let appCarouselIndex = { guestel: 0 };
+let appCarouselIndex = { frontdesk: 0, guestel: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
@@ -275,8 +282,8 @@ const HUB_ITEMS = [
     id: 'activation',
     step: 3,
     event: 'ActivationOfferViewed',
-    title: 'Activate everything',
-    body: 'Your page, Front Desk and Guestel together.',
+    title: 'Activate everything — $199/month',
+    body: 'Protected by a 7-day money-back guarantee. Cancel anytime.',
     cta: '',
   },
 ];
@@ -415,11 +422,47 @@ function bookingPreviewCardHtml() {
   </div>`;
 }
 
-// The reveal now shows one sequence only: how a guest keeps the property in
-// Guestel. Front Desk is a single screenshot and the booking page is the real
-// thing, so neither needs a carousel.
+// The booking page is the one live, interactive proof. The two apps use real
+// screenshots so owners see their complete system without getting lost in a
+// second product demo or mistaking disabled preview controls for broken ones.
 function appShowcases() {
   return {
+    frontdesk: {
+      id: 'frontdesk',
+      title: 'Marketel Front Desk is your real owner app.',
+      body: 'Run your booking page, reservations, availability, and guest relationships from your phone.',
+      slides: [
+        {
+          label: 'Your Page',
+          url: frontdeskYourPageUrl,
+          width: 900,
+          height: 1721,
+          alt: 'Marketel Front Desk Your Page showing the live booking-page editor.',
+          event: 'GuestAppOwnerEditorViewed',
+        },
+        {
+          label: 'Bookings',
+          url: frontdeskBookingsUrl,
+          width: 900,
+          height: 1728,
+          alt: 'Marketel Front Desk Bookings showing a reservation and its availability decision.',
+        },
+        {
+          label: 'Availability',
+          url: frontdeskAvailabilityUrl,
+          width: 900,
+          height: 1734,
+          alt: 'Marketel Front Desk Availability showing a room calendar and remaining inventory.',
+        },
+        {
+          label: 'Guest Reach',
+          url: frontdeskGuestAppUrl,
+          width: 900,
+          height: 1734,
+          alt: 'Marketel Front Desk Guest Reach showing a live guest notification preview and composer.',
+        },
+      ],
+    },
     guestel: {
       id: 'guestel',
       eyebrow: 'FROM YOUR PAGE TO THEIR PHONE',
@@ -638,7 +681,7 @@ function finaleHtml() {
             <span>Guests use a temporary $1 card verification, then pay your property directly at check-in. Marketel never holds the room payment.</span>
           </div>
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
-          <div class="mvr-guarantee"><span>7</span><p><strong>Seven-day money-back guarantee</strong><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
+          <div class="mvr-guarantee"><span>7</span><p><strong>Try Marketel for 7 days.</strong><b>If it isn't right, get your money back.</b><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
           <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
@@ -839,6 +882,7 @@ function closeSheet(reason = 'closed') {
   }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : undefined });
   openSheetId = null;
   stageStartedAt = 0;
+  stopFrontdeskAutoplay();
   stopGuestelAutoplay();
   document.getElementById('mvrSheet')?.remove();
   document.getElementById('mvrLivePreview')?.remove();
@@ -846,14 +890,12 @@ function closeSheet(reason = 'closed') {
 }
 
 function frontdeskSheetBodyHtml() {
+  const showcase = appShowcases().frontdesk;
   return `<div class="mvr-sheet-lede">
-    <h2>Marketel Front Desk is a real App Store app.</h2>
-    <p>Edit your booking page and manage bookings and availability from your phone. You download it after you activate.</p>
+    <h2>${esc(showcase.title)}</h2>
+    <p>${esc(showcase.body)}</p>
   </div>
-  <figure class="mvr-sheet-shot">
-    <img src="${frontdeskYourPageUrl}" width="900" height="1721" loading="eager" decoding="async"
-      alt="Marketel Front Desk showing the live booking-page editor for a property.">
-  </figure>`;
+  ${appCarouselHtml(showcase)}`;
 }
 
 function guestelSheetBodyHtml() {
@@ -905,6 +947,7 @@ function finishReveal() {
     bookingPageTimer = 0;
   }
   openSheetId = null;
+  stopFrontdeskAutoplay();
   stopGuestelAutoplay();
   lastRenderedRevealHtml = '';
   document.getElementById('marketelValueReveal')?.remove();
@@ -1027,7 +1070,34 @@ function bindSheetEvents() {
     });
   });
   bindAppCarousels();
+  startFrontdeskAutoplay();
   startGuestelAutoplay();
+}
+
+// Front Desk tells a four-part story. Advance through it once, then leave the
+// final Guest Reach screen in place; looping would make the proof compete with
+// the owner's next decision.
+function startFrontdeskAutoplay() {
+  stopFrontdeskAutoplay();
+  const root = document.querySelector('#mvrSheet [data-mvr-carousel="frontdesk"]');
+  if (!root) return;
+  const lastIndex = appShowcases().frontdesk.slides.length - 1;
+  frontdeskAutoplayId = window.setInterval(() => {
+    if (!root.isConnected) return stopFrontdeskAutoplay();
+    const current = appCarouselIndex.frontdesk || 0;
+    if (current >= lastIndex) return stopFrontdeskAutoplay();
+    setAppCarouselSlide(root, current + 1, false);
+  }, 2800);
+  root.addEventListener('pointerdown', stopFrontdeskAutoplay, { once: true });
+  root.querySelectorAll('button').forEach((control) => {
+    control.addEventListener('click', stopFrontdeskAutoplay, { once: true });
+  });
+}
+
+function stopFrontdeskAutoplay() {
+  if (!frontdeskAutoplayId) return;
+  window.clearInterval(frontdeskAutoplayId);
+  frontdeskAutoplayId = 0;
 }
 
 // Owners skip carousels — the one recorded traversal of the old reveal clicked

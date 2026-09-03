@@ -1591,6 +1591,13 @@
   font-size: 12px;
 }
 
+.mvr-guarantee b {
+  color: #285f45;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .mvr-value-list small,
 .mvr-guarantee small {
   color: #75837b;
@@ -1829,31 +1836,42 @@
 
 .mvr-guarantee {
   display: grid;
-  grid-template-columns: 38px 1fr;
+  grid-template-columns: 42px 1fr;
   align-items: center;
-  gap: 10px;
-  max-width: 360px;
-  margin: 10px auto 0;
-  padding: 11px 13px;
+  gap: 12px;
+  max-width: 390px;
+  margin: 12px auto 0;
+  padding: 13px 15px;
   text-align: left;
-  border: 1px solid rgba(202, 225, 211, 0.6);
-  border-radius: 14px;
-  background: rgba(238, 248, 242, 0.7);
+  border: 1.5px solid rgba(46, 125, 91, 0.3);
+  border-radius: 16px;
+  background: rgba(232, 247, 238, 0.92);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 22px rgba(34, 102, 70, 0.09);
 }
 
 .mvr-guarantee > span {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   color: #fff;
   border-radius: 50%;
   background: linear-gradient(145deg, var(--mvr-green-light), var(--mvr-green));
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
   box-shadow: 0 4px 12px rgba(46, 125, 91, 0.2);
+}
+
+.mvr-guarantee strong {
+  color: #173e2b;
+  font-size: 14px;
+}
+
+.mvr-guarantee small {
+  margin-top: 2px;
+  font-size: 10.5px;
 }
 
 .mvr-primary,
