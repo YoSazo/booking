@@ -69,6 +69,11 @@ test('demand fit comes first and follows the owner through the funnel', () => {
     assert.match(reveal, /result\?\.demandFit/);
     assert.match(setup, /Give callers, walk-ins, and past guests one place to book directly with us again/);
     assert.match(setup, /Replace our PMS or channel manager and automatically sync every OTA/);
+    assert.ok(
+        setup.indexOf('demand-new-travelers') < setup.indexOf('demand-ota-leakage')
+        && setup.indexOf('demand-pms-sync') < setup.indexOf('demand-direct-guest-relationships'),
+        'the two mismatch choices should appear before the two qualified uses'
+    );
 });
 
 test('the owner preview explains activation and the room-money flow honestly', () => {
