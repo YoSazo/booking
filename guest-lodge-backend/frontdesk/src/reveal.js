@@ -395,16 +395,24 @@ function shellVisible(visible) {
   }
 }
 
-// The booking sheet is the owner's real engine, so reaching checkout inside it
-// is the strongest engagement signal this screen can produce. That is all this
-// listener is for now — the timed challenge and the embedded editor are gone.
+// The booking sheet is the owner's real engine. It can report checkout depth,
+// and its Guestel Preview action hands control back to this reveal instead of
+// navigating the owner away to Apple's App Clip page.
 function handleBookingPreviewMessage(event) {
-  if (event?.data?.type !== 'marketel:checkout-reached') return;
+  const messageType = event?.data?.type;
+  if (!['marketel:checkout-reached', 'marketel:guestel-preview-requested'].includes(messageType)) return;
   const reveal = document.getElementById('marketelValueReveal');
   if (!reveal) return;
   const knownFrame = Array.from(reveal.querySelectorAll('iframe'))
     .some((frame) => frame.contentWindow === event.source);
   if (!knownFrame) return;
+
+  if (messageType === 'marketel:guestel-preview-requested') {
+    if (openSheetId === 'booking') closeSheet('guestel-preview-requested');
+    openHubItem('guestel');
+    return;
+  }
+
   if (bookingCheckoutReachedTracked) return;
   bookingCheckoutReachedTracked = true;
   trackReveal('BookingPreviewCheckoutReached');

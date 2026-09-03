@@ -2183,8 +2183,9 @@ const handlePayLaterBooking = async (e) => {
                     ownerPreview={isPreviewMode}
                     sticky
                     bottomOffset={14}
-                    touchpoint="checkout"
+                    touchpoint={isPreviewMode ? 'frontdesk-checkout-preview' : 'checkout'}
                     apiBaseUrl={apiBaseUrl}
+                    hotelSubscribed={hotel?.subscribed !== false}
                   />
                 </div>,
                 document.body

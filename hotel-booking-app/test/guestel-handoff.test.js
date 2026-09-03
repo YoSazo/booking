@@ -49,3 +49,18 @@ test('QR handoffs render locally rather than leaking their URL to an image API',
   assert.match(qrSource, /import\('qrcode'\)/);
   assert.doesNotMatch(qrSource, /api\.qrserver|chart\.googleapis/);
 });
+
+test('owner previews demonstrate Guestel without invoking Apple', () => {
+  const bannerSource = fs.readFileSync(path.join(root, 'src', 'InstallAppBanner.jsx'), 'utf8');
+  const guestInfoSource = fs.readFileSync(path.join(root, 'src', 'GuestInfoPage.jsx'), 'utf8');
+  const previewBranch = bannerSource.slice(
+    bannerSource.indexOf('if (ownerPreview)'),
+    bannerSource.indexOf('if (hotelSubscribed !== true)')
+  );
+
+  assert.match(previewBranch, /marketel:guestel-preview-requested/);
+  assert.doesNotMatch(previewBranch, /guestelInvocationUrl|location\.assign/);
+  assert.match(bannerSource, /ownerPreview \? 'Preview'/);
+  assert.match(guestInfoSource, /hotelSubscribed=\{hotel\?\.subscribed !== false\}/);
+  assert.match(guestInfoSource, /frontdesk-checkout-preview/);
+});

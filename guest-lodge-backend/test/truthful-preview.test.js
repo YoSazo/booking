@@ -59,7 +59,8 @@ test('room setup advances immediately while the property builds in the backgroun
 test('the owner preview explains activation and the room-money flow honestly', () => {
     assert.doesNotMatch(installBanner, /Available once this property finishes setup/);
     assert.doesNotMatch(installBanner, /\{locked \? 'Locked'/);
-    assert.match(installBanner, /Guestel is included when you activate Marketel/);
+    assert.match(installBanner, /This is what Add opens for guests/);
+    assert.match(installBanner, /This turns on when you activate Marketel/);
     assert.match(reveal, /Your room money stays yours/);
     assert.match(reveal, /temporary \$1 card verification/);
     assert.match(reveal, /Marketel never holds the room payment/);
@@ -73,4 +74,12 @@ test('the owner preview explains activation and the room-money flow honestly', (
     assert.match(livePreview, /temporary \$1 hold/);
     assert.match(livePreview, /id="mvrClosePreview">Close/);
     assert.doesNotMatch(livePreview, /challenge|timer|editor/);
+});
+
+test('Guestel preview stays inside the owner reveal', () => {
+    assert.match(installBanner, /marketel:guestel-preview-requested/);
+    assert.match(installBanner, /ownerPreview \? 'Preview'/);
+    assert.match(guestInfo, /hotelSubscribed=\{hotel\?\.subscribed !== false\}/);
+    assert.match(reveal, /messageType === 'marketel:guestel-preview-requested'/);
+    assert.match(reveal, /openHubItem\('guestel'\)/);
 });
