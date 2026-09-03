@@ -257,12 +257,6 @@ async function startFreeSetup() {
         request: 'setup-start',
         outcome: 'success',
       }, { durationMs: Date.now() - requestStartedAt });
-      fetch('/api/funnel/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventName: 'SetupStarted', setupToken: data.token, contentName: ACQUISITION_ANGLE, ...journeyLinkage() }),
-        keepalive: true,
-      }).catch(() => {});
       window.MarketelJourney?.track('JourneyHandoffStarted', {
         from: 'landing',
         to: 'setup',

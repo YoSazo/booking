@@ -10,6 +10,7 @@ const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.j
 const dashboard = fs.readFileSync(path.join(root, 'funnel.html'), 'utf8');
 const setup = fs.readFileSync(path.join(root, 'setup.html'), 'utf8');
 const metaCapi = fs.readFileSync(path.join(root, 'marketel-meta-capi.js'), 'utf8');
+const journeyTracker = fs.readFileSync(path.join(root, 'public', 'marketel-journey.js'), 'utf8');
 
 function allowlist(startMarker) {
     const start = server.indexOf(startMarker);
@@ -23,11 +24,8 @@ function allowlist(startMarker) {
     );
 }
 
-// The reveal was rebuilt around real screenshots played as beats and the
-// server allowlists were not updated with it, so nine reveal milestones and
-// four journey events were rejected as unknown for the whole first ad run.
-// Nothing surfaces that failure — the client swallows the error — so the only
-// way it stays fixed is a test that reads both sides.
+// The hub stores only business milestones. Carousel navigation and ordinary
+// controls belong in session replay, not in Neon.
 test('every reveal event the client fires is accepted by the server', () => {
     const revealEvents = allowlist('const MARKETEL_VALUE_REVEAL_EVENTS = new Set([');
 
@@ -40,18 +38,14 @@ test('every reveal event the client fires is accepted by the server', () => {
         for (const match of stageArray[1].matchAll(/'([A-Za-z]+)'/g)) fired.add(match[1]);
     }
 
-    // The hub deliberately removed the old challenge and multi-beat tour. Keep
-    // this threshold aligned with the compact set of commercial milestones so
-    // subtraction does not look like missing instrumentation.
-    assert.ok(fired.size >= 8, `expected the complete reveal hub event set, saw ${fired.size}`);
+    assert.ok(fired.size >= 8, `expected the compact reveal milestone set, saw ${fired.size}`);
     for (const required of [
         'ValueRevealStarted',
         'BookingEngineRevealViewed',
-        'BookingEngineFullPreviewOpened',
         'AssistantRevealViewed',
         'GuestAppRevealViewed',
+        'BookingPreviewCheckoutReached',
         'ActivationOfferViewed',
-        'ActivationCtaClicked',
     ]) {
         assert.ok(fired.has(required), `${required} is no longer fired by the reveal`);
     }
@@ -59,27 +53,31 @@ test('every reveal event the client fires is accepted by the server', () => {
     assert.deepEqual(rejected, [], `reveal events rejected at ingest: ${rejected.join(', ')}`);
 });
 
-test('every journey event the reveal fires is accepted by the server', () => {
+test('interaction telemetry is blocked before it can write to Neon', () => {
     const journeyEvents = allowlist('const MARKETEL_JOURNEY_EVENT_NAMES');
-
-    const fired = new Set();
-    for (const match of reveal.matchAll(/trackJourney\('([A-Za-z]+)'/g)) fired.add(match[1]);
-
-    assert.ok(fired.size >= 10, `expected journey events, saw ${fired.size}`);
-    const rejected = [...fired].filter((name) => !journeyEvents.has(name));
-    assert.deepEqual(rejected, [], `journey events rejected at ingest: ${rejected.join(', ')}`);
+    assert.deepEqual([...journeyEvents].sort(), ['JourneyCheckoutFailed', 'JourneyClientError']);
+    assert.match(journeyTracker, /PERSISTED_EVENT_NAMES/);
+    assert.match(journeyTracker, /if \(!PERSISTED_EVENT_NAMES\[eventName\]/);
+    assert.doesNotMatch(journeyTracker, /track\('JourneyPageViewed'/);
 });
 
-test('the dashboard names every beat it charts', () => {
-    // A beat that reaches the database but has no label renders as a raw event
-    // name, which is how the reveal restructure went unnoticed on this screen.
-    const walk = dashboard.match(/const REVEAL_WALK = \[([\s\S]*?)\];/);
-    assert.ok(walk, 'REVEAL_WALK is missing from the dashboard');
-    const keys = [...walk[1].matchAll(/key: '([A-Za-z]+)'/g)].map((match) => match[1]);
-    assert.ok(keys.length >= 12, `expected the full reveal walk, saw ${keys.length}`);
-    for (const key of keys) {
-        assert.match(dashboard, new RegExp(`${key}: '`), `${key} has no label in TYPE_LABELS`);
-    }
+test('the dashboard presents the compact commercial path', () => {
+    assert.match(dashboard, /Email leads/);
+    assert.match(dashboard, /Qualified leads/);
+    assert.match(dashboard, /Saw Guestel/);
+    assert.match(dashboard, /Saw Front Desk/);
+    assert.doesNotMatch(dashboard, /Where the reveal loses people|REVEAL_WALK|renderBeatFunnel/);
+});
+
+test('guest Meta events no longer duplicate themselves into FunnelEvent', () => {
+    const route = server.slice(
+        server.indexOf("app.post('/api/track'"),
+        server.indexOf('// --- Payment declined leads')
+    );
+    assert.match(route, /Do not duplicate every guest interaction in Neon/);
+    assert.doesNotMatch(route, /prisma\.funnelEvent\.create/);
+    assert.match(route, /sendToMetaCAPI\(event_name/);
+    assert.match(route, /prisma\.hitPayment\.create/);
 });
 
 test('every push trigger is actually fired by the code path it names', () => {

@@ -5294,33 +5294,10 @@ app.post('/api/track', async (req, res) => {
     // Store in funnel dashboard (in-memory)
     pushFunnelEvent(event_name, enrichedPayload);
 
-    // Persist to database for permanent funnel analytics
-    try {
-        const user = enrichedPayload.user_data || {};
-        const hotelId = process.env.HOTEL_ID || 'guest-lodge-minot';
-        await withRetry(() => prisma.funnelEvent.create({
-            data: {
-                hotelId,
-                eventName: event_name,
-                eventId: enrichedPayload.event_id || null,
-                value: parseFloat(enrichedPayload.value) || null,
-                currency: enrichedPayload.currency || 'USD',
-                contentName: enrichedPayload.content_name || null,
-                checkinDate: enrichedPayload.checkin_date || null,
-                checkoutDate: enrichedPayload.checkout_date || null,
-                nights: parseInt(enrichedPayload.nights, 10) || null,
-                guestFirstName: user.fn || null,
-                guestLastName: user.ln || null,
-                guestEmail: user.em || null,
-                guestPhone: user.ph || null,
-                externalId: user.external_id || null,
-                userAgent: enrichedPayload.user_agent || null,
-                ipAddress: enrichedPayload.client_ip_address || null,
-            }
-        }));
-    } catch (e) {
-        console.error('Failed to persist FunnelEvent:', e.message);
-    }
+    // Do not duplicate every guest interaction in Neon. Meta still receives
+    // this event below, AddPaymentInfo still creates the actionable HitPayment
+    // lead above, and the hotel-scoped growth endpoint retains one page view
+    // and one checkout milestone per session for the owner's dashboard.
     // double-notification removed: if (event_name === 'Purchase') notifyPurchase().catch(() => {});
 
     // Send directly to Meta CAPI — no middleman needed
@@ -6964,63 +6941,11 @@ app.post('/api/crm/frontdesk-install-event', crmAuth, async (req, res) => {
     }
 });
 
-// Detailed first-party owner journey events. These complement the durable
-// conversion milestones below: a conversion is still counted once, while
-// journey rows preserve ordering, timing, attribution and interaction context.
+// Clarity and Smartlook own interaction-level playback. Neon keeps only one
+// browser/client failure of each kind per session; the dedicated onboarding,
+// reveal and checkout routes below own the commercial milestones.
 const MARKETEL_JOURNEY_EVENT_NAMES = new Set([
-    'JourneyPageViewed',
-    'JourneyPagePerformance',
-    'JourneyPageExited',
-    'JourneyEngagementMilestone',
-    'JourneyScrollDepth',
-    'JourneyVisibilityChanged',
-    'JourneyConnectivityChanged',
-    'JourneyControlActivated',
-    'JourneyFieldFocused',
-    'JourneyFieldCompleted',
-    'JourneyValidationFailed',
     'JourneyClientError',
-    'JourneyRequestStarted',
-    'JourneyRequestCompleted',
-    'JourneyRequestFailed',
-    'JourneyDemoSelected',
-    'JourneyDemoLoaded',
-    'JourneySetupStepViewed',
-    'JourneySetupNavigation',
-    'JourneySetupStepCompleted',
-    'JourneyPhotoSelected',
-    'JourneyQualitySelected',
-    'JourneyPreviewReady',
-    'JourneySetupResumed',
-    'JourneyRecoveryEmailRequested',
-    'JourneyHandoffStarted',
-    'JourneyHandoffCompleted',
-    'JourneyFrontDeskReady',
-    'JourneyRevealStarted',
-    'JourneyRevealStageViewed',
-    'JourneyRevealStageCompleted',
-    'JourneyRevealNavigation',
-    // Beats are the real resolution of the reveal. A stage view only says an
-    // owner reached the guest-app stage; the beat says whether they got past
-    // the install sheet. Without this the middle of the funnel is one bucket.
-    'JourneyRevealBeatViewed',
-    'JourneyAppCarouselSlideViewed',
-    'JourneyAssistantFallbackSelected',
-    'JourneyBillingIntervalSelected',
-    'JourneyBookingPreviewOpened',
-    'JourneyBookingPreviewModeChanged',
-    'JourneyBookingPreviewEdited',
-    'JourneyBookingPreviewCheckoutReached',
-    'JourneyBookingChallengeShown',
-    'JourneyBookingChallengeStarted',
-    'JourneyBookingChallengeDismissed',
-    'JourneyBookingChallengeAbandoned',
-    'JourneyBookingChallengeCompleted',
-    'JourneyGuestAppDemo',
-    'JourneyBookingPageStatus',
-    'JourneyCheckoutRequested',
-    'JourneyCheckoutCancelled',
-    'JourneyCheckoutRedirected',
     'JourneyCheckoutFailed',
 ]);
 
@@ -7243,47 +7168,15 @@ app.post('/api/crm/journey-events', journeyEventRateLimit, crmAuth, async (req, 
 const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'ValueRevealStarted',
     'BookingEngineRevealViewed',
-    'BookingEngineEditPreviewViewed',
-    'BookingEngineFullPreviewOpened',
     'GuestAppRevealViewed',
     'AssistantRevealViewed',
     'ActivationOfferViewed',
-    'ActivationCtaClicked',
     // The activation sheet asks one framing question before showing the price.
     // Neither of these moves revealProgressStep — only ActivationOfferViewed does,
     // and that now fires when the price itself renders.
     'ActivationFramingViewed',
     'ActivationFramingAnswered',
-    'GuestAppPreviewRequestedFromBookingEngine',
-    'GuestAppValueSlideViewed',
-    'GuestAppInstallSlideReplayed',
-    'GuestAppInstallDemoClicked',
-    // The reveal was rebuilt around real screenshots played as beats, and these
-    // are the per-beat milestones it has been firing ever since. They were never
-    // added here, so every one of them was rejected as an unknown event and the
-    // guest-app and assistant stages recorded nothing between entry and exit.
-    'GuestAppOwnerEditorViewed',
-    'GuestAppInstallBannerViewed',
-    'GuestAppInstallSheetViewed',
-    'GuestAppHomeScreenViewed',
-    'GuestAppRebookViewed',
-    'GuestAppBroadcastViewed',
-    // Guestel replaced the retired browser-install path. Keep the historic
-    // names above so old sessions remain readable; the current reveal packs
-    // the Front Desk, App Clip handoff and Guestel screens into three optional
-    // carousels.
-    'GuestelInstallFlowViewed',
-    'GuestelWalletViewed',
-    'GuestelReachViewed',
-    'AssistantTextProofViewed',
-    'AssistantAppProofViewed',
-    'AssistantFallbackViewed',
-    'MarketelSystemViewed',
-    'BookingChallengeShown',
-    'BookingChallengeStarted',
-    'BookingChallengeDismissed',
-    'BookingChallengeAbandoned',
-    'BookingChallengeCheckoutReached',
+    'BookingPreviewCheckoutReached',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true, local: true });
@@ -7300,7 +7193,6 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
             AssistantRevealViewed: 2,
             GuestAppRevealViewed: 3,
             ActivationOfferViewed: 3,
-            ActivationCtaClicked: 3,
         };
         if (Object.prototype.hasOwnProperty.call(revealStepByEvent, eventName)) {
             const revealDepth = revealStepByEvent[eventName];
@@ -10816,6 +10708,14 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             }
         }
 
+        // These calls keep cross-device setup recovery accurate, but they are
+        // progress state rather than business analytics. Updating HotelConfig
+        // above is sufficient; writing a FunnelEvent for every Next tap only
+        // duplicates what Clarity and Smartlook already show.
+        if (eventName === 'SetupStarted' || setupStepMatch) {
+            return res.json({ success: true, progressOnly: true });
+        }
+
         const linkedExternalId = sanitizeJourneyIdentifier(journeyVisitorId, 'mjv_');
         const linkedSessionId = sanitizeJourneyIdentifier(journeySessionId, 'mjs_');
         const linkedSequence = linkedSessionId
@@ -10826,6 +10726,32 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         const linkedMetadata = linkedSessionId
             ? marketelAttributionMetadata({ journeyFirstTouch, journeyLatestTouch }, { linkedJourney: true })
             : undefined;
+
+        // Retain the latest qualification answer as one row per property. A
+        // prospect can go back and change the answer without manufacturing a
+        // second funnel step or a second dashboard card.
+        if (eventName === 'QualityAnswer') {
+            const existingAnswer = await prisma.funnelEvent.findFirst({
+                where: { hotelId: trackedHotelId, eventName: 'QualityAnswer' },
+                select: { id: true },
+            });
+            if (existingAnswer) {
+                await prisma.funnelEvent.update({
+                    where: { id: existingAnswer.id },
+                    data: {
+                        contentName: cleanContentName,
+                        occurredAt: linkedSessionId ? journeyOccurredAt(clientOccurredAt) : undefined,
+                        sessionId: linkedSessionId || undefined,
+                        sequence: linkedSequence || undefined,
+                        surface: linkedSessionId ? redactJourneyString(journeySurface || 'setup', 40) : undefined,
+                        pagePath: linkedSessionId ? sanitizeJourneyPath(journeyPagePath) : undefined,
+                        metadata: linkedMetadata,
+                        externalId: linkedExternalId || undefined,
+                    },
+                });
+                return res.json({ success: true, updated: true });
+            }
+        }
         await prisma.funnelEvent.create({
             data: {
                 hotelId: trackedHotelId,
@@ -11318,7 +11244,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             property.lastSeenAt = timestamp;
             property.eventCount += 1;
             if (row.sessionId) property.sessions.add(row.sessionId);
-            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
+            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
                 property.milestones[row.eventName] = timestamp;
             }
             propertyMap.set(row.hotelId, property);
@@ -11363,19 +11289,21 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             }
             const outcomeRank = {
                 browsed: 0,
-                'qualified-lead': 1,
-                'setup-completed': 2,
-                'offer-viewed': 3,
-                'checkout-requested': 4,
-                'checkout-started': 5,
-                paid: 6,
+                lead: 1,
+                'qualified-lead': 2,
+                'setup-completed': 3,
+                'offer-viewed': 4,
+                'checkout-requested': 5,
+                'checkout-started': 6,
+                paid: 7,
             };
             let nextOutcome = session.outcome;
-            if (event.event === 'Lead' || (event.event === 'JourneyQualitySelected' && context.qualified)) nextOutcome = 'qualified-lead';
-            if (event.event === 'SetupCompleted' || event.event === 'JourneyPreviewReady') nextOutcome = 'setup-completed';
-            if (event.event === 'ActivationOfferViewed' || (event.event === 'JourneyRevealStageViewed' && context.stageName === 'activation')) nextOutcome = 'offer-viewed';
-            if (event.event === 'JourneyCheckoutRequested' || event.event === 'ActivationCtaClicked' || event.event === 'GoLiveClicked') nextOutcome = 'checkout-requested';
-            if (event.event === 'CheckoutStarted' || event.event === 'JourneyCheckoutRedirected') nextOutcome = 'checkout-started';
+            if (event.event === 'Lead') nextOutcome = 'lead';
+            if (event.event === 'QualifiedLead') nextOutcome = 'qualified-lead';
+            if (event.event === 'SetupCompleted') nextOutcome = 'setup-completed';
+            if (event.event === 'ActivationOfferViewed') nextOutcome = 'offer-viewed';
+            if (event.event === 'GoLiveClicked') nextOutcome = 'checkout-requested';
+            if (event.event === 'CheckoutStarted') nextOutcome = 'checkout-started';
             if (event.event === 'PaymentSucceeded') nextOutcome = 'paid';
             if ((outcomeRank[nextOutcome] || 0) > (outcomeRank[session.outcome] || 0)) session.outcome = nextOutcome;
             session.events.push(event);
@@ -11420,9 +11348,9 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
                 identity: 'Anonymous visitor and per-tab session IDs are used to join events.',
             },
             interpretation: {
-                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'ActivationCtaClicked', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
-                journeyEvents: 'Journey* rows are high-resolution behavior. Conversion rows remain the authoritative business milestones.',
-                duration: 'JourneyRevealStageCompleted.durationMs is time spent on a reveal stage. JourneyPageExited.durationMs is page residence time.',
+                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
+                journeyEvents: 'Clarity and Smartlook own interaction playback. Journey* rows are reserved for rare client and checkout failures.',
+                duration: 'Use timestamps between compact milestones for directional timing; session replay is authoritative for detailed behavior.',
                 ordering: 'Within a session, sort by sequence first and timestamp second.',
                 caution: 'Do not infer intent from a single click. Compare repeated drop-off patterns across qualified sessions.',
             },
@@ -12667,7 +12595,8 @@ app.post('/api/admin/funnel/purge', adminAuth, async (req, res) => {
 // all day gets its notifications switched off within a day, taking the useful
 // ones with it.
 const ADMIN_PUSH_TRIGGERS = {
-    Lead: { title: 'Qualified lead', body: (c) => `${c.property || 'A property'} answered as qualified.` },
+    Lead: { title: 'Email lead', body: (c) => `${c.property || 'A property'} submitted their email.` },
+    QualifiedLead: { title: 'Qualified lead', body: (c) => `${c.property || 'A property'} has a problem Marketel can solve.` },
     SetupCompleted: { title: 'Setup completed', body: (c) => `${c.property || 'A property'} finished setup.` },
     GoLiveClicked: { title: 'Activation clicked', body: (c) => `${c.property || 'A property'} clicked activate.` },
     PaymentSucceeded: { title: 'Paid', body: (c) => `${c.property || 'A property'} activated Marketel.` },

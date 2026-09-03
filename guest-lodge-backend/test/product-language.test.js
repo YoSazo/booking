@@ -62,7 +62,7 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.match(revealCopy, /guestelChatUrl/);
     assert.match(revealCopy, /preloadCarouselScreens/);
     assert.match(revealCopy, /loading="eager"/);
-    assert.match(revealCopy, /JourneyAppCarouselSlideViewed/);
+    assert.doesNotMatch(revealCopy, /JourneyAppCarouselSlideViewed/);
     assert.match(revealCopy, /startGuestelAutoplay/);
     assert.match(revealCopy, /startFrontdeskAutoplay/);
     assert.match(revealCopy, /current >= lastIndex/);

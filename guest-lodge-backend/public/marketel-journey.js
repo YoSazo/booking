@@ -3,7 +3,7 @@
 
   if (window.MarketelJourney) return;
 
-  var VERSION = '1.0.0';
+  var VERSION = '2.0.0';
   var VISITOR_KEY = 'marketelJourneyVisitorV1';
   var SESSION_KEY = 'marketelJourneySessionV1';
   var SESSION_STARTED_KEY = 'marketelJourneyStartedV1';
@@ -13,18 +13,19 @@
   var BATCH_SIZE = 20;
   var FLUSH_DELAY_MS = 650;
   var pageStartedAt = Date.now();
-  var activeStartedAt = pageStartedAt;
-  var hiddenStartedAt = 0;
-  var hiddenTotalMs = 0;
-  var maxScrollPercent = 0;
   var initialized = false;
   var listenersInstalled = false;
-  var pageExitTracked = false;
   var flushTimer = 0;
   var retryDelayMs = 1500;
   var queue = [];
-  var focusedFields = new WeakMap();
-  var scrollMilestones = {};
+  // Clarity and Smartlook already record interaction detail. Persist only the
+  // rare failures that need engineering attention; commercial milestones use
+  // the dedicated onboarding/reveal/checkout routes and remain authoritative.
+  var PERSISTED_EVENT_NAMES = {
+    JourneyClientError: true,
+    JourneyCheckoutFailed: true,
+  };
+  var persistedThisSession = {};
   var config = {
     endpoint: '/api/funnel/journey',
     surface: 'unknown',
@@ -260,6 +261,8 @@
 
   function track(eventName, metadata, options) {
     if (!initialized || config.disabled || !eventName) return null;
+    if (!PERSISTED_EVENT_NAMES[eventName] || persistedThisSession[eventName]) return null;
+    persistedThisSession[eventName] = true;
     var record = eventRecord(eventName, metadata, options || {});
     queue.push(record);
     if (queue.length > MAX_QUEUE) queue.shift();
@@ -269,122 +272,9 @@
     return record.eventId;
   }
 
-  function fieldName(field) {
-    return redactString(field.getAttribute('data-journey-field') || field.id || field.name || field.type || field.tagName.toLowerCase(), 80);
-  }
-
-  function fieldLengthBucket(field) {
-    if (field.type === 'password') return 'excluded';
-    var length = String(field.value || '').trim().length;
-    if (!length) return 'empty';
-    if (length <= 3) return '1-3';
-    if (length <= 10) return '4-10';
-    if (length <= 30) return '11-30';
-    return '31+';
-  }
-
-  function controlMetadata(control) {
-    var hrefPath = '';
-    if (control.tagName === 'A' && control.getAttribute('href')) hrefPath = sanitizedPath(control.href);
-    var action = control.getAttribute('data-journey') || control.id || '';
-    if (!action) {
-      action = Array.prototype.slice.call(control.classList || []).filter(function (name) {
-        return /btn|cta|tab|link|choice|toggle|preview|install/i.test(name);
-      }).slice(0, 3).join('.');
-    }
-    return {
-      control: redactString(action || control.tagName.toLowerCase(), 100),
-      tag: control.tagName.toLowerCase(),
-      type: control.getAttribute('type') || '',
-      destinationPath: hrefPath,
-    };
-  }
-
-  function updateScrollDepth() {
-    var root = document.documentElement;
-    var maxScroll = Math.max(0, root.scrollHeight - window.innerHeight);
-    var percent = maxScroll ? Math.min(100, Math.round((window.scrollY / maxScroll) * 100)) : 100;
-    maxScrollPercent = Math.max(maxScrollPercent, percent);
-    [25, 50, 75, 90, 100].forEach(function (milestone) {
-      if (percent >= milestone && !scrollMilestones[milestone]) {
-        scrollMilestones[milestone] = true;
-        track('JourneyScrollDepth', { percent: milestone });
-      }
-    });
-  }
-
-  function capturePagePerformance() {
-    window.setTimeout(function () {
-      try {
-        var navigation = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
-        if (!navigation) return;
-        track('JourneyPagePerformance', {
-          ttfbMs: Math.round(navigation.responseStart),
-          domInteractiveMs: Math.round(navigation.domInteractive),
-          domContentLoadedMs: Math.round(navigation.domContentLoadedEventEnd),
-          loadMs: Math.round(navigation.loadEventEnd || performance.now()),
-          transferBytes: Number(navigation.transferSize) || null,
-          encodedBytes: Number(navigation.encodedBodySize) || null,
-        });
-      } catch (_) {}
-    }, 0);
-  }
-
   function installListeners() {
     if (listenersInstalled) return;
     listenersInstalled = true;
-
-    document.addEventListener('click', function (event) {
-      var control = event.target && event.target.closest && event.target.closest('button, a, [role="button"]');
-      if (!control || control.closest('[data-journey-ignore]')) return;
-      track('JourneyControlActivated', controlMetadata(control));
-    }, true);
-
-    document.addEventListener('focusin', function (event) {
-      var field = event.target;
-      if (!field || !/^(INPUT|SELECT|TEXTAREA)$/.test(field.tagName) || field.type === 'password') return;
-      focusedFields.set(field, Date.now());
-      track('JourneyFieldFocused', { field: fieldName(field), type: field.type || field.tagName.toLowerCase() });
-    }, true);
-
-    document.addEventListener('focusout', function (event) {
-      var field = event.target;
-      if (!field || !/^(INPUT|SELECT|TEXTAREA)$/.test(field.tagName) || field.type === 'password') return;
-      var started = focusedFields.get(field) || Date.now();
-      track('JourneyFieldCompleted', {
-        field: fieldName(field),
-        type: field.type || field.tagName.toLowerCase(),
-        filled: String(field.value || '').trim().length > 0,
-        lengthBucket: fieldLengthBucket(field),
-      }, { durationMs: Date.now() - started });
-      focusedFields.delete(field);
-    }, true);
-
-    var scrollScheduled = false;
-    window.addEventListener('scroll', function () {
-      if (scrollScheduled) return;
-      scrollScheduled = true;
-      window.requestAnimationFrame(function () {
-        scrollScheduled = false;
-        updateScrollDepth();
-      });
-    }, { passive: true });
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') {
-        hiddenStartedAt = Date.now();
-        track('JourneyVisibilityChanged', { state: 'hidden' });
-      } else {
-        var hiddenMs = hiddenStartedAt ? Date.now() - hiddenStartedAt : 0;
-        hiddenTotalMs += hiddenMs;
-        hiddenStartedAt = 0;
-        activeStartedAt = Date.now();
-        track('JourneyVisibilityChanged', { state: 'visible', hiddenMs: hiddenMs });
-      }
-    });
-
-    window.addEventListener('online', function () { track('JourneyConnectivityChanged', { online: true }); });
-    window.addEventListener('offline', function () { track('JourneyConnectivityChanged', { online: false }); });
 
     window.addEventListener('error', function (event) {
       track('JourneyClientError', {
@@ -399,26 +289,6 @@
     window.addEventListener('unhandledrejection', function (event) {
       var reason = event.reason && event.reason.message ? event.reason.message : String(event.reason || 'Unhandled rejection');
       track('JourneyClientError', { kind: 'unhandledrejection', errorSummary: redactString(reason, 260) }, { immediate: true });
-    });
-
-    [10, 30, 60, 120, 300].forEach(function (seconds) {
-      window.setTimeout(function () {
-        if (!pageExitTracked) track('JourneyEngagementMilestone', { seconds: seconds, maxScrollPercent: maxScrollPercent });
-      }, seconds * 1000);
-    });
-
-    if (document.readyState === 'complete') capturePagePerformance();
-    else window.addEventListener('load', capturePagePerformance, { once: true });
-
-    window.addEventListener('pagehide', function () {
-      if (pageExitTracked) return;
-      pageExitTracked = true;
-      if (hiddenStartedAt) hiddenTotalMs += Date.now() - hiddenStartedAt;
-      track('JourneyPageExited', {
-        maxScrollPercent: maxScrollPercent,
-        hiddenTotalMs: hiddenTotalMs,
-        activeSinceLastVisibleMs: Math.max(0, Date.now() - activeStartedAt),
-      }, { durationMs: Date.now() - pageStartedAt, immediate: true, keepalive: true });
     });
   }
 
@@ -436,11 +306,6 @@
     config.disabled = options.disabled === true || (localBrowser && !debugEnabled);
     initialized = true;
     installListeners();
-    track('JourneyPageViewed', {
-      entry: true,
-      navigationType: (performance.getEntriesByType && performance.getEntriesByType('navigation')[0] || {}).type || '',
-    }, { immediate: true });
-    updateScrollDepth();
     return api;
   }
 

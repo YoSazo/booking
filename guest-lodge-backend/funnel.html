@@ -596,23 +596,6 @@
     .meta-capi-row { grid-template-columns: 1fr auto; }
     .meta-capi-row code { grid-column: 1 / -1; grid-row: 2; }
   }
-  .beat-row {
-    display: grid;
-    grid-template-columns: 200px 1fr 52px;
-    align-items: center;
-    gap: 12px;
-    padding: 5px 0;
-    font-size: 13px;
-  }
-  .beat-row.is-stage { font-weight: 700; margin-top: 10px; }
-  .beat-row.is-stage:first-child { margin-top: 0; }
-  .beat-row .beat-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .beat-row:not(.is-stage) .beat-name { color: var(--muted); padding-left: 14px; }
-  .beat-bar { background: var(--bg); border-radius: 999px; height: 8px; overflow: hidden; }
-  .beat-bar i { display: block; height: 100%; background: var(--green); border-radius: 999px; }
-  .beat-row:not(.is-stage) .beat-bar i { background: var(--green-lt); border: 1px solid var(--green); box-sizing: border-box; }
-  .beat-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .beat-drop { color: var(--red); font-weight: 600; }
   .portfolio-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -840,12 +823,12 @@
       <div class="stat-value" id="stat-landing">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Setup started</div>
-      <div class="stat-value" id="stat-started">0</div>
+      <div class="stat-label">Email leads</div>
+      <div class="stat-value" id="stat-leads">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Qualified leads</div>
-      <div class="stat-value" id="stat-leads">0</div>
+      <div class="stat-value" id="stat-started">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Setup done</div>
@@ -856,11 +839,11 @@
       <div class="stat-value" id="stat-booking-reveal">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Saw home screen</div>
+      <div class="stat-label">Saw Guestel</div>
       <div class="stat-value" id="stat-app-reveal">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Saw assistant</div>
+      <div class="stat-label">Saw Front Desk</div>
       <div class="stat-value" id="stat-assistant-reveal">0</div>
     </div>
     <div class="stat-card">
@@ -906,16 +889,6 @@
     <div class="panel-hint" id="metaCapiHint">Lead, registration, offer view, checkout and paid subscription are queued server-side. A declined card correctly stops at checkout and never sends Subscribe.</div>
   </div>
 
-  <!-- Beat-level drop-off. A stage count says an owner reached the guest-app
-       stage; these say which beat lost them. -->
-  <div class="panel">
-    <div class="panel-head">
-      <h2>Where the reveal loses people</h2>
-      <span class="panel-note">Properties reaching each beat, in order</span>
-    </div>
-    <div id="beatFunnel"><div class="loading">Loading…</div></div>
-  </div>
-
   <!-- Gross booking volume across every property. -->
   <div class="panel">
     <div class="panel-head">
@@ -943,13 +916,13 @@
   <div class="panel">
     <div class="panel-head">
       <h2>Data</h2>
-      <span class="panel-note">Full journey detail for analysis</span>
+      <span class="panel-note">Compact conversion milestones for analysis</span>
     </div>
     <div class="panel-actions">
       <button class="ghost-btn" onclick="copyJourneyExport()">Copy journey JSON</button>
       <button class="danger-btn" onclick="purgeActivity()">Delete all activity</button>
     </div>
-    <div class="panel-hint" id="dataHint">Copy pastes the full visitor→session→event export to your clipboard. Delete clears the landing → setup → reveal → activation telemetry and cannot be undone. It keeps the rows that do a job: the activation and preview email send-once guards, blocked-booking demand, and onboarding answers. Bookings, properties and support threads are never touched.</div>
+    <div class="panel-hint" id="dataHint">Copy exports the compact lead → setup → reveal → offer → paid path. Clarity and Smartlook hold interaction playback; Neon keeps business milestones. Delete clears those dashboard milestones and cannot be undone, while preserving operational records, bookings, properties and support.</div>
   </div>
 </div>
 
@@ -958,12 +931,12 @@
 <div class="filters">
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
   <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
-  <button class="filter-btn" data-filter="SetupStarted" onclick="setFilter('SetupStarted')">Started</button>
-  <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Qualified</button>
+  <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Email lead</button>
+  <button class="filter-btn" data-filter="QualifiedLead" onclick="setFilter('QualifiedLead')">Qualified</button>
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
   <button class="filter-btn" data-filter="BookingEngineRevealViewed" onclick="setFilter('BookingEngineRevealViewed')">Booking Reveal</button>
-  <button class="filter-btn" data-filter="GuestAppRevealViewed" onclick="setFilter('GuestAppRevealViewed')">Home Screen</button>
-  <button class="filter-btn" data-filter="AssistantRevealViewed" onclick="setFilter('AssistantRevealViewed')">Assistant</button>
+  <button class="filter-btn" data-filter="GuestAppRevealViewed" onclick="setFilter('GuestAppRevealViewed')">Guestel</button>
+  <button class="filter-btn" data-filter="AssistantRevealViewed" onclick="setFilter('AssistantRevealViewed')">Front Desk</button>
   <button class="filter-btn" data-filter="ActivationOfferViewed" onclick="setFilter('ActivationOfferViewed')">Offer</button>
   <button class="filter-btn" data-filter="GoLiveClicked" onclick="setFilter('GoLiveClicked')">Activation</button>
   <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
@@ -1556,41 +1529,16 @@ function closeDetail(e) {
 // used to live here was the last of it.
 const TYPE_LABELS = {
   LandingPageView: 'Landing Page',
-  SetupStarted: 'Setup Started',
-  Step1Reached: 'Step 1',
-  Step2Reached: 'Step 2',
-  Step3Reached: 'Setup Done',
-  Step4Reached: 'Demo Reached',
-  Step5Reached: 'Preview Ready',
   QualityAnswer: 'Quality Answer',
-  Lead: 'Qualified Lead',
+  Lead: 'Email Lead',
+  QualifiedLead: 'Qualified Lead',
   SetupCompleted: 'Setup Completed',
   ValueRevealStarted: 'Value Reveal Started',
   BookingEngineRevealViewed: 'Booking Page Reveal',
-  BookingEngineEditPreviewViewed: 'Front Desk Preview Opened',
-  BookingEngineFullPreviewOpened: 'Full Booking Preview',
-  BookingChallengeShown: '60-Second Challenge Shown',
-  BookingChallengeStarted: '60-Second Challenge Started',
-  BookingChallengeDismissed: 'Challenge Skipped',
-  BookingChallengeAbandoned: 'Challenge Exited',
-  BookingChallengeCheckoutReached: 'Preview Checkout Reached',
-  GuestAppRevealViewed: 'Owner + Guest Apps Reveal',
-  GuestAppOwnerEditorViewed: '· Front Desk app carousel',
-  GuestAppInstallBannerViewed: '· Beat 2 — Install banner',
-  GuestAppInstallSheetViewed: '· Beat 3 — iOS install sheet',
-  GuestAppHomeScreenViewed: '· Beat 4 — Home screen',
-  GuestAppRebookViewed: '· Beat 5 — Rebooking',
-  GuestAppBroadcastViewed: '· Beat 6 — Broadcast',
-  GuestelInstallFlowViewed: '· Beat 2 — App Clip handoff',
-  GuestelWalletViewed: '· Guestel app carousel',
-  GuestelReachViewed: '· Guestel messages explored',
-  AssistantRevealViewed: 'Assistant Reveal',
-  AssistantTextProofViewed: '· Beat 1 — Text proof',
-  AssistantAppProofViewed: '· Beat 2 — App proof',
-  AssistantFallbackViewed: '· Beat 3 — Fallback rule',
-  MarketelSystemViewed: '· Beat 3 — Complete system',
+  BookingPreviewCheckoutReached: 'Preview Checkout Reached',
+  GuestAppRevealViewed: 'Guestel Viewed',
+  AssistantRevealViewed: 'Front Desk Viewed',
   ActivationOfferViewed: '$199 Offer Viewed',
-  ActivationCtaClicked: 'Activation CTA Clicked',
   PreviewReadyEmailSent: 'Preview Email Sent',
   ActivationEmailSent: 'Activation Email Sent',
   PaymentCTAClicked: 'Hit Gate',
@@ -1640,7 +1588,7 @@ function renderEvents() {
     .reduce((sum, e) => sum + (Number(e.value) || 199), 0);
   document.getElementById('stat-revenue').textContent = '$' + revenue.toLocaleString('en-US', { maximumFractionDigits: 2 });
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
-  document.getElementById('stat-started').textContent = allCounts.SetupStarted || 0;
+  document.getElementById('stat-started').textContent = allCounts.QualifiedLead || 0;
   document.getElementById('stat-leads').textContent = allCounts.Lead || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
   document.getElementById('stat-booking-reveal').textContent = allCounts.BookingEngineRevealViewed || 0;
@@ -1649,7 +1597,6 @@ function renderEvents() {
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
   document.getElementById('stat-paid').textContent = paid;
-  renderBeatFunnel(allCounts);
   renderAttribution(allAttribution);
 
   if (filtered.length === 0) {
@@ -1786,7 +1733,8 @@ function eventInitials(label) {
 /* ---------- Push notifications ---------- */
 
 const PUSH_TRIGGER_LABELS = {
-  Lead: 'Qualified lead',
+  Lead: 'Email lead',
+  QualifiedLead: 'Qualified lead',
   SetupCompleted: 'Setup completed',
   GoLiveClicked: 'Activation clicked',
   PaymentSucceeded: 'Paid',
@@ -1952,48 +1900,6 @@ async function disablePush() {
   } catch (e) {
     setPushUi({ state: 'Error', hint: e.message, subscribed: true });
   }
-}
-
-// The reveal in the order an owner actually walks it, stage by stage and beat
-// by beat. Reading the counts down the column shows exactly which frame loses
-// them, which a four-bucket stage funnel cannot.
-const REVEAL_WALK = [
-  { key: 'BookingEngineRevealViewed', label: 'Booking page', stage: true },
-  { key: 'BookingEngineFullPreviewOpened', label: 'Opened full preview' },
-  { key: 'BookingEngineEditPreviewViewed', label: 'Opened Front Desk editor' },
-  { key: 'GuestAppRevealViewed', label: 'Owner + guest apps', stage: true },
-  { key: 'GuestAppOwnerEditorViewed', label: 'Front Desk app carousel' },
-  { key: 'GuestelInstallFlowViewed', label: 'App Clip handoff' },
-  { key: 'GuestelWalletViewed', label: 'Guestel app carousel' },
-  { key: 'AssistantRevealViewed', label: 'Assistant', stage: true },
-  { key: 'AssistantTextProofViewed', label: 'Text proof' },
-  { key: 'AssistantAppProofViewed', label: 'App proof' },
-  { key: 'MarketelSystemViewed', label: 'Complete system' },
-  { key: 'ActivationOfferViewed', label: 'Activation offer', stage: true },
-  { key: 'ActivationCtaClicked', label: 'Clicked activate' },
-];
-
-function renderBeatFunnel(counts) {
-  const host = document.getElementById('beatFunnel');
-  if (!host) return;
-  const top = counts.BookingEngineRevealViewed || 0;
-  if (!top) {
-    host.innerHTML = '<div class="portfolio-empty">No reveal activity in this range yet.</div>';
-    return;
-  }
-  let previous = top;
-  host.innerHTML = REVEAL_WALK.map((step) => {
-    const value = counts[step.key] || 0;
-    const width = top ? Math.round((value / top) * 100) : 0;
-    const dropped = previous - value;
-    const dropNote = dropped > 0 ? ` <span class="beat-drop">−${dropped}</span>` : '';
-    previous = value;
-    return `<div class="beat-row${step.stage ? ' is-stage' : ''}">
-      <span class="beat-name">${escapeHtml(step.label)}</span>
-      <span class="beat-bar"><i style="width:${width}%"></i></span>
-      <span class="beat-count">${value}${dropNote}</span>
-    </div>`;
-  }).join('');
 }
 
 async function loadPortfolio() {

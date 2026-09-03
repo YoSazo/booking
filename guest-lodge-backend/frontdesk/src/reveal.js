@@ -371,7 +371,7 @@ function handleBookingPreviewMessage(event) {
   if (!knownFrame) return;
   if (bookingCheckoutReachedTracked) return;
   bookingCheckoutReachedTracked = true;
-  trackReveal('BookingChallengeCheckoutReached');
+  trackReveal('BookingPreviewCheckoutReached');
   trackJourney('JourneyBookingPreviewCheckoutReached', {
     bookingPageReady: !!bookingPageState.ready,
   });
@@ -449,7 +449,6 @@ function appShowcases() {
           width: 900,
           height: 1721,
           alt: 'Marketel Front Desk Your Page showing the live booking-page editor.',
-          event: 'GuestAppOwnerEditorViewed',
         },
         {
           label: 'Bookings',
@@ -521,7 +520,6 @@ function appShowcases() {
           width: 900,
           height: 1764,
           alt: 'Guestel showing an upcoming stay and the property saved for direct rebooking.',
-          event: 'GuestelWalletViewed',
         },
         {
           label: 'Book Again',
@@ -536,7 +534,6 @@ function appShowcases() {
           width: 900,
           height: 1762,
           alt: 'Guestel Messages showing a direct conversation between a guest and the property Front Desk.',
-          event: 'GuestelReachViewed',
         },
       ],
     },
@@ -576,13 +573,12 @@ function appCarouselHtml(showcase) {
   </div>`;
 }
 
-function setAppCarouselSlide(root, requestedIndex, manual = false) {
+function setAppCarouselSlide(root, requestedIndex) {
   if (!root?.isConnected) return;
   const showcase = appShowcases()[root.dataset.mvrCarousel];
   if (!showcase) return;
   const length = showcase.slides.length;
   const active = ((Number(requestedIndex) || 0) % length + length) % length;
-  const previous = appCarouselIndex[showcase.id] || 0;
   appCarouselIndex[showcase.id] = active;
   root.dataset.active = String(active);
   root.querySelectorAll('[data-carousel-slide]').forEach((card) => {
@@ -597,18 +593,10 @@ function setAppCarouselSlide(root, requestedIndex, manual = false) {
     dot.classList.toggle('is-active', selected);
     dot.setAttribute('aria-current', selected ? 'true' : 'false');
   });
-  const slide = showcase.slides[active];
   const title = root.closest('.mvr-stage')?.querySelector('[data-carousel-title]');
   const body = root.closest('.mvr-stage')?.querySelector('[data-carousel-body]');
   if (title) title.textContent = showcase.title;
   if (body) body.textContent = showcase.body;
-  if (!manual || active === previous) return;
-  if (slide.event) trackReveal(slide.event);
-  trackJourney('JourneyAppCarouselSlideViewed', {
-    showcase: showcase.id,
-    slide: active,
-    screen: slide.label,
-  });
 }
 
 function bindAppCarousels() {
@@ -895,7 +883,6 @@ function showExpandedPreview() {
     }, { durationMs: Date.now() - previewOpenedAt });
     closeSheet('preview-closed');
   });
-  trackReveal('BookingEngineFullPreviewOpened');
   trackJourney('JourneyBookingPreviewOpened', {
     mode: 'guest',
     bookingPageReady: !!bookingPageState.ready,
@@ -1072,7 +1059,6 @@ async function activateMarketel(button) {
   if (typeof window.goLive !== 'function') return;
   button.disabled = true;
   button.textContent = 'Opening secure checkout…';
-  trackReveal('ActivationCtaClicked');
   try {
     await window.goLive({ billingInterval });
   } finally {
@@ -1126,7 +1112,6 @@ function bindSheetEvents() {
       if (nextInterval === billingInterval) return;
       billingInterval = nextInterval;
       try { localStorage.setItem(BILLING_KEY, billingInterval); } catch (_) {}
-      trackReveal(nextInterval === 'year' ? 'YearlyBillingSelected' : 'MonthlyBillingSelected');
       trackJourney('JourneyBillingIntervalSelected', {
         billingInterval,
         price: billingInterval === 'year' ? 1990 : 199,

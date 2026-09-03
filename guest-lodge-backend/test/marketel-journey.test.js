@@ -82,35 +82,38 @@ function trackerHarness() {
     return { tracker: window.MarketelJourney, requests, windowListeners, documentListeners };
 }
 
-test('journey tracker links attribution and strips sensitive metadata', async () => {
+test('journey tracker links attribution while persisting only one actionable failure', async () => {
     const { tracker, requests } = trackerHarness();
     tracker.init({ surface: 'landing', context: { acquisitionAngle: 'assistant' } });
     await new Promise((resolve) => setImmediate(resolve));
 
-    assert.equal(requests.length, 1);
-    const pageView = requests[0].body.events[0];
-    assert.equal(pageView.eventName, 'JourneyPageViewed');
-    assert.match(pageView.visitorId, /^mjv_/);
-    assert.match(pageView.sessionId, /^mjs_/);
-    assert.equal(pageView.metadata.firstTouch.utm_source, 'facebook');
-    assert.equal(pageView.metadata.firstTouch.fbp, 'fb.1.123.test');
-    assert.equal(pageView.metadata.context.acquisitionAngle, 'assistant');
+    assert.equal(requests.length, 0, 'page load should not write high-resolution telemetry');
 
-    tracker.track('JourneyValidationFailed', {
+    assert.equal(tracker.track('JourneyValidationFailed', { reason: 'invalid-email' }), null);
+    await tracker.flush();
+    assert.equal(requests.length, 0, 'ordinary interaction detail belongs in session replay');
+
+    tracker.track('JourneyClientError', {
         reason: 'invalid-email',
         email: 'owner@example.com',
         errorSummary: 'owner@example.com entered an invalid value',
-    });
+    }, { immediate: true });
     await tracker.flush();
-    const validation = requests[1].body.events[0];
-    assert.equal(validation.metadata.reason, 'invalid-email');
-    assert.equal(validation.metadata.email, undefined);
-    assert.equal(validation.metadata.errorSummary, '[email] entered an invalid value');
+    assert.equal(requests.length, 1);
+    const failure = requests[0].body.events[0];
+    assert.equal(failure.eventName, 'JourneyClientError');
+    assert.equal(failure.metadata.reason, 'invalid-email');
+    assert.equal(failure.metadata.email, undefined);
+    assert.equal(failure.metadata.errorSummary, '[email] entered an invalid value');
+
+    assert.equal(tracker.track('JourneyClientError', { errorSummary: 'second error' }), null);
+    await tracker.flush();
+    assert.equal(requests.length, 1, 'the same failure type is capped at one row per session');
 
     const linkage = tracker.linkage();
-    assert.equal(linkage.journeyVisitorId, pageView.visitorId);
-    assert.equal(linkage.journeySessionId, pageView.sessionId);
-    assert.ok(linkage.journeySequence > validation.sequence);
+    assert.match(linkage.journeyVisitorId, /^mjv_/);
+    assert.match(linkage.journeySessionId, /^mjs_/);
+    assert.ok(linkage.journeySequence > failure.sequence);
     assert.equal(linkage.journeyPagePath, '/landing');
     assert.equal(linkage.journeyFirstTouch.utm_source, 'facebook');
     assert.equal(linkage.journeyFirstTouch.utm_campaign, 'owners');
