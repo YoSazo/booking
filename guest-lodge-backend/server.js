@@ -7249,6 +7249,11 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'AssistantRevealViewed',
     'ActivationOfferViewed',
     'ActivationCtaClicked',
+    // The activation sheet asks one framing question before showing the price.
+    // Neither of these moves revealProgressStep — only ActivationOfferViewed does,
+    // and that now fires when the price itself renders.
+    'ActivationFramingViewed',
+    'ActivationFramingAnswered',
     'GuestAppPreviewRequestedFromBookingEngine',
     'GuestAppValueSlideViewed',
     'GuestAppInstallSlideReplayed',

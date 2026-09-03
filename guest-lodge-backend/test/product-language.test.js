@@ -19,6 +19,7 @@ const productCopy = files
     .map((file) => fs.readFileSync(path.join(backendRoot, file), 'utf8'))
     .join('\n');
 const revealCopy = fs.readFileSync(path.join(backendRoot, 'frontdesk/src/reveal.js'), 'utf8');
+const landingCopy = fs.readFileSync(path.join(backendRoot, 'landing.html'), 'utf8');
 
 test('owner and guest products never collapse into ambiguous app language', () => {
     assert.doesNotMatch(productCopy, /\bGuest App\b/);
@@ -71,8 +72,11 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });
 
-test('activation pairs the upfront price with a visible risk reversal', () => {
-    assert.match(revealCopy, /Activate everything — \$199\/month/);
+test('activation pairs the disclosed price with a visible risk reversal', () => {
+    assert.match(revealCopy, /title: 'Activate everything'/);
+    assert.doesNotMatch(revealCopy, /title: 'Activate everything —/);
+    assert.match(landingCopy, /\$199\/month.*7-day money-back guarantee/);
+    assert.match(revealCopy, /Activate Marketel — \$199\/month/);
     assert.match(revealCopy, /Protected by a 7-day money-back guarantee\. Cancel anytime\./);
     assert.match(revealCopy, /Try Marketel for 7 days\./);
     assert.match(revealCopy, /If it isn't right, get your money back\./);
@@ -88,4 +92,16 @@ test('activation turns the nightly rate into an editable break-even decision', (
     assert.match(revealCopy, /Guestel/);
     assert.match(productCopy, /previewActivation/);
     assert.match(revealCopy, /activationPreviewMode && crm\.hotelSubscribed/);
+    assert.match(revealCopy, /could avoid about.*in OTA commission/);
+    assert.doesNotMatch(revealCopy, /could cover one month of Marketel/);
+});
+
+test('activation framing stays optional, measurable, and economically honest', () => {
+    assert.match(revealCopy, /What did you pay Booking\.com, Expedia or Airbnb last month\?/);
+    assert.match(revealCopy, /data-framing-answer="skipped">Skip to plans/);
+    assert.match(revealCopy, /ActivationFramingViewed/);
+    assert.match(revealCopy, /ActivationFramingAnswered/);
+    assert.match(revealCopy, /ActivationOfferViewed.*saw the price/s);
+    assert.match(revealCopy, /You paid <strong>under \$500 last month<\/strong>/);
+    assert.doesNotMatch(revealCopy, /every direct booking after that is yours/i);
 });

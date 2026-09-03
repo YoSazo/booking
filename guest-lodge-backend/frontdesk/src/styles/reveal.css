@@ -3087,3 +3087,50 @@
 .mvr-sheet .mvr-coverflow { height: auto; }
 .mvr-sheet .mvr-coverflow-viewport { min-height: 0; height: 46vh; max-height: 420px; }
 .mvr-sheet .mvr-coverflow-controls { padding-bottom: 4px; }
+
+/* ==========================================================================
+   Activation framing step
+   One question before the price. Deliberately quiet: no green pill here, so
+   the hub's one-dominant-action rule survives into the sheet.
+   ========================================================================== */
+
+.mvr-framing { padding: 2px 0 4px; }
+.mvr-framing h2 {
+  margin: 6px 0 6px;
+  font-size: 21px; font-weight: 700; line-height: 1.2; letter-spacing: -0.022em;
+  color: var(--mvr-text); text-wrap: balance;
+}
+.mvr-framing-hint { margin: 0 0 14px; font-size: 13.5px; color: var(--mvr-muted); }
+.mvr-framing-choices { display: flex; flex-direction: column; gap: 8px; }
+
+/* Same row object as the hub, minus the completion column. */
+.mvr-row.is-choice {
+  grid-template-columns: minmax(0, 1fr) 14px;
+  padding: 15px;
+}
+.mvr-row.is-choice .mvr-row-text strong { font-size: 15.5px; }
+
+.mvr-framing-skip {
+  display: block;
+  margin: 14px auto 2px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px; font-weight: 600;
+  color: var(--mvr-green);
+  cursor: pointer;
+}
+.mvr-framing-skip:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* The answer, carried onto the price screen as one quiet band. Not a card —
+   it introduces the price, it does not compete with it. */
+.mvr-framing-line {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--green-pale, #e8f5ee);
+  font-size: 13.5px; line-height: 1.5; color: var(--mvr-text);
+  animation: mvr-copy-in 320ms var(--ease-out, ease) both;
+}
+.mvr-framing-line strong { font-weight: 700; }

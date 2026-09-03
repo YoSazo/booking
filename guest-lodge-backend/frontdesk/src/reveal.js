@@ -63,6 +63,12 @@ let openSheetId = null;
 // hub lets someone reopen the offer freely. Fire it once per reveal so the one
 // metric this redesign exists to move stays countable.
 let activationOfferTracked = false;
+let activationFramingTracked = false;
+// null = not asked yet. A bracket id or 'skipped' once answered, which also
+// stops the question being re-asked when the sheet is reopened.
+let activationFramingAnswer = null;
+// Checkout returns and subscribed replays go straight to the price.
+let skipActivationFraming = false;
 let bookingCheckoutReachedTracked = false;
 let guestelAutoplayId = 0;
 let frontdeskAutoplayId = 0;
@@ -144,15 +150,16 @@ function activationBreakEven(rate = currentActivationRate()) {
   const monthlyCost = billingInterval === 'year' ? 1990 / 12 : 199;
   const commissionPerNight = normalizedRate * 0.15;
   const roomNights = Math.max(1, Math.ceil(monthlyCost / commissionPerNight));
-  return { rate: normalizedRate, roomNights };
+  const avoidedCommission = roomNights * commissionPerNight;
+  return { rate: normalizedRate, roomNights, avoidedCommission };
 }
 
 function activationRateCalculatorHtml() {
-  const { rate, roomNights } = activationBreakEven();
+  const { rate, roomNights, avoidedCommission } = activationBreakEven();
   const unit = roomNights === 1 ? 'room-night' : 'room-nights';
   const result = billingInterval === 'year'
-    ? 'per month could cover the yearly plan.'
-    : 'could cover one month of Marketel.';
+    ? `could avoid about ${money(avoidedCommission)} in OTA commission — enough to offset the yearly plan's average monthly cost.`
+    : `could avoid about ${money(avoidedCommission)} in OTA commission — more than one month of Marketel.`;
   return `<div class="mvr-rate-calculator">
     <div class="mvr-rate-heading"><span>Your nightly rate</span><small>Adjust it</small></div>
     <div class="mvr-rate-stepper" role="group" aria-label="Nightly room rate">
@@ -187,7 +194,7 @@ function sizeRateInput(input) {
 function updateActivationRateCalculator(value, options = {}) {
   const rate = normalizedActivationRate(value, currentActivationRate());
   activationNightlyRate = rate;
-  const { roomNights } = activationBreakEven(rate);
+  const { roomNights, avoidedCommission } = activationBreakEven(rate);
   const input = document.getElementById('mvrActivationRate');
   const nights = document.getElementById('mvrBreakEvenNights');
   const context = document.getElementById('mvrBreakEvenContext');
@@ -196,8 +203,8 @@ function updateActivationRateCalculator(value, options = {}) {
   if (nights) nights.textContent = `${roomNights} direct ${roomNights === 1 ? 'room-night' : 'room-nights'}`;
   if (context) {
     context.textContent = billingInterval === 'year'
-      ? 'per month could cover the yearly plan.'
-      : 'could cover one month of Marketel.';
+      ? `could avoid about ${money(avoidedCommission)} in OTA commission — enough to offset the yearly plan's average monthly cost.`
+      : `could avoid about ${money(avoidedCommission)} in OTA commission — more than one month of Marketel.`;
   }
   if (options.track) {
     trackJourney('JourneyControlActivated', {
@@ -282,7 +289,10 @@ const HUB_ITEMS = [
     id: 'activation',
     step: 3,
     event: 'ActivationOfferViewed',
-    title: 'Activate everything — $199/month',
+    // The figure lives behind the framing question now. This is sequencing, not
+    // concealment: landing.html states "$199/month only when you activate" above
+    // the fold, so nobody reaches the reveal without having seen it.
+    title: 'Activate everything',
     body: 'Protected by a 7-day money-back guarantee. Cancel anytime.',
     cta: '',
   },
@@ -646,6 +656,75 @@ function bindAppCarousels() {
   });
 }
 
+// One question between the hub and the price. Its job is to change what $199 is
+// compared against: not "the nothing I pay today" but "the commission I already
+// tolerate". Every bracket makes $199 look small, including "not sure" — which
+// is why this axis was chosen over typical stay length, where a one-night answer
+// produces "11 bookings to break even" and argues against the product.
+const ACTIVATION_FRAMING_CHOICES = [
+  { id: 'under_500', label: 'Under $500' },
+  { id: '500_1500', label: '$500 – $1,500' },
+  { id: '1500_5000', label: '$1,500 – $5,000' },
+  { id: 'over_5000', label: 'More than $5,000' },
+  { id: 'not_sure', label: "I'm not sure" },
+];
+
+// "not_sure" deliberately asserts no figure. Inventing an industry average here
+// would be the same fabrication that got cut from the earlier money slide.
+const ACTIVATION_FRAMING_LINES = {
+  under_500: 'You paid <strong>under $500 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat — each booking moved direct keeps more of that money at your property.',
+  '500_1500': 'You paid <strong>$500–$1,500 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
+  '1500_5000': 'You paid <strong>$1,500–$5,000 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
+  over_5000: 'You paid <strong>over $5,000 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
+  not_sure: "Most owners don't know the exact number. Marketel is <strong>$199</strong>, flat, and Front Desk tracks the OTA fees your direct bookings avoid.",
+};
+
+function activationFramingHtml() {
+  return `<section class="mvr-framing">
+    <div class="mvr-eyebrow">Before the price</div>
+    <h2>What did you pay Booking.com, Expedia or Airbnb last month?</h2>
+    <p class="mvr-framing-hint">Roughly is fine.</p>
+    <div class="mvr-framing-choices">
+      ${ACTIVATION_FRAMING_CHOICES.map((choice) => `<button type="button" class="mvr-row is-choice" data-framing-answer="${choice.id}">
+        <span class="mvr-row-text"><strong>${esc(choice.label)}</strong></span>
+        <span class="mvr-row-chevron" aria-hidden="true">›</span>
+      </button>`).join('')}
+    </div>
+    <button type="button" class="mvr-framing-skip" data-framing-answer="skipped">Skip to plans →</button>
+  </section>`;
+}
+
+function framingLineHtml(answer) {
+  const line = ACTIVATION_FRAMING_LINES[answer];
+  if (!line) return '';
+  return `<div class="mvr-framing-line">${line}</div>`;
+}
+
+// Screen B. ActivationOfferViewed fires here rather than when the sheet opens,
+// so the one metric this redesign exists to move still means "saw the price".
+function activationPriceHtml() {
+  if (!activationOfferTracked) {
+    activationOfferTracked = true;
+    trackReveal('ActivationOfferViewed', activationFramingAnswer || '');
+  }
+  return framingLineHtml(activationFramingAnswer) + finaleHtml();
+}
+
+function answerActivationFraming(value) {
+  const known = ACTIVATION_FRAMING_CHOICES.some((choice) => choice.id === value);
+  activationFramingAnswer = known ? value : 'skipped';
+  trackReveal('ActivationFramingAnswered', activationFramingAnswer);
+  trackJourney('JourneyControlActivated', {
+    controlName: 'activation-framing',
+    answer: activationFramingAnswer,
+  });
+  const body = document.querySelector('#mvrSheet .mvr-sheet-body');
+  if (!body) return;
+  body.innerHTML = activationPriceHtml();
+  body.scrollTop = 0;
+  bindSheetEvents();
+}
+
 function finaleHtml() {
   const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
@@ -842,15 +921,10 @@ function openHubItem(id) {
 
   // Only fire the stage event on open. The server writes revealProgressStep on
   // every call and follows backward moves, so firing on close would rewrite a
-  // lower step.
-  if (item.id === 'activation') {
-    if (!activationOfferTracked) {
-      activationOfferTracked = true;
-      trackReveal(item.event);
-    }
-  } else {
-    trackReveal(item.event);
-  }
+  // lower step. Activation is the exception: its event fires when the price
+  // actually renders (activationPriceHtml), because a framing question now sits
+  // in front of it and ActivationOfferViewed has to keep meaning "saw the price".
+  if (item.id !== 'activation') trackReveal(item.event);
   recordHubDepth(item.step);
   trackJourney('JourneyRevealStageViewed', {
     resumed: nextStageViewIsResume,
@@ -910,11 +984,17 @@ function guestelSheetBodyHtml() {
 function presentSheet(id) {
   const root = document.getElementById('marketelValueReveal');
   if (!root || document.getElementById('mvrSheet')) return;
+  const showFraming = id === 'activation'
+    && !activationFramingAnswer
+    && !skipActivationFraming
+    && !(crm.hotelSubscribed && !activationPreviewMode);
   const body = id === 'frontdesk'
     ? frontdeskSheetBodyHtml()
     : id === 'guestel'
       ? guestelSheetBodyHtml()
-      : finaleHtml();
+      : showFraming
+        ? activationFramingHtml()
+        : activationPriceHtml();
   const sheet = document.createElement('div');
   sheet.id = 'mvrSheet';
   sheet.className = `mvr-sheet is-${id}`;
@@ -929,6 +1009,10 @@ function presentSheet(id) {
       </div>
     </div>`;
   root.appendChild(sheet);
+  if (showFraming && !activationFramingTracked) {
+    activationFramingTracked = true;
+    trackReveal('ActivationFramingViewed');
+  }
   sheet.querySelectorAll('[data-sheet-dismiss]').forEach((control) => {
     control.addEventListener('click', () => closeSheet('sheet-closed'));
   });
@@ -1028,6 +1112,9 @@ function bindRevealEvents() {
 // Activation lives in a sheet now, so its controls bind when that sheet is
 // presented rather than with the hub.
 function bindSheetEvents() {
+  document.querySelectorAll('#mvrSheet [data-framing-answer]').forEach((control) => {
+    control.addEventListener('click', () => answerActivationFraming(control.dataset.framingAnswer));
+  });
   document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
     window.openMarketelSupport?.();
   });
@@ -1046,7 +1133,7 @@ function bindSheetEvents() {
       });
       const body = document.querySelector('#mvrSheet .mvr-sheet-body');
       if (body) {
-        body.innerHTML = finaleHtml();
+        body.innerHTML = framingLineHtml(activationFramingAnswer) + finaleHtml();
         bindSheetEvents();
       }
       refreshHubState();
@@ -1249,8 +1336,11 @@ export async function showMarketelValueReveal(options = {}) {
   seedVisitedFromStep(currentStep);
   openSheetId = null;
   activationOfferTracked = false;
+  activationFramingTracked = false;
+  activationFramingAnswer = null;
+  skipActivationFraming = currentStep >= 3 || activationPreviewMode;
   bookingCheckoutReachedTracked = false;
-  appCarouselIndex = { guestel: 0 };
+  appCarouselIndex = { frontdesk: 0, guestel: 0 };
   activationNightlyRate = null;
   bookingPreviewUnavailable = false;
   lastRenderedRevealHtml = '';
