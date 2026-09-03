@@ -67,6 +67,8 @@ test('demand fit comes first and follows the owner through the funnel', () => {
     assert.match(server, /demandFit,/);
     assert.match(reveal, /demandFitRevealMessage/);
     assert.match(reveal, /result\?\.demandFit/);
+    assert.match(setup, /Give callers, walk-ins, and past guests one place to book directly with us again/);
+    assert.match(setup, /Replace our PMS or channel manager and automatically sync every OTA/);
 });
 
 test('the owner preview explains activation and the room-money flow honestly', () => {

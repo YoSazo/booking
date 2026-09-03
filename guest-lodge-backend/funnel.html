@@ -1532,6 +1532,7 @@ const TYPE_LABELS = {
   QualityAnswer: 'Quality Answer',
   Lead: 'Email Lead',
   QualifiedLead: 'Qualified Lead',
+  FitMismatchContinued: 'Fit Mismatch Continued',
   SetupCompleted: 'Setup Completed',
   ValueRevealStarted: 'Value Reveal Started',
   BookingEngineRevealViewed: 'Booking Page Reveal',
@@ -1645,10 +1646,11 @@ const ATTRIBUTION_ANGLE_LABELS = {
   assistant: 'Front Desk Assistant',
 };
 const DEMAND_FIT_LABELS = {
-  branded_ota_leakage: 'Branded searches leak to OTAs',
-  existing_online_traffic: 'Existing online traffic',
-  repeat_guest_leakage: 'Repeat guests rebook elsewhere',
-  low_online_demand: 'Mostly offline / low demand',
+  ota_leakage: 'Existing guests finish on OTAs',
+  direct_guest_relationships: 'Callers, walk-ins and past guests',
+  existing_online_demand: 'Existing online traffic (legacy)',
+  new_traveler_demand: 'Expects new traveler demand',
+  pms_channel_sync: 'Expects PMS / OTA synchronization',
   not_answered: 'Question not answered',
 };
 
@@ -1698,6 +1700,7 @@ function demandFitTable(rows) {
     <th style="text-align:right">Leads</th>
     <th style="text-align:right">Setup</th>
     <th style="text-align:right">Offer</th>
+    <th style="text-align:right">Continued anyway</th>
     <th style="text-align:right">Checkout</th>
     <th style="text-align:right">Paid</th>
     <th style="text-align:right">Start → paid</th>
@@ -1708,6 +1711,7 @@ function demandFitTable(rows) {
     <td class="num">${Number(row.leads || 0)}</td>
     <td class="num">${Number(row.setupCompleted || 0)}</td>
     <td class="num">${Number(row.offerViewed || 0)}</td>
+    <td class="num">${Number(row.mismatchContinued || 0)}</td>
     <td class="num">${Number(row.checkoutStarted || 0)}</td>
     <td class="num">${Number(row.paid || 0)}</td>
     <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>

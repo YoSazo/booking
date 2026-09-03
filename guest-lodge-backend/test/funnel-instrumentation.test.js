@@ -167,26 +167,28 @@ test('Meta setup completion is a deduplicated standard CompleteRegistration even
 });
 
 test('Lead qualification describes a current monetizable problem and is identical across ad angles', () => {
-    for (const answer of ['branded_ota_leakage', 'existing_online_traffic', 'repeat_guest_leakage']) {
+    for (const answer of ['ota_leakage', 'direct_guest_relationships']) {
         assert.match(setup, new RegExp(`answer === '${answer}'`), `${answer} is not qualified in setup`);
         assert.match(server, new RegExp(`'${answer}'`), `${answer} is not accepted by the server`);
     }
-    assert.match(setup, /answerQualityQ\('low_online_demand'\)/);
-    assert.doesNotMatch(
-        setup.slice(setup.indexOf('function answerQualityQ'), setup.indexOf("window.MarketelJourney?.track('JourneyQualitySelected'")),
-        /low_online_demand/,
-        'low online demand must remain tracked but unqualified'
-    );
+    for (const mismatch of ['new_traveler_demand', 'pms_channel_sync']) {
+        assert.match(setup, new RegExp(`answerQualityQ\\('${mismatch}'\\)`));
+    }
     const leadValidation = server.slice(
         server.indexOf("if (eventName === 'QualifiedLead')"),
         server.indexOf('// A setup can qualify only once')
     );
     assert.doesNotMatch(leadValidation, /acquisitionAngle|AcquisitionAngle/);
-    assert.doesNotMatch(leadValidation, /low_online_demand/);
-    assert.match(setup, /Marketel captures demand\. It doesn&apos;t create new travelers\./);
+    assert.doesNotMatch(leadValidation, /new_traveler_demand|pms_channel_sync/);
+    assert.match(setup, /Marketel captures demand\. It doesn’t create new travelers\./);
+    assert.match(setup, /Marketel works alongside your current setup\./);
     assert.match(setup, /I understand — continue anyway/);
+    assert.doesNotMatch(setup, /Exit for now/);
+    assert.match(setup, /eventName: 'FitMismatchContinued'/);
+    assert.match(server, /MARKETEL_DEMAND_FIT_MISMATCH_TYPES/);
     assert.match(dashboard, /Demand fit/);
     assert.match(dashboard, /byDemandFit/);
+    assert.match(dashboard, /Continued anyway/);
 });
 
 test('email submission is the deduplicated Meta Lead while qualification remains first-party', () => {

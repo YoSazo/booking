@@ -818,14 +818,16 @@ let lastRenderedRevealHtml = '';
 
 function demandFitRevealMessage() {
   switch (String(revealData.demandFit || '')) {
-    case 'branded_ota_leakage':
+    case 'ota_leakage':
       return `Keep guests who already search for ${propertyName()} from finishing on an OTA.`;
-    case 'existing_online_traffic':
+    case 'direct_guest_relationships':
+      return 'Give callers, walk-ins and past guests one direct place to book again.';
+    case 'existing_online_demand':
       return 'Turn traffic you already earn into direct bookings.';
-    case 'repeat_guest_leakage':
-      return 'Give past guests a direct way back without another OTA commission.';
-    case 'low_online_demand':
-      return 'See what Marketel can capture as more guests begin finding or returning to you online.';
+    case 'new_traveler_demand':
+      return 'Marketel captures guests who already find or return to you; it does not generate new traveler demand.';
+    case 'pms_channel_sync':
+      return 'Marketel works alongside your current setup; it does not replace or automatically sync every OTA.';
     default:
       return 'Turn the attention and guest relationships you already have into direct bookings.';
   }

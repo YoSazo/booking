@@ -199,20 +199,31 @@ function emailTemplateValue(value) {
 }
 
 const MARKETEL_DEMAND_FIT_ALIASES = Object.freeze({
-    online_ota_leakage: 'branded_ota_leakage',
-    ota_marketplaces: 'branded_ota_leakage',
-    direct_calls_messages: 'existing_online_traffic',
-    google_website: 'existing_online_traffic',
-    social_ads: 'existing_online_traffic',
-    repeat_guests: 'repeat_guest_leakage',
-    building_demand: 'low_online_demand',
-    referrals_offline: 'low_online_demand',
+    online_ota_leakage: 'ota_leakage',
+    ota_marketplaces: 'ota_leakage',
+    branded_ota_leakage: 'ota_leakage',
+    existing_online_traffic: 'existing_online_demand',
+    google_website: 'existing_online_demand',
+    social_ads: 'existing_online_demand',
+    direct_calls_messages: 'direct_guest_relationships',
+    repeat_guests: 'direct_guest_relationships',
+    repeat_guest_leakage: 'direct_guest_relationships',
+    building_demand: 'new_traveler_demand',
+    referrals_offline: 'new_traveler_demand',
+    low_online_demand: 'new_traveler_demand',
 });
 const MARKETEL_DEMAND_FIT_TYPES = Object.freeze([
-    'branded_ota_leakage',
-    'existing_online_traffic',
-    'repeat_guest_leakage',
-    'low_online_demand',
+    'ota_leakage',
+    'direct_guest_relationships',
+    // Historical fit choice retained as its own cohort so an owner who said
+    // "website/social traffic" is never relabeled as OTA leakage.
+    'existing_online_demand',
+    'new_traveler_demand',
+    'pms_channel_sync',
+]);
+const MARKETEL_DEMAND_FIT_MISMATCH_TYPES = new Set([
+    'new_traveler_demand',
+    'pms_channel_sync',
 ]);
 
 function normalizeMarketelDemandFit(value) {
@@ -224,14 +235,16 @@ function normalizeMarketelDemandFit(value) {
 function marketelDemandFitMessage(value, hotelName = 'your property') {
     const safeName = String(hotelName || 'your property').trim() || 'your property';
     switch (normalizeMarketelDemandFit(value)) {
-        case 'branded_ota_leakage':
+        case 'ota_leakage':
             return `Guests already search for ${safeName}. Marketel gives them a direct place to finish instead of sending that demand back to an OTA.`;
-        case 'existing_online_traffic':
-            return 'You already earn attention from Google, your website, social media or ads. Marketel gives that traffic a direct place to book.';
-        case 'repeat_guest_leakage':
-            return `Past guests already know ${safeName}. Guestel gives them a direct way back without searching through an OTA again.`;
-        case 'low_online_demand':
-            return 'Marketel captures demand you already have; it does not create new travelers. Activate when enough guests are already finding or returning to your property online.';
+        case 'direct_guest_relationships':
+            return `Give callers, walk-ins and past guests one direct place to book ${safeName} again.`;
+        case 'existing_online_demand':
+            return 'Turn traffic you already earn from Google, your website, social media or ads into direct bookings.';
+        case 'new_traveler_demand':
+            return 'Marketel captures guests who already find, contact, walk into or return to you; it does not generate new traveler demand.';
+        case 'pms_channel_sync':
+            return 'Marketel works alongside your current setup through Front Desk; it does not replace or automatically sync a PMS, channel manager or every OTA.';
         default:
             return 'Marketel turns the attention and guest relationships you already have into more direct bookings.';
     }
@@ -10627,6 +10640,7 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'PreviewReadyEmailSent',
     'CheckoutCancelled',
     'QualifiedLead',
+    'FitMismatchContinued',
     'CheckoutRecoveryEmailSending',
     'CheckoutRecoveryEmailSent',
     'LegacyComebackEmailSent',
@@ -10647,6 +10661,7 @@ const MARKETEL_PUBLIC_ONBOARDING_EVENTS = new Set([
     'QualityAnswer',
     'Lead',
     'QualifiedLead',
+    'FitMismatchContinued',
 ]);
 
 // Onboarding funnel tracking (landing page + setup wizard)
@@ -10694,6 +10709,10 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         if (eventName === 'QualityAnswer') {
             const allowedAnswers = new Set([
                 ...MARKETEL_DEMAND_FIT_TYPES,
+                'branded_ota_leakage',
+                'existing_online_traffic',
+                'repeat_guest_leakage',
+                'low_online_demand',
                 'online_ota_leakage',
                 'direct_calls_messages',
                 'repeat_guests',
@@ -10706,6 +10725,13 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             ]);
             if (!setupHotel || !allowedAnswers.has(contentName)) {
                 return res.status(400).json({ success: false, message: 'Invalid quality answer' });
+            }
+        }
+
+        if (eventName === 'FitMismatchContinued') {
+            const normalizedFit = normalizeMarketelDemandFit(contentName);
+            if (!setupHotel || !MARKETEL_DEMAND_FIT_MISMATCH_TYPES.has(normalizedFit)) {
+                return res.status(400).json({ success: false, message: 'Invalid fit mismatch' });
             }
         }
 
@@ -10727,6 +10753,9 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         // optimization event.
         if (eventName === 'QualifiedLead') {
             const qualifiedAnswers = new Set([
+                'ota_leakage',
+                'direct_guest_relationships',
+                'existing_online_demand',
                 'branded_ota_leakage',
                 'existing_online_traffic',
                 'repeat_guest_leakage',
@@ -10761,6 +10790,14 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
             if (existingLead) {
                 return res.json({ success: true, duplicate: true });
             }
+        }
+
+        if (eventName === 'FitMismatchContinued') {
+            const existingOverride = await prisma.funnelEvent.findFirst({
+                where: { hotelId: trackedHotelId, eventName: 'FitMismatchContinued' },
+                select: { id: true },
+            });
+            if (existingOverride) return res.json({ success: true, duplicate: true });
         }
 
         // These calls keep cross-device setup recovery accurate, but they are
@@ -10846,6 +10883,7 @@ const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
     'ActivationOfferViewed',
     'CheckoutStarted',
     'PaymentSucceeded',
+    'FitMismatchContinued',
 ]);
 const MARKETEL_ACQUISITION_ANGLES = ['direct', 'guest_app', 'assistant'];
 
@@ -10981,6 +11019,7 @@ function emptyMarketelAttributionGroup(dimensions) {
         setupCompleted: 0,
         offerViewed: 0,
         checkoutStarted: 0,
+        mismatchContinued: 0,
         paid: 0,
         revenue: 0,
         startToPaidRate: 0,
@@ -11003,6 +11042,7 @@ function addMarketelAttributionProperty(group, property) {
     if (property.milestones.has('SetupCompleted')) group.setupCompleted += 1;
     if (property.milestones.has('ActivationOfferViewed')) group.offerViewed += 1;
     if (property.milestones.has('CheckoutStarted')) group.checkoutStarted += 1;
+    if (property.milestones.has('FitMismatchContinued')) group.mismatchContinued += 1;
     if (property.milestones.has('PaymentSucceeded')) group.paid += 1;
     group.revenue += property.revenue;
 }

@@ -16,27 +16,33 @@ const QA_OWNER_EMAILS = [
 ];
 const ANGLES = ['direct', 'guest_app', 'assistant'];
 const DEMAND_FITS = [
-  'branded_ota_leakage',
-  'existing_online_traffic',
-  'repeat_guest_leakage',
-  'low_online_demand',
+  'ota_leakage',
+  'direct_guest_relationships',
+  'existing_online_demand',
+  'new_traveler_demand',
+  'pms_channel_sync',
   'not_answered',
 ];
 const DEMAND_FIT_ALIASES = {
-  online_ota_leakage: 'branded_ota_leakage',
-  ota_marketplaces: 'branded_ota_leakage',
-  direct_calls_messages: 'existing_online_traffic',
-  google_website: 'existing_online_traffic',
-  social_ads: 'existing_online_traffic',
-  repeat_guests: 'repeat_guest_leakage',
-  building_demand: 'low_online_demand',
-  referrals_offline: 'low_online_demand',
+  online_ota_leakage: 'ota_leakage',
+  ota_marketplaces: 'ota_leakage',
+  branded_ota_leakage: 'ota_leakage',
+  existing_online_traffic: 'existing_online_demand',
+  google_website: 'existing_online_demand',
+  social_ads: 'existing_online_demand',
+  direct_calls_messages: 'direct_guest_relationships',
+  repeat_guests: 'direct_guest_relationships',
+  repeat_guest_leakage: 'direct_guest_relationships',
+  building_demand: 'new_traveler_demand',
+  referrals_offline: 'new_traveler_demand',
+  low_online_demand: 'new_traveler_demand',
 };
 const DEMAND_FIT_LABELS = {
-  branded_ota_leakage: 'branded searches leak to OTAs',
-  existing_online_traffic: 'existing online traffic',
-  repeat_guest_leakage: 'repeat guests rebook elsewhere',
-  low_online_demand: 'mostly offline / low demand',
+  ota_leakage: 'existing guests finish on OTAs',
+  direct_guest_relationships: 'callers, walk-ins and past guests',
+  existing_online_demand: 'existing online traffic (legacy)',
+  new_traveler_demand: 'expects new traveler demand',
+  pms_channel_sync: 'expects PMS / OTA synchronization',
   not_answered: 'question not answered',
 };
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
@@ -240,6 +246,7 @@ function emptyGroup(label) {
     revealEngaged: 0,
     offerViewed: 0,
     checkoutStarted: 0,
+    mismatchContinued: 0,
     paid: 0,
     revenue: 0,
   };
@@ -254,6 +261,7 @@ function addProperty(group, property) {
   if (property.events.has('JourneyRevealStageCompleted')) group.revealEngaged += 1;
   if (property.events.has('ActivationOfferViewed')) group.offerViewed += 1;
   if (property.events.has('CheckoutStarted')) group.checkoutStarted += 1;
+  if (property.events.has('FitMismatchContinued')) group.mismatchContinued += 1;
   if (property.events.has('PaymentSucceeded')) group.paid += 1;
   group.revenue += property.revenue;
 }
@@ -393,7 +401,8 @@ async function dbSection() {
     `${String(group.leads).padStart(3)} Lead | ${String(group.qualified).padStart(3)} qual | ` +
     `${String(group.completed).padStart(3)} setup | ` +
     `${String(group.revealEntered).padStart(3)} reveal | ${String(group.revealEngaged).padStart(3)} engaged | ` +
-    `${String(group.offerViewed).padStart(3)} offer | ${String(group.checkoutStarted).padStart(3)} checkout | ` +
+    `${String(group.offerViewed).padStart(3)} offer | ${String(group.mismatchContinued).padStart(3)} override | ` +
+    `${String(group.checkoutStarted).padStart(3)} checkout | ` +
     `${String(group.paid).padStart(3)} paid | ${money(group.revenue)}`;
 
   const out = [

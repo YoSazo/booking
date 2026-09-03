@@ -342,10 +342,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius:50%; background:#edf7f1; color:var(--green); font-size:20px; font-weight:800;
 }
 .demand-fit-warning p { color:var(--muted); font-size:14px; line-height:1.6; margin:10px 0 18px; }
-.demand-fit-warning .fit-honesty {
-  padding:13px 14px; border:1px solid var(--border); border-radius:12px;
-  background:#f8faf8; color:#44544a; font-size:13px; line-height:1.5; text-align:left;
-}
 .demand-fit-warning .fit-change {
   display:inline-block; margin-top:12px; padding:8px; border:0; background:transparent;
   color:var(--muted); font:inherit; font-size:12px; text-decoration:underline; cursor:pointer;
@@ -375,22 +371,20 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   <!-- STEP 1: Existing demand / fit -->
   <div class="step active" id="step-1">
     <div class="form-card fade-stagger" id="demandFitQuestion">
-      <h2>Which best describes the demand you already have?</h2>
-      <p class="demand-question-copy">Choose what happens today. Marketel works best when guests already find you or come back to you.</p>
+      <h2>What would you mainly use Marketel for?</h2>
+      <p class="demand-question-copy">Choose the one job you need it to do most.</p>
       <div class="demand-options">
-        <button class="btn btn-back" data-journey="demand-branded-ota-leakage" onclick="answerQualityQ('branded_ota_leakage')">Guests search for us by name, but often finish booking on an OTA</button>
-        <button class="btn btn-back" data-journey="demand-existing-online-traffic" onclick="answerQualityQ('existing_online_traffic')">We get visitors from Google, our website, social media, or ads</button>
-        <button class="btn btn-back" data-journey="demand-repeat-guest-leakage" onclick="answerQualityQ('repeat_guest_leakage')">Past guests return, but usually rebook by phone or through an OTA</button>
-        <button class="btn btn-back" data-journey="demand-low-online-demand" onclick="answerQualityQ('low_online_demand')">Most stays are walk-ins or referrals; very few guests find us online</button>
+        <button class="btn btn-back" data-journey="demand-ota-leakage" onclick="answerQualityQ('ota_leakage')">Give guests who already find us a direct way to book instead of using an OTA</button>
+        <button class="btn btn-back" data-journey="demand-direct-guest-relationships" onclick="answerQualityQ('direct_guest_relationships')">Give callers, walk-ins, and past guests one place to book directly with us again</button>
+        <button class="btn btn-back" data-journey="demand-new-travelers" onclick="answerQualityQ('new_traveler_demand')">Bring new travelers to our property who haven&apos;t found us yet</button>
+        <button class="btn btn-back" data-journey="demand-pms-sync" onclick="answerQualityQ('pms_channel_sync')">Replace our PMS or channel manager and automatically sync every OTA</button>
       </div>
     </div>
     <div class="form-card fade-stagger demand-fit-warning" id="demandFitWarning" hidden>
       <div class="fit-mark">i</div>
-      <h2>Marketel captures demand. It doesn&apos;t create new travelers.</h2>
-      <p>If very few guests currently find or return to your property online, Marketel may not be worth $199/month yet.</p>
-      <div class="fit-honesty">Marketel is strongest when it can turn existing searches, website visits, advertising traffic, or repeat guests into direct bookings.</div>
-      <button class="btn btn-primary" data-journey="demand-low-continue" onclick="continueLowDemand()">I understand — continue anyway</button>
-      <a class="btn btn-back" data-journey="demand-low-exit" href="/landing" style="display:block;text-decoration:none;">Exit for now</a>
+      <h2 id="demandFitWarningTitle"></h2>
+      <p id="demandFitWarningBody"></p>
+      <button class="btn btn-primary" data-journey="demand-mismatch-continue" onclick="continueDemandFitMismatch()">I understand — continue anyway</button>
       <button class="fit-change" type="button" onclick="resetDemandFitQuestion()">Choose a different answer</button>
     </div>
   </div>
@@ -635,21 +629,38 @@ function goToStep(n) {
 
 function normalizeDemandFitAnswer(answer) {
   const aliases = {
-    online_ota_leakage: 'branded_ota_leakage',
-    ota_marketplaces: 'branded_ota_leakage',
-    direct_calls_messages: 'existing_online_traffic',
-    google_website: 'existing_online_traffic',
-    social_ads: 'existing_online_traffic',
-    repeat_guests: 'repeat_guest_leakage',
-    building_demand: 'low_online_demand',
-    referrals_offline: 'low_online_demand',
+    online_ota_leakage: 'ota_leakage',
+    ota_marketplaces: 'ota_leakage',
+    branded_ota_leakage: 'ota_leakage',
+    existing_online_traffic: 'existing_online_demand',
+    google_website: 'existing_online_demand',
+    social_ads: 'existing_online_demand',
+    direct_calls_messages: 'direct_guest_relationships',
+    repeat_guests: 'direct_guest_relationships',
+    repeat_guest_leakage: 'direct_guest_relationships',
+    building_demand: 'new_traveler_demand',
+    referrals_offline: 'new_traveler_demand',
+    low_online_demand: 'new_traveler_demand',
   };
   return aliases[answer] || answer || '';
 }
 
-function showDemandFitWarning(animate = true) {
+function isDemandFitMismatch(answer) {
+  return answer === 'new_traveler_demand' || answer === 'pms_channel_sync';
+}
+
+function showDemandFitWarning(answer = selectedDemandFit, animate = true) {
   const question = document.getElementById('demandFitQuestion');
   const warning = document.getElementById('demandFitWarning');
+  const title = document.getElementById('demandFitWarningTitle');
+  const body = document.getElementById('demandFitWarningBody');
+  const expectsSync = answer === 'pms_channel_sync';
+  if (title) title.textContent = expectsSync
+    ? 'Marketel works alongside your current setup.'
+    : 'Marketel captures demand. It doesn’t create new travelers.';
+  if (body) body.textContent = expectsSync
+    ? 'Front Desk helps protect availability, but Marketel does not replace or automatically sync a PMS, channel manager, or every OTA.'
+    : 'It helps guests who already find, contact, walk into, or return to your property book directly.';
   if (question) question.hidden = true;
   if (warning) {
     warning.hidden = false;
@@ -667,11 +678,22 @@ function resetDemandFitQuestion() {
   }
 }
 
-function continueLowDemand() {
+function continueDemandFitMismatch() {
   window.MarketelJourney?.track('JourneyControlActivated', {
-    controlName: 'continue-after-low-demand-warning',
+    controlName: 'continue-after-fit-correction',
     demandFit: selectedDemandFit,
   });
+  fetch('/api/funnel/onboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      eventName: 'FitMismatchContinued',
+      eventId: 'marketel-fit-continued.' + (hotelData.id || TOKEN),
+      setupToken: TOKEN,
+      contentName: selectedDemandFit,
+      ...journeyLinkage(),
+    }),
+  }).catch(() => {});
   goToStep(2);
 }
 
@@ -680,9 +702,9 @@ function answerQualityQ(answer) {
   selectedDemandFit = answer;
   // Qualification is intentionally identical for every acquisition angle so
   // Meta compares the ads against the same commercial standard.
-  const isQualifiedLead = answer === 'branded_ota_leakage'
-    || answer === 'existing_online_traffic'
-    || answer === 'repeat_guest_leakage';
+  const isQualifiedLead = answer === 'ota_leakage'
+    || answer === 'direct_guest_relationships'
+    || answer === 'existing_online_demand';
   window.MarketelJourney?.track('JourneyQualitySelected', {
     answer,
     qualified: isQualifiedLead,
@@ -717,8 +739,8 @@ function answerQualityQ(answer) {
       ...journeyLinkage(),
     }),
   }).catch(() => {});
-  if (answer === 'low_online_demand') {
-    showDemandFitWarning();
+  if (isDemandFitMismatch(answer)) {
+    showDemandFitWarning(answer);
   } else {
     goToStep(2);
   }
@@ -776,8 +798,8 @@ async function loadSetup() {
       });
     } else if (resumeStep > 1) {
       const resumedStep = Math.min(3, resumeStep);
-      if (selectedDemandFit === 'low_online_demand' && !hotelData.name && resumedStep === 2) {
-        showDemandFitWarning(false);
+      if (isDemandFitMismatch(selectedDemandFit) && !hotelData.name && resumedStep === 2) {
+        showDemandFitWarning(selectedDemandFit, false);
       } else {
         goToStep(resumedStep);
       }
