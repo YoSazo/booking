@@ -9,6 +9,8 @@ const landing = fs.readFileSync(path.join(root, 'landing.html'), 'utf8');
 const setup = fs.readFileSync(path.join(root, 'setup.html'), 'utf8');
 const core = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'core.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'prisma', 'schema.prisma'), 'utf8');
+const previewReadyEmail = fs.readFileSync(path.join(root, 'email-templates', 'preview-ready.html'), 'utf8');
+const checkoutRecoveryEmail = fs.readFileSync(path.join(root, 'email-templates', 'checkout-recovery.html'), 'utf8');
 
 function route(startMarker, endMarker) {
     const start = server.indexOf(startMarker);
@@ -44,6 +46,8 @@ test('completed setup sends preview recovery before the CTA is clicked', () => {
     assert.match(complete, /sendPreviewReadyEmailOnce\(hotel\.id, req\)/);
     assert.match(server, /PreviewReadyEmailSending/);
     assert.match(server, /PreviewReadyEmailSent/);
+    assert.match(previewReadyEmail, /\{\{FIT_MESSAGE\}\}/);
+    assert.match(server, /sendPreviewReadyEmail\([\s\S]{0,400}demandFit/);
 });
 
 test('email login creates a scoped session without mutating staff PINs', () => {
@@ -78,6 +82,8 @@ test('checkout abandonment gets one durable, subscription-aware recovery', () =>
     assert.match(server, /subscribed: false[\s\S]{0,250}checkoutRecoveryEmailSentAt: null/);
     assert.match(server, /checkoutRecoveryEmailSentAt: claimedAt/);
     assert.match(server, /template: 'checkout-recovery\.html'/);
+    assert.match(checkoutRecoveryEmail, /\{\{FIT_MESSAGE\}\}/);
+    assert.match(server, /demandFitByHotel/);
     assert.match(server, /ENABLE_CHECKOUT_RECOVERY_EMAIL/);
     const goLive = route("app.post('/api/crm/go-live'", "// Go Live success");
     assert.doesNotMatch(goLive, /checkoutRecoveryEmailSentAt: null/, 'opening checkout again must not create an email drip');

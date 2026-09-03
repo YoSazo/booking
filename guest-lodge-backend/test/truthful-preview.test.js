@@ -39,12 +39,12 @@ test('self-serve setup does not silently invent discounts or tax', () => {
     assert.doesNotMatch(setupRatesRoute, /taxRate: taxRate \|\| 0\.10/);
 });
 
-test('room setup advances immediately while the property builds in the background', () => {
+test('room setup advances immediately to ready while the property builds in the background', () => {
     const roomStep = setup.slice(
         setup.indexOf('async function addRoomAndFinish'),
         setup.indexOf('window._siteReady = false')
     );
-    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(3\);/);
+    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(4\);/);
     assert.match(roomStep, /Promise\.all\(\[roomRequest, ratesRequest\]\)/);
     assert.doesNotMatch(roomStep, /showLoading\(/);
 
@@ -52,8 +52,21 @@ test('room setup advances immediately while the property builds in the backgroun
         server.indexOf("app.post('/api/setup/:token/complete'"),
         server.indexOf('// Polled by setup.html')
     );
-    assert.match(completeRoute, /setupProgressStep: \{ lt: 3 \}/);
-    assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 3/);
+    assert.match(completeRoute, /setupProgressStep: \{ lt: 4 \}/);
+    assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 4/);
+});
+
+test('demand fit comes first and follows the owner through the funnel', () => {
+    assert.ok(
+        setup.indexOf('id="demandFitQuestion"') < setup.indexOf('id="hotelName"'),
+        'the fit question must be the first easy commitment after email capture'
+    );
+    assert.match(setup, /data\.demandFitAnswer/);
+    assert.match(server, /demandFitAnswer/);
+    assert.match(server, /marketelDemandFitMessage/);
+    assert.match(server, /demandFit,/);
+    assert.match(reveal, /demandFitRevealMessage/);
+    assert.match(reveal, /result\?\.demandFit/);
 });
 
 test('the owner preview explains activation and the room-money flow honestly', () => {

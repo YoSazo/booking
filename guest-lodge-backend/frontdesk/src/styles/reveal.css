@@ -2927,6 +2927,15 @@
   color: var(--mvr-text);
   text-wrap: balance;
 }
+.mvr-hub-fit {
+  max-width: 520px;
+  margin: -2px 0 1px;
+  color: var(--mvr-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: balance;
+}
 
 .mvr-hub-domain {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

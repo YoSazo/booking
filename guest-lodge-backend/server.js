@@ -198,6 +198,55 @@ function emailTemplateValue(value) {
         .replace(/'/g, '&#39;');
 }
 
+const MARKETEL_DEMAND_FIT_ALIASES = Object.freeze({
+    online_ota_leakage: 'branded_ota_leakage',
+    ota_marketplaces: 'branded_ota_leakage',
+    direct_calls_messages: 'existing_online_traffic',
+    google_website: 'existing_online_traffic',
+    social_ads: 'existing_online_traffic',
+    repeat_guests: 'repeat_guest_leakage',
+    building_demand: 'low_online_demand',
+    referrals_offline: 'low_online_demand',
+});
+const MARKETEL_DEMAND_FIT_TYPES = Object.freeze([
+    'branded_ota_leakage',
+    'existing_online_traffic',
+    'repeat_guest_leakage',
+    'low_online_demand',
+]);
+
+function normalizeMarketelDemandFit(value) {
+    const clean = String(value || '').trim().toLowerCase();
+    const normalized = MARKETEL_DEMAND_FIT_ALIASES[clean] || clean;
+    return MARKETEL_DEMAND_FIT_TYPES.includes(normalized) ? normalized : '';
+}
+
+function marketelDemandFitMessage(value, hotelName = 'your property') {
+    const safeName = String(hotelName || 'your property').trim() || 'your property';
+    switch (normalizeMarketelDemandFit(value)) {
+        case 'branded_ota_leakage':
+            return `Guests already search for ${safeName}. Marketel gives them a direct place to finish instead of sending that demand back to an OTA.`;
+        case 'existing_online_traffic':
+            return 'You already earn attention from Google, your website, social media or ads. Marketel gives that traffic a direct place to book.';
+        case 'repeat_guest_leakage':
+            return `Past guests already know ${safeName}. Guestel gives them a direct way back without searching through an OTA again.`;
+        case 'low_online_demand':
+            return 'Marketel captures demand you already have; it does not create new travelers. Activate when enough guests are already finding or returning to your property online.';
+        default:
+            return 'Marketel turns the attention and guest relationships you already have into more direct bookings.';
+    }
+}
+
+async function latestMarketelDemandFit(hotelId, client = prisma) {
+    if (!hotelId) return '';
+    const row = await client.funnelEvent.findFirst({
+        where: { hotelId, eventName: 'QualityAnswer' },
+        orderBy: { createdAt: 'desc' },
+        select: { contentName: true },
+    });
+    return normalizeMarketelDemandFit(row?.contentName);
+}
+
 async function sendMarketelLifecycleEmail({ toEmail, subject, template, replacements = {}, text = '' }) {
     if (!emailTransporter) {
         console.log(`⚠️ Email not configured — skipping ${template}`);
@@ -237,7 +286,8 @@ async function sendSetupResumeEmail({ toEmail, hotelName, setupUrl }) {
     });
 }
 
-async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, domain, frontdeskUrl }) {
+async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, domain, frontdeskUrl, demandFit }) {
+    const fitMessage = marketelDemandFitMessage(demandFit, hotelName);
     return sendMarketelLifecycleEmail({
         toEmail,
         subject: `Your ${hotelName || 'Marketel'} preview is ready`,
@@ -247,8 +297,9 @@ async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, domain, fron
             HOTEL_ID: hotelId,
             DOMAIN: domain,
             FRONTDESK_URL: frontdeskUrl,
+            FIT_MESSAGE: fitMessage,
         },
-        text: `Your Marketel preview is ready.\n\nContinue your personalized walkthrough: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking-page preview: https://${domain}\n\nThe booking page remains in preview mode until you activate Marketel.`,
+        text: `Your Marketel preview is ready.\n\n${fitMessage}\n\nContinue your personalized walkthrough: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking-page preview: https://${domain}\n\nThe booking page remains in preview mode until you activate Marketel.`,
     });
 }
 
@@ -10642,6 +10693,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
 
         if (eventName === 'QualityAnswer') {
             const allowedAnswers = new Set([
+                ...MARKETEL_DEMAND_FIT_TYPES,
                 'online_ota_leakage',
                 'direct_calls_messages',
                 'repeat_guests',
@@ -10659,7 +10711,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
 
         const setupStepMatch = /^Step([1-4])Reached$/.exec(String(eventName || ''));
         const durableSetupStep = eventName === 'QualityAnswer'
-            ? 4
+            ? 2
             : (setupStepMatch ? Number(setupStepMatch[1]) : 0);
         if (setupHotel && durableSetupStep > (Number(setupHotel.setupProgressStep) || 1)) {
             await prisma.hotelConfig.update({
@@ -10675,6 +10727,9 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
         // optimization event.
         if (eventName === 'QualifiedLead') {
             const qualifiedAnswers = new Set([
+                'branded_ota_leakage',
+                'existing_online_traffic',
+                'repeat_guest_leakage',
                 'online_ota_leakage',
                 'direct_calls_messages',
                 'repeat_guests',
@@ -10989,7 +11044,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         if (!acquisitionByHotel.has(row.hotelId)) acquisitionByHotel.set(row.hotelId, row);
     });
     const hotelIds = Array.from(acquisitionByHotel.keys());
-    const [milestoneRows, journeyFallbackRows] = hotelIds.length
+    const [milestoneRows, journeyFallbackRows, demandFitRows] = hotelIds.length
         ? await Promise.all([
             withRetry(() => prisma.funnelEvent.findMany({
                 where: {
@@ -11018,14 +11073,29 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
                 orderBy: { createdAt: 'asc' },
                 select: { hotelId: true, metadata: true },
             })),
+            withRetry(() => prisma.funnelEvent.findMany({
+                where: {
+                    hotelId: { in: hotelIds },
+                    eventName: 'QualityAnswer',
+                    createdAt: { lte: until },
+                },
+                orderBy: { createdAt: 'desc' },
+                select: { hotelId: true, contentName: true },
+            })),
         ])
-        : [[], []];
+        : [[], [], []];
 
     const fallbackTouchByHotel = new Map();
     journeyFallbackRows.forEach((row) => {
         if (fallbackTouchByHotel.has(row.hotelId)) return;
         const touch = marketelAttributionTouchFromMetadata(row.metadata);
         if (Object.keys(touch).length) fallbackTouchByHotel.set(row.hotelId, touch);
+    });
+    const demandFitByHotel = new Map();
+    demandFitRows.forEach((row) => {
+        if (!demandFitByHotel.has(row.hotelId)) {
+            demandFitByHotel.set(row.hotelId, normalizeMarketelDemandFit(row.contentName));
+        }
     });
 
     const properties = new Map();
@@ -11035,6 +11105,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         properties.set(hotelId, {
             hotelId,
             dimensions: marketelAttributionDimensions(touch, row.contentName),
+            demandFit: demandFitByHotel.get(hotelId) || 'not_answered',
             milestones: new Set(),
             paymentEventIds: new Set(),
             revenue: 0,
@@ -11057,6 +11128,13 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         angle,
         emptyMarketelAttributionGroup({ angle }),
     ]));
+    const demandFitGroups = new Map([
+        ...MARKETEL_DEMAND_FIT_TYPES,
+        'not_answered',
+    ].map((demandFit) => [
+        demandFit,
+        emptyMarketelAttributionGroup({ demandFit }),
+    ]));
     const campaignGroups = new Map();
     const campaignGroup = (dimensions) => {
         const key = [dimensions.angle, dimensions.source, dimensions.medium, dimensions.campaign, dimensions.content, dimensions.term].join('\u001f');
@@ -11066,6 +11144,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
 
     properties.forEach((property) => {
         addMarketelAttributionProperty(angleGroups.get(property.dimensions.angle), property);
+        addMarketelAttributionProperty(demandFitGroups.get(property.demandFit), property);
         addMarketelAttributionProperty(campaignGroup(property.dimensions), property);
     });
 
@@ -11086,6 +11165,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
     });
 
     const byAngle = MARKETEL_ACQUISITION_ANGLES.map((angle) => finalizeMarketelAttributionGroup(angleGroups.get(angle)));
+    const byDemandFit = Array.from(demandFitGroups.values()).map(finalizeMarketelAttributionGroup);
     const byCampaign = Array.from(campaignGroups.values())
         .map(finalizeMarketelAttributionGroup)
         .sort((left, right) => right.paid - left.paid || right.started - left.started || left.campaign.localeCompare(right.campaign));
@@ -11093,6 +11173,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         model: 'first-touch acquisition cohort',
         range: { from: since.toISOString(), to: until.toISOString() },
         byAngle,
+        byDemandFit,
         byCampaign,
     };
 }
@@ -11962,6 +12043,7 @@ app.get('/api/setup/:token', async (req, res) => {
         const frontdeskReturnToken = hotel.setupComplete
             ? await generateCrmReturnTokenForHotel(hotel.id, hotel.setupToken || '').catch(() => '')
             : '';
+        const demandFitAnswer = await latestMarketelDemandFit(hotel.id).catch(() => '');
         res.json({
             hotel: { id: hotel.id, name: hotel.name, address: hotel.address, phone: hotel.phone, subtitle: hotel.subtitle, checkInTime: hotel.checkInTime, checkOutTime: hotel.checkOutTime, setupComplete: hotel.setupComplete },
             rooms: hotel.rooms.map(r => ({ id: r.id, name: r.name, description: r.description, amenities: r.amenities, maxOccupancy: r.maxOccupancy, totalUnits: r.totalUnits, images: r.images.map(i => ({ id: i.id, url: i.url, sortOrder: i.sortOrder })) })),
@@ -11969,6 +12051,7 @@ app.get('/api/setup/:token', async (req, res) => {
             domain: hotel.domains[0]?.domain || '',
             resumeStep: Math.max(1, Math.min(4, Number(hotel.setupProgressStep) || 1)),
             frontdeskReturnToken,
+            demandFitAnswer,
         });
     } catch (e) {
         console.error('Setup GET error:', e.message);
@@ -11991,7 +12074,7 @@ app.post('/api/setup/:token/hotel', async (req, res) => {
                 subtitle,
                 checkInTime,
                 checkOutTime,
-                setupProgressStep: Math.max(2, Number(hotel.setupProgressStep) || 1),
+                setupProgressStep: Math.max(3, Number(hotel.setupProgressStep) || 1),
             },
         });
         res.json({ success: true });
@@ -13082,7 +13165,7 @@ async function sendPreviewReadyEmailOnce(hotelId, req = null) {
     if (!claim) return false;
 
     try {
-        const [hotel, domainRow] = await Promise.all([
+        const [hotel, domainRow, demandFit] = await Promise.all([
             prisma.hotelConfig.findUnique({
                 where: { id: hotelId },
                 select: {
@@ -13098,6 +13181,7 @@ async function sendPreviewReadyEmailOnce(hotelId, req = null) {
                 orderBy: { isPrimary: 'desc' },
                 select: { domain: true },
             }),
+            latestMarketelDemandFit(hotelId).catch(() => ''),
         ]);
         if (!hotel?.ownerEmail) throw new Error('Property has no owner email');
         if (hotel.subscribed) throw new Error('Property is already activated');
@@ -13111,6 +13195,7 @@ async function sendPreviewReadyEmailOnce(hotelId, req = null) {
             hotelId: hotel.id,
             domain,
             frontdeskUrl,
+            demandFit,
         });
         if (!sent) throw new Error('Preview email was not sent');
         await prisma.$transaction([
@@ -13289,10 +13374,10 @@ app.post('/api/setup/:token/complete', async (req, res) => {
             }),
             // The owner can answer the qualification question while this
             // request finishes. Never overwrite a concurrently persisted step
-            // 4 with step 3 when the background build completes.
+            // 4 with an earlier step when the background build completes.
             prisma.hotelConfig.updateMany({
-                where: { id: hotel.id, setupProgressStep: { lt: 3 } },
-                data: { setupProgressStep: 3 },
+                where: { id: hotel.id, setupProgressStep: { lt: 4 } },
+                data: { setupProgressStep: 4 },
             }),
         ]);
 
@@ -14927,6 +15012,19 @@ async function runCheckoutRecoverySweep() {
             checkoutStartedAt: true,
         },
     });
+    const demandFitRows = candidates.length
+        ? await prisma.funnelEvent.findMany({
+            where: { hotelId: { in: candidates.map((hotel) => hotel.id) }, eventName: 'QualityAnswer' },
+            orderBy: { createdAt: 'desc' },
+            select: { hotelId: true, contentName: true },
+        })
+        : [];
+    const demandFitByHotel = new Map();
+    demandFitRows.forEach((row) => {
+        if (!demandFitByHotel.has(row.hotelId)) {
+            demandFitByHotel.set(row.hotelId, normalizeMarketelDemandFit(row.contentName));
+        }
+    });
     let sentCount = 0;
     for (const hotel of candidates) {
         const claimedAt = new Date();
@@ -14954,6 +15052,7 @@ async function runCheckoutRecoverySweep() {
         const resumeUrl = frontdeskMagicUrl(null, hotel, {
             expiresInMs: RECOVERY_LINK_EXPIRY_MS,
         });
+        const fitMessage = marketelDemandFitMessage(demandFitByHotel.get(hotel.id), hotel.name);
         const sent = await sendMarketelLifecycleEmail({
             toEmail: hotel.ownerEmail,
             subject: `${hotel.name || 'Your Marketel'} is still saved`,
@@ -14961,8 +15060,9 @@ async function runCheckoutRecoverySweep() {
             replacements: {
                 HOTEL_NAME: hotel.name || 'your property',
                 RESUME_URL: resumeUrl,
+                FIT_MESSAGE: fitMessage,
             },
-            text: `Your Marketel is still saved and no charge was made.\n\nReview activation when you are ready: ${resumeUrl}\n\nQuestions? Reply to this email.`,
+            text: `Your Marketel is still saved and no charge was made.\n\n${fitMessage}\n\nReview activation when you are ready: ${resumeUrl}\n\nQuestions? Reply to this email.`,
         });
         if (sent) {
             sentCount += 1;
@@ -16771,14 +16871,17 @@ app.get('/api/crm/rooms', crmAuth, async (req, res) => {
         const hotelId = requireScopedHotelId(req, res);
         if (!hotelId) return;
         if (isStaticOnlyHotelId(hotelId)) {
-            return res.json({ success: true, rooms: [], rates: null });
+            return res.json({ success: true, rooms: [], rates: null, demandFit: '' });
         }
-        const rooms = await withRetry(() => prisma.room.findMany({
-            where: { hotelId },
-            include: { images: { orderBy: { sortOrder: 'asc' } } },
-            orderBy: { sortOrder: 'asc' },
-        }));
-        const rates = await withRetry(() => prisma.hotelRates.findUnique({ where: { hotelId } }));
+        const [rooms, rates, demandFit] = await Promise.all([
+            withRetry(() => prisma.room.findMany({
+                where: { hotelId },
+                include: { images: { orderBy: { sortOrder: 'asc' } } },
+                orderBy: { sortOrder: 'asc' },
+            })),
+            withRetry(() => prisma.hotelRates.findUnique({ where: { hotelId } })),
+            withRetry(() => latestMarketelDemandFit(hotelId)),
+        ]);
         const baseUrl = `${req.protocol}://${req.get('host')}`;
         const resolveImgUrl = (url) => url.startsWith('http') ? url : baseUrl + url;
         res.json({
@@ -16794,6 +16897,7 @@ app.get('/api/crm/rooms', crmAuth, async (req, res) => {
                 images: r.images.map(i => ({ id: i.id, url: resolveImgUrl(i.url) })),
             })),
             rates: rates ? { nightly: rates.nightly, weekly: rates.weekly, monthly: rates.monthly, taxRate: rates.taxRate } : null,
+            demandFit,
         });
     } catch (e) {
         console.error('CRM rooms GET error:', e.message);

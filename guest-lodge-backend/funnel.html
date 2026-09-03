@@ -1644,6 +1644,13 @@ const ATTRIBUTION_ANGLE_LABELS = {
   guest_app: 'Guestel / home screen',
   assistant: 'Front Desk Assistant',
 };
+const DEMAND_FIT_LABELS = {
+  branded_ota_leakage: 'Branded searches leak to OTAs',
+  existing_online_traffic: 'Existing online traffic',
+  repeat_guest_leakage: 'Repeat guests rebook elsewhere',
+  low_online_demand: 'Mostly offline / low demand',
+  not_answered: 'Question not answered',
+};
 
 function attributionMoney(value) {
   return '$' + Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -1682,6 +1689,32 @@ function attributionTable(rows, includeCampaign) {
   }).join('')}</tbody></table></div>`;
 }
 
+function demandFitTable(rows) {
+  const visible = rows.filter((row) => row.started || row.paid);
+  if (!visible.length) return '<div class="portfolio-empty">No demand-fit answers in this range yet.</div>';
+  return `<div class="portfolio-scroll"><table class="portfolio-table attribution-table"><thead><tr>
+    <th>Demand already present</th>
+    <th style="text-align:right">Properties</th>
+    <th style="text-align:right">Leads</th>
+    <th style="text-align:right">Setup</th>
+    <th style="text-align:right">Offer</th>
+    <th style="text-align:right">Checkout</th>
+    <th style="text-align:right">Paid</th>
+    <th style="text-align:right">Start → paid</th>
+    <th style="text-align:right">Cash</th>
+  </tr></thead><tbody>${visible.map((row) => `<tr>
+    <td><span class="attribution-name">${escapeHtml(DEMAND_FIT_LABELS[row.demandFit] || row.demandFit || 'Unknown')}</span></td>
+    <td class="num">${Number(row.started || 0)}</td>
+    <td class="num">${Number(row.leads || 0)}</td>
+    <td class="num">${Number(row.setupCompleted || 0)}</td>
+    <td class="num">${Number(row.offerViewed || 0)}</td>
+    <td class="num">${Number(row.checkoutStarted || 0)}</td>
+    <td class="num">${Number(row.paid || 0)}</td>
+    <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
+    <td class="num">${attributionMoney(row.revenue)}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
 function renderAttribution(attribution) {
   const host = document.getElementById('attributionTable');
   if (!host) return;
@@ -1690,8 +1723,11 @@ function renderAttribution(attribution) {
     return;
   }
   const angleRows = attribution.byAngle || [];
+  const demandFitRows = attribution.byDemandFit || [];
   const campaignRows = (attribution.byCampaign || []).filter((row) => row.landingViews || row.started || row.paid);
   host.innerHTML = attributionTable(angleRows, false)
+    + '<div class="attribution-section-title">Demand fit</div>'
+    + demandFitTable(demandFitRows)
     + '<div class="attribution-section-title">Campaign and creative</div>'
     + attributionTable(campaignRows, true);
 }

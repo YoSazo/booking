@@ -167,22 +167,26 @@ test('Meta setup completion is a deduplicated standard CompleteRegistration even
 });
 
 test('Lead qualification describes a current monetizable problem and is identical across ad angles', () => {
-    for (const answer of ['online_ota_leakage', 'direct_calls_messages', 'repeat_guests']) {
+    for (const answer of ['branded_ota_leakage', 'existing_online_traffic', 'repeat_guest_leakage']) {
         assert.match(setup, new RegExp(`answer === '${answer}'`), `${answer} is not qualified in setup`);
         assert.match(server, new RegExp(`'${answer}'`), `${answer} is not accepted by the server`);
     }
-    assert.match(setup, /answerQualityQ\('building_demand'\)/);
+    assert.match(setup, /answerQualityQ\('low_online_demand'\)/);
     assert.doesNotMatch(
         setup.slice(setup.indexOf('function answerQualityQ'), setup.indexOf("window.MarketelJourney?.track('JourneyQualitySelected'")),
-        /building_demand/,
-        'building demand must remain tracked but unqualified'
+        /low_online_demand/,
+        'low online demand must remain tracked but unqualified'
     );
     const leadValidation = server.slice(
         server.indexOf("if (eventName === 'QualifiedLead')"),
         server.indexOf('// A setup can qualify only once')
     );
     assert.doesNotMatch(leadValidation, /acquisitionAngle|AcquisitionAngle/);
-    assert.doesNotMatch(leadValidation, /building_demand/);
+    assert.doesNotMatch(leadValidation, /low_online_demand/);
+    assert.match(setup, /Marketel captures demand\. It doesn&apos;t create new travelers\./);
+    assert.match(setup, /I understand — continue anyway/);
+    assert.match(dashboard, /Demand fit/);
+    assert.match(dashboard, /byDemandFit/);
 });
 
 test('email submission is the deduplicated Meta Lead while qualification remains first-party', () => {

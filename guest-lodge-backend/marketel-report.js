@@ -15,6 +15,30 @@ const QA_OWNER_EMAILS = [
   'bro2theno@gmail.com',
 ];
 const ANGLES = ['direct', 'guest_app', 'assistant'];
+const DEMAND_FITS = [
+  'branded_ota_leakage',
+  'existing_online_traffic',
+  'repeat_guest_leakage',
+  'low_online_demand',
+  'not_answered',
+];
+const DEMAND_FIT_ALIASES = {
+  online_ota_leakage: 'branded_ota_leakage',
+  ota_marketplaces: 'branded_ota_leakage',
+  direct_calls_messages: 'existing_online_traffic',
+  google_website: 'existing_online_traffic',
+  social_ads: 'existing_online_traffic',
+  repeat_guests: 'repeat_guest_leakage',
+  building_demand: 'low_online_demand',
+  referrals_offline: 'low_online_demand',
+};
+const DEMAND_FIT_LABELS = {
+  branded_ota_leakage: 'branded searches leak to OTAs',
+  existing_online_traffic: 'existing online traffic',
+  repeat_guest_leakage: 'repeat guests rebook elsewhere',
+  low_online_demand: 'mostly offline / low demand',
+  not_answered: 'question not answered',
+};
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
 const TOKEN = process.env.MARKETEL_META_ADS_READ_TOKEN || process.env.MARKETEL_META_ACCESS_TOKEN;
 const ACCOUNT_ID = String(process.env.MARKETEL_META_AD_ACCOUNT_ID || '').replace(/^act_/, '');
@@ -31,6 +55,14 @@ function pct(numerator, denominator) {
 function normalizeAngle(value) {
   const angle = String(value || '').trim().toLowerCase();
   return ANGLES.includes(angle) ? angle : 'direct';
+}
+
+function normalizeDemandFit(value) {
+  const clean = String(value || '').trim().toLowerCase();
+  const normalized = DEMAND_FIT_ALIASES[clean] || clean;
+  return DEMAND_FITS.includes(normalized) && normalized !== 'not_answered'
+    ? normalized
+    : 'not_answered';
 }
 
 function actionValue(actions, preferredTypes) {
@@ -290,6 +322,7 @@ async function dbSection() {
     properties.set(hotelId, {
       hotelId,
       dimensions: dimensions(event.metadata, event.contentName),
+      demandFit: 'not_answered',
       events: new Set(),
       paymentIds: new Set(),
       revenue: 0,
@@ -299,6 +332,9 @@ async function dbSection() {
     const property = properties.get(event.hotelId);
     if (!property) continue;
     property.events.add(event.eventName);
+    if (event.eventName === 'QualityAnswer') {
+      property.demandFit = normalizeDemandFit(event.contentName);
+    }
     if (event.eventName === 'PaymentSucceeded') {
       const paymentId = event.eventId || event.id;
       if (!property.paymentIds.has(paymentId)) {
@@ -309,6 +345,7 @@ async function dbSection() {
   }
 
   const angleGroups = new Map(ANGLES.map((angle) => [angle, emptyGroup(angle)]));
+  const demandFitGroups = new Map(DEMAND_FITS.map((fit) => [fit, emptyGroup(DEMAND_FIT_LABELS[fit])]));
   const campaignGroups = new Map();
   const getCampaignGroup = (d) => {
     const key = `${d.angle}\u001f${d.source}\u001f${d.campaign}\u001f${d.content}`;
@@ -319,6 +356,7 @@ async function dbSection() {
   };
   for (const property of properties.values()) {
     addProperty(angleGroups.get(property.dimensions.angle), property);
+    addProperty(demandFitGroups.get(property.demandFit), property);
     addProperty(getCampaignGroup(property.dimensions), property);
   }
 
@@ -362,6 +400,9 @@ async function dbSection() {
     `DB FUNNEL — rolling ${DAYS}d, first-touch cohorts (QA sessions excluded)`,
     '  by acquisition angle:',
     ...ANGLES.map((angle) => renderGroup(angleGroups.get(angle))),
+    '',
+    '  by demand already present:',
+    ...DEMAND_FITS.map((fit) => renderGroup(demandFitGroups.get(fit))),
   ];
   const nonemptyCampaigns = [...campaignGroups.values()]
     .filter((group) => group.landingViews || group.started)

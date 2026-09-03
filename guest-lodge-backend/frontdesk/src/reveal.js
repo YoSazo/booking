@@ -75,7 +75,7 @@ let guestelAutoplayId = 0;
 // Scroll position of the page underneath, restored when the reveal closes.
 let lockedScrollY = 0;
 let frontdeskAutoplayId = 0;
-let revealData = { rooms: [], rates: null };
+let revealData = { rooms: [], rates: null, demandFit: '' };
 let dataPromise = null;
 let bookingPageState = { ready: false, checking: true, reason: '', attempts: 0, domain: '' };
 // Sticky once a status check has actually come back negative. The check retries
@@ -816,6 +816,21 @@ function finaleHtml() {
 // output is byte-identical keeps the frame alive.
 let lastRenderedRevealHtml = '';
 
+function demandFitRevealMessage() {
+  switch (String(revealData.demandFit || '')) {
+    case 'branded_ota_leakage':
+      return `Keep guests who already search for ${propertyName()} from finishing on an OTA.`;
+    case 'existing_online_traffic':
+      return 'Turn traffic you already earn into direct bookings.';
+    case 'repeat_guest_leakage':
+      return 'Give past guests a direct way back without another OTA commission.';
+    case 'low_online_demand':
+      return 'See what Marketel can capture as more guests begin finding or returning to you online.';
+    default:
+      return 'Turn the attention and guest relationships you already have into direct bookings.';
+  }
+}
+
 function hubRowHtml(item, nextId) {
   const done = visitedItems.has(item.id);
   const classes = ['mvr-row', `is-${item.id}`];
@@ -839,6 +854,7 @@ function hubHtml() {
       <h1>${crm.hotelSubscribed && !activationPreviewMode
         ? `${esc(propertyName())} is live.`
         : 'Your Marketel is ready.'}</h1>
+      <p class="mvr-hub-fit">${esc(demandFitRevealMessage())}</p>
       <button type="button" class="mvr-hub-domain" id="mvrCopyDomain" aria-label="Copy your booking link">
         <span>${esc(bookingDisplayDomain())}</span><b aria-hidden="true">Copy</b>
       </button>
@@ -1396,9 +1412,17 @@ async function loadRevealData() {
       revealData = {
         rooms: Array.isArray(result?.rooms) ? result.rooms : [],
         rates: result?.rates || null,
+        demandFit: String(result?.demandFit || ''),
       };
       if (revealData.rooms.length) crm.editRooms = revealData.rooms;
-      if (document.getElementById('marketelValueReveal') && !openSheetId) renderReveal();
+      // Demand fit can arrive after the live booking iframe is already mounted.
+      // Update the one sentence in place so personalization never causes the
+      // owner's page to visibly reload underneath them.
+      if (document.getElementById('marketelValueReveal') && !openSheetId) {
+        const fitCopy = document.querySelector('.mvr-hub-fit');
+        if (fitCopy) fitCopy.textContent = demandFitRevealMessage();
+        lastRenderedRevealHtml = hubHtml();
+      }
       return revealData;
     })
     .catch(() => revealData)
