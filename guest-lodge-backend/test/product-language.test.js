@@ -73,8 +73,7 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
 });
 
 test('activation pairs the disclosed price with a visible risk reversal', () => {
-    assert.match(revealCopy, /title: 'Activate everything'/);
-    assert.doesNotMatch(revealCopy, /title: 'Activate everything —/);
+    assert.match(revealCopy, /title: 'Activate everything — \$199\/month'/);
     assert.match(landingCopy, /\$199\/month.*7-day money-back guarantee/);
     assert.match(revealCopy, /Activate Marketel — \$199\/month/);
     assert.match(revealCopy, /Protected by a 7-day money-back guarantee\. Cancel anytime\./);

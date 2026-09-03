@@ -289,10 +289,10 @@ const HUB_ITEMS = [
     id: 'activation',
     step: 3,
     event: 'ActivationOfferViewed',
-    // The figure lives behind the framing question now. This is sequencing, not
-    // concealment: landing.html states "$199/month only when you activate" above
-    // the fold, so nobody reaches the reveal without having seen it.
-    title: 'Activate everything',
+    // Price acceptance happens before the framing question. The question then
+    // explains the economics of a figure the owner knowingly chose to inspect,
+    // rather than feeling like a gate hiding a surprise price.
+    title: 'Activate everything — $199/month',
     body: 'Protected by a 7-day money-back guarantee. Cancel anytime.',
     cta: '',
   },
