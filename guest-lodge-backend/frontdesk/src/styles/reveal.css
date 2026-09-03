@@ -2908,7 +2908,7 @@
   width: min(560px, 100%);
   margin: 0 auto;
   padding: max(20px, env(safe-area-inset-top, 0px)) 18px
-           calc(28px + max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard, 0px));
+           calc(20px + max(env(safe-area-inset-bottom, 0px), var(--mv-tap-guard, 0px), 8px));
   animation: mvr-stage-in 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -3087,14 +3087,16 @@
 /* Two rows now (stage + footer): the toolbar, timer and mode switch are gone. */
 .mvr-live-preview { grid-template-rows: minmax(0, 1fr) auto; z-index: 8; }
 .mvr-live-foot {
-  display: flex; flex-direction: column; gap: 9px;
-  padding: 12px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 9px 18px 9px;
   border-top: 1px solid var(--mvr-line);
   background: #fff;
 }
 .mvr-live-foot p {
-  margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--mvr-muted); text-align: center;
+  margin: 0; font-size: 11px; line-height: 1.4; color: var(--mvr-muted); text-align: center;
 }
+/* The clearance belongs under the button, not around the whole banner. */
+.mvr-live-foot .mvr-sheet-close { min-height: 44px; }
 
 @media (max-width: 480px) {
   .mvr-sheet-shot img { width: min(240px, 72%); }
@@ -3174,7 +3176,7 @@ html.mv-retractable-chrome { --mv-tap-guard: 44px; }
 
 .mvr-sheet-foot,
 .mvr-live-foot {
-  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard));
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--mv-tap-guard), 8px);
 }
 
 /* ---------------------------------------------------------- top-right close */

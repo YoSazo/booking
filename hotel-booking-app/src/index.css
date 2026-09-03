@@ -6980,13 +6980,13 @@ html.mv-retractable-chrome { --mv-tap-guard: 44px; }
 /* Apply / Book 1 Week sit at the end of the scrollable body, so the clearance
    belongs to the body rather than to a footer. */
 .calendar-modal-fullscreen .calendar-modal-body {
-  padding-bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), 8px) + var(--mv-tap-guard));
+  padding-bottom: calc(20px + max(env(safe-area-inset-bottom, 0px), var(--mv-tap-guard), 8px));
 }
 
 .checkout-install-mobile-only {
-  bottom: calc(14px + max(env(safe-area-inset-bottom, 0px), 0px) + var(--mv-tap-guard));
+  bottom: max(env(safe-area-inset-bottom, 0px), var(--mv-tap-guard), 14px);
 }
 
 .help-widget-container {
-  bottom: calc(20px + var(--mv-tap-guard));
+  bottom: max(var(--mv-tap-guard), 20px);
 }
