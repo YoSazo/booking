@@ -13282,10 +13282,19 @@ app.post('/api/setup/:token/complete', async (req, res) => {
         }
 
         // Mark setup complete, activate (subscribed defaults to false)
-        await prisma.hotelConfig.update({
-            where: { id: hotel.id },
-            data: { setupComplete: true, active: true, setupProgressStep: 3 },
-        });
+        await prisma.$transaction([
+            prisma.hotelConfig.update({
+                where: { id: hotel.id },
+                data: { setupComplete: true, active: true },
+            }),
+            // The owner can answer the qualification question while this
+            // request finishes. Never overwrite a concurrently persisted step
+            // 4 with step 3 when the background build completes.
+            prisma.hotelConfig.updateMany({
+                where: { id: hotel.id, setupProgressStep: { lt: 3 } },
+                data: { setupProgressStep: 3 },
+            }),
+        ]);
 
         // Create a default CRM PIN
         const defaultPin = generateCrmOwnerPin();

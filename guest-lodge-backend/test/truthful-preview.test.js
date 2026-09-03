@@ -39,6 +39,23 @@ test('self-serve setup does not silently invent discounts or tax', () => {
     assert.doesNotMatch(setupRatesRoute, /taxRate: taxRate \|\| 0\.10/);
 });
 
+test('room setup advances immediately while the property builds in the background', () => {
+    const roomStep = setup.slice(
+        setup.indexOf('async function addRoomAndFinish'),
+        setup.indexOf('window._siteReady = false')
+    );
+    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(3\);/);
+    assert.match(roomStep, /Promise\.all\(\[roomRequest, ratesRequest\]\)/);
+    assert.doesNotMatch(roomStep, /showLoading\(/);
+
+    const completeRoute = server.slice(
+        server.indexOf("app.post('/api/setup/:token/complete'"),
+        server.indexOf('// Polled by setup.html')
+    );
+    assert.match(completeRoute, /setupProgressStep: \{ lt: 3 \}/);
+    assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 3/);
+});
+
 test('the owner preview explains activation and the room-money flow honestly', () => {
     assert.doesNotMatch(installBanner, /Available once this property finishes setup/);
     assert.doesNotMatch(installBanner, /\{locked \? 'Locked'/);

@@ -469,6 +469,7 @@ let qualifiedLeadTracked = false;
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
 let setupCompleteData = null;
+let setupBuildInFlight = false;
 
 window.MarketelJourney?.init({
   surface: 'setup',
@@ -819,6 +820,7 @@ async function saveStep1() {
 
 // Step 2: Rooms
 async function addRoomAndFinish() {
+  if (setupBuildInFlight) return;
   const name = document.getElementById('rmName').value.trim();
   const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
   const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
@@ -834,7 +836,12 @@ async function addRoomAndFinish() {
   }
   const nightly = Math.max(1, nightlyInput);
 
-  showLoading(true);
+  // The room, rate, domain and recovery-email work takes a few seconds, but
+  // none of it is needed to answer the next question. Move immediately and do
+  // the build behind that screen. If the owner answers faster than the build,
+  // step 4 already has an honest preparing state and turns ready in place.
+  setupBuildInFlight = true;
+  goToStep(3);
   const buildStartedAt = Date.now();
   window.MarketelJourney?.track('JourneyRequestStarted', {
     request: 'build-marketel',
@@ -844,17 +851,14 @@ async function addRoomAndFinish() {
     hasPhoto: !!pendingFile,
   });
   try {
-    // Save room
-    const res = await fetch(API + '/api/setup/' + TOKEN + '/rooms', {
+    const existingRates = hotelData.rates || {};
+    // Room catalog and rates are independent. Starting them together removes
+    // another full network round-trip from the background build.
+    const roomRequest = fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: rooms[0]?.id, name, maxOccupancy: 4, totalUnits }),
     });
-    if (!res.ok) throw new Error('Server error');
-    const roomResult = await res.json();
-    const roomId = roomResult?.room?.id || rooms[0]?.id;
-
-    const existingRates = hotelData.rates || {};
-    const ratesRes = await fetch(API + '/api/setup/' + TOKEN + '/rates', {
+    const ratesRequest = fetch(API + '/api/setup/' + TOKEN + '/rates', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nightly,
@@ -866,7 +870,11 @@ async function addRoomAndFinish() {
         taxRate: existingRates.taxRate ?? 0,
       }),
     });
+    const [res, ratesRes] = await Promise.all([roomRequest, ratesRequest]);
+    if (!res.ok) throw new Error('Could not save room');
     if (!ratesRes.ok) throw new Error('Could not save starting price');
+    const roomResult = await res.json();
+    const roomId = roomResult?.room?.id || rooms[0]?.id;
 
     // Compressing and uploading the photo is the slowest part of the build and
     // nothing between here and the success step needs it, so it runs alongside
@@ -933,13 +941,15 @@ async function addRoomAndFinish() {
       personalized: true,
     }, { durationMs: Date.now() - buildStartedAt });
     window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'build-marketel' }, { durationMs: Date.now() - buildStartedAt });
-
-    goToStep(3);
+    setupBuildInFlight = false;
   } catch (e) {
+    setupBuildInFlight = false;
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'build-marketel', reason: 'request-failed' }, { durationMs: Date.now() - buildStartedAt });
-    showToast('Something went wrong. Try again.', true);
+    // A failed background build must stay recoverable. Return to the populated
+    // room form so one tap retries without losing anything the owner entered.
+    if (currentSetupStep === 3 || currentSetupStep === 4) goToStep(2);
+    showToast('We couldn’t finish building your page. Try again.', true);
   }
-  showLoading(false);
 }
 
 window._siteReady = false;
