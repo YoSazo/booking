@@ -81,5 +81,8 @@ test('Guestel preview stays inside the owner reveal', () => {
     assert.match(installBanner, /ownerPreview \? 'Preview'/);
     assert.match(guestInfo, /hotelSubscribed=\{hotel\?\.subscribed !== false\}/);
     assert.match(reveal, /messageType === 'marketel:guestel-preview-requested'/);
-    assert.match(reveal, /openHubItem\('guestel'\)/);
+    assert.match(reveal, /openGuestelPreviewFromBooking\(\)/);
+    assert.match(reveal, /const returnToBooking = closed === 'guestel' && !!livePreview/);
+    assert.match(reveal, /livePreview\.removeAttribute\('aria-hidden'\)/);
+    assert.match(reveal, /visitedItems\.add\(item\.id\)/);
 });

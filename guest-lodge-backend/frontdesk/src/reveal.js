@@ -408,8 +408,11 @@ function handleBookingPreviewMessage(event) {
   if (!knownFrame) return;
 
   if (messageType === 'marketel:guestel-preview-requested') {
-    if (openSheetId === 'booking') closeSheet('guestel-preview-requested');
-    openHubItem('guestel');
+    if (openSheetId === 'booking') {
+      openGuestelPreviewFromBooking();
+    } else {
+      openHubItem('guestel');
+    }
     return;
   }
 
@@ -981,13 +984,51 @@ function openHubItem(id) {
   refreshHubState();
 }
 
+// Previewing Guestel from the live engine is a nested explanation, not a
+// navigation. Keep the engine mounted underneath so closing the Guestel sheet
+// returns the owner to the exact room, dates, or checkout step they were on.
+// The visit still counts: they deliberately opened and saw the Guestel value.
+function openGuestelPreviewFromBooking() {
+  const item = hubItem('guestel');
+  const livePreview = document.getElementById('mvrLivePreview');
+  if (!item || !livePreview || document.getElementById('mvrSheet')) return;
+
+  livePreview.setAttribute('aria-hidden', 'true');
+  openSheetId = item.id;
+  stageStartedAt = Date.now();
+  trackReveal(item.event);
+  recordHubDepth(item.step);
+  trackJourney('JourneyRevealStageViewed', {
+    resumed: false,
+    openedFrom: 'booking-preview',
+  });
+  nextStageViewIsResume = false;
+  visitedItems.add(item.id);
+  persistVisitedItems();
+  presentSheet(item.id);
+  refreshHubState();
+}
+
 function closeSheet(reason = 'closed') {
   if (!openSheetId) return;
   const closed = openSheetId;
+  const livePreview = document.getElementById('mvrLivePreview');
+  const returnToBooking = closed === 'guestel' && !!livePreview;
   trackJourney('JourneyRevealStageCompleted', {
     action: reason,
     stageName: closed,
   }, { durationMs: stageStartedAt ? Date.now() - stageStartedAt : undefined });
+
+  if (returnToBooking) {
+    openSheetId = 'booking';
+    stageStartedAt = Date.now();
+    stopGuestelAutoplay();
+    document.getElementById('mvrSheet')?.remove();
+    livePreview.removeAttribute('aria-hidden');
+    refreshHubState();
+    return;
+  }
+
   openSheetId = null;
   stageStartedAt = 0;
   stopFrontdeskAutoplay();
