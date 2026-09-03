@@ -67,7 +67,8 @@ let activationFramingTracked = false;
 // null = not asked yet. A bracket id or 'skipped' once answered, which also
 // stops the question being re-asked when the sheet is reopened.
 let activationFramingAnswer = null;
-// Checkout returns and subscribed replays go straight to the price.
+// Checkout returns go straight to the price. Internal subscribed replays still
+// show the framing question so QA sees the same path a prospect sees.
 let skipActivationFraming = false;
 let bookingCheckoutReachedTracked = false;
 let guestelAutoplayId = 0;
@@ -1338,7 +1339,7 @@ export async function showMarketelValueReveal(options = {}) {
   activationOfferTracked = false;
   activationFramingTracked = false;
   activationFramingAnswer = null;
-  skipActivationFraming = currentStep >= 3 || activationPreviewMode;
+  skipActivationFraming = currentStep >= 3;
   bookingCheckoutReachedTracked = false;
   appCarouselIndex = { frontdesk: 0, guestel: 0 };
   activationNightlyRate = null;

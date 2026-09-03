@@ -102,5 +102,7 @@ test('activation framing stays optional, measurable, and economically honest', (
     assert.match(revealCopy, /ActivationFramingAnswered/);
     assert.match(revealCopy, /ActivationOfferViewed.*saw the price/s);
     assert.match(revealCopy, /You paid <strong>under \$500 last month<\/strong>/);
+    assert.match(revealCopy, /skipActivationFraming = currentStep >= 3;/);
+    assert.doesNotMatch(revealCopy, /skipActivationFraming = currentStep >= 3 \|\| activationPreviewMode/);
     assert.doesNotMatch(revealCopy, /every direct booking after that is yours/i);
 });
