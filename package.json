@@ -1,15 +1,11 @@
 {
   "name": "marketel-booking-workspace",
   "private": true,
-  "scripts": {
-    "dev:local": "node scripts/dev-local.mjs"
+  "engines": {
+    "node": ">=22.0.0"
   },
-  "dependencies": {
-    "@react-google-maps/api": "^2.20.7",
-    "@vercel/analytics": "^1.5.0",
-    "react-google-autocomplete": "^2.7.5",
-    "react-router-dom": "^7.9.1",
-    "prisma": "6.16.1",
-    "@prisma/client": "6.16.1"
+  "scripts": {
+    "dev:local": "node scripts/dev-local.mjs",
+    "verify": "npm --prefix guest-lodge-backend test && npm --prefix hotel-booking-app run lint && npm --prefix hotel-booking-app test && npm --prefix hotel-booking-app run build && npm --prefix marketel-frontdesk-ios run verify:release"
   }
 }

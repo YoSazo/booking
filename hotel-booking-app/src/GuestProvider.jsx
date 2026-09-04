@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { GuestContext } from './guestContext.js';
 import {
   clearGuestStay,
   readGuestStay,
@@ -7,8 +8,6 @@ import {
   selectGuestStay as selectStoredGuestStay,
   writeGuestStay,
 } from './guestStayStorage.js';
-
-const GuestContext = createContext(null);
 
 export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
   const [guestStay, setGuestStayState] = useState(null);
@@ -131,10 +130,4 @@ export function GuestProvider({ children, apiBaseUrl = '', hotelId = '' }) {
       {children}
     </GuestContext.Provider>
   );
-}
-
-export function useGuest() {
-  const ctx = useContext(GuestContext);
-  if (!ctx) throw new Error('useGuest must be used within GuestProvider');
-  return ctx;
 }

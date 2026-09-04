@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useGuest } from './GuestProvider.jsx';
+import { useGuest } from './guestContext.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { stayStorageSnapshot } from './guestStayState.js';
 

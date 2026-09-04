@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, Search } from 'lucide-react';
-import { useGuest } from './GuestProvider.jsx';
+import { useGuest } from './guestContext.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { stayStorageSnapshot } from './guestStayState.js';
 

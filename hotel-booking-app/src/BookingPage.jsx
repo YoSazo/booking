@@ -3,7 +3,7 @@ import { PawPrint, Users } from 'lucide-react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import CalendarModal from './CalendarModal.jsx';
-import { isAndroid, resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { isAndroid, resolvePropertyIconUrl } from './guestInstallUtils.js';
 import { trackPageView, trackHotelFunnel } from './trackingService.js';
 import { calculateTieredPrice } from './priceCalculator.js';
 

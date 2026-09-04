@@ -292,6 +292,5 @@ Scope tags: **`[unify]`** = bring onto the shared system · **`[lower-priority]`
 
 ## 9. Appendix — what this audit did *not* deeply cover
 - Desktop-wide Front Desk layouts (audit skewed mobile).
-- `install-page-redesign (1).html` if present (a mock/reference file — Opus may use or ignore).
 - `marketel-telemetry.js` (analytics, not UI).
 - The three `tmp_rovodev_*` working copies of the repo (use `BOOKING/booking` as canonical).

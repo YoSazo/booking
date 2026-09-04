@@ -102,15 +102,18 @@ const MARKETEL_PIXEL_ID = process.env.MARKETEL_META_PIXEL_ID || '';
 const MARKETEL_ACCESS_TOKEN = process.env.MARKETEL_META_ACCESS_TOKEN || '';
 const MARKETEL_META_TEST_EVENT_CODE = String(process.env.MARKETEL_META_TEST_EVENT_CODE || '').trim();
 const ENABLE_META_CAPI = process.env.ENABLE_META_CAPI !== 'false';
-// Meta versions the Conversions API endpoint. Keep the version deploy-time
-// configurable so an API sunset never requires a code change, while validating
-// the value before it is interpolated into an outbound URL. v26.0 is the
-// current Graph API release as of this implementation.
-const MARKETEL_META_GRAPH_API_VERSION = (() => {
-    const configured = String(process.env.MARKETEL_META_GRAPH_API_VERSION || 'v26.0').trim();
+// Meta versions its APIs. Keep the version deploy-time configurable so an API
+// sunset never requires a code change, while validating the value before it is
+// interpolated into an outbound URL.
+function resolveMetaGraphApiVersion(value) {
+    const configured = String(value || 'v26.0').trim();
     const normalized = configured.startsWith('v') ? configured : `v${configured}`;
     return /^v\d{1,2}\.\d{1,2}$/.test(normalized) ? normalized : 'v26.0';
-})();
+}
+
+const MARKETEL_META_GRAPH_API_VERSION = resolveMetaGraphApiVersion(
+    process.env.MARKETEL_META_GRAPH_API_VERSION
+);
 
 async function sendMarketelCAPI(eventName, input = {}) {
     if (!ENABLE_META_CAPI || !MARKETEL_PIXEL_ID || !MARKETEL_ACCESS_TOKEN) {
@@ -611,7 +614,7 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@bookmarketel.
 // Meta Ads / Facebook Marketing API config
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const META_API_VERSION = process.env.META_API_VERSION || 'v19.0';
+const META_API_VERSION = resolveMetaGraphApiVersion(process.env.META_API_VERSION);
 
 // Meta Conversions API (CAPI) config
 const META_PIXEL_ID = process.env.META_PIXEL_ID || '';
@@ -652,6 +655,7 @@ if (GUESTEL_APNS_CONFIGURED) {
 }
 
 const app = express();
+app.disable('x-powered-by');
 app.use(compression());
 
 const LOCAL_API_PROXY_URL = String(process.env.LOCAL_API_PROXY_URL || '').replace(/\/$/, '');
@@ -17948,7 +17952,29 @@ function startServer() {
 }
 
 if (require.main === module) {
-    startServer();
+    const server = startServer();
+    let shuttingDown = false;
+    const shutdown = async (signal) => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        console.log(`${signal} received; closing HTTP and database connections.`);
+        const forceExit = setTimeout(() => {
+            console.error('Graceful shutdown timed out.');
+            process.exit(1);
+        }, 10_000);
+        forceExit.unref();
+        server.close(async () => {
+            try {
+                await prisma.$disconnect();
+                process.exit(0);
+            } catch (error) {
+                console.error('Database disconnect failed during shutdown:', error.message);
+                process.exit(1);
+            }
+        });
+    };
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
+    process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
 // The release-QA runner imports these exact production paths. Keeping them

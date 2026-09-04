@@ -48,7 +48,13 @@ const DEMAND_FIT_LABELS = {
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
 const TOKEN = process.env.MARKETEL_META_ADS_READ_TOKEN || process.env.MARKETEL_META_ACCESS_TOKEN;
 const ACCOUNT_ID = String(process.env.MARKETEL_META_AD_ACCOUNT_ID || '').replace(/^act_/, '');
-const GRAPH_VERSION = process.env.MARKETEL_META_GRAPH_API_VERSION || 'v21.0';
+const configuredGraphVersion = String(process.env.MARKETEL_META_GRAPH_API_VERSION || 'v26.0').trim();
+const normalizedGraphVersion = configuredGraphVersion.startsWith('v')
+  ? configuredGraphVersion
+  : `v${configuredGraphVersion}`;
+const GRAPH_VERSION = /^v\d{1,2}\.\d{1,2}$/.test(normalizedGraphVersion)
+  ? normalizedGraphVersion
+  : 'v26.0';
 
 function money(value) {
   return `$${Number(value || 0).toFixed(2)}`;

@@ -20,6 +20,14 @@ build/
 
 # Ignore system files
 .DS_Store
+desktop.ini
+
+# Apple signing material belongs in the external signing directory, never Git.
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.keychain-db
 
 # Ignore uploaded images and videos
 *.mp4
@@ -31,6 +39,7 @@ hotel-booking-app/0518.mp4
 
 # Ignore temp files
 .memla_patch_exec_tmp/
+temp_server.js
 
 # Ignore internal notes
 Conversation about marketel.md

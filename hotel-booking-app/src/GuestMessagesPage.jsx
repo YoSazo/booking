@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Send, Search, MessageSquare } from 'lucide-react';
-import { useGuest } from './GuestProvider.jsx';
+import { useGuest } from './guestContext.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
-import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUtils.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { getStayStatusMeta, isDeadBookingStatus, stayStorageSnapshot } from './guestStayState.js';
 import useGuestStayDeepLink from './useGuestStayDeepLink.js';

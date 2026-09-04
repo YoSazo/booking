@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGuest } from './GuestProvider.jsx';
+import { useGuest } from './guestContext.js';
 import { PhoneCall, CheckCircle2, Smartphone, DollarSign, CalendarPlus, CalendarClock, PartyPopper, Check, Moon, Clock3, XCircle } from 'lucide-react';
 import { trackCallModalDismissed, trackTapToCallFirst } from './trackingService.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
-import { resolveGuestelWalletImageUrl, resolvePropertyIconUrl } from './guestInstallUi.jsx';
-import { downloadStayIcs } from './guestMessaging.jsx';
+import { resolveGuestelWalletImageUrl, resolvePropertyIconUrl } from './guestInstallUtils.js';
+import { downloadStayIcs } from './guestCalendar.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import { normalizeBookingStatus } from './guestStayState.js';
 

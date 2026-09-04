@@ -16,10 +16,10 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
-import { useGuest } from './GuestProvider.jsx';
-import { downloadStayIcs } from './guestMessaging.jsx';
+import { useGuest } from './guestContext.js';
+import { downloadStayIcs } from './guestCalendar.js';
 import GuestInstallCard from './GuestInstallCard.jsx';
-import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUtils.js';
 import { fetchWithTimeout } from './fetchWithTimeout.js';
 import {
   daysUntilStayDate,

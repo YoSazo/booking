@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { BRAND, HotelIcon, isAndroid, isIos } from './guestInstallUi.jsx';
+import { HotelIcon } from './guestInstallUi.jsx';
+import { BRAND, isAndroid, isIos } from './guestInstallUtils.js';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
 import { guestelInvocationUrl } from './appClipInstall.js';

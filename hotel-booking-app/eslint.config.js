@@ -9,7 +9,6 @@ export default [
       'dist/**',
       'node_modules/**',
       'public/**',
-      'install-page-redesign (1).html',
     ],
   },
   {

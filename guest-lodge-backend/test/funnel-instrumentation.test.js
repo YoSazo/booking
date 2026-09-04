@@ -10,6 +10,7 @@ const settings = fs.readFileSync(path.join(root, 'frontdesk', 'src', 'settings.j
 const dashboard = fs.readFileSync(path.join(root, 'funnel.html'), 'utf8');
 const setup = fs.readFileSync(path.join(root, 'setup.html'), 'utf8');
 const metaCapi = fs.readFileSync(path.join(root, 'marketel-meta-capi.js'), 'utf8');
+const marketelReport = fs.readFileSync(path.join(root, 'marketel-report.js'), 'utf8');
 const journeyTracker = fs.readFileSync(path.join(root, 'public', 'marketel-journey.js'), 'utf8');
 
 function allowlist(startMarker) {
@@ -238,6 +239,9 @@ test('Marketel CAPI uses a configurable current Graph API version', () => {
     assert.match(helper, /process\.env\.MARKETEL_META_GRAPH_API_VERSION/);
     assert.match(helper, /'v26\.0'/);
     assert.doesNotMatch(helper, /graph\.facebook\.com\/v18\.0/);
+    assert.doesNotMatch(server, /META_API_VERSION \|\| 'v19\.0'/);
+    assert.match(marketelReport, /MARKETEL_META_GRAPH_API_VERSION \|\| 'v26\.0'/);
+    assert.doesNotMatch(marketelReport, /'v21\.0'/);
 });
 
 test('commercial Meta events use a durable retrying server outbox', () => {

@@ -6,7 +6,7 @@ import { Autocomplete, LoadScript } from '@react-google-maps/api';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { trackInitiateCheckout, trackAddPaymentInfo, trackCardModalAcknowledged, trackFirstCardFieldFocus, trackConfirmBookingClick, trackCardDeclineModalShown, trackTapToCallFirst, trackHotelFunnel } from './trackingService.js';
-import { resolvePropertyIconUrl } from './guestInstallUi.jsx';
+import { resolvePropertyIconUrl } from './guestInstallUtils.js';
 import LoadingScreen from './LoadingScreen.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';

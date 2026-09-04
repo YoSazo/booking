@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { ArrowRight, QrCode, Smartphone } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BRAND, HotelIcon, INSTALL_THEME, isAndroid, isIos } from './guestInstallUi.jsx';
+import { HotelIcon } from './guestInstallUi.jsx';
+import { BRAND, INSTALL_THEME, isAndroid, isIos } from './guestInstallUtils.js';
 import { trackGuestInstall, installTouchpointFromRef } from './guestInstallTracking.js';
 import { guestelInvocationUrl, guestelQrInvocationUrl } from './appClipInstall.js';
 import GuestelQrCode from './GuestelQrCode.jsx';
