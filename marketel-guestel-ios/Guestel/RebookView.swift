@@ -73,9 +73,17 @@ struct RebookView: View {
     private var roomsStage: some View {
         ScrollView {
             VStack(spacing: 16) {
-                ForEach(data?.rooms ?? []) { r in
-                    Button { room = r; stage = .dates } label: { RoomCard(room: r, rates: data?.rates) }
-                        .buttonStyle(.plain)
+                if data?.subscribed == false {
+                    ContentUnavailableView(
+                        "Direct booking unavailable",
+                        systemImage: "calendar.badge.exclamationmark",
+                        description: Text("This property is not accepting new direct booking requests right now. Your saved stay and messages remain in Guestel.")
+                    )
+                } else {
+                    ForEach(data?.rooms ?? []) { r in
+                        Button { room = r; stage = .dates } label: { RoomCard(room: r, rates: data?.rates) }
+                            .buttonStyle(.plain)
+                    }
                 }
             }
             .padding(20)
@@ -276,7 +284,10 @@ struct RebookView: View {
     }
 
     private func confirmAndPay() {
-        guard let room else { return }
+        guard data?.subscribed != false, let room else {
+            errorMessage = "This property is not accepting new direct booking requests right now."
+            return
+        }
         isSubmitting = true
         errorMessage = nil
         store.saveGuest(guest)

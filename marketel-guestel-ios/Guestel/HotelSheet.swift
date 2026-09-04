@@ -58,6 +58,7 @@ struct HotelSheet: View {
     }
     private var anim: Animation { .interactiveSpring(response: 0.5, dampingFraction: 0.82) }
     private var checkoutFloor: Date { Calendar.current.date(byAdding: .day, value: 1, to: checkin)! }
+    private var acceptsBookings: Bool { hotelData?.subscribed != false }
 
     var body: some View {
         ScrollView {
@@ -102,8 +103,12 @@ struct HotelSheet: View {
 
     private var actions: some View {
         VStack(spacing: 12) {
-            Button { beginBooking(preferred: nil) } label: { primaryLabel("Book another stay") }
-                .buttonStyle(GuestelPressButtonStyle())
+            if acceptsBookings {
+                Button { beginBooking(preferred: nil) } label: { primaryLabel("Book another stay") }
+                    .buttonStyle(GuestelPressButtonStyle())
+            } else {
+                notice("This property is not accepting new direct booking requests right now. Your saved stays and messages remain here.", symbol: "calendar.badge.exclamationmark", color: .orange)
+            }
             HStack(spacing: 12) {
                 Button { messageStay = currentStay } label: {
                     secondaryLabel("Message hotel", "bubble.left")
@@ -137,7 +142,8 @@ struct HotelSheet: View {
                         .foregroundStyle(Theme.inkSoft)
                     ForEach(rooms) { candidate in
                         RoomCard(room: candidate, rates: rates, nights: nil, roomsAvailable: nil)
-                            .onTapGesture { beginBooking(preferred: candidate) }
+                            .opacity(acceptsBookings ? 1 : 0.64)
+                            .onTapGesture { if acceptsBookings { beginBooking(preferred: candidate) } }
                     }
                 }
                 .padding(.top, 10)
@@ -146,6 +152,10 @@ struct HotelSheet: View {
     }
 
     private func beginBooking(preferred: BookingAPI.APIRoom?) {
+        guard acceptsBookings else {
+            errorMessage = "This property is not accepting new direct booking requests right now."
+            return
+        }
         preferredRoomID = preferred?.id
         errorMessage = nil
         withAnimation(anim) {
@@ -193,6 +203,10 @@ struct HotelSheet: View {
     }
 
     private func searchAvailability() {
+        guard acceptsBookings else {
+            errorMessage = "This property is not accepting new direct booking requests right now."
+            return
+        }
         guard nights > 0 else { return }
         isLoading = true
         errorMessage = nil
@@ -394,6 +408,10 @@ struct HotelSheet: View {
     // MARK: - Payment
 
     private func confirmAndPay() {
+        guard acceptsBookings else {
+            errorMessage = "This property is not accepting new direct booking requests right now."
+            return
+        }
         guard let room, availableRoom != nil, quote != nil else { return }
         isSubmitting = true
         errorMessage = nil

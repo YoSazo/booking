@@ -847,12 +847,32 @@
       <div class="stat-value" id="stat-assistant-reveal">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Saw $199 offer</div>
+      <div class="stat-label">Saw trial offer</div>
       <div class="stat-value" id="stat-offer-reveal">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Activation clicks</div>
       <div class="stat-value" id="stat-cta">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trials started</div>
+      <div class="stat-value" id="stat-trials">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trial app opens</div>
+      <div class="stat-value" id="stat-trial-app">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trial links placed</div>
+      <div class="stat-value" id="stat-trial-link">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trial first bookings</div>
+      <div class="stat-value" id="stat-trial-booking">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trials canceled</div>
+      <div class="stat-value" id="stat-trial-canceled">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Paid</div>
@@ -882,11 +902,12 @@
     <div class="panel-actions">
       <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('ViewContent')">Test offer view</button>
       <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('InitiateCheckout')">Test checkout</button>
+      <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('StartTrial')">Test trial</button>
       <button class="ghost-btn meta-test-btn" onclick="sendMetaCapiTest('Subscribe')">Test subscribe</button>
       <button class="ghost-btn" onclick="retryMetaCapi()">Retry failed</button>
     </div>
     <div class="meta-capi-list" id="metaCapiRecent"><div class="loading">Loading delivery receipts…</div></div>
-    <div class="panel-hint" id="metaCapiHint">Lead, registration, offer view, checkout and paid subscription are queued server-side. A declined card correctly stops at checkout and never sends Subscribe.</div>
+    <div class="panel-hint" id="metaCapiHint">Lead, registration, offer view, checkout, trial start and paid subscription are queued server-side. A $0 trial sends StartTrial; only a real Stripe charge sends Subscribe.</div>
   </div>
 
   <!-- Gross booking volume across every property. -->
@@ -940,6 +961,7 @@
   <button class="filter-btn" data-filter="ActivationOfferViewed" onclick="setFilter('ActivationOfferViewed')">Offer</button>
   <button class="filter-btn" data-filter="GoLiveClicked" onclick="setFilter('GoLiveClicked')">Activation</button>
   <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
+  <button class="filter-btn" data-filter="TrialStarted" onclick="setFilter('TrialStarted')">Trial</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
 </div>
 
@@ -1033,7 +1055,7 @@ async function loadMetaCapiStatus() {
       ? 'Set MARKETEL_META_PIXEL_ID and MARKETEL_META_ACCESS_TOKEN on Render before ads.'
       : config.testMode
         ? 'Test Events mode is active. Use the buttons, verify receipt in Meta, then remove MARKETEL_META_TEST_EVENT_CODE before ads.'
-        : 'Production delivery is active. Declined cards stop at InitiateCheckout; only Stripe-confirmed payment queues Subscribe.';
+        : 'Production delivery is active. A $0 trial queues StartTrial; only Stripe-confirmed money queues Subscribe.';
   } catch (error) {
     if (recent) recent.innerHTML = `<div class="panel-hint">Could not load Meta delivery: ${escapeHtml(error.message)}</div>`;
   }
@@ -1539,13 +1561,22 @@ const TYPE_LABELS = {
   BookingPreviewCheckoutReached: 'Preview Checkout Reached',
   GuestAppRevealViewed: 'Guestel Viewed',
   AssistantRevealViewed: 'Front Desk Viewed',
-  ActivationOfferViewed: '$199 Offer Viewed',
+  ActivationOfferViewed: 'Trial Offer Viewed',
   PreviewReadyEmailSent: 'Preview Email Sent',
   ActivationEmailSent: 'Activation Email Sent',
   PaymentCTAClicked: 'Hit Gate',
   GoLiveClicked: 'Activation Clicked',
   CheckoutStarted: 'Stripe Checkout',
-  PaymentSucceeded: 'Paid $199',
+  TrialStarted: 'Trial Started',
+  TrialWillEnd: 'Trial Ending Soon',
+  TrialNativeAppActivated: 'Front Desk App Opened',
+  TrialLinkPlacementConfirmed: 'Booking Link Placed',
+  TrialFirstBookingReceived: 'First Trial Booking',
+  TrialCancellationScheduled: 'Trial Cancellation Scheduled',
+  TrialCancellationReversed: 'Trial Cancellation Reversed',
+  TrialCanceled: 'Trial Canceled',
+  TrialConverted: 'Trial Converted',
+  PaymentSucceeded: 'Paid',
   SubscriptionStatusChanged: 'Subscription Status',
 };
 
@@ -1586,7 +1617,7 @@ function renderEvents() {
   const paid = allCounts.PaymentSucceeded || 0;
   const revenue = allEvents
     .filter(e => e.event_name === 'PaymentSucceeded')
-    .reduce((sum, e) => sum + (Number(e.value) || 199), 0);
+    .reduce((sum, e) => sum + (Number(e.value) || 0), 0);
   document.getElementById('stat-revenue').textContent = '$' + revenue.toLocaleString('en-US', { maximumFractionDigits: 2 });
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
   document.getElementById('stat-started').textContent = allCounts.QualifiedLead || 0;
@@ -1597,6 +1628,11 @@ function renderEvents() {
   document.getElementById('stat-assistant-reveal').textContent = allCounts.AssistantRevealViewed || 0;
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
   document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
+  document.getElementById('stat-trials').textContent = allCounts.TrialStarted || 0;
+  document.getElementById('stat-trial-app').textContent = allCounts.TrialNativeAppActivated || 0;
+  document.getElementById('stat-trial-link').textContent = allCounts.TrialLinkPlacementConfirmed || 0;
+  document.getElementById('stat-trial-booking').textContent = allCounts.TrialFirstBookingReceived || 0;
+  document.getElementById('stat-trial-canceled').textContent = allCounts.TrialCanceled || 0;
   document.getElementById('stat-paid').textContent = paid;
   renderAttribution(allAttribution);
 
@@ -1667,6 +1703,7 @@ function attributionTable(rows, includeCampaign) {
     <th style="text-align:right">Leads</th>
     <th style="text-align:right">Setup</th>
     <th style="text-align:right">Checkout</th>
+    <th style="text-align:right">Trial</th>
     <th style="text-align:right">Paid</th>
     <th style="text-align:right">Start → paid</th>
     <th style="text-align:right">Cash</th>
@@ -1684,6 +1721,7 @@ function attributionTable(rows, includeCampaign) {
       <td class="num">${Number(row.leads || 0)}</td>
       <td class="num">${Number(row.setupCompleted || 0)}</td>
       <td class="num">${Number(row.checkoutStarted || 0)}</td>
+      <td class="num">${Number(row.trialsStarted || 0)}</td>
       <td class="num">${Number(row.paid || 0)}</td>
       <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
       <td class="num">${attributionMoney(row.revenue)}</td>
@@ -1702,6 +1740,7 @@ function demandFitTable(rows) {
     <th style="text-align:right">Offer</th>
     <th style="text-align:right">Continued anyway</th>
     <th style="text-align:right">Checkout</th>
+    <th style="text-align:right">Trial</th>
     <th style="text-align:right">Paid</th>
     <th style="text-align:right">Start → paid</th>
     <th style="text-align:right">Cash</th>
@@ -1713,6 +1752,7 @@ function demandFitTable(rows) {
     <td class="num">${Number(row.offerViewed || 0)}</td>
     <td class="num">${Number(row.mismatchContinued || 0)}</td>
     <td class="num">${Number(row.checkoutStarted || 0)}</td>
+    <td class="num">${Number(row.trialsStarted || 0)}</td>
     <td class="num">${Number(row.paid || 0)}</td>
     <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
     <td class="num">${attributionMoney(row.revenue)}</td>
@@ -1777,6 +1817,9 @@ const PUSH_TRIGGER_LABELS = {
   QualifiedLead: 'Qualified lead',
   SetupCompleted: 'Setup completed',
   GoLiveClicked: 'Activation clicked',
+  TrialStarted: 'Trial started',
+  TrialConverted: 'Trial converted',
+  TrialCanceled: 'Trial canceled',
   PaymentSucceeded: 'Paid',
   SupportMessage: 'Support message',
 };
@@ -1966,6 +2009,7 @@ async function loadPortfolio() {
       ['Booking volume', money(t.gmv)],
       ['Properties', t.properties || 0],
       ['Paying', paying],
+      ['Trialing', t.trialingProperties || 0],
       ['Bookings', t.bookings || 0],
       ['Nights', t.nights || 0],
       ['Avg booking', money(t.averageBookingValue)],

@@ -295,8 +295,8 @@ const HUB_ITEMS = [
     // Price acceptance happens before the framing question. The question then
     // explains the economics of a figure the owner knowingly chose to inspect,
     // rather than feeling like a gate hiding a surprise price.
-    title: 'Activate everything — $199/month',
-    body: 'Protected by a 7-day money-back guarantee. Cancel anytime.',
+    title: 'Start your 14-day free trial',
+    body: '$0 today. Full access. Then $199/month. Cancel anytime.',
     cta: '',
   },
 ];
@@ -708,11 +708,11 @@ const ACTIVATION_FRAMING_CHOICES = [
 // "not_sure" deliberately asserts no figure. Inventing an industry average here
 // would be the same fabrication that got cut from the earlier money slide.
 const ACTIVATION_FRAMING_LINES = {
-  under_500: 'You paid <strong>under $500 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat — each booking moved direct keeps more of that money at your property.',
-  '500_1500': 'You paid <strong>$500–$1,500 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
-  '1500_5000': 'You paid <strong>$1,500–$5,000 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
-  over_5000: 'You paid <strong>over $5,000 last month</strong> in OTA commission. Marketel is <strong>$199</strong>, flat.',
-  not_sure: "Most owners don't know the exact number. Marketel is <strong>$199</strong>, flat, and Front Desk tracks the OTA fees your direct bookings avoid.",
+  under_500: 'You paid <strong>under $500 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
+  '500_1500': 'You paid <strong>$500–$1,500 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
+  '1500_5000': 'You paid <strong>$1,500–$5,000 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
+  over_5000: 'You paid <strong>over $5,000 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
+  not_sure: "Most owners don't know the exact number because it comes out before the payout lands. Front Desk tracks the OTA fees your direct bookings avoid.",
 };
 
 function activationFramingHtml() {
@@ -734,6 +734,31 @@ function framingLineHtml(answer) {
   const line = ACTIVATION_FRAMING_LINES[answer];
   if (!line) return '';
   return `<div class="mvr-framing-line">${line}</div>`;
+}
+
+function trialOfferAvailable() {
+  return !crm.hotelSubscribed && crm.marketelTrialEligible !== false;
+}
+
+function trialDays() {
+  return Math.max(1, Number(crm.marketelTrialDays) || 14);
+}
+
+function firstTrialBillingDate() {
+  const date = new Date();
+  date.setDate(date.getDate() + trialDays());
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function activationCtaLabel() {
+  if (trialOfferAvailable()) return `Start your ${trialDays()}-day free trial`;
+  return billingInterval === 'year'
+    ? 'Activate Marketel — $1,990/year'
+    : 'Activate Marketel — $199/month';
 }
 
 // Screen B. ActivationOfferViewed fires here rather than when the sheet opens,
@@ -764,11 +789,11 @@ function answerActivationFraming(value) {
 function finaleHtml() {
   const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
+  const hasTrial = trialOfferAvailable();
   const displayedPrice = isYearly ? '$1,990' : '$199';
   const displayedInterval = isYearly ? '/year' : '/month';
-  const activationLabel = isYearly
-    ? 'Activate Marketel — $1,990/year'
-    : 'Activate Marketel — $199/month';
+  const activationLabel = activationCtaLabel();
+  const renewalDate = firstTrialBillingDate();
   const includedValueHtml = `<div class="mvr-value-list">
     <div style="--stagger:0"><span>1</span><p><strong>Direct Booking Page</strong><small>Take bookings on your own page without OTA commission</small></p></div>
     <div style="--stagger:1"><span>2</span><p><strong>Marketel Front Desk</strong><small>Control bookings and availability around the setup you already use</small></p></div>
@@ -777,7 +802,7 @@ function finaleHtml() {
   return `<section class="mvr-stage mvr-stage-finale">
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
-      <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : 'Ready to activate'}</div>
+      <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : hasTrial ? 'Full access for 14 days' : 'Ready to activate'}</div>
       <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
       <p>Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.</p>
       ${isSubscribed ? `${includedValueHtml}
@@ -789,15 +814,19 @@ function finaleHtml() {
           <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
           </div>
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
-          <div class="mvr-price-detail${isYearly ? ' is-visible' : ''}">${isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
+          <div class="mvr-price-detail${isYearly || hasTrial ? ' is-visible' : ''}">${hasTrial
+            ? `$0 today · first ${displayedPrice} charge ${renewalDate}`
+            : isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
           ${activationRateCalculatorHtml()}
           <div class="mvr-payment-flow">
             <strong>Your room money stays yours.</strong>
             <span>Guests use a temporary $1 card verification, then pay your property directly at check-in. Marketel never holds the room payment.</span>
           </div>
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
-          <div class="mvr-guarantee"><span>7</span><p><strong>Try Marketel for 7 days.</strong><b>If it isn't right, get your money back.</b><small>${isYearly ? 'Cancel anytime. Renews yearly at $1,990 unless canceled.' : 'Cancel anytime. Renews monthly at $199 unless canceled.'}</small></p></div>
-          <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Guarantee terms</a></div>
+          ${hasTrial ? `<div class="mvr-guarantee"><span>${trialDays()}</span><p><strong>${trialDays()} days of full access. $0 today.</strong><b>Card required. Cancel before ${renewalDate} and you will not be charged.</b><small>${isYearly ? `Then $1,990 for one year on ${renewalDate}.` : `Then $199/month starting ${renewalDate}.`} Cancel anytime.</small></p></div>
+          <div class="mvr-secure-note">Stripe securely stores your card · <a href="/terms" target="_blank" rel="noopener">Trial terms</a></div>`
+            : `<div class="mvr-guarantee"><span>✓</span><p><strong>Full Marketel access.</strong><b>${isYearly ? '$1,990 is billed yearly.' : '$199 is billed monthly.'}</b><small>Cancel anytime. Charges already processed are non-refundable.</small></p></div>
+          <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Billing terms</a></div>`}
           <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
@@ -838,11 +867,17 @@ function hubRowHtml(item, nextId) {
   const classes = ['mvr-row', `is-${item.id}`];
   if (done) classes.push('is-done');
   if (item.id === nextId) classes.push('is-next');
+  const title = item.id === 'activation' && !crm.hotelSubscribed && crm.marketelTrialEligible === false
+    ? 'Activate everything — $199/month'
+    : item.title;
+  const body = item.id === 'activation' && !crm.hotelSubscribed && crm.marketelTrialEligible === false
+    ? 'Full access. Cancel anytime.'
+    : item.body;
   return `<button type="button" class="${classes.join(' ')}" data-hub-item="${item.id}">
     <span class="mvr-row-mark" aria-hidden="true">${done ? '✓' : ''}</span>
     <span class="mvr-row-text">
-      <strong>${esc(item.title)}</strong>
-      <small>${esc(item.body)}</small>
+      <strong>${esc(title)}</strong>
+      <small>${esc(body)}</small>
     </span>
     <span class="mvr-row-chevron" aria-hidden="true">›</span>
   </button>`;
@@ -1273,9 +1308,7 @@ async function activateMarketel(button) {
   } finally {
     if (document.body.contains(button)) {
       button.disabled = false;
-      button.textContent = billingInterval === 'year'
-        ? 'Activate Marketel — $1,990/year'
-        : 'Activate Marketel — $199/month';
+      button.textContent = activationCtaLabel();
     }
   }
 }

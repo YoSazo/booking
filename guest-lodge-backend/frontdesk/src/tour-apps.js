@@ -584,8 +584,10 @@ function startAppsTour(opts) {
       title: hotelIsLive ? 'This loop is on.' : 'Everything is ready to turn on.',
       text: hotelIsLive
         ? 'Guests book, keep your property in Guestel, receive opted-in updates, and message you. Front Desk gets the alerts.'
-        : 'For $199/month, guests can book direct, keep your property in Guestel, receive opted-in updates, and message you — while Front Desk receives the alerts.',
-      primaryLabel: hotelIsLive ? 'Done' : 'Activate everything — $199/month',
+        : (crm.marketelTrialEligible !== false
+          ? 'Start with 14 days of full access for $0 today. Guests can book direct, keep your property in Guestel, receive opted-in updates, and message you — while Front Desk receives the alerts.'
+          : 'Reactivate Marketel so guests can book direct, keep your property in Guestel, receive opted-in updates, and message you — while Front Desk receives the alerts.'),
+      primaryLabel: hotelIsLive ? 'Done' : (crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate Marketel'),
       secondaryLabel: hotelIsLive ? 'Close' : 'Keep exploring',
       activateOnNext: !hotelIsLive,
       tooltipPosition: 'below',

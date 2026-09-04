@@ -594,9 +594,9 @@ function sheetBodyHtml() {
     ${storySection}
 
     ${!subscribed && !isNativeApp ? `<div class="fda-section fda-lock">
-      <div class="fda-section-title">Included with your $199/month activation</div>
-      <div class="fda-lock-price">Activate your direct booking page to connect phones, receive booking texts, and update availability by reply.</div>
-      <button type="button" class="fda-btn primary full" onclick="activateFromAssistant()">Activate Marketel</button>
+      <div class="fda-section-title">${crm.marketelTrialEligible !== false ? 'Included in your 14-day free trial' : 'Included when you reactivate'}</div>
+      <div class="fda-lock-price">Turn on your direct booking page to connect phones, receive booking texts, and update availability by reply.</div>
+      <button type="button" class="fda-btn primary full" onclick="activateFromAssistant()">${crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate Marketel'}</button>
     </div>` : ''}
     ${blockerNote}
     ${nativeBookingAlertsHtml()}

@@ -256,7 +256,7 @@ test('commercial Meta events use a durable retrying server outbox', () => {
     assert.match(server, /MARKETEL_META_TEST_EVENT_CODE/);
 });
 
-test('Stripe carries Meta attribution into the paid webhook', () => {
+test('Stripe carries Meta attribution through trial start and paid conversion', () => {
     const goLive = server.slice(
         server.indexOf("app.post('/api/crm/go-live'"),
         server.indexOf("app.get('/api/crm/go-live-success'")
@@ -266,13 +266,19 @@ test('Stripe carries Meta attribution into the paid webhook', () => {
     assert.match(goLive, /metaSourceUrl/);
     assert.match(settings, /journey\?\.linkage\?\.\(\)/);
     assert.match(settings, /\.\.\.journeyLinkage/);
-    const paid = server.slice(
-        server.indexOf('async function recordMarketelPaymentSuccess'),
-        server.indexOf('function invoiceSubscriptionId')
+    const activationContext = server.slice(
+        server.indexOf('async function marketelActivationContext'),
+        server.indexOf('async function recordMarketelTrialStarted')
     );
-    assert.match(paid, /checkoutSession\?\.metadata\?\.metaFbp/);
-    assert.match(paid, /checkoutSession\?\.metadata\?\.metaFbc/);
+    assert.match(activationContext, /metadata\?\.metaFbp/);
+    assert.match(activationContext, /metadata\?\.metaFbc/);
+    const paidStart = server.indexOf('async function recordMarketelPaymentSuccess');
+    const paid = server.slice(
+        paidStart,
+        server.indexOf('async function recordMarketelTrialLifecycle', paidStart)
+    );
     assert.match(paid, /queueMarketelCAPI\('Subscribe'/);
+    assert.match(server, /queueMarketelCAPI\('StartTrial'/);
 });
 
 test('the funnel dashboard exposes sanitized Meta delivery receipts and test controls', () => {
@@ -281,8 +287,9 @@ test('the funnel dashboard exposes sanitized Meta delivery receipts and test con
     assert.match(server, /\/api\/admin\/meta-capi\/retry/);
     assert.match(dashboard, /Meta CAPI delivery/);
     assert.match(dashboard, /sendMetaCapiTest\('ViewContent'\)/);
+    assert.match(dashboard, /sendMetaCapiTest\('StartTrial'\)/);
     assert.match(dashboard, /sendMetaCapiTest\('Subscribe'\)/);
-    assert.match(dashboard, /Declined cards stop at InitiateCheckout/);
+    assert.match(dashboard, /only Stripe-confirmed money queues Subscribe/);
 });
 
 test('QA properties and their sessions never inflate the business dashboard', () => {

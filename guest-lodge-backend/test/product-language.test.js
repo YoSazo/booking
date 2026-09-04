@@ -72,13 +72,15 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
 });
 
-test('activation pairs the disclosed price with a visible risk reversal', () => {
-    assert.match(revealCopy, /title: 'Activate everything — \$199\/month'/);
-    assert.match(landingCopy, /\$199\/month.*7-day money-back guarantee/);
-    assert.match(revealCopy, /Activate Marketel — \$199\/month/);
-    assert.match(revealCopy, /Protected by a 7-day money-back guarantee\. Cancel anytime\./);
-    assert.match(revealCopy, /Try Marketel for 7 days\./);
-    assert.match(revealCopy, /If it isn't right, get your money back\./);
+test('activation discloses a card-required trial and its paid renewal before checkout', () => {
+    assert.match(revealCopy, /title: 'Start your 14-day free trial'/);
+    assert.match(landingCopy, /14-day full-access trial/);
+    assert.match(landingCopy, /Card required/);
+    assert.match(revealCopy, /Start your \$\{trialDays\(\)\}-day free trial/);
+    assert.match(revealCopy, /\$0 today · first \$\{displayedPrice\} charge \$\{renewalDate\}/);
+    assert.match(revealCopy, /Cancel before \$\{renewalDate\} and you will not be charged/);
+    assert.match(revealCopy, /Then \$1,990 for one year on \$\{renewalDate\}/);
+    assert.doesNotMatch(revealCopy, /money-back guarantee|Try Marketel for 7 days/);
 });
 
 test('activation turns the nightly rate into an editable break-even decision', () => {

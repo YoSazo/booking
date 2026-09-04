@@ -21,7 +21,11 @@ struct ClipRootView: View {
             if loading {
                 ProgressView().tint(Theme.green)
             } else if let hotel {
-                content(hotel)
+                if hotel.subscribed == false {
+                    inactiveContent(hotel)
+                } else {
+                    content(hotel)
+                }
             } else {
                 ContentUnavailableView(
                     "Property unavailable",
@@ -41,6 +45,14 @@ struct ClipRootView: View {
                 .ignoresSafeArea()
             }
         }
+    }
+
+    private func inactiveContent(_ hotel: BookingAPI.HotelPublic) -> some View {
+        ContentUnavailableView(
+            "\(hotel.name) is unavailable",
+            systemImage: "calendar.badge.exclamationmark",
+            description: Text("This property is not accepting new direct booking requests right now.")
+        )
     }
 
     private func bookingURL(for hotel: BookingAPI.HotelPublic) -> URL {

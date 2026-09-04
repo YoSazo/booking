@@ -319,18 +319,45 @@ async function sendPreviewReadyEmail({ toEmail, hotelName, hotelId, domain, fron
     });
 }
 
-async function sendActivationEmail({ toEmail, hotelName, hotelId, domain, frontdeskUrl }) {
+async function sendActivationEmail({
+    toEmail,
+    hotelName,
+    hotelId,
+    domain,
+    frontdeskUrl,
+    trialing = false,
+    trialEndsAt = null,
+    billingInterval = 'month',
+    renewalAmountUsd = MARKETEL_MONTHLY_PRICE_USD,
+}) {
+    const cleanHotelName = hotelName || 'Your property';
+    const billingDate = trialEndsAt instanceof Date && Number.isFinite(trialEndsAt.getTime())
+        ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(trialEndsAt)
+        : 'the end of your trial';
+    const renewal = `$${Number(renewalAmountUsd || MARKETEL_MONTHLY_PRICE_USD).toLocaleString('en-US')}/${billingInterval === 'year' ? 'year' : 'month'}`;
+    const kicker = trialing ? `${MARKETEL_TRIAL_DAYS}-day trial started` : 'Payment confirmed';
+    const headline = trialing ? `${cleanHotelName}'s trial is live` : `${cleanHotelName} is activated`;
+    const intro = trialing
+        ? `Your complete Marketel system is live now. Your first ${renewal} charge is scheduled for ${billingDate} unless you cancel before then.`
+        : 'Your direct booking page and Front Desk now have full access.';
+    const footer = trialing
+        ? `Questions or want to cancel before ${billingDate}? Reply to this email or contact support@bookmarketel.com.`
+        : 'Questions? Reply to this email or contact support@bookmarketel.com.';
     return sendMarketelLifecycleEmail({
         toEmail,
-        subject: `${hotelName || 'Your Marketel property'} is activated`,
+        subject: trialing ? `${cleanHotelName}'s Marketel trial is live` : `${cleanHotelName} is activated`,
         template: 'activation.html',
         replacements: {
-            HOTEL_NAME: hotelName || 'Your property',
+            HOTEL_NAME: cleanHotelName,
             HOTEL_ID: hotelId,
             DOMAIN: domain,
             FRONTDESK_URL: frontdeskUrl,
+            ACTIVATION_KICKER: kicker,
+            ACTIVATION_HEADLINE: headline,
+            ACTIVATION_INTRO: intro,
+            ACTIVATION_FOOTER: footer,
         },
-        text: `${hotelName || 'Your property'} is activated.\n\nOpen Front Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking page: https://${domain}\n\nNext: turn on Front Desk alerts, review availability, and make one test booking. Questions? Reply to this email.`,
+        text: `${headline}.\n\n${intro}\n\nOpen Front Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking page: https://${domain}\n\nNext: turn on Front Desk alerts, place your booking link where guests can find it, and make one test booking.\n\n${footer}`,
     });
 }
 
@@ -5653,6 +5680,21 @@ function verifyCrmSessionToken(token) {
 
 const nativeOwnerHotelsCache = new Map();
 
+async function hotelHasOpenGuestObligations(hotelId) {
+    if (!hotelId) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const booking = await prisma.booking.findFirst({
+        where: {
+            hotelId,
+            checkoutDate: { gte: today },
+            status: { notIn: ['cancelled', 'canceled', 'released'] },
+        },
+        select: { id: true },
+    }).catch(() => null);
+    return !!booking;
+}
+
 async function getDbAllowedHotelsForOwnerEmail(email) {
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!normalizedEmail || !prisma.hotelConfig) return [];
@@ -5661,12 +5703,14 @@ async function getDbAllowedHotelsForOwnerEmail(email) {
     const rows = await withRetry(() => prisma.hotelConfig.findMany({
         where: {
             active: true,
-            subscribed: true,
             ownerEmail: { equals: normalizedEmail, mode: 'insensitive' },
         },
-        select: { id: true },
+        select: { id: true, subscribed: true },
     }));
-    const value = [...new Set(rows.map(row => String(row.id || '').trim()).filter(Boolean))];
+    const value = [];
+    for (const row of rows) {
+        if (row.subscribed || await hotelHasOpenGuestObligations(row.id)) value.push(row.id);
+    }
     const cacheEntry = {
         value,
         // Short-lived on purpose: follow-up startup requests reuse the result,
@@ -5972,7 +6016,10 @@ const crmAuth = async (req, res, next) => {
                 where: { id: nativeHotelId },
                 select: { active: true, subscribed: true },
             })).catch(() => null);
-            if (!nativeHotel?.active || !nativeHotel?.subscribed) {
+            const hasOperationalAccess = !!nativeHotel?.active && (
+                !!nativeHotel?.subscribed || await hotelHasOpenGuestObligations(nativeHotelId)
+            );
+            if (!hasOperationalAccess) {
                 return res.status(403).json({
                     success: false,
                     message: 'This property does not currently have Front Desk app access.',
@@ -10651,6 +10698,17 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'ActivationEmailSending',
     'ActivationEmailSent',
     'SubscriptionStatusChanged',
+    // Trial lifecycle and milestones. Server-only: written from signed Stripe webhooks
+    // or trusted backend logic, never accepted from a browser.
+    'TrialStarted',
+    'TrialWillEnd',
+    'TrialConverted',
+    'TrialCancellationScheduled',
+    'TrialCancellationReversed',
+    'TrialCanceled',
+    'TrialNativeAppActivated',
+    'TrialLinkPlacementConfirmed',
+    'TrialFirstBookingReceived',
     ...MARKETEL_VALUE_REVEAL_EVENTS,
     ...MARKETEL_JOURNEY_EVENT_NAMES,
 ];
@@ -10886,6 +10944,12 @@ const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
     'SetupCompleted',
     'ActivationOfferViewed',
     'CheckoutStarted',
+    'TrialStarted',
+    'TrialNativeAppActivated',
+    'TrialLinkPlacementConfirmed',
+    'TrialFirstBookingReceived',
+    'TrialConverted',
+    'TrialCanceled',
     'PaymentSucceeded',
     'FitMismatchContinued',
 ]);
@@ -11024,6 +11088,12 @@ function emptyMarketelAttributionGroup(dimensions) {
         offerViewed: 0,
         checkoutStarted: 0,
         mismatchContinued: 0,
+        trialsStarted: 0,
+        trialAppsOpened: 0,
+        trialLinksPlaced: 0,
+        trialBookings: 0,
+        trialsConverted: 0,
+        trialsCanceled: 0,
         paid: 0,
         revenue: 0,
         startToPaidRate: 0,
@@ -11047,6 +11117,12 @@ function addMarketelAttributionProperty(group, property) {
     if (property.milestones.has('ActivationOfferViewed')) group.offerViewed += 1;
     if (property.milestones.has('CheckoutStarted')) group.checkoutStarted += 1;
     if (property.milestones.has('FitMismatchContinued')) group.mismatchContinued += 1;
+    if (property.milestones.has('TrialStarted')) group.trialsStarted += 1;
+    if (property.milestones.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
+    if (property.milestones.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;
+    if (property.milestones.has('TrialFirstBookingReceived')) group.trialBookings += 1;
+    if (property.milestones.has('TrialConverted')) group.trialsConverted += 1;
+    if (property.milestones.has('TrialCanceled')) group.trialsCanceled += 1;
     if (property.milestones.has('PaymentSucceeded')) group.paid += 1;
     group.revenue += property.revenue;
 }
@@ -11369,7 +11445,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             property.lastSeenAt = timestamp;
             property.eventCount += 1;
             if (row.sessionId) property.sessions.add(row.sessionId);
-            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'].includes(row.eventName)) {
+            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'].includes(row.eventName)) {
                 property.milestones[row.eventName] = timestamp;
             }
             propertyMap.set(row.hotelId, property);
@@ -11420,7 +11496,8 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
                 'offer-viewed': 4,
                 'checkout-requested': 5,
                 'checkout-started': 6,
-                paid: 7,
+                'trial-started': 7,
+                paid: 8,
             };
             let nextOutcome = session.outcome;
             if (event.event === 'Lead') nextOutcome = 'lead';
@@ -11429,6 +11506,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             if (event.event === 'ActivationOfferViewed') nextOutcome = 'offer-viewed';
             if (event.event === 'GoLiveClicked') nextOutcome = 'checkout-requested';
             if (event.event === 'CheckoutStarted') nextOutcome = 'checkout-started';
+            if (event.event === 'TrialStarted') nextOutcome = 'trial-started';
             if (event.event === 'PaymentSucceeded') nextOutcome = 'paid';
             if ((outcomeRank[nextOutcome] || 0) > (outcomeRank[session.outcome] || 0)) session.outcome = nextOutcome;
             session.events.push(event);
@@ -11473,7 +11551,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
                 identity: 'Anonymous visitor and per-tab session IDs are used to join events.',
             },
             interpretation: {
-                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'PaymentSucceeded'],
+                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'],
                 journeyEvents: 'Clarity and Smartlook own interaction playback. Journey* rows are reserved for rare client and checkout failures.',
                 duration: 'Use timestamps between compact milestones for directional timing; session replay is authoritative for detailed behavior.',
                 ordering: 'Within a session, sort by sequence first and timestamp second.',
@@ -12326,6 +12404,55 @@ const MARKETEL_BILLING_PLANS = Object.freeze({
         configuredPriceId: () => process.env.STRIPE_MARKETEL_YEARLY_PRICE_ID || '',
     }),
 });
+// One source of truth for the trial length. Stripe's trial_period_days and the
+// billing date disclosed before the card form both derive from this, so the promise
+// shown to the owner can never drift from what Stripe actually schedules.
+const MARKETEL_TRIAL_DAYS = 14;
+
+// Stripe reports payment_status 'paid' for a trial checkout, because the $0 trial
+// invoice really did process. Subscription status is the only honest signal for
+// whether money moved.
+function marketelSubscriptionIsTrialing(subscription) {
+    if (!subscription) return false;
+    return String(subscription.status || '').trim().toLowerCase() === 'trialing';
+}
+
+// Every activation path routes through this so none of them can accidentally book
+// revenue for a free trial.
+function resolveActivationOutcome(subscription) {
+    return marketelSubscriptionIsTrialing(subscription) ? 'trial' : 'paid';
+}
+
+// One trial per property. A property that already started one — including a trial it
+// later cancelled — goes straight to billing rather than silently getting another.
+async function hotelTrialEligible(hotelId) {
+    if (!hotelId) return false;
+    const prior = await prisma.funnelEvent.findFirst({
+        where: { hotelId, eventName: { in: ['TrialStarted', 'PaymentSucceeded'] } },
+        select: { id: true },
+    });
+    return !prior;
+}
+
+async function createFunnelEventOnce(eventName, eventId, data, { lockKey = eventId } = {}) {
+    if (!eventName || !eventId) return { created: false, row: null };
+    return prisma.$transaction(async (tx) => {
+        // FunnelEvent.eventId predates the billing lifecycle and is not unique.
+        // A transaction-scoped lock prevents the webhook and browser return from
+        // both creating the same business event.
+        await tx.$queryRaw`SELECT 1 AS "locked" FROM pg_advisory_xact_lock(hashtext(${String(lockKey)}))`;
+        const existing = await tx.funnelEvent.findFirst({
+            where: { eventName, eventId },
+            orderBy: { createdAt: 'asc' },
+        });
+        if (existing) return { created: false, row: existing };
+        const row = await tx.funnelEvent.create({
+            data: { ...data, eventName, eventId },
+        });
+        return { created: true, row };
+    });
+}
+
 const MARKETEL_STRIPE_KEY_MODE = process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_live_')
     ? 'live'
     : process.env.STRIPE_MARKETEL_SECRET_KEY?.startsWith('sk_test_')
@@ -12363,7 +12490,9 @@ function stripeObjectId(value) {
 }
 
 function stripePeriodEnd(subscription) {
-    const raw = Number(subscription?.current_period_end || 0);
+    const raw = marketelSubscriptionIsTrialing(subscription)
+        ? Number(subscription?.trial_end || subscription?.current_period_end || 0)
+        : Number(subscription?.current_period_end || 0);
     return raw > 0 ? new Date(raw * 1000) : null;
 }
 
@@ -12635,7 +12764,8 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
         }
 
         const properties = Array.from(byHotel.values()).sort((a, b) => b.gmv - a.gmv);
-        const paying = properties.filter((p) => ['active', 'trialing'].includes(String(p.subscriptionStatus || '').toLowerCase()));
+        const paying = properties.filter((p) => String(p.subscriptionStatus || '').toLowerCase() === 'active');
+        const trialing = properties.filter((p) => String(p.subscriptionStatus || '').toLowerCase() === 'trialing');
         const gmv = properties.reduce((sum, p) => sum + p.gmv, 0);
         const bookingCount = properties.reduce((sum, p) => sum + p.bookings, 0);
 
@@ -12645,6 +12775,7 @@ app.get('/api/admin/portfolio', adminAuth, async (req, res) => {
             totals: {
                 properties: properties.length,
                 payingProperties: paying.length,
+                trialingProperties: trialing.length,
                 bookings: bookingCount,
                 cancelled: properties.reduce((sum, p) => sum + p.cancelled, 0),
                 nights: properties.reduce((sum, p) => sum + p.nights, 0),
@@ -12685,6 +12816,10 @@ const FUNNEL_PURGE_PROTECTED = new Set([
     'LegacyComebackEmailSent',
     'BlockedBookingAttempt',
     'OnboardingAnswers',
+    // These are billing entitlements, not disposable analytics. TrialStarted is
+    // also the one-trial-per-property guard; deleting it would grant another trial.
+    'TrialStarted',
+    'PaymentSucceeded',
 ]);
 const FUNNEL_PURGEABLE_EVENT_NAMES = MARKETEL_ONBOARDING_EVENT_NAMES
     .filter((name) => !FUNNEL_PURGE_PROTECTED.has(name));
@@ -12726,6 +12861,9 @@ const ADMIN_PUSH_TRIGGERS = {
     QualifiedLead: { title: 'Qualified lead', body: (c) => `${c.property || 'A property'} has a problem Marketel can solve.` },
     SetupCompleted: { title: 'Setup completed', body: (c) => `${c.property || 'A property'} finished setup.` },
     GoLiveClicked: { title: 'Activation clicked', body: (c) => `${c.property || 'A property'} clicked activate.` },
+    TrialStarted: { title: 'Trial started', body: (c) => `${c.property || 'A property'} started a ${MARKETEL_TRIAL_DAYS}-day trial.` },
+    TrialConverted: { title: 'Trial converted', body: (c) => `${c.property || 'A property'} converted to paid.` },
+    TrialCanceled: { title: 'Trial canceled', body: (c) => `${c.property || 'A property'} canceled during the trial.` },
     PaymentSucceeded: { title: 'Paid', body: (c) => `${c.property || 'A property'} activated Marketel.` },
     SupportMessage: { title: 'New support message', body: (c) => `${c.property || 'A property'} sent a message.` },
 };
@@ -12930,7 +13068,7 @@ app.post('/api/admin/meta-capi/test', adminAuth, async (req, res) => {
             });
         }
         const eventName = String(req.body?.eventName || '').trim();
-        if (!['ViewContent', 'InitiateCheckout', 'Subscribe'].includes(eventName)) {
+        if (!['ViewContent', 'InitiateCheckout', 'StartTrial', 'Subscribe'].includes(eventName)) {
             return res.status(400).json({ success: false, message: 'Unsupported Meta test event.' });
         }
         const eventId = `marketel-capi-test.${eventName}.${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
@@ -12943,7 +13081,7 @@ app.post('/api/admin/meta-capi/test', adminAuth, async (req, res) => {
             sourceUrl: meta.sourceUrl || `${req.protocol}://${req.get('host')}/funnel`,
             fbp: meta.fbp,
             fbc: meta.fbc,
-            value: 199,
+            value: eventName === 'StartTrial' ? 0 : 199,
             currency: 'USD',
             eventId,
             contentName: 'Marketel CAPI delivery test',
@@ -13015,6 +13153,7 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
         const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const billingInterval = normalizeMarketelBillingInterval(req.body?.billingInterval);
         const billing = await getMarketelSubscriptionPrice(billingInterval);
+        const trialDays = (await hotelTrialEligible(hotel.id)) ? MARKETEL_TRIAL_DAYS : 0;
 
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
@@ -13029,18 +13168,32 @@ app.post('/api/setup/:token/checkout', async (req, res) => {
                 setupToken: req.params.token,
                 billingInterval,
                 billingAmountUsd: String(billing.amountUsd),
+                ...(trialDays ? { trialDays: String(trialDays) } : {}),
+                ...(cpMeta.fbp ? { metaFbp: cpMeta.fbp } : {}),
+                ...(cpMeta.fbc ? { metaFbc: cpMeta.fbc } : {}),
+                ...(cpMeta.sourceUrl ? { metaSourceUrl: cpMeta.sourceUrl } : {}),
             },
             subscription_data: {
+                ...(trialDays ? {
+                    trial_period_days: trialDays,
+                    trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+                } : {}),
                 metadata: {
                     product: 'hotel-onboarding',
                     hotelId: hotel.id,
                     setupToken: req.params.token,
                     billingInterval,
                     billingAmountUsd: String(billing.amountUsd),
+                    ...(trialDays ? { trialDays: String(trialDays) } : {}),
+                    ...(cpMeta.fbp ? { metaFbp: cpMeta.fbp } : {}),
+                    ...(cpMeta.fbc ? { metaFbc: cpMeta.fbc } : {}),
+                    ...(cpMeta.sourceUrl ? { metaSourceUrl: cpMeta.sourceUrl } : {}),
                 },
             },
             success_url: `${baseUrl}/setup/${req.params.token}/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/setup/${req.params.token}`,
+        }, {
+            idempotencyKey: `marketel-legacy-checkout.${hotel.id}.${billingInterval}.${trialDays}.${Math.floor(Date.now() / 60000)}`,
         });
 
         res.json({ success: true, url: session.url });
@@ -13108,31 +13261,27 @@ app.get('/setup/:token/success', async (req, res) => {
             return res.redirect(`/setup/${encodeURIComponent(req.params.token)}?payment=unverified`);
         }
 
-        // Mark complete and activate
-        await prisma.hotelConfig.update({
-            where: { id: hotel.id },
-            data: {
-                setupComplete: true,
-                subscribed: true,
-                active: true,
-                marketelStripeCustomerId: stripeObjectId(checkoutSession.customer) || null,
-                marketelStripeSubscriptionId: stripeObjectId(subscription) || null,
-                marketelSubscriptionStatus: subscription.status || null,
-                marketelCurrentPeriodEnd: stripePeriodEnd(subscription),
-            },
-        });
-
-        await recordMarketelPaymentSuccess({
-            hotelId: hotel.id,
+        const activation = await processMarketelCheckoutActivation({
             checkoutSession,
+            subscription,
+            expectedHotelId: hotel.id,
             req,
         });
+        if (activation.duplicate) {
+            return res.redirect(`/setup/${encodeURIComponent(req.params.token)}?trial=already-used`);
+        }
+        const isTrial = !!activation.trialing;
         const paidPlan = marketelBillingPlan(checkoutSession.metadata?.billingInterval);
         const paidAmountUsd = Number(checkoutSession.amount_total) / 100;
         const subscriptionAmountUsd = Number.isFinite(paidAmountUsd) && paidAmountUsd > 0
             ? paidAmountUsd
             : paidPlan.amountUsd;
-        const subscriptionEventId = `marketel-subscribe.${checkoutSession.id}`;
+        const paidSourceId = stripeObjectId(checkoutSession.invoice) || checkoutSession.id;
+        const subscriptionEventId = isTrial
+            ? `marketel-trial.${checkoutSession.id}`
+            : `marketel-subscribe.${paidSourceId}`;
+        const pixelEventName = isTrial ? 'StartTrial' : 'Subscribe';
+        const pixelValue = isTrial ? 0 : subscriptionAmountUsd;
 
         // Create default CRM PIN
         const defaultPin = generateCrmOwnerPin();
@@ -13165,7 +13314,7 @@ app.get('/setup/:token/success', async (req, res) => {
 
         // Don't send welcome email here — wait until they submit their contact info via /finalize
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>You're Live!</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','Subscribe',{value:${subscriptionAmountUsd},currency:'USD'},{eventID:'${subscriptionEventId}'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} You're live!</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
+        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${isTrial ? 'Your Trial Is Live!' : "You're Live!"}</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"><script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');fbq('track','${pixelEventName}',{value:${pixelValue},currency:'USD'},{eventID:'${subscriptionEventId}'});</script><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Sans',sans-serif;background:#f8f9fa;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:white;border-radius:20px;padding:36px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.1)}h1{font-size:24px;margin-bottom:8px;color:#1a1a2e}.subtitle{color:#6b7280;font-size:14px;margin-bottom:16px;line-height:1.5}.url-box{background:#e8f5ee;border-radius:12px;padding:14px;font-family:monospace;font-size:15px;color:#2E7D5B;font-weight:600;margin-bottom:16px;word-break:break-all}.field{text-align:left;margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:#1a1a2e}.field input{width:100%;padding:12px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:inherit;font-size:16px;outline:none}.field input:focus{border-color:#2E7D5B}.btn{display:block;width:100%;padding:14px;background:#2E7D5B;color:white;border:none;border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;transition:all 0.15s;text-decoration:none;text-align:center}.btn:hover{background:#1a5c3f}.note{margin-top:12px;font-size:12px;color:#6b7280;line-height:1.5}.pin-box{background:#f0f4ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}.pin-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.pin-value{font-family:'DM Mono',monospace;font-size:28px;font-weight:700;color:#1a1a2e;letter-spacing:4px}.pin-hint{font-size:12px;color:#6b7280;margin-top:8px;line-height:1.4}.err{color:#ef4444;font-size:13px;margin-top:6px;display:none}</style></head><body><div class="card"><h1>\u{1F389} ${isTrial ? 'Your 14-day trial is live!' : "You're live!"}</h1><p class="subtitle">Your booking site is ready at:</p><div class="url-box">${assignedDomain}</div><p class="subtitle" id="contactSubtitle">Enter your email and phone so we can send you your access code.</p><div id="contactForm"><div class="field"><label>Email</label><input type="email" id="ownerEmail" placeholder="you@hotel.com" value="${hotel.ownerEmail || ''}" autocomplete="email"></div><div class="field"><label>Phone</label><input type="tel" id="ownerPhone" placeholder="(555) 123-4567" autocomplete="tel"></div><div class="err" id="formErr"></div><button class="btn" onclick="submitContact()">Send me my code \u2192</button></div><div id="revealSection" style="display:none;"><div class="pin-box"><div class="pin-label">Front Desk PIN</div><div class="pin-value">${defaultPin}</div><div class="pin-hint">Tap the \u270f\ufe0f pencil on your booking site and enter this PIN to manage everything.</div></div><a class="btn" href="https://${assignedDomain}?welcome=1" target="_blank">Visit Your Site \u2192</a><p class="note">We\u2019ve emailed this to you. You can change your PIN later in your front desk settings.</p></div></div><script>function submitContact(){var email=document.getElementById('ownerEmail').value.trim();var phone=document.getElementById('ownerPhone').value.trim();var err=document.getElementById('formErr');err.style.display='none';if(!email||!email.includes('@')){err.textContent='Please enter a valid email';err.style.display='block';return;}if(!phone){err.textContent='Please enter your phone number';err.style.display='block';return;}var btn=document.querySelector('#contactForm .btn');btn.textContent='Sending...';btn.disabled=true;fetch('/api/setup/${token}/finalize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,phone:phone,pin:'${defaultPin}',domainPref:'subdomain',customDomain:''})}).then(function(r){return r.json()}).then(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';}).catch(function(){document.getElementById('contactForm').style.display='none';document.getElementById('contactSubtitle').style.display='none';document.getElementById('revealSection').style.display='block';});}</script></body></html>`);
     } catch (e) {
         console.error('Setup success error:', e.message);
         res.redirect('/');
@@ -13809,6 +13958,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 returnOfferLabel: true,
                 otaCommissionRate: true,
                 subscribed: true,
+                marketelSubscriptionStatus: true,
+                marketelCurrentPeriodEnd: true,
                 setupToken: true,
                 ownerEmail: true,
                 rooms: {
@@ -13849,6 +14000,13 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 }).catch(() => {});
             }
         }
+        const trialing = String(dbHotel?.marketelSubscriptionStatus || '').toLowerCase() === 'trialing';
+        const trialEligible = !!dbHotel && !dbHotel.subscribed
+            ? await hotelTrialEligible(hotelId)
+            : false;
+        if (trialing && req.crmIsNativeClient) {
+            await recordTrialMilestone(hotelId, 'TrialNativeAppActivated', { client: req.crmClient || 'ios' });
+        }
         res.json({
             success: true,
             hotelId,
@@ -13874,6 +14032,12 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             returnOfferLabel: dbHotel?.returnOfferLabel || '',
             otaCommissionRate: Number.isFinite(Number(dbHotel?.otaCommissionRate)) ? Number(dbHotel?.otaCommissionRate) : 0.15,
             subscribed: dbHotel?.subscribed || false,
+            subscriptionStatus: dbHotel?.marketelSubscriptionStatus || null,
+            subscriptionPeriodEnd: dbHotel?.marketelCurrentPeriodEnd || null,
+            trialing,
+            trialDays: MARKETEL_TRIAL_DAYS,
+            trialEligible,
+            operationalAccessOnly: !!req.crmIsNativeClient && !!dbHotel && !dbHotel.subscribed,
             frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
         });
     } catch (e) {
@@ -13889,13 +14053,12 @@ app.get('/api/crm/properties', crmAuth, async (req, res) => {
     try {
         const allowed = Array.isArray(req.crmAllowedHotels) ? req.crmAllowedHotels : [];
         const isMaster = allowed.includes('*');
-        const activeCustomerOnly = !!(
-            (req.crmIsNativeClient || req.crmIsNativeSession)
-            && !req.crmIsDogfoodPreview
-        );
+        // Native owner sessions were already reduced to subscribed properties or
+        // properties with a future guest obligation by crmAuth. Do not reapply a
+        // subscribed-only filter here or an expired trial would strand an existing stay.
         const where = isMaster
-            ? { active: true, ...(activeCustomerOnly ? { subscribed: true } : {}) }
-            : { active: true, id: { in: allowed }, ...(activeCustomerOnly ? { subscribed: true } : {}) };
+            ? { active: true }
+            : { active: true, id: { in: allowed } };
         const rows = await prisma.hotelConfig.findMany({
             where,
             select: {
@@ -15281,8 +15444,39 @@ async function syncMarketelSubscription(subscription, { forcedStatus = '' } = {}
     const subscribed = marketelSubscriptionHasAccess(status);
     const previous = await prisma.hotelConfig.findUnique({
         where: { id: hotelId },
-        select: { marketelSubscriptionStatus: true, ownerEmail: true },
+        select: {
+            marketelSubscriptionStatus: true,
+            marketelStripeSubscriptionId: true,
+            ownerEmail: true,
+        },
     });
+
+    // A stale or duplicate Stripe subscription must not turn off the current one.
+    // This can happen when two Checkout tabs complete close together and the
+    // duplicate is immediately canceled. Only an access-granting replacement may
+    // supersede a different stored subscription.
+    const storedSubscriptionId = String(previous?.marketelStripeSubscriptionId || '').trim();
+    const storedHasAccess = marketelSubscriptionHasAccess(previous?.marketelSubscriptionStatus);
+    if (
+        storedSubscriptionId
+        && subscriptionId
+        && storedSubscriptionId !== subscriptionId
+        && storedHasAccess
+        && !subscribed
+    ) {
+        console.warn('Ignoring non-active status from a non-current Marketel subscription:', {
+            hotelId,
+            subscriptionId,
+            storedSubscriptionId,
+            status,
+        });
+        return {
+            hotelId,
+            subscribed: true,
+            status: previous.marketelSubscriptionStatus,
+            ignored: true,
+        };
+    }
     await prisma.hotelConfig.update({
         where: { id: hotelId },
         data: {
@@ -15294,22 +15488,26 @@ async function syncMarketelSubscription(subscription, { forcedStatus = '' } = {}
             ...(subscribed ? { setupComplete: true, active: true } : {}),
         },
     });
-    if (previous?.marketelSubscriptionStatus !== status) {
-        await prisma.funnelEvent.create({
-            data: {
+    if (
+        previous?.marketelSubscriptionStatus !== status
+        || (storedSubscriptionId && storedSubscriptionId !== subscriptionId)
+    ) {
+        await createFunnelEventOnce(
+            'SubscriptionStatusChanged',
+            `marketel-subscription-status.${subscriptionId}.${status}`,
+            {
                 hotelId,
-                eventName: 'SubscriptionStatusChanged',
-                eventId: `marketel-subscription-status.${subscriptionId}.${status}.${Date.now()}`,
                 guestEmail: previous?.ownerEmail || null,
                 contentName: status,
-            },
-        }).catch(() => {});
+                surface: 'stripe',
+            }
+        ).catch(() => {});
     }
     console.log(`Marketel subscription synchronized: ${hotelId} status=${status} access=${subscribed}`);
     return { hotelId, subscribed, status };
 }
 
-async function sendMarketelActivationEmailOnce(hotelId, req = null) {
+async function sendMarketelActivationEmailOnce(hotelId, req = null, activation = {}) {
     if (!hotelId || !emailTransporter) return false;
     let claim = null;
     await prisma.$transaction(async (tx) => {
@@ -15338,7 +15536,13 @@ async function sendMarketelActivationEmailOnce(hotelId, req = null) {
         const [hotel, domainRow] = await Promise.all([
             prisma.hotelConfig.findUnique({
                 where: { id: hotelId },
-                select: { id: true, name: true, ownerEmail: true },
+                select: {
+                    id: true,
+                    name: true,
+                    ownerEmail: true,
+                    marketelSubscriptionStatus: true,
+                    marketelCurrentPeriodEnd: true,
+                },
             }),
             prisma.hotelDomain.findFirst({
                 where: { hotelId },
@@ -15349,12 +15553,31 @@ async function sendMarketelActivationEmailOnce(hotelId, req = null) {
         if (!hotel?.ownerEmail) throw new Error('Property has no owner email');
         const domain = domainRow?.domain || await assignUniqueDomainForHotel(hotel);
         const frontdeskUrl = `${marketelFrontdeskOrigin(req)}/frontdesk?hotelId=${encodeURIComponent(hotelId)}`;
+        const trialStarted = String(hotel.marketelSubscriptionStatus || '').toLowerCase() === 'trialing'
+            ? await prisma.funnelEvent.findFirst({
+                where: { hotelId, eventName: 'TrialStarted' },
+                orderBy: { createdAt: 'asc' },
+                select: { metadata: true },
+            }).catch(() => null)
+            : null;
+        const trialMetadata = trialStarted?.metadata && typeof trialStarted.metadata === 'object'
+            ? trialStarted.metadata
+            : {};
+        const effectiveActivation = Object.prototype.hasOwnProperty.call(activation, 'trialing')
+            ? activation
+            : {
+                trialing: !!trialStarted,
+                trialEndsAt: hotel.marketelCurrentPeriodEnd,
+                billingInterval: trialMetadata.billingInterval,
+                renewalAmountUsd: trialMetadata.renewalAmountUsd,
+            };
         const sent = await sendActivationEmail({
             toEmail: hotel.ownerEmail,
             hotelName: hotel.name || 'Your property',
             hotelId,
             domain,
             frontdeskUrl,
+            ...effectiveActivation,
         });
         if (!sent) throw new Error('Activation email was not sent');
         await prisma.funnelEvent.update({
@@ -15363,6 +15586,14 @@ async function sendMarketelActivationEmailOnce(hotelId, req = null) {
                 eventName: 'ActivationEmailSent',
                 eventId: `marketel-activation-email.${hotelId}`,
                 guestEmail: hotel.ownerEmail,
+                metadata: {
+                    trialing: !!effectiveActivation.trialing,
+                    trialEndsAt: effectiveActivation.trialEndsAt instanceof Date
+                        ? effectiveActivation.trialEndsAt.toISOString()
+                        : null,
+                    billingInterval: normalizeMarketelBillingInterval(effectiveActivation.billingInterval),
+                    renewalAmountUsd: Number(effectiveActivation.renewalAmountUsd) || null,
+                },
             },
         });
         return true;
@@ -15373,88 +15604,453 @@ async function sendMarketelActivationEmailOnce(hotelId, req = null) {
     }
 }
 
-async function recordMarketelPaymentSuccess({ hotelId, checkoutSession, req = null }) {
-    if (!hotelId || !checkoutSession?.id) return;
-    const eventId = `marketel-subscribe.${checkoutSession.id}`;
-    const journeyExternalId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeyVisitorId, 'mjv_');
-    const journeySessionId = sanitizeJourneyIdentifier(checkoutSession?.metadata?.journeySessionId, 'mjs_');
-    const billingInterval = normalizeMarketelBillingInterval(checkoutSession?.metadata?.billingInterval);
-    const billingPlan = marketelBillingPlan(billingInterval);
-    const checkoutAmountUsd = Number(checkoutSession.amount_total) / 100;
-    const metadataAmountUsd = Number(checkoutSession?.metadata?.billingAmountUsd);
-    const amountUsd = Number.isFinite(checkoutAmountUsd) && checkoutAmountUsd > 0
-        ? checkoutAmountUsd
-        : Number.isFinite(metadataAmountUsd) && metadataAmountUsd > 0
-            ? metadataAmountUsd
-            : billingPlan.amountUsd;
-
+// Shared attribution for every activation outcome. Stripe redirects leave the browser
+// and webhooks carry no cookies, so the fbp/fbc, source URL, IP and user agent captured
+// before Checkout are recovered here and reused for whichever Meta event fires.
+async function marketelActivationContext({ hotelId, metadata = {}, checkoutSessionId = '', req = null }) {
     const hotel = await prisma.hotelConfig.findUnique({
         where: { id: hotelId },
         select: { ownerEmail: true, ownerPhone: true },
     }).catch(() => null);
+    // The invoice path has no checkout session id, so fall back to the property's most
+    // recent CheckoutStarted rather than losing match quality on conversion.
     const checkoutTracking = await prisma.funnelEvent.findFirst({
-        where: { eventName: 'CheckoutStarted', eventId: `marketel-checkout.${checkoutSession.id}` },
+        where: checkoutSessionId
+            ? { eventName: 'CheckoutStarted', eventId: `marketel-checkout.${checkoutSessionId}` }
+            : { eventName: 'CheckoutStarted', hotelId },
         orderBy: { createdAt: 'desc' },
         select: { metadata: true, userAgent: true, ipAddress: true },
     }).catch(() => null);
-    const existing = await prisma.funnelEvent.findFirst({
-        where: { eventName: 'PaymentSucceeded', eventId },
-        select: { id: true },
-    }).catch(() => null);
-    if (!existing) {
-        await prisma.funnelEvent.create({
-            data: {
-                hotelId,
-                eventName: 'PaymentSucceeded',
-                eventId,
-                guestEmail: hotel?.ownerEmail || null,
-                guestPhone: hotel?.ownerPhone || null,
-                value: amountUsd,
-                currency: 'USD',
-                contentName: billingPlan.contentName,
-                externalId: journeyExternalId,
-                sessionId: journeySessionId,
-                surface: 'stripe',
-                pagePath: '/checkout/success',
-                metadata: {
-                    provider: 'stripe',
-                    product: billingPlan.contentName,
-                    billingInterval,
-                    attributionLinked: !!(journeyExternalId && journeySessionId),
-                },
-            },
-        }).catch((e) => console.error('Payment funnel tracking failed:', e.message));
-        void sendAdminPush('PaymentSucceeded', { property: hotel?.ownerEmail || hotelId });
-    }
-
-    // Stripe redirects leave the browser and webhooks have no browser cookies.
-    // The original fbp/fbc, source URL, IP and user agent were captured before
-    // Checkout and carried in Stripe/FunnelEvent, so Subscribe retains the same
-    // match quality even when the webhook is the only request that arrives.
     const storedTracking = checkoutTracking?.metadata && typeof checkoutTracking.metadata === 'object'
         ? checkoutTracking.metadata.metaAttribution || {}
         : {};
     const requestMeta = req ? marketelMetaContext(req) : {};
-    await queueMarketelCAPI('Subscribe', {
-        hotelId,
-        email: hotel?.ownerEmail || '',
-        phone: hotel?.ownerPhone || '',
+    const billingInterval = normalizeMarketelBillingInterval(metadata?.billingInterval);
+    return {
+        hotel,
+        billingInterval,
+        billingPlan: marketelBillingPlan(billingInterval),
+        journeyExternalId: sanitizeJourneyIdentifier(metadata?.journeyVisitorId, 'mjv_'),
+        journeySessionId: sanitizeJourneyIdentifier(metadata?.journeySessionId, 'mjs_'),
+        identity: {
+            hotelId,
+            email: hotel?.ownerEmail || '',
+            phone: hotel?.ownerPhone || '',
+            externalId: hotelId,
+            ip: checkoutTracking?.ipAddress || req?.ip || '',
+            userAgent: checkoutTracking?.userAgent || req?.headers?.['user-agent'] || '',
+            sourceUrl: metadata?.metaSourceUrl
+                || storedTracking.sourceUrl
+                || requestMeta.sourceUrl
+                || process.env.BACKEND_URL
+                || 'https://bookmarketel.com/frontdesk',
+            fbp: metadata?.metaFbp || storedTracking.fbp || requestMeta.fbp || '',
+            fbc: metadata?.metaFbc || storedTracking.fbc || requestMeta.fbc || '',
+        },
+    };
+}
+
+// A trial start is not revenue. It records TrialStarted and sends Meta StartTrial with
+// value 0 — reporting the plan price here would book money that has not moved and would
+// teach the ad account to optimise toward a purchase that never happened.
+async function recordMarketelTrialStarted({ hotelId, checkoutSession, subscription, req = null }) {
+    if (!hotelId || !checkoutSession?.id) return { created: false, duplicate: false };
+    const eventId = `marketel-trial.${checkoutSession.id}`;
+    const metadata = checkoutSession?.metadata || subscription?.metadata || {};
+    const ctx = await marketelActivationContext({
+        hotelId, metadata, checkoutSessionId: checkoutSession.id, req,
+    });
+    const trialEnd = Number(subscription?.trial_end);
+    const subscriptionId = stripeObjectId(subscription);
+    const claim = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT 1 AS "locked" FROM pg_advisory_xact_lock(hashtext(${`marketel-trial-start.${hotelId}`}))`;
+        const existing = await tx.funnelEvent.findFirst({
+            where: { hotelId, eventName: 'TrialStarted' },
+            orderBy: { createdAt: 'asc' },
+        });
+        if (existing) {
+            const existingMeta = existing.metadata && typeof existing.metadata === 'object'
+                ? existing.metadata
+                : {};
+            const sameActivation = existing.eventId === eventId
+                || (subscriptionId && existingMeta.subscriptionId === subscriptionId);
+            return { created: false, duplicate: !sameActivation, row: existing };
+        }
+        const row = await tx.funnelEvent.create({ data: {
+            hotelId,
+            eventName: 'TrialStarted',
+            eventId,
+            guestEmail: ctx.hotel?.ownerEmail || null,
+            guestPhone: ctx.hotel?.ownerPhone || null,
+            value: 0,
+            currency: 'USD',
+            contentName: ctx.billingPlan.contentName,
+            externalId: ctx.journeyExternalId,
+            sessionId: ctx.journeySessionId,
+            surface: 'stripe',
+            pagePath: '/checkout/trial-started',
+            metadata: {
+                provider: 'stripe',
+                product: ctx.billingPlan.contentName,
+                billingInterval: ctx.billingInterval,
+                trialDays: MARKETEL_TRIAL_DAYS,
+                renewalAmountUsd: ctx.billingPlan.amountUsd,
+                trialEndsAt: Number.isFinite(trialEnd) ? new Date(trialEnd * 1000).toISOString() : null,
+                checkoutSessionId: checkoutSession.id,
+                subscriptionId: subscriptionId || null,
+                attributionLinked: !!(ctx.journeyExternalId && ctx.journeySessionId),
+            },
+        } });
+        return { created: true, duplicate: false, row };
+    });
+    if (!claim.created) return claim;
+
+    void sendAdminPush('TrialStarted', { property: ctx.hotel?.ownerEmail || hotelId });
+
+    await queueMarketelCAPI('StartTrial', {
+        ...ctx.identity,
         externalId: hotelId,
-        ip: checkoutTracking?.ipAddress || req?.ip || '',
-        userAgent: checkoutTracking?.userAgent || req?.headers?.['user-agent'] || '',
-        sourceUrl: checkoutSession?.metadata?.metaSourceUrl
-            || storedTracking.sourceUrl
-            || requestMeta.sourceUrl
-            || process.env.BACKEND_URL
-            || 'https://bookmarketel.com/frontdesk',
-        fbp: checkoutSession?.metadata?.metaFbp || storedTracking.fbp || requestMeta.fbp || '',
-        fbc: checkoutSession?.metadata?.metaFbc || storedTracking.fbc || requestMeta.fbc || '',
-        value: amountUsd,
+        value: 0,
         currency: 'USD',
         eventId,
-        contentName: billingPlan.contentName,
+        contentName: ctx.billingPlan.contentName,
+    }).catch((error) => console.error('StartTrial CAPI queue failed:', error.message));
+    await sendMarketelActivationEmailOnce(hotelId, req, {
+        trialing: true,
+        trialEndsAt: Number.isFinite(trialEnd) ? new Date(trialEnd * 1000) : null,
+        billingInterval: ctx.billingInterval,
+        renewalAmountUsd: ctx.billingPlan.amountUsd,
     });
+    return claim;
+}
+
+async function processMarketelCheckoutActivation({ checkoutSession, subscription, expectedHotelId = '', req = null }) {
+    if (!checkoutSession || !subscription) throw new Error('Stripe activation is incomplete');
+    const subscriptionId = stripeObjectId(subscription);
+    const hotelId = await resolveMarketelSubscriptionHotelId({
+        hotelId: checkoutSession?.metadata?.hotelId || subscription?.metadata?.hotelId,
+        subscriptionId,
+        customerId: stripeObjectId(subscription?.customer || checkoutSession?.customer),
+    });
+    if (!hotelId || (expectedHotelId && hotelId !== expectedHotelId)) {
+        throw new Error('Stripe activation could not be matched to this property');
+    }
+
+    if (resolveActivationOutcome(subscription) === 'trial') {
+        // Claim the one permitted trial before persisting the subscription. If two
+        // Checkout tabs finish, the loser is canceled and can never replace the
+        // active subscription in HotelConfig.
+        const claim = await recordMarketelTrialStarted({
+            hotelId,
+            checkoutSession,
+            subscription,
+            req,
+        });
+        if (claim?.duplicate) {
+            if (subscriptionId) {
+                await marketelStripe.subscriptions.cancel(subscriptionId).catch((error) => {
+                    console.error('Could not cancel duplicate Marketel trial:', error.message);
+                });
+            }
+            console.warn('Duplicate Marketel trial rejected:', { hotelId, subscriptionId });
+            return { hotelId, subscribed: false, status: 'duplicate_trial', duplicate: true };
+        }
+        const synced = await syncMarketelSubscription(subscription);
+        if (!synced.subscribed) throw new Error('Trial access could not be activated');
+        return { ...synced, trialing: true, duplicate: false };
+    }
+
+    const synced = await syncMarketelSubscription(subscription);
+    if (!synced.subscribed) throw new Error('Paid subscription access could not be activated');
+    await recordMarketelPaymentSuccess({
+        hotelId,
+        checkoutSession,
+        subscription,
+        req,
+    });
+    return { ...synced, trialing: false, duplicate: false };
+}
+
+// Real money. Called from the immediate-purchase paths with a checkout session, and
+// from invoice.paid with the first nonzero invoice when a trial converts.
+async function recordMarketelPaymentSuccess({
+    hotelId,
+    checkoutSession = null,
+    invoice = null,
+    subscription = null,
+    req = null,
+    converted = false,
+    reportSubscribe = true,
+}) {
+    // Checkout and invoice.paid can arrive in either order for the same initial
+    // charge. Checkout carries that invoice ID, so both routes deliberately claim
+    // the same event instead of reporting the money twice.
+    const sourceId = invoice?.id || stripeObjectId(checkoutSession?.invoice) || checkoutSession?.id;
+    if (!hotelId || !sourceId) return;
+    const eventId = `marketel-subscribe.${sourceId}`;
+    const metadata = checkoutSession?.metadata || subscription?.metadata || {};
+    const ctx = await marketelActivationContext({
+        hotelId, metadata, checkoutSessionId: checkoutSession?.id || '', req,
+    });
+
+    // An invoice states exactly what was collected. Never fall back to the plan price
+    // from an invoice — a zero there means a trial invoice, not a $199 purchase.
+    let amountUsd;
+    if (invoice) {
+        amountUsd = Number(invoice.amount_paid) / 100;
+        if (!Number.isFinite(amountUsd) || amountUsd <= 0) return;
+    } else {
+        const checkoutAmountUsd = Number(checkoutSession.amount_total) / 100;
+        const metadataAmountUsd = Number(metadata?.billingAmountUsd);
+        amountUsd = Number.isFinite(checkoutAmountUsd) && checkoutAmountUsd > 0
+            ? checkoutAmountUsd
+            : Number.isFinite(metadataAmountUsd) && metadataAmountUsd > 0
+                ? metadataAmountUsd
+                : ctx.billingPlan.amountUsd;
+    }
+
+    const payment = await createFunnelEventOnce('PaymentSucceeded', eventId, {
+        hotelId,
+        guestEmail: ctx.hotel?.ownerEmail || null,
+        guestPhone: ctx.hotel?.ownerPhone || null,
+        value: amountUsd,
+        currency: 'USD',
+        contentName: ctx.billingPlan.contentName,
+        externalId: ctx.journeyExternalId,
+        sessionId: ctx.journeySessionId,
+        surface: 'stripe',
+        pagePath: '/checkout/success',
+        metadata: {
+            provider: 'stripe',
+            product: ctx.billingPlan.contentName,
+            billingInterval: ctx.billingInterval,
+            convertedFromTrial: !!converted,
+            attributionLinked: !!(ctx.journeyExternalId && ctx.journeySessionId),
+        },
+    });
+    if (payment.created) {
+        if (converted) {
+            await createFunnelEventOnce(
+                'TrialConverted',
+                `marketel-trial-converted.${sourceId}`,
+                {
+                    hotelId,
+                    guestEmail: ctx.hotel?.ownerEmail || null,
+                    value: amountUsd,
+                    currency: 'USD',
+                    contentName: ctx.billingPlan.contentName,
+                    surface: 'stripe',
+                    metadata: { provider: 'stripe', billingInterval: ctx.billingInterval },
+                }
+            );
+            void sendAdminPush('TrialConverted', { property: ctx.hotel?.ownerEmail || hotelId });
+        }
+        void sendAdminPush('PaymentSucceeded', { property: ctx.hotel?.ownerEmail || hotelId });
+    }
+
+    // PaymentSucceeded is cash accounting and therefore records every paid
+    // invoice. Meta Subscribe is acquisition attribution and must fire only for
+    // the first real charge, never again for a monthly/yearly renewal.
+    if (reportSubscribe) {
+        await queueMarketelCAPI('Subscribe', {
+            ...ctx.identity,
+            externalId: hotelId,
+            value: amountUsd,
+            currency: 'USD',
+            eventId,
+            contentName: ctx.billingPlan.contentName,
+        });
+    }
     await sendMarketelActivationEmailOnce(hotelId, req);
+}
+
+// Trial lifecycle, kept distinct from billing. Stripe usually schedules a cancellation
+// (cancel_at_period_end) well before the status actually becomes canceled, and access is
+// owed for the whole trial the owner was promised — so the two are recorded separately.
+async function recordMarketelTrialLifecycle(event) {
+    const subscription = event?.data?.object;
+    const subscriptionId = stripeObjectId(subscription);
+    const customerId = stripeObjectId(subscription?.customer);
+    const hotelId = await resolveMarketelSubscriptionHotelId({
+        hotelId: subscription?.metadata?.hotelId,
+        subscriptionId,
+        customerId,
+    });
+    if (!hotelId) return;
+    const safeSubscriptionId = subscriptionId || 'unknown';
+    const lifecycleSourceId = String(event?.id || safeSubscriptionId).trim();
+    const status = String(subscription?.status || '').trim().toLowerCase();
+    const trialing = marketelSubscriptionIsTrialing(subscription);
+
+    const write = async (eventName, metadata = {}) => {
+        const eventId = `marketel-${eventName.toLowerCase()}.${lifecycleSourceId}`;
+        return createFunnelEventOnce(eventName, eventId, {
+                hotelId,
+                contentName: status,
+                surface: 'stripe',
+                metadata: { provider: 'stripe', status, ...metadata },
+        }).catch((e) => {
+            console.error(`${eventName} tracking failed:`, e.message);
+            return { created: false, row: null };
+        });
+    };
+
+    if (event.type === 'customer.subscription.trial_will_end') {
+        await write('TrialWillEnd', {
+            trialEndsAt: subscription?.trial_end
+                ? new Date(subscription.trial_end * 1000).toISOString()
+                : null,
+        });
+        return;
+    }
+    // Scheduled, not yet ended: the property keeps access until the trial actually runs out.
+    if (trialing && subscription?.cancel_at_period_end) {
+        await write('TrialCancellationScheduled', {
+            accessEndsAt: subscription?.trial_end
+                ? new Date(subscription.trial_end * 1000).toISOString()
+                : null,
+        });
+        return;
+    }
+    if (trialing && !subscription?.cancel_at_period_end) {
+        const latestCancellationChoice = await prisma.funnelEvent.findFirst({
+            where: {
+                hotelId,
+                eventName: { in: ['TrialCancellationScheduled', 'TrialCancellationReversed'] },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { eventName: true },
+        }).catch(() => null);
+        if (latestCancellationChoice?.eventName === 'TrialCancellationScheduled') {
+            await write('TrialCancellationReversed');
+        }
+    }
+    // Access has actually ended. Existing reservations, guest messages and stay records
+    // are untouched — only new booking requests stop, via the subscribed flag.
+    if (event.type === 'customer.subscription.deleted' || status === 'canceled') {
+        const hadTrial = await prisma.funnelEvent.findFirst({
+            where: { hotelId, eventName: 'TrialStarted' }, select: { id: true },
+        }).catch(() => null);
+        const converted = await prisma.funnelEvent.findFirst({
+            where: { hotelId, eventName: 'PaymentSucceeded' }, select: { id: true },
+        }).catch(() => null);
+        if (hadTrial && !converted) {
+            const canceled = await write('TrialCanceled');
+            if (canceled?.created) void sendAdminPush('TrialCanceled', { property: hotelId });
+        }
+    }
+}
+
+// Trial milestones. These exist so a trial that ends without converting can be read as
+// "Marketel did not work" versus "the owner never launched it" — which are opposite
+// problems with opposite fixes. Names describe exactly what was observed: a booking-page
+// visit does not prove a link was placed, so placement is owner-confirmed and stored as
+// self-reported.
+async function recordTrialMilestone(hotelId, eventName, metadata = {}) {
+    if (!hotelId) return false;
+    const activeTrial = await prisma.funnelEvent.findFirst({
+        where: { hotelId, eventName: 'TrialStarted' },
+        select: { id: true },
+    }).catch(() => null);
+    if (!activeTrial) return false;
+    const eventId = `marketel-${eventName.toLowerCase()}.${hotelId}`;
+    const result = await createFunnelEventOnce(eventName, eventId, {
+            hotelId,
+            surface: 'frontdesk',
+            metadata: { ...metadata },
+    }).catch((e) => {
+        console.error(`${eventName} tracking failed:`, e.message);
+        return { created: false };
+    });
+    return !!result.created;
+}
+
+async function marketelTrialState(hotelId) {
+    if (!hotelId) return { trialing: false };
+    const hotel = await prisma.hotelConfig.findUnique({
+        where: { id: hotelId },
+        select: { marketelSubscriptionStatus: true, marketelCurrentPeriodEnd: true, subscribed: true },
+    }).catch(() => null);
+    const trialing = String(hotel?.marketelSubscriptionStatus || '').toLowerCase() === 'trialing';
+    const started = await prisma.funnelEvent.findFirst({
+        where: { hotelId, eventName: 'TrialStarted' },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true, contentName: true, metadata: true },
+    }).catch(() => null);
+    const [latestCancellationChoice, converted, canceled] = await Promise.all([
+        prisma.funnelEvent.findFirst({
+            where: {
+                hotelId,
+                eventName: { in: ['TrialCancellationScheduled', 'TrialCancellationReversed'] },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { eventName: true },
+        }).catch(() => null),
+        prisma.funnelEvent.findFirst({
+            where: { hotelId, eventName: 'TrialConverted' },
+            select: { createdAt: true },
+        }).catch(() => null),
+        prisma.funnelEvent.findFirst({
+            where: { hotelId, eventName: 'TrialCanceled' },
+            select: { createdAt: true },
+        }).catch(() => null),
+    ]);
+    const startedMetadata = started?.metadata && typeof started.metadata === 'object'
+        ? started.metadata
+        : {};
+    const storedTrialEnd = startedMetadata.trialEndsAt
+        ? new Date(startedMetadata.trialEndsAt)
+        : null;
+    const endsAt = storedTrialEnd && Number.isFinite(storedTrialEnd.getTime())
+        ? storedTrialEnd
+        : hotel?.marketelCurrentPeriodEnd || null;
+    return {
+        trialing,
+        subscribed: !!hotel?.subscribed,
+        startedAt: started?.createdAt || null,
+        endsAt,
+        daysLeft: endsAt ? Math.max(0, Math.ceil((endsAt.getTime() - Date.now()) / 86400000)) : null,
+        billingInterval: normalizeMarketelBillingInterval(startedMetadata.billingInterval),
+        renewalAmountUsd: Number(startedMetadata.renewalAmountUsd) || null,
+        cancellationScheduled: latestCancellationChoice?.eventName === 'TrialCancellationScheduled',
+        convertedAt: converted?.createdAt || null,
+        canceledAt: canceled?.createdAt || null,
+    };
+}
+
+async function marketelTrialMilestones(hotelId, trial) {
+    const names = ['TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived'];
+    const rows = await prisma.funnelEvent.findMany({
+        where: { hotelId, eventName: { in: names } },
+        select: { eventName: true },
+    }).catch(() => []);
+    const done = new Set(rows.map((r) => r.eventName));
+
+    // First booking is derived rather than instrumented at every creation path: any
+    // booking persisted after the trial began counts, and it is recorded once.
+    if (!done.has('TrialFirstBookingReceived') && trial?.startedAt) {
+        const trialBookingWindow = {
+            gte: trial.startedAt,
+            ...(trial.endsAt ? { lte: trial.endsAt } : {}),
+        };
+        const booking = await prisma.booking.findFirst({
+            where: { hotelId, createdAt: trialBookingWindow },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true, ourReservationCode: true },
+        }).catch(() => null);
+        if (booking) {
+            await recordTrialMilestone(hotelId, 'TrialFirstBookingReceived', {
+                firstBookingAt: booking.createdAt.toISOString(),
+                reservationCode: booking.ourReservationCode || null,
+            });
+            done.add('TrialFirstBookingReceived');
+        }
+    }
+    return {
+        nativeAppActivated: done.has('TrialNativeAppActivated'),
+        linkPlacementConfirmed: done.has('TrialLinkPlacementConfirmed'),
+        firstBookingReceived: done.has('TrialFirstBookingReceived'),
+    };
 }
 
 function invoiceSubscriptionId(invoice) {
@@ -15490,13 +16086,10 @@ app.post('/api/marketel-stripe-webhook', async (req, res) => {
                 const subscriptionId = stripeObjectId(session.subscription);
                 if (subscriptionId) {
                     const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
-                    const synced = await syncMarketelSubscription(subscription);
-                    if (synced.subscribed) {
-                        await recordMarketelPaymentSuccess({
-                            hotelId: synced.hotelId,
-                            checkoutSession: session,
-                        });
-                    }
+                    await processMarketelCheckoutActivation({
+                        checkoutSession: session,
+                        subscription,
+                    });
                 }
             }
         } else if (
@@ -15504,20 +16097,110 @@ app.post('/api/marketel-stripe-webhook', async (req, res) => {
             || event.type === 'customer.subscription.updated'
             || event.type === 'customer.subscription.deleted'
         ) {
-            await syncMarketelSubscription(event.data.object);
+            const subscription = event.data.object;
+            if (marketelSubscriptionIsTrialing(subscription)) {
+                // A trial is first claimed by its signed Checkout Session. Stripe can
+                // deliver subscription.created before checkout.session.completed, so
+                // do not let that out-of-order event bypass the one-trial guard.
+                const subscriptionId = stripeObjectId(subscription);
+                const claimed = await prisma.funnelEvent.findFirst({
+                    where: {
+                        eventName: 'TrialStarted',
+                        metadata: { path: ['subscriptionId'], equals: subscriptionId },
+                    },
+                    select: { id: true },
+                }).catch(() => null);
+                if (claimed) await syncMarketelSubscription(subscription);
+            } else {
+                await syncMarketelSubscription(subscription);
+            }
+            await recordMarketelTrialLifecycle(event);
+        } else if (event.type === 'customer.subscription.trial_will_end') {
+            // Stripe fires this roughly three days out. The reminder email itself is a
+            // dashboard setting; this only records that the owner was warned.
+            await recordMarketelTrialLifecycle(event);
         } else if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
-            const subscriptionId = invoiceSubscriptionId(event.data.object);
+            const invoice = event.data.object;
+            const subscriptionId = invoiceSubscriptionId(invoice);
             if (subscriptionId) {
                 const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
-                await syncMarketelSubscription(subscription, {
+                const synced = await syncMarketelSubscription(subscription, {
                     forcedStatus: event.type === 'invoice.payment_failed' ? 'past_due' : '',
                 });
+                // The $0 trial invoice also arrives as invoice.paid. Only a nonzero
+                // amount is money, and only then does a trial become a customer.
+                const amountPaid = Number(invoice?.amount_paid) || 0;
+                if (event.type === 'invoice.paid' && amountPaid > 0 && synced.hotelId) {
+                    const [trialStarted, priorPayment] = await Promise.all([
+                        prisma.funnelEvent.findFirst({
+                            where: { hotelId: synced.hotelId, eventName: 'TrialStarted' },
+                            select: { id: true },
+                        }).catch(() => null),
+                        prisma.funnelEvent.findFirst({
+                            where: { hotelId: synced.hotelId, eventName: 'PaymentSucceeded' },
+                            select: { id: true },
+                        }).catch(() => null),
+                    ]);
+                    await recordMarketelPaymentSuccess({
+                        hotelId: synced.hotelId,
+                        invoice,
+                        subscription,
+                        converted: !!trialStarted && !priorPayment,
+                        reportSubscribe: !priorPayment,
+                    });
+                }
             }
         }
         res.json({ received: true });
     } catch (e) {
         console.error(`Marketel Stripe webhook ${event.type} failed:`, e.message);
         res.status(500).send('Webhook processing failed');
+    }
+});
+
+// Trial checklist for Front Desk. Reading it also settles the derived milestones, so
+// the native app and the web app converge on the same state without extra plumbing.
+app.get('/api/crm/trial-status', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        const trial = await marketelTrialState(hotelId);
+        // An authenticated native session is the honest signal that the App Store app is
+        // actually in their hands — an install we cannot observe, a session we can.
+        if (trial.trialing && req.crmIsNativeClient) {
+            await recordTrialMilestone(hotelId, 'TrialNativeAppActivated', { client: 'native' });
+        }
+        const milestones = await marketelTrialMilestones(hotelId, trial);
+        res.json({ success: true, trialDays: MARKETEL_TRIAL_DAYS, ...trial, milestones });
+    } catch (e) {
+        console.error('crm:trial-status', e.message);
+        res.status(500).json({ success: false, message: 'Could not load trial status.' });
+    }
+});
+
+app.post('/api/crm/trial-milestone', crmAuth, async (req, res) => {
+    try {
+        const hotelId = requireScopedHotelId(req, res);
+        if (!hotelId) return;
+        if (String(req.body?.milestone || '') !== 'link-placed') {
+            return res.status(400).json({ success: false, message: 'Unknown milestone.' });
+        }
+        const trial = await marketelTrialState(hotelId);
+        if (!trial.trialing) {
+            return res.status(409).json({ success: false, message: 'This property does not have an active trial.' });
+        }
+        const where = String(req.body?.placement || '').trim().slice(0, 80);
+        await recordTrialMilestone(hotelId, 'TrialLinkPlacementConfirmed', {
+            // Owner-asserted, not observed. Anything reading this must not treat it as
+            // proof the link is live.
+            selfReported: true,
+            placement: where || null,
+        });
+        const milestones = await marketelTrialMilestones(hotelId, trial);
+        res.json({ success: true, milestones });
+    } catch (e) {
+        console.error('crm:trial-milestone', e.message);
+        res.status(500).json({ success: false, message: 'Could not save that.' });
     }
 });
 
@@ -15593,6 +16276,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
             hasReturnToken: !!returnToken,
             returnTokenKind: returnToken.startsWith('fd_') ? 'return-token' : (returnToken ? 'other' : 'none'),
         });
+        const trialDays = (await hotelTrialEligible(hotelId)) ? MARKETEL_TRIAL_DAYS : 0;
         const session = await marketelStripe.checkout.sessions.create({
             mode: 'subscription',
             client_reference_id: hotelId,
@@ -15605,6 +16289,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 hotelId,
                 billingInterval,
                 billingAmountUsd: String(amountUsd),
+                ...(trialDays ? { trialDays: String(trialDays) } : {}),
                 ...(meta.fbp ? { metaFbp: meta.fbp } : {}),
                 ...(meta.fbc ? { metaFbc: meta.fbc } : {}),
                 ...(meta.sourceUrl ? { metaSourceUrl: meta.sourceUrl } : {}),
@@ -15612,11 +16297,19 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
                 ...(journeySessionId ? { journeySessionId } : {}),
             },
             subscription_data: {
+                // Card collection is Checkout's default for subscription mode; we
+                // deliberately do NOT pass payment_method_collection: 'if_required',
+                // which is what would create a card-less trial.
+                ...(trialDays ? {
+                    trial_period_days: trialDays,
+                    trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+                } : {}),
                 metadata: {
                     product: 'hotel-go-live',
                     hotelId,
                     billingInterval,
                     billingAmountUsd: String(amountUsd),
+                    ...(trialDays ? { trialDays: String(trialDays) } : {}),
                     ...(meta.fbp ? { metaFbp: meta.fbp } : {}),
                     ...(meta.fbc ? { metaFbc: meta.fbc } : {}),
                     ...(meta.sourceUrl ? { metaSourceUrl: meta.sourceUrl } : {}),
@@ -15626,6 +16319,10 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
             },
             success_url: `${baseUrl}/api/crm/go-live-success?session_id={CHECKOUT_SESSION_ID}&frontdeskOrigin=${encodeURIComponent(frontdeskOrigin)}`,
             cancel_url: cancelUrl,
+        }, {
+            // A double-tapped CTA returns the same session instead of opening a second
+            // subscription. Bucketed by minute so a genuine retry later still works.
+            idempotencyKey: `marketel-go-live.${hotelId}.${billingInterval}.${trialDays}.${Math.floor(Date.now() / 60000)}`,
         });
         const checkoutEventId = `marketel-checkout.${session.id}`;
         await prisma.funnelEvent.create({
@@ -15810,16 +16507,19 @@ app.get('/api/crm/go-live-success', async (req, res) => {
 
     try {
         if (stripeVerifiedHotelId && verifiedCheckoutSession && verifiedSubscription) {
-            const synced = await syncMarketelSubscription(verifiedSubscription);
-            if (!synced.subscribed || synced.hotelId !== stripeVerifiedHotelId) {
-                throw new Error('Paid subscription could not be matched to this property');
-            }
-            await recordMarketelPaymentSuccess({
-                hotelId: stripeVerifiedHotelId,
+            const activated = await processMarketelCheckoutActivation({
                 checkoutSession: verifiedCheckoutSession,
+                subscription: verifiedSubscription,
+                expectedHotelId: stripeVerifiedHotelId,
                 req,
             });
-            console.log(`✅ Hotel subscribed: ${stripeVerifiedHotelId}`);
+            if (activated.duplicate) {
+                console.warn(`Duplicate trial checkout closed: ${stripeVerifiedHotelId}`);
+            } else if (activated.trialing) {
+                console.log(`✅ Hotel trial started: ${stripeVerifiedHotelId}`);
+            } else {
+                console.log(`✅ Hotel subscribed: ${stripeVerifiedHotelId}`);
+            }
         }
         res.redirect(await buildFrontdeskRedirect());
     } catch (e) {

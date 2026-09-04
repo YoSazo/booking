@@ -1882,12 +1882,13 @@ function blockedDemandLineHtml() {
 function goLiveBannerHtml() {
   if (isNativeFrontdeskApp()) return '';
   const demand = crm.blockedDemand && crm.blockedDemand.total > 0 ? crm.blockedDemand.total : 0;
+  const hasTrial = crm.marketelTrialEligible !== false;
   if (demand > 0) {
     return `
       <div onclick="goLive()" role="button" tabindex="0" style="display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:1px 14px;margin-bottom:14px;cursor:pointer;">
         <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;flex-shrink:0;"></span>
-        <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.25;">${demand} guest${demand>1?'s':''} tried to book — turn on direct bookings to accept reservations like these.</span>
-        <span style="white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;line-height:1;">Go live →</span>
+        <span style="font-size:13px;color:#9a3412;font-weight:600;line-height:1.25;">${demand} guest${demand>1?'s':''} tried to book — ${hasTrial ? 'start your free trial' : 'reactivate'} to accept reservations like these.</span>
+        <span style="white-space:nowrap;font-size:13px;color:#c2410c;font-weight:800;line-height:1;">${hasTrial ? 'Start free' : 'Reactivate'} →</span>
       </div>`;
   }
   return `
@@ -1895,8 +1896,76 @@ function goLiveBannerHtml() {
       <span style="width:8px;height:8px;border-radius:50%;background:#2E7D5B;flex-shrink:0;"></span>
       <span style="display:inline-flex;align-items:center;min-height:24px;font-size:13px;color:#1a5c3f;font-weight:600;line-height:1.3;">Preview mode</span>
       <span style="display:inline-flex;align-items:center;min-height:24px;font-size:12px;color:#6b7280;line-height:1.35;">· guests can browse, but can&apos;t book yet</span>
-      <span style="display:inline-flex;align-items:center;min-height:24px;margin-left:auto;white-space:nowrap;font-size:13px;color:#2E7D5B;font-weight:700;line-height:1.3;">Go live →</span>
+      <span style="display:inline-flex;align-items:center;min-height:24px;margin-left:auto;white-space:nowrap;font-size:13px;color:#2E7D5B;font-weight:700;line-height:1.3;">${hasTrial ? 'Start free' : 'Reactivate'} →</span>
     </div>`;
+}
+
+function trialDateLabel(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return 'the end of your trial';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+function trialChecklistHtml() {
+  const trial = crm.trialStatus || {};
+  const milestones = trial.milestones || {};
+  const endLabel = trialDateLabel(trial.endsAt || crm.marketelSubscriptionPeriodEnd);
+  const interval = trial.billingInterval === 'year' ? 'year' : 'month';
+  const renewal = Number(trial.renewalAmountUsd) || (interval === 'year' ? 1990 : 199);
+  const items = [
+    { done: !!milestones.nativeAppActivated, label: 'Open Marketel Front Desk on your phone' },
+    { done: !!milestones.linkPlacementConfirmed, label: 'Place your booking link where guests find you', action: true },
+    { done: !!milestones.firstBookingReceived, label: 'Receive your first booking' },
+  ];
+  return `<section aria-label="Trial launch checklist" style="background:#eef6f1;border:1px solid #cfe6da;border-radius:16px;padding:14px 15px;margin-bottom:14px;color:#183d2e;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+      <div><strong style="display:block;font-size:14px;line-height:1.25;">Your ${crm.marketelTrialDays || 14}-day trial is live</strong><span style="display:block;margin-top:3px;font-size:11.5px;color:#577266;line-height:1.35;">${trial.cancellationScheduled ? `Canceled · access remains through ${esc(endLabel)}` : `${Number(trial.daysLeft) || crm.marketelTrialDays || 14} days left · $${renewal.toLocaleString('en-US')}/${interval} on ${esc(endLabel)}`}</span></div>
+      <span style="width:9px;height:9px;border-radius:50%;background:#2E7D5B;box-shadow:0 0 0 5px rgba(46,125,91,.10);margin:5px 4px 0 0;flex:0 0 auto;"></span>
+    </div>
+    <div style="display:grid;gap:7px;">
+      ${items.map((item) => `<div style="display:grid;grid-template-columns:22px minmax(0,1fr)${item.action && !item.done ? ' auto' : ''};align-items:center;gap:8px;min-height:28px;">
+        <span aria-hidden="true" style="display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:${item.done ? '#2E7D5B' : '#fff'};border:1px solid ${item.done ? '#2E7D5B' : '#bdd5c8'};color:#fff;font-size:12px;font-weight:800;">${item.done ? '✓' : ''}</span>
+        <span style="font-size:12px;line-height:1.3;color:${item.done ? '#577266' : '#183d2e'};${item.done ? 'text-decoration:line-through;text-decoration-color:#9db8aa;' : ''}">${esc(item.label)}</span>
+        ${item.action && !item.done ? '<button type="button" onclick="confirmTrialLinkPlaced()" style="border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:11.5px;font-weight:800;padding:5px 0 5px 7px;cursor:pointer;white-space:nowrap;">I added it</button>' : ''}
+      </div>`).join('')}
+    </div>
+  </section>`;
+}
+
+function operationalAccessBannerHtml() {
+  return `<section aria-label="Direct bookings paused" style="display:flex;align-items:flex-start;gap:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:12px 14px;margin-bottom:14px;color:#9a3412;">
+    <span style="width:8px;height:8px;border-radius:50%;background:#ea580c;margin-top:5px;flex:0 0 auto;"></span>
+    <span style="font-size:12.5px;line-height:1.4;"><strong style="display:block;">New direct bookings are paused</strong>Your existing reservations and guest messages remain available here.</span>
+  </section>`;
+}
+
+async function loadMarketelTrialStatus() {
+  if (crm.marketelSubscriptionStatus !== 'trialing' || !crm.token || !crm.activeHotelId) {
+    crm.trialStatus = null;
+    updateGoLiveBanner();
+    return;
+  }
+  try {
+    const data = await api('GET', '/api/crm/trial-status');
+    if (data?.success) {
+      crm.trialStatus = data;
+      crm.marketelTrialDays = Math.max(1, Number(data.trialDays) || crm.marketelTrialDays || 14);
+      updateGoLiveBanner();
+    }
+  } catch (_) { /* Trial status is helpful, never app-blocking. */ }
+}
+
+async function confirmTrialLinkPlaced() {
+  try {
+    const data = await api('POST', '/api/crm/trial-milestone', { milestone: 'link-placed' });
+    if (data?.success) {
+      crm.trialStatus = { ...(crm.trialStatus || {}), milestones: data.milestones || {} };
+      updateGoLiveBanner();
+      toast('Booking link marked as placed', 'success');
+    }
+  } catch (_) {
+    toast('Could not save that yet. Try again.', 'error');
+  }
 }
 
 function goLiveInlineCardHtml() {
@@ -1904,14 +1973,15 @@ function goLiveInlineCardHtml() {
   // The card preloads before settingsTourActive flips true, so also gate on the
   // tour-completion flag — value is established first, price only after.
   if (isNativeFrontdeskApp() || crm.hotelSubscribed || crm.settingsTourActive || !localStorage.getItem('settingsTourDone')) return '';
+  const hasTrial = crm.marketelTrialEligible !== false;
   return `
     <div class="booking-card" id="tour-go-live-card" style="margin-bottom:14px;background:linear-gradient(135deg,#1a2b22 0%,#2E7D5B 100%);border:none;">
       <div style="padding:18px;text-align:center;">
-        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Ready to go live</div>
-        <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your page is built and previewing for guests. Flip the switch to start accepting reservations.</p>
+        <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">${hasTrial ? 'Start your 14-day free trial' : 'Ready to reactivate'}</div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your page is built. ${hasTrial ? 'Start full access to accept reservations and run Front Desk for $0 today.' : 'Reactivate to accept reservations and run Front Desk again.'}</p>
         ${blockedDemandLineHtml()}
-        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
-        <div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:8px;">Cancel anytime · No contracts</div>
+        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${hasTrial ? 'Start 14 days free' : 'Reactivate — $199/month'} →</button>
+        <div style="font-size:10px;color:rgba(255,255,255,0.68);margin-top:8px;">${hasTrial ? 'Card required · Then $199/month · Cancel anytime' : 'Billed monthly · Cancel anytime'}</div>
       </div>
     </div>`;
 }
@@ -1958,9 +2028,15 @@ async function loadBlockedDemand() {
 function updateGoLiveBanner() {
   const banner = document.getElementById('goLiveBanner');
   if (!banner) return;
-  const shouldShow = !isNativeFrontdeskApp() && !crm.hotelSubscribed && !banner.dataset.tourHidden;
+  const trialing = crm.marketelSubscriptionStatus === 'trialing';
+  const operationalOnly = !!crm.operationalAccessOnly;
+  const shouldShow = !banner.dataset.tourHidden && (
+    trialing || operationalOnly || (!isNativeFrontdeskApp() && !crm.hotelSubscribed)
+  );
   banner.style.display = shouldShow ? 'block' : 'none';
-  if (shouldShow) banner.innerHTML = goLiveBannerHtml();
+  if (shouldShow) banner.innerHTML = trialing
+    ? trialChecklistHtml()
+    : operationalOnly ? operationalAccessBannerHtml() : goLiveBannerHtml();
   const app = document.getElementById('app');
   if (app) app.classList.toggle('has-go-live-banner', shouldShow);
 }
@@ -2627,6 +2703,11 @@ async function startCrmApp(verification, options = {}) {
 
   // Track subscription status globally for banner visibility
   crm.hotelSubscribed = !!(verification && verification.subscribed);
+  crm.marketelSubscriptionStatus = String(verification?.subscriptionStatus || '').trim().toLowerCase();
+  crm.marketelSubscriptionPeriodEnd = String(verification?.subscriptionPeriodEnd || '').trim();
+  crm.marketelTrialEligible = verification?.trialEligible !== false;
+  crm.marketelTrialDays = Math.max(1, Number(verification?.trialDays) || 14);
+  crm.operationalAccessOnly = !!verification?.operationalAccessOnly;
   crm.frontdeskAppStoreUrl = String(verification?.frontdeskAppStoreUrl || '').trim();
   crm.guestelWalletImageUrl = String(
     verification?.guestelWalletImageUrl || crm.guestelWalletImageUrl || ''
@@ -2648,6 +2729,7 @@ async function startCrmApp(verification, options = {}) {
     } catch (_) {}
   }
   updateGoLiveBanner();
+  void loadMarketelTrialStatus();
   if (!crm.hotelSubscribed) loadBlockedDemand();
   initializeFrontdeskJourney(isEmbeddedEditorPreview);
 
@@ -4131,8 +4213,8 @@ function renderBookings(fullList) {
         <div class="empty-state">
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">Your page is ready to go live</div>
-          <div class="empty-sub" style="margin-bottom:12px;">Everything&apos;s set up. Flip the switch to start accepting direct bookings.${crm.blockedDemand && crm.blockedDemand.total > 0 ? ` <strong>${crm.blockedDemand.total} guest${crm.blockedDemand.total>1?'s':''} already tried to book.</strong>` : ''}</div>
-          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Turn on direct bookings — $199/mo →</button>
+          <div class="empty-sub" style="margin-bottom:12px;">Everything&apos;s set up. ${crm.marketelTrialEligible !== false ? 'Start 14 days of full access for $0 today.' : 'Reactivate to start accepting direct bookings again.'}${crm.blockedDemand && crm.blockedDemand.total > 0 ? ` <strong>${crm.blockedDemand.total} guest${crm.blockedDemand.total>1?'s':''} already tried to book.</strong>` : ''}</div>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate — $199/month'} →</button>
         </div>`;
       if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
     } else {
@@ -6699,6 +6781,7 @@ exposeToWindow({
   toggleMessageThreadPicker,
   toggleMessagesInbox,
   closeMessagesWorkspace,
+  confirmTrialLinkPlaced,
   twoRoomExplainerHtml,
   updateBookingsTabBadge,
   updateFrontdeskManifestLink,
@@ -6711,6 +6794,7 @@ exposeToWindow({
   loadSettingsModule,
   loadAppsModule,
   loadRevealModule,
+  loadMarketelTrialStatus,
   replayWalkthrough,
   replayValueReveal,
   resetWalkthroughProgress,

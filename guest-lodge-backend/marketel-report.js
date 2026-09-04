@@ -253,6 +253,12 @@ function emptyGroup(label) {
     offerViewed: 0,
     checkoutStarted: 0,
     mismatchContinued: 0,
+    trialsStarted: 0,
+    trialAppsOpened: 0,
+    trialLinksPlaced: 0,
+    trialBookings: 0,
+    trialsConverted: 0,
+    trialsCanceled: 0,
     paid: 0,
     revenue: 0,
   };
@@ -268,6 +274,12 @@ function addProperty(group, property) {
   if (property.events.has('ActivationOfferViewed')) group.offerViewed += 1;
   if (property.events.has('CheckoutStarted')) group.checkoutStarted += 1;
   if (property.events.has('FitMismatchContinued')) group.mismatchContinued += 1;
+  if (property.events.has('TrialStarted')) group.trialsStarted += 1;
+  if (property.events.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
+  if (property.events.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;
+  if (property.events.has('TrialFirstBookingReceived')) group.trialBookings += 1;
+  if (property.events.has('TrialConverted')) group.trialsConverted += 1;
+  if (property.events.has('TrialCanceled')) group.trialsCanceled += 1;
   if (property.events.has('PaymentSucceeded')) group.paid += 1;
   group.revenue += property.revenue;
 }
@@ -397,7 +409,13 @@ async function dbSection() {
   const activeAccounts = await prisma.hotelConfig.count({
     where: {
       id: { notIn: excludedHotelIds },
-      OR: [{ subscribed: true }, { marketelSubscriptionStatus: 'active' }],
+      marketelSubscriptionStatus: 'active',
+    },
+  });
+  const trialingAccounts = await prisma.hotelConfig.count({
+    where: {
+      id: { notIn: excludedHotelIds },
+      marketelSubscriptionStatus: 'trialing',
     },
   });
 
@@ -409,6 +427,7 @@ async function dbSection() {
     `${String(group.revealEntered).padStart(3)} reveal | ${String(group.revealEngaged).padStart(3)} engaged | ` +
     `${String(group.offerViewed).padStart(3)} offer | ${String(group.mismatchContinued).padStart(3)} override | ` +
     `${String(group.checkoutStarted).padStart(3)} checkout | ` +
+    `${String(group.trialsStarted).padStart(3)} trial | ${String(group.trialsConverted).padStart(3)} convert | ` +
     `${String(group.paid).padStart(3)} paid | ${money(group.revenue)}`;
 
   const out = [
@@ -428,7 +447,8 @@ async function dbSection() {
   out.push(
     '',
     `  cash collected during window: ${money(cashCollected)} (${seenPayments.size} Stripe-confirmed payment${seenPayments.size === 1 ? '' : 's'})`,
-    `  currently active non-QA accounts: ${activeAccounts}`,
+    `  currently paid non-QA accounts: ${activeAccounts} | currently trialing: ${trialingAccounts}`,
+    `  trial launch milestones: ${events.filter((e) => e.eventName === 'TrialNativeAppActivated').length} app opened | ${events.filter((e) => e.eventName === 'TrialLinkPlacementConfirmed').length} link placed (self-reported) | ${events.filter((e) => e.eventName === 'TrialFirstBookingReceived').length} first booking`,
     '  Note: “engaged” means at least one reveal-stage completion, not the raw number of carousel events.'
   );
   return out.join('\n');

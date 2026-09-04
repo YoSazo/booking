@@ -683,10 +683,10 @@ function showTestDriveModal(bookingUrl) {
           <div style="width:42px;height:42px;border-radius:14px;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i data-lucide="rocket" style="width:22px;height:22px;"></i></div>
           <div>
             <div style="font-size:11px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:#2E7D5B;margin-bottom:3px;">Activation</div>
-            <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">Go live when you are ready.</div>
+            <div style="font-size:20px;font-weight:850;color:#1A2B22;line-height:1.18;">${crm.marketelTrialEligible !== false ? 'Start free when you are ready.' : 'Reactivate when you are ready.'}</div>
           </div>
         </div>
-        <p style="font-size:13px;color:#4B5D52;line-height:1.6;margin:0 0 18px;">Your link is copied. Activate when you want guests to submit real bookings through this page.</p>
+        <p style="font-size:13px;color:#4B5D52;line-height:1.6;margin:0 0 18px;">Your link is copied. ${crm.marketelTrialEligible !== false ? 'Start 14 days of full access for $0 today when you want guests to submit real bookings.' : 'Reactivate when you want guests to submit real bookings again.'}</p>
         <div style="background:#F4F8F5;border-radius:14px;padding:14px;border:1.5px solid #D8E4DC;text-align:left;margin-bottom:18px;">
           <div style="display:flex;flex-direction:column;gap:9px;">
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">Booking page accepts reservations</span></div>
@@ -695,8 +695,8 @@ function showTestDriveModal(bookingUrl) {
             <div style="display:flex;align-items:center;gap:9px;"><span style="color:#2E7D5B;font-weight:850;">✓</span><span style="font-size:13px;color:#1A2B22;">No OTA commission</span></div>
           </div>
         </div>
-        <button id="activateNowBtn" style="width:100%;padding:15px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:850;cursor:pointer;margin-bottom:8px;box-shadow:0 8px 20px rgba(46,125,91,0.22);">$199/mo - Go live now</button>
-        <p style="font-size:11px;color:#6B7D72;margin:0 0 14px;text-align:center;">Cancel anytime. No contracts.</p>
+        <button id="activateNowBtn" style="width:100%;padding:15px 20px;border-radius:12px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:15px;font-weight:850;cursor:pointer;margin-bottom:8px;box-shadow:0 8px 20px rgba(46,125,91,0.22);">${crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate — $199/month'}</button>
+        <p style="font-size:11px;color:#6B7D72;margin:0 0 14px;text-align:center;">${crm.marketelTrialEligible !== false ? '$0 today. Card required. Then $199/month.' : 'Billed monthly.'} Cancel anytime.</p>
         <button id="activateLaterBtn" style="width:100%;background:none;border:none;color:#6B7D72;font-size:12px;font-family:inherit;font-weight:750;cursor:pointer;padding:8px 12px;">Keep page inactive for now</button>
       </div>
     </div>`;
