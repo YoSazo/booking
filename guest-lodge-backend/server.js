@@ -12409,9 +12409,9 @@ const MARKETEL_BILLING_PLANS = Object.freeze({
 // shown to the owner can never drift from what Stripe actually schedules.
 const MARKETEL_TRIAL_DAYS = 14;
 
-// Stripe reports payment_status 'paid' for a trial checkout, because the $0 trial
-// invoice really did process. Subscription status is the only honest signal for
-// whether money moved.
+// Stripe can report either paid or no_payment_required for a completed trial
+// Checkout. Subscription status is therefore the honest signal for trial access;
+// only a nonzero invoice is the honest signal that money moved.
 function marketelSubscriptionIsTrialing(subscription) {
     if (!subscription) return false;
     return String(subscription.status || '').trim().toLowerCase() === 'trialing';
@@ -12421,6 +12421,23 @@ function marketelSubscriptionIsTrialing(subscription) {
 // revenue for a free trial.
 function resolveActivationOutcome(subscription) {
     return marketelSubscriptionIsTrialing(subscription) ? 'trial' : 'paid';
+}
+
+function marketelCheckoutCanActivate(checkoutSession, subscription) {
+    if (
+        !checkoutSession
+        || checkoutSession.mode !== 'subscription'
+        || checkoutSession.status !== 'complete'
+        || !subscription
+        || !marketelSubscriptionHasAccess(subscription.status)
+    ) return false;
+    const paymentStatus = String(checkoutSession.payment_status || '').trim().toLowerCase();
+    // Stripe can report no_payment_required for a completed free-trial Checkout.
+    // It is safe only when the signed subscription object independently proves the
+    // property is trialing. A non-trial activation still requires actual payment.
+    return marketelSubscriptionIsTrialing(subscription)
+        ? ['paid', 'no_payment_required'].includes(paymentStatus)
+        : paymentStatus === 'paid';
 }
 
 // One trial per property. A property that already started one — including a trial it
@@ -13252,11 +13269,7 @@ app.get('/setup/:token/success', async (req, res) => {
         const metadataMatches = checkoutSession.metadata?.product === 'hotel-onboarding'
             && checkoutSession.metadata?.hotelId === hotel.id
             && checkoutSession.metadata?.setupToken === req.params.token;
-        const paymentVerified = checkoutSession.mode === 'subscription'
-            && checkoutSession.status === 'complete'
-            && checkoutSession.payment_status === 'paid'
-            && subscription
-            && marketelSubscriptionHasAccess(subscription.status);
+        const paymentVerified = marketelCheckoutCanActivate(checkoutSession, subscription);
         if (!metadataMatches || !paymentVerified) {
             return res.redirect(`/setup/${encodeURIComponent(req.params.token)}?payment=unverified`);
         }
@@ -16082,14 +16095,21 @@ app.post('/api/marketel-stripe-webhook', async (req, res) => {
         if (event.type === 'checkout.session.completed') {
             const session = event.data.object;
             const supportedProduct = ['hotel-go-live', 'hotel-onboarding'].includes(session.metadata?.product);
-            if (supportedProduct && session.mode === 'subscription' && session.payment_status === 'paid') {
+            if (
+                supportedProduct
+                && session.mode === 'subscription'
+                && session.status === 'complete'
+                && ['paid', 'no_payment_required'].includes(String(session.payment_status || '').toLowerCase())
+            ) {
                 const subscriptionId = stripeObjectId(session.subscription);
                 if (subscriptionId) {
                     const subscription = await marketelStripe.subscriptions.retrieve(subscriptionId);
-                    await processMarketelCheckoutActivation({
-                        checkoutSession: session,
-                        subscription,
-                    });
+                    if (marketelCheckoutCanActivate(session, subscription)) {
+                        await processMarketelCheckoutActivation({
+                            checkoutSession: session,
+                            subscription,
+                        });
+                    }
                 }
             }
         } else if (
@@ -16408,11 +16428,7 @@ app.get('/api/crm/go-live-success', async (req, res) => {
                 : null;
             const metadataHotelId = String(checkoutSession?.metadata?.hotelId || '').trim();
             const paymentComplete = checkoutSession?.metadata?.product === 'hotel-go-live'
-                && checkoutSession?.mode === 'subscription'
-                && checkoutSession?.payment_status === 'paid'
-                && checkoutSession?.status === 'complete'
-                && subscription
-                && marketelSubscriptionHasAccess(subscription.status)
+                && marketelCheckoutCanActivate(checkoutSession, subscription)
                 && subscription.metadata?.hotelId === metadataHotelId;
             if (metadataHotelId && paymentComplete) {
                 stripeVerifiedHotelId = metadataHotelId;

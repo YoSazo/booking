@@ -27,6 +27,9 @@ test('both Marketel checkout paths create one card-required 14-day trial', () =>
 
 test('a free trial is access but never cash or a Meta purchase', () => {
   assert.match(server, /MARKETEL_ACTIVE_SUBSCRIPTION_STATUSES[\s\S]*?'trialing'/);
+  assert.match(server, /function marketelCheckoutCanActivate/);
+  assert.match(server, /\['paid', 'no_payment_required'\]\.includes\(paymentStatus\)/);
+  assert.match(server, /: paymentStatus === 'paid'/);
   assert.match(server, /value: 0,[\s\S]*?queueMarketelCAPI\('StartTrial'/);
   assert.match(server, /if \(invoice\) \{[\s\S]*?amount_paid[\s\S]*?amountUsd <= 0\) return/);
   assert.match(server, /event\.type === 'invoice\.paid' && amountPaid > 0/);
