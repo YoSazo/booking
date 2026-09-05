@@ -74,8 +74,14 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
 
 test('activation discloses a card-required trial and its paid renewal before checkout', () => {
     assert.match(revealCopy, /title: 'Start your 14-day free trial'/);
-    assert.match(landingCopy, /14-day full-access trial/);
-    assert.match(landingCopy, /Card required/);
+    // The landing page collects an email, not a card. Card-network disclosure is
+    // owed before the card form — the reveal, asserted below — so the hero stays a
+    // low-friction capture. May's no-price, no-card page ran at $3-5 CPL on this
+    // same Lead trigger; a card commitment in the hero reintroduces exactly the
+    // friction that removing the price was meant to shed.
+    assert.match(landingCopy, /Free to build\. Takes 3 minutes\./);
+    assert.doesNotMatch(landingCopy, /Card required/);
+    assert.doesNotMatch(landingCopy, /\$199|\$1,990/);
     assert.match(revealCopy, /Start your \$\{trialDays\(\)\}-day free trial/);
     assert.match(revealCopy, /Try everything free for \$\{trialDays\(\)\} days/);
     assert.match(revealCopy, /\$0 <b>today<\/b>/);
