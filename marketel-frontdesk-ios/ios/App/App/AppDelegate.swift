@@ -110,7 +110,7 @@ private final class MarketelMarkView: UIView {
 /// owns top-level navigation so iOS 26 can render the real Liquid Glass tab
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
-final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate {
+final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate, SFSafariViewControllerDelegate {
     private let backendOrigin = URL(string: "https://guest-lodge-backend.onrender.com")!
     private let bundledFrontDesk = URL(string: "capacitor://localhost/frontdesk/index.html")!
     private let statusBarBackdrop = UIView()
@@ -1019,6 +1019,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             return
         }
         let browser = SFSafariViewController(url: url)
+        browser.delegate = self
         browser.dismissButtonStyle = .close
         browser.preferredControlTintColor = UIColor(
             red: 46 / 255,
@@ -1027,6 +1028,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             alpha: 1
         )
         present(browser, animated: true)
+    }
+
+    func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+        sendWebAction("browserClosed")
     }
 
     private func requireNativeMessagingSession() -> Bool {

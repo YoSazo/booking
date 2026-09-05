@@ -914,6 +914,14 @@ function marketelNativeSwitchProperty(hotelId) {
 function marketelNativeAction(action) {
   if (action === 'qr') showCheckinQrOverlay();
   else if (action === 'refresh') refreshCurrentView({ force: true, visibleOnly: false });
+  else if (action === 'browserClosed') {
+    // Stripe changes happen outside the WKWebView. Reconcile both the billing
+    // badge/card and visible property data as soon as Safari closes.
+    void Promise.allSettled([
+      loadMarketelTrialStatus(),
+      refreshCurrentView({ force: true, visibleOnly: false }),
+    ]);
+  }
   else if (action === 'tour') replayWalkthrough();
   else if (action === 'assistant') {
     if (!nativeShellPost({ type: 'openAssistant' })) {
@@ -1940,6 +1948,9 @@ function trialChecklistHtml() {
         ${item.action && !item.done ? '<button type="button" onclick="confirmTrialLinkPlaced()" style="border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:11.5px;font-weight:800;padding:5px 0 5px 7px;cursor:pointer;white-space:nowrap;">I added it</button>' : ''}
       </div>`).join('')}
     </div>
+    <div style="border-top:1px solid #cfe6da;margin-top:11px;padding-top:9px;text-align:right;">
+      <button type="button" onclick="openMarketelBillingPortal()" style="border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:11.5px;font-weight:800;padding:5px 0;cursor:pointer;">Manage trial &amp; billing&nbsp; →</button>
+    </div>
   </section>`;
 }
 
@@ -1993,6 +2004,25 @@ async function confirmTrialLinkPlaced() {
     }
   } catch (_) {
     toast('Could not save that yet. Try again.', 'error');
+  }
+}
+
+let billingPortalOpening = false;
+
+async function openMarketelBillingPortal() {
+  if (billingPortalOpening) return;
+  billingPortalOpening = true;
+  try {
+    const result = await api('GET', '/api/crm/billing-portal');
+    if (!result?.success || !result.url) {
+      throw new Error(result?.message || 'Billing is unavailable right now.');
+    }
+    if (isNativeFrontdeskApp()) openInAppBrowser(result.url);
+    else window.location.assign(result.url);
+  } catch (error) {
+    toast(error?.message || 'Contact support@bookmarketel.com for billing help.', 'error');
+  } finally {
+    billingPortalOpening = false;
   }
 }
 
@@ -2886,6 +2916,17 @@ async function startCrmApp(verification, options = {}) {
     } else {
       toast('Stripe has not confirmed this subscription yet. Refresh in a moment or contact support.', 'error');
     }
+  }
+
+  if (urlParams.get('billingReturn') === '1') {
+    const cleanUrl = new URL(window.location);
+    cleanUrl.searchParams.delete('billingReturn');
+    window.history.replaceState({}, '', cleanUrl);
+    toast('Billing details updated.', 'success');
+    // Stripe webhooks normally arrive first, but retry once to cover the
+    // narrow race where the owner returns before subscription.updated lands.
+    void loadMarketelTrialStatus();
+    window.setTimeout(() => { void loadMarketelTrialStatus(); }, 1400);
   }
 
   if (urlParams.get('activation_error') === '1') {
@@ -6726,6 +6767,7 @@ exposeToWindow({
   openGrowthWorkspace,
   openGuestAppSharing,
   openInAppBrowser,
+  openMarketelBillingPortal,
   openMarketelSupport,
   openMessagesWorkspace,
   openRoomsAddModal,

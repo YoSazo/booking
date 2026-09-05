@@ -224,7 +224,7 @@ async function loadSettings() {
     `;
 
     // Subscription
-    if (hotelRes?.subscribed && !isNativeApp()) {
+    if (hotelRes?.subscribed) {
       html += `
         <div class="booking-card" style="margin-bottom:14px;">
           <div style="padding:18px;">
@@ -978,7 +978,7 @@ async function loadEditRooms() {
             </div>
             <button onclick="changePin()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Update PIN</button>
             <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">${crm.isMasterPin ? 'You are signed in with a universal admin PIN. Choose a unique owner PIN before saving.' : "You'll need to use the new PIN next time you log in."}</p>`)}
-      ${hotelRes?.subscribed && !isNativeApp() ? `<div class="booking-card" style="margin-bottom:14px;">
+      ${hotelRes?.subscribed ? `<div class="booking-card" style="margin-bottom:14px;">
         <div style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="toggleSection(this)">
           <div style="font-size:14px;font-weight:700;color:var(--text);">Subscription</div>
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
@@ -1570,14 +1570,18 @@ async function goLive(options = {}) {
 }
 
 async function openBillingPortal() {
-  if (isNativeApp()) {
-    toast('Email support@bookmarketel.com for billing help.', 'info');
+  if (typeof window.openMarketelBillingPortal === 'function') {
+    await window.openMarketelBillingPortal();
     return;
   }
   try {
     const res = await api('GET', '/api/crm/billing-portal');
     if (res.success && res.url) {
-      window.location.href = res.url;
+      if (isNativeApp() && typeof window.openInAppBrowser === 'function') {
+        window.openInAppBrowser(res.url);
+      } else {
+        window.location.href = res.url;
+      }
     } else {
       toast(res.message || 'Contact support@bookmarketel.com to manage your subscription.', 'error');
     }

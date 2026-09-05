@@ -16547,12 +16547,6 @@ app.get('/api/crm/go-live-success', async (req, res) => {
 // Billing portal — redirect to Stripe customer portal
 app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
     try {
-        if (req.crmIsNativeClient) {
-            return res.status(403).json({
-                success: false,
-                message: 'Manage your Marketel subscription on the web or contact support@bookmarketel.com.',
-            });
-        }
         if (!marketelStripe) {
             return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
         }
@@ -16581,7 +16575,10 @@ app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
         }
         const session = await marketelStripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: req.headers.referer || '/',
+            // Native requests originate at capacitor://localhost, which Stripe
+            // cannot use as a return URL. A fixed first-party URL is also safer
+            // than reflecting an arbitrary Referer into a Stripe session.
+            return_url: 'https://bookmarketel.com/frontdesk?billingReturn=1',
         });
         res.json({ success: true, url: session.url });
     } catch (e) {
