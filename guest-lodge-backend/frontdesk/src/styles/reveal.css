@@ -1545,6 +1545,58 @@
   margin-top: 20px;
 }
 
+.mvr-trial-lead {
+  width: min(390px, 100%);
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  margin: 0 auto 14px;
+  padding: 15px 18px;
+  border: 1.5px solid rgba(46, 125, 91, 0.42);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(225, 246, 234, 0.98), rgba(244, 251, 247, 0.96));
+  box-shadow: 0 10px 28px rgba(34, 102, 70, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.mvr-trial-lead > span {
+  color: var(--mvr-green);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.mvr-trial-lead > strong {
+  color: #173e2b;
+  font-size: clamp(31px, 5vw, 40px);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.mvr-trial-lead > strong b {
+  margin-left: 2px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.mvr-trial-lead > small {
+  color: #536b5e;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.mvr-renewal-label {
+  margin: 2px 0 0;
+  color: #65766c;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .mvr-activation-proof {
   margin-top: 24px;
   padding-top: 20px;
@@ -2500,6 +2552,11 @@
 
   .mvr-activation-decision {
     margin-top: 14px;
+  }
+
+  .mvr-trial-lead {
+    margin-bottom: 11px;
+    padding: 12px 13px;
   }
 
   .mvr-activation-proof {

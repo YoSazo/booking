@@ -184,8 +184,11 @@ struct RebookView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Returning-guest rate")
                     .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.ink)
-                Text("$\(Int(returnNightly.rounded()))/night · normally $\(Int(normalNightly.rounded())) — applied at the desk")
+                Text("$\(Int(returnNightly.rounded()))/night · normally $\(Int(normalNightly.rounded()))")
                     .font(.system(size: 12)).foregroundStyle(Theme.inkSoft)
+                Text("This offer is attached to your request. \(hotel.name) applies it when you pay at the property.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

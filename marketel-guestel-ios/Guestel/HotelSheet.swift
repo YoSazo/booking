@@ -59,6 +59,10 @@ struct HotelSheet: View {
     private var anim: Animation { .interactiveSpring(response: 0.5, dampingFraction: 0.82) }
     private var checkoutFloor: Date { Calendar.current.date(byAdding: .day, value: 1, to: checkin)! }
     private var acceptsBookings: Bool { hotelData?.subscribed != false }
+    private var activeReturnOffer: BookingAPI.ReturnOffer? {
+        guard let offer = hotelData?.returnOffer, offer.value > 0 else { return nil }
+        return offer
+    }
 
     var body: some View {
         ScrollView {
@@ -325,6 +329,10 @@ struct HotelSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
+            if let offer = activeReturnOffer {
+                returnOfferCard(offer)
+            }
+
             if let quote {
                 VStack(spacing: 10) {
                     priceRow("Room · \(quote.nights) night\(quote.nights == 1 ? "" : "s")", quote.subtotal)
@@ -368,6 +376,45 @@ struct HotelSheet: View {
             .foregroundStyle(Theme.inkSoft)
             .frame(maxWidth: .infinity, alignment: .center)
         }
+    }
+
+    private func returnOfferCard(_ offer: BookingAPI.ReturnOffer) -> some View {
+        let rounded = offer.value.rounded()
+        let value = rounded == offer.value
+            ? String(Int(rounded))
+            : String(format: "%.2f", offer.value)
+        let discount = offer.kind == "amount"
+            ? "$\(value) off each night"
+            : "\(value)% off your direct room rate"
+
+        return HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(Theme.green)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(discount) · included")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+                Text("This returning-guest offer is attached to your request. \(hotel.name) applies it when you pay at the property.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let label = offer.label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
+                    Text(label)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.green)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Theme.green.opacity(0.28), lineWidth: 1)
+        )
     }
 
     private var terms: some View {
@@ -478,6 +525,8 @@ struct HotelSheet: View {
                     "taxes": freshQuote.taxes,
                     "total": freshQuote.total,
                     "totalCents": freshQuote.totalCents,
+                    "source": "rebook",
+                    "returnOfferApplied": activeReturnOffer != nil,
                 ]
                 let savedCardToken = GuestPaymentAccess.token
                 let hold = try await BookingAPI.createHold(

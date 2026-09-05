@@ -794,6 +794,17 @@ function finaleHtml() {
   const displayedInterval = isYearly ? '/year' : '/month';
   const activationLabel = activationCtaLabel();
   const renewalDate = firstTrialBillingDate();
+  const finaleEyebrow = isSubscribed
+    ? 'Your Marketel system'
+    : hasTrial ? `${trialDays()}-day free trial` : 'Ready to activate';
+  const finaleTitle = isSubscribed
+    ? `${esc(propertyName())} is ready.`
+    : hasTrial ? `Try everything free for ${trialDays()} days.` : `Marketel is ready for ${esc(propertyName())}.`;
+  const finaleIntro = isSubscribed
+    ? 'Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.'
+    : hasTrial
+      ? `${esc(propertyName())} gets full Marketel access now. There is no charge today, and you can cancel before ${renewalDate} without paying anything.`
+      : 'Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.';
   const includedValueHtml = `<div class="mvr-value-list">
     <div style="--stagger:0"><span>1</span><p><strong>Direct Booking Page</strong><small>Take bookings on your own page without OTA commission</small></p></div>
     <div style="--stagger:1"><span>2</span><p><strong>Marketel Front Desk</strong><small>Control bookings and availability around the setup you already use</small></p></div>
@@ -802,20 +813,26 @@ function finaleHtml() {
   return `<section class="mvr-stage mvr-stage-finale">
     <div class="mvr-finale-card">
       <div class="mvr-finale-mark">✓</div>
-      <div class="mvr-eyebrow">${isSubscribed ? 'Your Marketel system' : hasTrial ? 'Full access for 14 days' : 'Ready to activate'}</div>
-      <h1>${isSubscribed ? `${esc(propertyName())} is ready.` : `Marketel is ready for ${esc(propertyName())}.`}</h1>
-      <p>Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.</p>
+      <div class="mvr-eyebrow">${finaleEyebrow}</div>
+      <h1>${finaleTitle}</h1>
+      <p>${finaleIntro}</p>
       ${isSubscribed ? `${includedValueHtml}
         <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">Open Front Desk</button>
         <div class="mvr-secure-note">You can replay this overview anytime from How it works.</div>` : `
         <div class="mvr-activation-decision">
+          ${hasTrial ? `<div class="mvr-trial-lead" role="note" aria-label="${trialDays()}-day free-trial terms">
+            <span>${trialDays()} DAYS FREE</span>
+            <strong>$0 <b>today</b></strong>
+            <small>Everything unlocked now · cancel before ${renewalDate} and pay nothing</small>
+          </div>` : ''}
           <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
           <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-billing="month">Monthly</button>
           <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
           </div>
+          ${hasTrial ? `<div class="mvr-renewal-label">Only after your ${trialDays()} free days</div>` : ''}
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
           <div class="mvr-price-detail${isYearly || hasTrial ? ' is-visible' : ''}">${hasTrial
-            ? `$0 today · first ${displayedPrice} charge ${renewalDate}`
+            ? `First ${displayedPrice} charge ${renewalDate}`
             : isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
           ${activationRateCalculatorHtml()}
           <div class="mvr-payment-flow">

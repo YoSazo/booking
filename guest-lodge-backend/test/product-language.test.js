@@ -77,7 +77,10 @@ test('activation discloses a card-required trial and its paid renewal before che
     assert.match(landingCopy, /14-day full-access trial/);
     assert.match(landingCopy, /Card required/);
     assert.match(revealCopy, /Start your \$\{trialDays\(\)\}-day free trial/);
-    assert.match(revealCopy, /\$0 today · first \$\{displayedPrice\} charge \$\{renewalDate\}/);
+    assert.match(revealCopy, /Try everything free for \$\{trialDays\(\)\} days/);
+    assert.match(revealCopy, /\$0 <b>today<\/b>/);
+    assert.match(revealCopy, /Only after your \$\{trialDays\(\)\} free days/);
+    assert.match(revealCopy, /First \$\{displayedPrice\} charge \$\{renewalDate\}/);
     assert.match(revealCopy, /Cancel before \$\{renewalDate\} and you will not be charged/);
     assert.match(revealCopy, /Then \$1,990 for one year on \$\{renewalDate\}/);
     assert.doesNotMatch(revealCopy, /money-back guarantee|Try Marketel for 7 days/);

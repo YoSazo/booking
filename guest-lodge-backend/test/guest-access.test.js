@@ -47,6 +47,10 @@ test('Guestel native checkout uses server-owned quote, pay-later, and fails clos
     assert.match(hotelSheet, /"rateID": match\.rateID/);
     assert.match(hotelSheet, /let freshQuote = try await BookingAPI\.quote/);
     assert.match(hotelSheet, /BookingAPI\.completePayLater/);
+    assert.match(hotelSheet, /if let offer = activeReturnOffer/);
+    assert.match(hotelSheet, /returnOfferCard\(offer\)/);
+    assert.match(hotelSheet, /"returnOfferApplied": activeReturnOffer != nil/);
+    assert.match(hotelSheet, /applies it when you pay at the property/);
     // The older full-screen rebook surface remains fail-closed while the
     // Wallet sheet is the primary native return-booking path.
     assert.match(rebook, /guard let match = available\.first/);
