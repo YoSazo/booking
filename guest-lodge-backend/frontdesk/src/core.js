@@ -2844,8 +2844,6 @@ async function startCrmApp(verification, options = {}) {
     window.history.replaceState({}, '', cleanUrl);
     if (crm.hotelSubscribed) {
       updateGoLiveBanner();
-      const _goLiveBanner = document.getElementById('goLiveBanner');
-      if (_goLiveBanner) { _goLiveBanner.style.display = 'none'; _goLiveBanner.innerHTML = ''; }
       const openActivatedModal = () => {
         const fn = (typeof showActivatedModal === 'function')
           ? showActivatedModal

@@ -822,6 +822,11 @@ function showActivatedModal() {
   if (document.getElementById('activatedModalOverlay')) return;
   const bookingDomain = crm.activeHotelDomain || (crm.activeHotelId ? crm.activeHotelId + '.mktel.co' : '');
   const bookingUrl = bookingDomain ? `https://${bookingDomain}` : '';
+  const trialing = crm.marketelSubscriptionStatus === 'trialing';
+  const trialEnd = crm.marketelSubscriptionPeriodEnd ? new Date(crm.marketelSubscriptionPeriodEnd) : null;
+  const trialEndLabel = trialEnd && Number.isFinite(trialEnd.getTime())
+    ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(trialEnd)
+    : '';
   const appStoreUrl = String(crm.frontdeskAppStoreUrl || '').trim();
   const appDownloadCta = appStoreUrl
     ? `<a id="activatedModalDownload" href="${esc(appStoreUrl)}" target="_blank" rel="noopener" style="display:block;width:100%;padding:15px;border-radius:12px;border:none;background:#2E7D5B;color:#fff;text-decoration:none;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;box-sizing:border-box;">Download Marketel Front Desk</a>`
@@ -832,8 +837,8 @@ function showActivatedModal() {
   overlay.innerHTML = `
     <div style="background:white;border-radius:22px;padding:32px 24px 22px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="width:56px;height:56px;border-radius:50%;background:#E8F5EE;color:#2E7D5B;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:29px;font-weight:900;">✓</div>
-      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e;margin:0 0 8px;">You're live</h2>
-      <p style="font-size:14px;color:#6b7280;line-height:1.55;margin:0 0 8px;">Guests can now book directly at</p>
+      <h2 style="font-size:24px;font-weight:800;color:#1a1a2e;margin:0 0 8px;">${trialing ? 'Your 14-day trial is live' : "You're live"}</h2>
+      <p style="font-size:14px;color:#6b7280;line-height:1.55;margin:0 0 8px;">${trialing && trialEndLabel ? `Full access is active through ${esc(trialEndLabel)}. Guests can now book directly at` : 'Guests can now book directly at'}</p>
       ${bookingUrl ? `<a href="${esc(bookingUrl)}" target="_blank" rel="noopener" style="display:block;color:#2E7D5B;font-size:15px;font-weight:800;text-decoration:none;word-break:break-word;margin:0 0 22px;">${esc(bookingDomain)}</a>` : '<div style="height:8px;"></div>'}
       ${appDownloadCta}
       <p style="font-size:12px;color:#7a857e;line-height:1.45;margin:10px 4px 4px;">${appStoreUrl ? 'This is the App Store app for you and your staff. Guests never download it; they keep using your booking-page link.' : 'Your booking page is live. This web Front Desk is for you and your staff; guests keep using your booking-page link.'}</p>
