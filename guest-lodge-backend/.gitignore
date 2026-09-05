@@ -6,3 +6,4 @@ frontdesk/node_modules
 frontdesk/.env.local
 
 /generated/prisma
+.env.*.local
