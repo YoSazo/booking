@@ -611,6 +611,12 @@ function syncNativeShellState() {
   const unreadMessages = crm.guestMessages.length
     ? crm.guestMessages.filter(m => !m.read && (m.sender || 'guest') !== 'hotel').length
     : Number(crm.messageUnreadCount || 0);
+  const trialing = crm.marketelSubscriptionStatus === 'trialing' || !!crm.trialStatus?.trialing;
+  const explicitDaysLeft = Number(crm.trialStatus?.daysLeft);
+  const trialEnd = new Date(crm.trialStatus?.endsAt || crm.marketelSubscriptionPeriodEnd || '');
+  const calculatedDaysLeft = Number.isFinite(trialEnd.getTime())
+    ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000))
+    : Number(crm.marketelTrialDays) || 14;
   nativeShellPost({
     type: 'state',
     visible: document.getElementById('app')?.style.display !== 'none',
@@ -622,6 +628,11 @@ function syncNativeShellState() {
       : 'settings',
     bookingBadge: Math.max(0, needsCalls),
     guestAppBadge: Math.max(0, unreadMessages),
+    trialing,
+    trialDaysLeft: trialing
+      ? Math.max(0, Number.isFinite(explicitDaysLeft) ? explicitDaysLeft : calculatedDaysLeft)
+      : 0,
+    trialEndsAt: trialing ? String(crm.trialStatus?.endsAt || crm.marketelSubscriptionPeriodEnd || '') : '',
     // The pill is drawn natively so it can use the same UIGlassEffect as the
     // tab bar; the web only decides whether it belongs on screen and what it
     // should say. A CSS pill could never match that material.
@@ -1940,17 +1951,34 @@ function operationalAccessBannerHtml() {
 }
 
 async function loadMarketelTrialStatus() {
-  if (crm.marketelSubscriptionStatus !== 'trialing' || !crm.token || !crm.activeHotelId) {
+  // The status endpoint is authoritative. Do not gate it on the earlier verify
+  // response: a freshly-created Stripe trial can become visible between those
+  // two requests, and older native sessions may carry a stale verify payload.
+  if (!crm.token || !crm.activeHotelId) {
     crm.trialStatus = null;
     updateGoLiveBanner();
+    syncNativeShellState();
     return;
   }
   try {
     const data = await api('GET', '/api/crm/trial-status');
     if (data?.success) {
-      crm.trialStatus = data;
+      crm.trialStatus = data.trialing ? data : null;
       crm.marketelTrialDays = Math.max(1, Number(data.trialDays) || crm.marketelTrialDays || 14);
+      if (data.trialing) {
+        crm.marketelSubscriptionStatus = 'trialing';
+        crm.marketelSubscriptionPeriodEnd = String(data.endsAt || crm.marketelSubscriptionPeriodEnd || '');
+        crm.hotelSubscribed = data.subscribed !== false;
+      } else if (crm.marketelSubscriptionStatus === 'trialing') {
+        // Avoid leaving a stale trial banner behind after conversion or
+        // cancellation. The normal subscription sync supplies the exact next
+        // status; this endpoint only needs to establish that it is no longer a
+        // trial.
+        crm.marketelSubscriptionStatus = data.subscribed ? 'active' : '';
+        crm.hotelSubscribed = !!data.subscribed;
+      }
       updateGoLiveBanner();
+      syncNativeShellState();
     }
   } catch (_) { /* Trial status is helpful, never app-blocking. */ }
 }

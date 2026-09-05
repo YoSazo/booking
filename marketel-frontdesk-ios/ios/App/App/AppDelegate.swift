@@ -119,6 +119,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private let menuButton = UIButton(type: .system)
     private let propertyHeaderControl = UIControl()
     private let propertyNameLabel = UILabel()
+    private let trialStatusBadge = UIButton(type: .system)
     private let yourPageTabItem = UITabBarItem(
         title: "Your Page",
         image: UIImage(systemName: "globe"),
@@ -307,6 +308,42 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         frontDeskLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         frontDeskLabel.textColor = .label
 
+        var trialConfiguration = UIButton.Configuration.filled()
+        trialConfiguration.title = "TRIAL"
+        trialConfiguration.baseForegroundColor = UIColor(
+            red: 26 / 255,
+            green: 92 / 255,
+            blue: 63 / 255,
+            alpha: 1
+        )
+        trialConfiguration.baseBackgroundColor = UIColor(
+            red: 211 / 255,
+            green: 235 / 255,
+            blue: 222 / 255,
+            alpha: 1
+        )
+        trialConfiguration.cornerStyle = .capsule
+        trialConfiguration.contentInsets = NSDirectionalEdgeInsets(
+            top: 2,
+            leading: 6,
+            bottom: 2,
+            trailing: 6
+        )
+        trialConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = .systemFont(ofSize: 9, weight: .bold)
+            return outgoing
+        }
+        trialStatusBadge.configuration = trialConfiguration
+        trialStatusBadge.isUserInteractionEnabled = false
+        trialStatusBadge.isHidden = true
+        trialStatusBadge.accessibilityTraits = .staticText
+
+        let frontDeskRow = UIStackView(arrangedSubviews: [frontDeskLabel, trialStatusBadge])
+        frontDeskRow.axis = .horizontal
+        frontDeskRow.alignment = .center
+        frontDeskRow.spacing = 6
+
         propertyNameLabel.text = "Your property"
         propertyNameLabel.font = .systemFont(ofSize: 11.5, weight: .medium)
         propertyNameLabel.textColor = .secondaryLabel
@@ -323,7 +360,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyRow.alignment = .center
         propertyRow.spacing = 4
 
-        let labels = UIStackView(arrangedSubviews: [frontDeskLabel, propertyRow])
+        let labels = UIStackView(arrangedSubviews: [frontDeskRow, propertyRow])
         labels.axis = .vertical
         labels.alignment = .leading
         labels.spacing = 0
@@ -819,6 +856,18 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyHeaderControl.accessibilityLabel = "Switch property, \(propertyName)"
     }
 
+    private func updateTrialStatus(trialing: Bool, daysLeft: Int) {
+        trialStatusBadge.isHidden = !trialing
+        guard trialing else { return }
+        let days = max(0, daysLeft)
+        var configuration = trialStatusBadge.configuration
+        configuration?.title = days == 1 ? "TRIAL · 1D" : "TRIAL · \(days)D"
+        trialStatusBadge.configuration = configuration
+        trialStatusBadge.accessibilityLabel = days == 1
+            ? "Free trial, 1 day left"
+            : "Free trial, \(days) days left"
+    }
+
     private func updateSelectedTab(_ identifier: String) {
         let tag: Int
         switch identifier {
@@ -1088,6 +1137,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
             updateGuestAppBadge(payload["guestAppBadge"] as? Int ?? 0)
+            let trialDaysLeft = (payload["trialDaysLeft"] as? NSNumber)?.intValue ?? 0
+            updateTrialStatus(
+                trialing: payload["trialing"] as? Bool ?? false,
+                daysLeft: trialDaysLeft
+            )
             updateAssistantPill(
                 visible: payload["assistantPill"] as? Bool ?? false,
                 label: payload["assistantPillLabel"] as? String ?? ""
