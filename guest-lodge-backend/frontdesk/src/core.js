@@ -2014,6 +2014,12 @@ async function openMarketelBillingPortal() {
   billingPortalOpening = true;
   try {
     const result = await api('GET', '/api/crm/billing-portal');
+    // Comped, demo and App Review properties are subscribed with no Stripe
+    // customer. That is a legitimate state, so it must not read as an error.
+    if (result?.reason === 'not-stripe-managed') {
+      toast(result.message || 'This account is billed directly by Marketel.');
+      return;
+    }
     if (!result?.success || !result.url) {
       throw new Error(result?.message || 'Billing is unavailable right now.');
     }

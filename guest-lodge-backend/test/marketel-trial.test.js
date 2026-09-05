@@ -77,8 +77,17 @@ test('trial lifecycle and milestones are exact, observable business events', () 
   assert.match(core, /action === 'browserClosed'/);
   assert.doesNotMatch(server, /req\.crmIsNativeClient[\s\S]{0,180}Manage your Marketel subscription on the web/);
   assert.match(server, /return_url: 'https:\/\/bookmarketel\.com\/frontdesk\?billingReturn=1'/);
-  assert.match(settings, /if \(hotelRes\?\.subscribed\) \{/);
+  // The live subscription card is the accordion in loadEditRooms(); "Your page"
+  // renders #editView, so a gate in loadSettings() would never reach screen.
+  assert.match(settings, /\$\{hotelRes\?\.subscribed \? /);
   assert.match(settings, /window\.openMarketelBillingPortal/);
+  // Comped, demo and App Review properties are subscribed with no Stripe
+  // customer: they must not be offered a portal button that only errors.
+  assert.match(settings, /hotelRes\?\.billingPortalAvailable === false/);
+  assert.match(settings, /billed directly by Marketel/);
+  assert.match(server, /billingPortalAvailable,/);
+  assert.match(server, /reason: 'not-stripe-managed'/);
+  assert.match(core, /result\?\.reason === 'not-stripe-managed'/);
   assert.match(appDelegate, /SFSafariViewControllerDelegate/);
   assert.match(appDelegate, /sendWebAction\("browserClosed"\)/);
   assert.match(report, /trialsStarted/);

@@ -223,18 +223,9 @@ async function loadSettings() {
       </div>
     `;
 
-    // Subscription
-    if (hotelRes?.subscribed) {
-      html += `
-        <div class="booking-card" style="margin-bottom:14px;">
-          <div style="padding:18px;">
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;">Subscription</div>
-            <button onclick="openBillingPortal()" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
-            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
-          </div>
-        </div>
-      `;
-    }
+    // No Subscription card here: applyFilter() hides #settingsView and shows
+    // #editView for the "Your page" tab, so this renderer never reaches screen.
+    // The live subscription controls are in loadEditRooms().
 
     // Founder support conversation
     html += supportCardHtml();
@@ -984,8 +975,10 @@ async function loadEditRooms() {
           <span style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;" class="accordion-arrow">›</span>
         </div>
         <div class="accordion-body" style="display:none;padding:0 18px 18px;">
-          <button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>
+          ${hotelRes?.billingPortalAvailable === false
+            ? `<p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin:0;text-align:center;">This account is billed directly by Marketel.<br>Email <a href="mailto:support@bookmarketel.com" style="color:var(--green);font-weight:700;text-decoration:none;">support@bookmarketel.com</a> for any billing change.</p>`
+            : `<button onclick="openBillingPortal()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--green);color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Manage Subscription</button>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center;">View invoices, update payment method, or cancel.</p>`}
         </div>
       </div>` : ''}
       ${supportCardHtml()}
@@ -1582,6 +1575,8 @@ async function openBillingPortal() {
       } else {
         window.location.href = res.url;
       }
+    } else if (res.reason === 'not-stripe-managed') {
+      toast(res.message || 'This account is billed directly by Marketel.');
     } else {
       toast(res.message || 'Contact support@bookmarketel.com to manage your subscription.', 'error');
     }

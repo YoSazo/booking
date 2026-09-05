@@ -12479,6 +12479,15 @@ const MARKETEL_STRIPE_KEY_MODE = process.env.STRIPE_MARKETEL_SECRET_KEY?.startsW
 // paid traffic starts; production otherwise requires live Stripe objects.
 const MARKETEL_ALLOW_TEST_BILLING = process.env.MARKETEL_ALLOW_TEST_BILLING === 'true';
 const MARKETEL_ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
+// Statuses that only ever come from Stripe. A property carrying one of these is
+// billed by Stripe and therefore has a customer portal. Comped, demo and App
+// Review properties are subscribed with no Stripe customer at all, and offering
+// them a portal button produces nothing but an error toast.
+const MARKETEL_STRIPE_MANAGED_STATUSES = new Set([
+    'active', 'trialing', 'past_due', 'unpaid', 'canceled', 'incomplete', 'incomplete_expired',
+]);
+const MARKETEL_UNMANAGED_BILLING_MESSAGE =
+    'This account is billed directly by Marketel. Email support@bookmarketel.com for any billing change.';
 if (
     process.env.NODE_ENV === 'production'
     && MARKETEL_STRIPE_KEY_MODE === 'test'
@@ -13973,6 +13982,8 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
                 subscribed: true,
                 marketelSubscriptionStatus: true,
                 marketelCurrentPeriodEnd: true,
+                marketelStripeCustomerId: true,
+                marketelStripeSubscriptionId: true,
                 setupToken: true,
                 ownerEmail: true,
                 rooms: {
@@ -14014,6 +14025,12 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             }
         }
         const trialing = String(dbHotel?.marketelSubscriptionStatus || '').toLowerCase() === 'trialing';
+        // Whether this property has a Stripe billing portal to open at all.
+        const billingPortalAvailable = !!dbHotel?.subscribed && (
+            !!dbHotel?.marketelStripeCustomerId
+            || !!dbHotel?.marketelStripeSubscriptionId
+            || MARKETEL_STRIPE_MANAGED_STATUSES.has(String(dbHotel?.marketelSubscriptionStatus || '').toLowerCase())
+        );
         const trialEligible = !!dbHotel && !dbHotel.subscribed
             ? await hotelTrialEligible(hotelId)
             : false;
@@ -14050,6 +14067,7 @@ app.get('/api/crm/verify', crmVerifyRateLimit, crmAuth, async (req, res) => {
             trialing,
             trialDays: MARKETEL_TRIAL_DAYS,
             trialEligible,
+            billingPortalAvailable,
             operationalAccessOnly: !!req.crmIsNativeClient && !!dbHotel && !dbHotel.subscribed,
             frontdeskAppStoreUrl: MARKETEL_FRONTDESK_APP_STORE_URL,
         });
@@ -16557,7 +16575,7 @@ app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
             select: { ownerEmail: true, marketelStripeCustomerId: true },
         });
         if (!hotel?.ownerEmail && !hotel?.marketelStripeCustomerId) {
-            return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
+            return res.json({ success: false, reason: 'not-stripe-managed', message: MARKETEL_UNMANAGED_BILLING_MESSAGE });
         }
         let customerId = hotel.marketelStripeCustomerId || '';
         if (!customerId && hotel.ownerEmail) {
@@ -16571,7 +16589,9 @@ app.get('/api/crm/billing-portal', crmAuth, async (req, res) => {
             }
         }
         if (!customerId) {
-            return res.json({ success: false, message: 'Contact support@bookmarketel.com to manage your subscription.' });
+            // Subscribed without a Stripe customer: comped, demo, or App Review.
+            // That is a legitimate state, not a failure, so it must not read as one.
+            return res.json({ success: false, reason: 'not-stripe-managed', message: MARKETEL_UNMANAGED_BILLING_MESSAGE });
         }
         const session = await marketelStripe.billingPortal.sessions.create({
             customer: customerId,
