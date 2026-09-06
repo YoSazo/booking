@@ -359,3 +359,65 @@ test('front desk answers stay grounded and never claim an operation', () => {
     // Long output is capped.
     assert.ok(sanitizeFrontDeskAnswer('a'.repeat(1000), fallback).length <= 700);
 });
+
+// ── Booking review's channel plumbing ──────────────────────────────
+// These guard the regression that made the sheet unusable: an owner added a
+// phone, verified it, and the booking rule still refused to save because the
+// channel count reads config.enabled — a toggle on a different screen.
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const repoRoot = path.resolve(__dirname, '..', '..');
+const readRepo = (...parts) => fs.readFileSync(path.join(repoRoot, ...parts), 'utf8');
+const assistantModule = readRepo('guest-lodge-backend', 'frontdesk-assistant.js');
+const assistantWeb = readRepo('guest-lodge-backend', 'frontdesk', 'src', 'assistant.js');
+const viteConfig = readRepo('guest-lodge-backend', 'frontdesk', 'vite.config.js');
+const nativeAssistant = readRepo('marketel-frontdesk-ios', 'ios', 'App', 'App', 'NativeAssistant.swift');
+const nativeAppDelegate = readRepo('marketel-frontdesk-ios', 'ios', 'App', 'App', 'AppDelegate.swift');
+
+test('connecting the first phone turns the Assistant on so booking review has a channel', () => {
+    // The coupling that caused the bug — kept asserted so it stays visible.
+    assert.match(assistantModule, /if \(!config\?\.enabled \|\| config\.notifyNewBookings === false\) return 0;/);
+    assert.match(assistantModule, /const verifiedCount = await prisma\.frontDeskAssistantRecipient\.count/);
+    assert.match(assistantModule, /if \(verifiedCount === 1\)/);
+    assert.match(assistantModule, /nextCheckAt: computeNextCheckAt\(\{ \.\.\.current, enabled: true \}\)/);
+});
+
+test('only a first verification enables the Assistant, so a deliberate off stays off', () => {
+    assert.match(assistantModule, /if \(current && !current\.enabled\)/);
+    assert.doesNotMatch(assistantModule, /if \(verifiedCount >= 1\)/);
+});
+
+test('a booking rule the server refused is never reported as saved', () => {
+    assert.match(assistantWeb, /const approval = await api\('POST', '\/api\/crm\/booking-approval'/);
+    assert.match(assistantWeb, /if \(!approval\?\.success\)/);
+});
+
+test('the native sheet never shows its own cancelled request as an error', () => {
+    assert.match(nativeAssistant, /static func isCancellation/);
+    assert.match(nativeAssistant, /nsError\.code == NSURLErrorCancelled/);
+    assert.match(nativeAssistant, /if !silent, !Self\.isCancellation\(error\)/);
+});
+
+test('the native sheet is one task until a phone is connected', () => {
+    assert.match(nativeAssistant, /if model\.hasVerifiedPhone \{/);
+    assert.match(nativeAssistant, /private var setupCard: some View/);
+    assert.match(nativeAssistant, /var pendingRecipient: MarketelAssistantRecipient\?/);
+    // An added-but-unverified phone must change what the sheet says.
+    assert.match(nativeAssistant, /return "Enter your code"/);
+});
+
+test('every phone can be removed without discovering a swipe gesture', () => {
+    assert.match(nativeAssistant, /Label\("Remove this phone", systemImage: "trash"\)/);
+});
+
+test('saving the booking rule does not rewrite the check-in settings', () => {
+    assert.match(nativeAssistant, /func saveApprovalOnly\(\) async/);
+    assert.match(nativeAssistant, /busyKey: "save-approval"/);
+});
+
+test('the Contacts entry uses the shipped app icon', () => {
+    assert.match(nativeAppDelegate, /forResource: "marketel-frontdesk-icon"/);
+    assert.match(viteConfig, /'marketel-frontdesk-icon\.png'/);
+});

@@ -236,6 +236,16 @@ private final class MarketelNativeAssistantModel: ObservableObject {
         recipients.filter(\.verified)
     }
 
+    /// A phone that has been added but whose code has not been entered yet.
+    /// Every "connected" signal reads `verifiedRecipients`, so without this the
+    /// sheet looked identical before and after adding a phone — which read as
+    /// the app still asking for one.
+    var pendingRecipient: MarketelAssistantRecipient? {
+        recipients.first { !$0.verified }
+    }
+
+    var hasVerifiedPhone: Bool { !verifiedRecipients.isEmpty }
+
     var activities: [MarketelAssistantActivity] { data?.activities ?? [] }
     var subscribed: Bool { data?.hotel?.subscribed == true }
     var manualAvailability: Bool { data?.capabilities?.manualAvailability == true }
@@ -244,6 +254,18 @@ private final class MarketelNativeAssistantModel: ObservableObject {
     var assistantPhone: String { data?.capabilities?.assistantPhone ?? "" }
     var canOperate: Bool { subscribed && manualAvailability && smsConfigured }
 
+    /// A cancelled request is this app abandoning its own work, not something the
+    /// owner did or can act on. `URLError(.cancelled).localizedDescription` is the
+    /// bare word "cancelled", so surfacing it produced an alert titled "Front Desk"
+    /// whose entire body read "cancelled" — which happened on every pull-to-refresh,
+    /// because dragging at the top of the scroll view hands the gesture to the
+    /// sheet's own resize handling and tears the refresh task down mid-flight.
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
     func load(silent: Bool = false) async {
         if !silent { isLoading = data == nil }
         do {
@@ -251,7 +273,7 @@ private final class MarketelNativeAssistantModel: ObservableObject {
             apply(assistant)
             errorMessage = nil
         } catch {
-            if !silent { errorMessage = error.localizedDescription }
+            if !silent, !Self.isCancellation(error) { errorMessage = error.localizedDescription }
         }
         isLoading = false
     }
@@ -267,6 +289,19 @@ private final class MarketelNativeAssistantModel: ObservableObject {
                 "timeZone": self.timeZone,
                 "notifyNewBookings": self.notifyNewBookings,
             ])
+            try await self.client.saveApproval([
+                "enabled": self.approvalEnabled,
+                "windowMinutes": self.approvalMinutes,
+                "noResponseAction": self.noResponseAction,
+            ])
+        }
+    }
+
+    /// The booking rule lives on its own screen, so saving it must not also
+    /// resubmit the check-in settings the owner never opened. Bundling both was
+    /// how a default-off `enabled` kept being written back underneath them.
+    func saveApprovalOnly() async {
+        _ = await perform("save-approval", success: "Booking rule saved.") {
             try await self.client.saveApproval([
                 "enabled": self.approvalEnabled,
                 "windowMinutes": self.approvalMinutes,
@@ -337,7 +372,7 @@ private final class MarketelNativeAssistantModel: ObservableObject {
             busyAction = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            if !Self.isCancellation(error) { errorMessage = error.localizedDescription }
             busyAction = nil
             return false
         }
@@ -371,6 +406,9 @@ struct MarketelNativeAssistantView: View {
     @StateObject private var model: MarketelNativeAssistantModel
     let onClose: () -> Void
     let onSaveContact: (String) -> Void
+    @State private var setupName = ""
+    @State private var setupPhone = ""
+    @State private var setupCode = ""
 
     init(
         origin: URL,
@@ -425,25 +463,138 @@ struct MarketelNativeAssistantView: View {
         }
     }
 
+    // Until a phone is connected the sheet has exactly one job. Everything else
+    // manages a thing that does not exist yet, and leading with "Text Front Desk"
+    // is what made the one step that matters impossible to find.
     private var dashboard: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                statusCard
-                if let notice = model.notice {
-                    Label(notice, systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(MarketelAssistantTheme.green)
-                        .padding(13)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(MarketelAssistantTheme.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                if model.hasVerifiedPhone {
+                    statusCard
+                    noticeLabel
+                    navigationCard
+                    quickActions
+                    recentActivity
+                } else if model.canOperate {
+                    setupCard
+                    noticeLabel
+                } else {
+                    // Locked or unconfigured: the status card names the blocker,
+                    // which is more use than a form that cannot succeed.
+                    statusCard
+                    noticeLabel
                 }
-                quickActions
-                navigationCard
-                recentActivity
             }
             .padding(18)
         }
         .refreshable { await model.load() }
+    }
+
+    @ViewBuilder private var noticeLabel: some View {
+        if let notice = model.notice {
+            Label(notice, systemImage: "checkmark.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(MarketelAssistantTheme.green)
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(MarketelAssistantTheme.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+    }
+
+    private func setupField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
+            .font(.system(size: 16))
+            .padding(.horizontal, 13)
+            .padding(.vertical, 12)
+            .background(MarketelAssistantTheme.canvas, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(MarketelAssistantTheme.ink.opacity(0.10), lineWidth: 1)
+            )
+    }
+
+    private var setupCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Front Desk texts you before a booking locks in.")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(MarketelAssistantTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(model.pendingRecipient == nil
+                     ? "Add the phone it should text. Start with yours — you can add teammates later."
+                     : "Enter the six-digit code we just texted.")
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(MarketelAssistantTheme.inkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let pending = model.pendingRecipient {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text([pending.name, pending.maskedPhone].compactMap { $0 }.joined(separator: " · "))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(MarketelAssistantTheme.inkSoft)
+                    setupField("6-digit code", text: $setupCode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                    Button {
+                        Task {
+                            if await model.verifyRecipient(id: pending.id, code: setupCode) {
+                                setupCode = ""
+                                setupName = ""
+                                setupPhone = ""
+                            }
+                        }
+                    } label: {
+                        assistantActionLabel(
+                            model.busyAction == "verify-\(pending.id)" ? "Connecting…" : "Connect this phone",
+                            symbol: "checkmark.circle.fill",
+                            primary: true
+                        )
+                    }
+                    .disabled(model.busyAction != nil || setupCode.filter(\.isNumber).count != 6)
+                    HStack(spacing: 18) {
+                        Button("Send a new code") { Task { await model.resendRecipient(id: pending.id) } }
+                        Button("Use a different number") {
+                            Task {
+                                await model.removeRecipient(id: pending.id)
+                                setupCode = ""
+                            }
+                        }
+                        .foregroundStyle(MarketelAssistantTheme.red)
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .disabled(model.busyAction != nil)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    setupField("Your name", text: $setupName)
+                        .textContentType(.name)
+                    setupField("Mobile number", text: $setupPhone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                    Button {
+                        Task { _ = await model.addRecipient(name: setupName, role: "", phone: setupPhone) }
+                    } label: {
+                        assistantActionLabel(
+                            model.busyAction == "add-recipient" ? "Sending…" : "Send code",
+                            symbol: "paperplane.fill",
+                            primary: true
+                        )
+                    }
+                    .disabled(
+                        model.busyAction != nil
+                        || setupName.trimmingCharacters(in: .whitespaces).isEmpty
+                        || setupPhone.trimmingCharacters(in: .whitespaces).isEmpty
+                    )
+                    Text("Front Desk texts this number once to confirm it is yours. Reply STOP anytime.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(MarketelAssistantTheme.inkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(18)
+        .background(MarketelAssistantTheme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private var statusCard: some View {
@@ -568,6 +719,7 @@ struct MarketelNativeAssistantView: View {
         if !model.smsConfigured { return "Texting needs attention" }
         if !model.manualAvailability { return "Availability is not connected" }
         if model.enabled && !model.verifiedRecipients.isEmpty { return "Front Desk is watching" }
+        if model.pendingRecipient != nil { return "Enter your code" }
         return "Finish connecting Front Desk"
     }
 
@@ -578,7 +730,10 @@ struct MarketelNativeAssistantView: View {
         if model.enabled && !model.verifiedRecipients.isEmpty {
             return "Booking alerts and proactive room checks are active."
         }
-        return "Connect a phone and choose when Front Desk should check in."
+        if let pending = model.pendingRecipient {
+            return "We texted a six-digit code to \(pending.maskedPhone ?? pending.name). Enter it to finish."
+        }
+        return "Add the phone Front Desk should text."
     }
 
     private var statusColor: Color {
@@ -656,7 +811,9 @@ private struct MarketelNativeBookingRuleView: View {
             }
 
             Section {
-                assistantSaveButton(model: model)
+                assistantSaveButton(model: model, busyKey: "save-approval") {
+                    await model.saveApprovalOnly()
+                }
             } footer: {
                 Text(model.approvalEnabled
                      ? "No answer after \(model.approvalMinutes) minutes \(model.noResponseAction == "release" ? "releases the request" : "keeps the booking")."
@@ -717,6 +874,20 @@ private struct MarketelNativePeopleView: View {
                             Button("Send a new code") { Task { await model.resendRecipient(id: recipient.id) } }
                                 .font(.system(size: 13, weight: .semibold))
                         }
+                        // Swipe used to be the only way to remove a phone, and on an
+                        // unverified row it competed for the pan gesture with the code
+                        // TextField above — on exactly the row someone most wants to
+                        // delete after mistyping a number. A visible button cannot be
+                        // out-gestured or go undiscovered.
+                        Button {
+                            pendingRemoval = recipient
+                        } label: {
+                            Label("Remove this phone", systemImage: "trash")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(MarketelAssistantTheme.red)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.busyAction != nil)
                     }
                     .swipeActions {
                         Button(role: .destructive) { pendingRemoval = recipient } label: {
@@ -747,8 +918,12 @@ private struct MarketelNativePeopleView: View {
                 }
             }
 
+            // These sat directly beneath "Send verification code", so the wrong
+            // button was easy to hit — and saving a contact stacks a Contacts sheet
+            // on top of this one, which reads as an unexplained system prompt in the
+            // middle of adding a phone. Keep them, but well away from that step.
             if !model.assistantPhone.isEmpty {
-                Section {
+                Section("Front Desk's own number") {
                     Button { onSaveContact(model.assistantPhone) } label: {
                         Label("Save Marketel Front Desk to Contacts", systemImage: "person.crop.circle.badge.plus")
                     }
@@ -855,7 +1030,9 @@ private struct MarketelNativeCheckInView: View {
             }
 
             Section {
-                assistantSaveButton(model: model)
+                assistantSaveButton(model: model) {
+                    await model.saveSettings()
+                }
                 Button { Task { await model.checkNow() } } label: {
                     Label(model.busyAction == "check" ? "Asking…" : "Ask for an update now", systemImage: "arrow.triangle.2.circlepath")
                 }
@@ -917,12 +1094,19 @@ private func assistantPolicyOption(
 }
 
 @MainActor
-private func assistantSaveButton(model: MarketelNativeAssistantModel) -> some View {
-    Button { Task { await model.saveSettings() } } label: {
+// Each screen saves only what it shows. Sharing one button that always called
+// saveSettings() meant saving the booking rule also rewrote the check-in
+// settings from another screen the owner had never opened.
+private func assistantSaveButton(
+    model: MarketelNativeAssistantModel,
+    busyKey: String = "save",
+    action: @escaping () async -> Void
+) -> some View {
+    Button { Task { await action() } } label: {
         HStack {
             Spacer()
-            if model.busyAction == "save" { ProgressView().tint(.white) }
-            Text(model.busyAction == "save" ? "Saving…" : "Save settings")
+            if model.busyAction == busyKey { ProgressView().tint(.white) }
+            Text(model.busyAction == busyKey ? "Saving…" : "Save settings")
                 .font(.system(size: 16, weight: .bold))
             Spacer()
         }

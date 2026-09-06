@@ -896,6 +896,20 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func marketelContactImage() -> UIImage {
+        // Prefer the real Front Desk app icon so the Contacts entry matches what
+        // the owner already recognises on their home screen. It ships in the
+        // Capacitor public directory (see the build:native copy list in
+        // frontdesk/vite.config.js). The drawn mark below stays as a fallback so
+        // an unsynced asset degrades to the previous behaviour rather than to no
+        // image at all.
+        if let url = Bundle.main.url(
+            forResource: "marketel-frontdesk-icon",
+            withExtension: "png",
+            subdirectory: "public"
+        ), let data = try? Data(contentsOf: url), let icon = UIImage(data: data) {
+            return icon
+        }
+
         // Render a deterministic 1024 px contact photo directly from the
         // vector mark so Contacts never has to enlarge a softer bitmap.
         let size = CGSize(width: 1024, height: 1024)

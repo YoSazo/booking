@@ -2627,6 +2627,35 @@ function createFrontDeskAssistant({
                     type: 'verification',
                     summary: `${recipient.name} connected`,
                 });
+                // Connecting the first phone *is* turning the Assistant on.
+                // Booking review counts only recipients that could actually be
+                // texted right now (countReachableBookingRecipients), and that
+                // requires config.enabled — so leaving it false stranded the
+                // owner: a verified phone still reported "nobody to ask" until a
+                // separate toggle on a different screen was found. Only the very
+                // first verification does this, so an owner who deliberately
+                // turned the Assistant off keeps it off.
+                const verifiedCount = await prisma.frontDeskAssistantRecipient.count({
+                    where: { hotelId, active: true, verifiedAt: { not: null }, consentAt: { not: null } },
+                });
+                if (verifiedCount === 1) {
+                    const current = await ensureConfig(hotelId).catch(() => null);
+                    if (current && !current.enabled) {
+                        await prisma.frontDeskAssistantConfig.update({
+                            where: { hotelId },
+                            data: {
+                                enabled: true,
+                                nextCheckAt: computeNextCheckAt({ ...current, enabled: true }),
+                            },
+                        }).catch(() => {});
+                        await createActivity({
+                            hotelId,
+                            direction: 'system',
+                            type: 'settings',
+                            summary: 'Front Desk Assistant turned on',
+                        });
+                    }
+                }
                 res.json({ success: true, data: await serializeAssistant(hotelId) });
             } catch (error) {
                 res.status(500).json({ success: false, message: 'Could not verify that phone.' });

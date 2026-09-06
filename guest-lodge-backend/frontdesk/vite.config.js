@@ -140,6 +140,9 @@ export default defineConfig(({ mode }) => {
           'manifest-simple-crm.json',
           'marketel.svg',
           'marketellogo.svg',
+          // Bundled so the native Contacts entry can use the real app icon
+          // rather than a mark redrawn in Swift.
+          'marketel-frontdesk-icon.png',
         ]) {
           fs.copyFileSync(path.join(publicRoot, filename), path.join(nativeWwwRoot, filename));
         }

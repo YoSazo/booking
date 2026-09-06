@@ -872,10 +872,20 @@ export async function saveAssistantSettings() {
   };
   try {
     applyResult(await api('PUT', '/api/crm/frontdesk-assistant', payload));
-    await api('POST', '/api/crm/booking-approval', approvalPayload);
+    // api() throws only on 401/503, so a refused booking rule arrives as a
+    // resolved { success: false } body. Dropping it on the floor meant the
+    // sheet reported "saved" over a rule the server had rejected, and the
+    // owner was left to infer the failure from the UI reverting.
+    const approval = await api('POST', '/api/crm/booking-approval', approvalPayload);
+    if (!approval?.success) {
+      throw new Error(approval?.message || 'Could not save the booking rule.');
+    }
     await loadFrontDeskAssistant({ force: true });
     toast('Front Desk Assistant and booking rule saved.', 'success');
   } catch (error) {
+    // The assistant half may have saved before the rule failed; reload so the
+    // sheet shows what is actually stored rather than the attempted state.
+    await loadFrontDeskAssistant({ force: true }).catch(() => {});
     toast(error.message || 'Could not save the assistant.', 'error');
   }
 }
