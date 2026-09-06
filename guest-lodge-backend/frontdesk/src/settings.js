@@ -1524,10 +1524,18 @@ async function goLive(options = {}) {
     console.warn('Marketel checkout was rejected:', res?.message || 'Unknown server response');
     showGoLiveError(() => goLive(options));
   } catch (e) {
+    // api() now throws when the server refuses a write, so a rejected checkout
+    // arrives here rather than through the success:false branch above. Keep the
+    // two apart: "the server said no, and why" and "the request never landed"
+    // call for different fixes, and this is the one event where losing that
+    // distinction is most expensive.
+    const refusal = e?.payload;
     journey?.track('JourneyCheckoutFailed', {
       stage: 'create-checkout-session',
-      reason: 'network-or-server-error',
-      errorName: String(e?.name || '').slice(0, 80),
+      reason: refusal ? 'server-rejected' : 'network-or-server-error',
+      ...(refusal
+        ? { serverMessage: String(refusal.message || e?.message || '').slice(0, 160) }
+        : { errorName: String(e?.name || '').slice(0, 80) }),
     }, { immediate: true });
     goLiveInFlight = false;
     console.warn('Marketel checkout could not start:', e);
