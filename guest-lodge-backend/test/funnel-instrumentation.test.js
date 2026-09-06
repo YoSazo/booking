@@ -172,9 +172,10 @@ test('setup asks only for the three details needed to build the preview', () => 
     assert.match(setup, /id="rmName"/);
     assert.match(setup, /id="rmNightly"/);
     assert.match(setup, /id="rmUnits" value="1"/);
+    assert.match(setup, /id="setupRoomPhoto"/);
+    assert.match(setup, /Add one room photo[\s\S]*\(optional\)/);
     assert.doesNotMatch(setup, /id="demandFitQuestion"|function answerQualityQ/);
-    assert.doesNotMatch(setup, /id="rmPhoto"|uploadRoomPhoto/);
-    assert.match(setup, /photos, more rooms, taxes, and policies after your preview opens/i);
+    assert.match(setup, /more photos, rooms, taxes, and policies after your preview opens/i);
 });
 
 test('email submission is the deduplicated Meta Lead and setup completion is the next commercial signal', () => {

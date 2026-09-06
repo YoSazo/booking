@@ -41,7 +41,7 @@ test('walk-in handling states the action and booking-page outcome', () => {
     assert.match(productCopy, /reduces? (?:the )?remaining availability/i);
 });
 
-test('the reveal makes the owner app and Guestel distinct, optional proofs', () => {
+test('the reveal makes the owner app and Guestel distinct without forcing a tour', () => {
     const ownerApp = revealCopy.indexOf('Marketel Front Desk is your real App Store app.');
     const guestel = revealCopy.indexOf("id: 'guestel'");
     assert.ok(ownerApp >= 0, 'the Front Desk app proof is missing');
@@ -70,6 +70,8 @@ test('the reveal makes the owner app and Guestel distinct, optional proofs', () 
     assert.doesNotMatch(revealCopy, /startBookingChallenge|showBookingChallengePrompt/);
     assert.doesNotMatch(revealCopy, /showcase-lightbox|expandable/);
     assert.doesNotMatch(revealCopy, /And if you miss it, your rule decides/);
+    assert.match(revealCopy, /See everything included/);
+    assert.doesNotMatch(revealCopy, />Optional</);
 });
 
 test('activation discloses a card-required trial and its paid renewal before checkout', () => {
@@ -108,4 +110,5 @@ test('activation opens directly to the measurable trial offer', () => {
     assert.match(revealCopy, /function activationPriceHtml\(\)/);
     assert.match(revealCopy, /trackReveal\('ActivationOfferViewed'\)/);
     assert.match(revealCopy, /: activationPriceHtml\(\)/);
+    assert.doesNotMatch(revealCopy, /Question before activating\? Message Salah|mvrAskBeforeActivating/);
 });

@@ -57,10 +57,13 @@ test('room setup advances immediately to ready while the property builds in the 
     assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 4/);
 });
 
-test('setup defers qualification and configuration that are not needed for the preview', () => {
+test('setup defers qualification and extended configuration while keeping one photo optional', () => {
     assert.doesNotMatch(setup, /id="demandFitQuestion"|data\.demandFitAnswer/);
-    assert.doesNotMatch(setup, /id="rmPhoto"|id="hotelAddress"|id="hotelPhone"/);
+    assert.doesNotMatch(setup, /id="hotelAddress"|id="hotelPhone"/);
     assert.match(setup, /id="rmUnits" value="1"/);
+    assert.match(setup, /id="setupRoomPhoto"[\s\S]*Add one room photo[\s\S]*\(optional\)/);
+    assert.match(setup, /pendingPhotoPrep = prepareSetupPhoto/);
+    assert.match(setup, /Promise\.all\(\[completeRequest, photoUpload\]\)/);
     assert.match(server, /demandFitAnswer/);
     assert.match(server, /marketelDemandFitMessage/);
     assert.match(server, /demandFit,/);

@@ -667,7 +667,6 @@ function finaleHtml() {
           <div class="mvr-secure-note">Stripe securely stores your card · <a href="/terms" target="_blank" rel="noopener">Trial terms</a></div>`
             : `<div class="mvr-guarantee"><span>✓</span><p><strong>Full Marketel access.</strong><b>${isYearly ? '$1,990 is billed yearly.' : '$199 is billed monthly.'}</b><small>Cancel anytime. Charges already processed are non-refundable.</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Billing terms</a></div>`}
-          <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
           <div class="mvr-included-label">Everything included in your trial</div>
@@ -741,7 +740,7 @@ function hubHtml() {
     </header>
     <div class="mvr-hub-hero">${bookingPreviewCardHtml()}</div>
     <div class="mvr-hub-trial-dock">${activationHubCtaHtml()}</div>
-    <div class="mvr-proof-label"><strong>See how the rest works</strong><span>Optional</span></div>
+    <div class="mvr-proof-label"><strong>See everything included</strong></div>
     <div class="mvr-hub-rows">
       ${HUB_ITEMS.filter((item) => item.id === 'frontdesk' || item.id === 'guestel').map(hubProofRowHtml).join('')}
     </div>
@@ -770,7 +769,7 @@ function renderReveal() {
 // would tear down the hero iframe, which is exactly the "page rebuilds itself"
 // bug the old render guard existed to stop.
 function refreshHubState() {
-  // Optional proof has no visual completion state. Visiting a carousel remains
+  // Product proof has no visual completion state. Visiting a carousel remains
   // measurable and resumable, but never makes the hub look like a checklist.
   lastRenderedRevealHtml = hubHtml();
 }
@@ -1160,9 +1159,6 @@ function bindRevealEvents() {
 // Activation lives in a sheet now, so its controls bind when that sheet is
 // presented rather than with the hub.
 function bindSheetEvents() {
-  document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
-    window.openMarketelSupport?.();
-  });
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.querySelectorAll('[data-mvr-billing]').forEach((button) => {
     button.addEventListener('click', () => {

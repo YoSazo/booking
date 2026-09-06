@@ -52,6 +52,23 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: 10px; font-family: inherit; font-size: 16px; outline: none;
 }
 .field input:focus { border-color: var(--green); }
+.upload-area {
+  display: flex; align-items: center; gap: 12px; min-height: 66px;
+  margin: 2px 0 14px; padding: 10px 12px; border: 1.5px dashed var(--border);
+  border-radius: 12px; background: #fbfcfb; cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.upload-area:hover { border-color: var(--green); background: #f7fbf8; }
+.upload-area.has-photo { border-style: solid; border-color: #b9dcc9; background: #f2faf5; }
+.upload-preview {
+  display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 48px;
+  border-radius: 10px; overflow: hidden; background: #edf3ef; color: var(--green);
+  font-size: 23px; font-weight: 400;
+}
+.upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+.upload-copy { min-width: 0; }
+.upload-title { color: var(--text); font-size: 13px; font-weight: 700; }
+.upload-hint { margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.35; }
 .btn {
   width: 100%; padding: 14px; border-radius: 10px; font-family: inherit;
   font-size: 15px; font-weight: 600; cursor: pointer; border: none;
@@ -200,9 +217,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
         <label for="rmNightly">Starting nightly price</label>
         <input type="number" id="rmNightly" min="1" max="100000" step="1" inputmode="decimal" value="99">
       </div>
+      <div class="upload-area" id="setupPhotoArea" role="button" tabindex="0" aria-label="Add one optional room photo">
+        <input type="file" id="setupRoomPhoto" accept="image/jpeg,image/png,image/webp" hidden>
+        <div class="upload-preview" id="setupPhotoPreview" aria-hidden="true">+</div>
+        <div class="upload-copy">
+          <div class="upload-title" id="setupPhotoTitle">Add one room photo <span style="font-weight:500;color:var(--muted);">(optional)</span></div>
+          <div class="upload-hint" id="setupPhotoHint">Make the preview instantly feel like your property.</div>
+        </div>
+      </div>
       <input type="hidden" id="rmUnits" value="1">
       <button class="btn btn-primary" data-journey="setup-build-booking-page" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
-      <p class="setup-footnote">You can add photos, more rooms, taxes, and policies after your preview opens.</p>
+      <p class="setup-footnote">You can add more photos, rooms, taxes, and policies after your preview opens.</p>
     </div>
   </div>
 
@@ -246,6 +271,10 @@ const requestedAngle = new URLSearchParams(window.location.search).get('angle') 
 const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
 let hotelData = {};
 let rooms = [];
+let pendingFile = null;
+let pendingPhotoPrep = null;
+let photoSelectionId = 0;
+let previewObjectUrl = '';
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
 let setupCompleteData = null;
@@ -358,6 +387,102 @@ function animateVisibleStep(stepEl) {
   });
 }
 
+function renderSetupPhoto(url, label) {
+  const preview = document.getElementById('setupPhotoPreview');
+  const area = document.getElementById('setupPhotoArea');
+  const title = document.getElementById('setupPhotoTitle');
+  const hint = document.getElementById('setupPhotoHint');
+  if (!preview || !area) return;
+  preview.innerHTML = '<img src="' + String(url).replace(/"/g, '&quot;') + '" alt="Room preview">';
+  area.classList.add('has-photo');
+  if (title) title.textContent = label || 'Photo selected';
+  if (hint) hint.textContent = 'Tap to choose a different photo.';
+}
+
+function clearSetupPhoto() {
+  const preview = document.getElementById('setupPhotoPreview');
+  const area = document.getElementById('setupPhotoArea');
+  const title = document.getElementById('setupPhotoTitle');
+  const hint = document.getElementById('setupPhotoHint');
+  const input = document.getElementById('setupRoomPhoto');
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = '';
+  if (preview) preview.textContent = '+';
+  if (input) input.value = '';
+  area?.classList.remove('has-photo');
+  if (title) title.innerHTML = 'Add one room photo <span style="font-weight:500;color:var(--muted);">(optional)</span>';
+  if (hint) hint.textContent = 'Make the preview instantly feel like your property.';
+}
+
+async function prepareSetupPhoto(file) {
+  if (!file || !file.type.startsWith('image/')) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / bitmap.width, 1200 / bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Photo conversion failed')), 'image/webp', 0.82);
+    });
+    return new File([blob], (file.name || 'room-photo').replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
+  } catch (_) {
+    return file;
+  }
+}
+
+function selectSetupPhoto(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    const input = document.getElementById('setupRoomPhoto');
+    if (input) input.value = '';
+    showToast('Choose a JPG, PNG, or WebP image', true);
+    return;
+  }
+  const selectionId = ++photoSelectionId;
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = URL.createObjectURL(file);
+  renderSetupPhoto(previewObjectUrl, 'Photo selected');
+  pendingFile = file;
+  pendingPhotoPrep = prepareSetupPhoto(file).then((prepared) => {
+    if (selectionId !== photoSelectionId) return null;
+    if (prepared.size > 5 * 1024 * 1024) {
+      pendingFile = null;
+      clearSetupPhoto();
+      showToast('That photo is too large. Choose one under 5 MB.', true);
+      return null;
+    }
+    pendingFile = prepared;
+    window.MarketelJourney?.track('JourneyPhotoSelected', {
+      mimeType: prepared.type || file.type || '',
+      originalBytes: file.size,
+      preparedBytes: prepared.size,
+    });
+    return prepared;
+  });
+}
+
+function bindPhotoPicker() {
+  const area = document.getElementById('setupPhotoArea');
+  const input = document.getElementById('setupRoomPhoto');
+  if (!area || !input) return;
+  const openPicker = () => input.click();
+  area.addEventListener('click', (event) => {
+    // The programmatic input click bubbles back through its container.
+    // Ignore that second event so one tap opens exactly one picker.
+    if (event.target === input) return;
+    openPicker();
+  });
+  area.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openPicker();
+  });
+  input.addEventListener('change', () => selectSetupPhoto(input.files?.[0]));
+}
+
 function goToStep(n) {
   const nextStepName = { 1: 'booking-page-essentials', 2: 'building' }[n] || 'unknown';
   window.MarketelJourney?.track('JourneySetupNavigation', {
@@ -407,6 +532,7 @@ async function loadSetup() {
     if (firstRoom) {
       document.getElementById('rmName').value = firstRoom.name || '';
       document.getElementById('rmUnits').value = Math.max(1, Number(firstRoom.totalUnits) || 1);
+      if (firstRoom.images?.[0]?.url) renderSetupPhoto(firstRoom.images[0].url, 'Current room photo');
     }
     if (data.rates?.nightly) document.getElementById('rmNightly').value = Number(data.rates.nightly) || 99;
     window.MarketelJourney?.track('JourneyRequestCompleted', {
@@ -469,6 +595,7 @@ async function addRoomAndFinish() {
     roomNameLength: roomName.length,
     totalUnits,
     nightly,
+    hasPhoto: !!pendingFile,
   });
   try {
     const existingRates = hotelData.rates || {};
@@ -479,6 +606,9 @@ async function addRoomAndFinish() {
     const roomRequest = fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: rooms[0]?.id, name: roomName, maxOccupancy: 4, totalUnits }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error('Could not save room');
+      return response.json();
     });
     const ratesRequest = fetch(API + '/api/setup/' + TOKEN + '/rates', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -492,16 +622,41 @@ async function addRoomAndFinish() {
         taxRate: existingRates.taxRate ?? 0,
       }),
     });
-    const [hotelRes, roomRes, ratesRes] = await Promise.all([hotelRequest, roomRequest, ratesRequest]);
+    // If a photo was chosen, its preparation and upload begin as soon as the
+    // room exists. This overlaps the other setup and domain work instead of
+    // adding a separate upload screen or round trip.
+    const photoUpload = pendingFile || pendingPhotoPrep
+      ? Promise.all([roomRequest, pendingPhotoPrep || Promise.resolve(pendingFile)]).then(async ([roomResult, photo]) => {
+          const roomId = roomResult?.room?.id || rooms[0]?.id;
+          if (!roomId || !photo) return false;
+          const form = new FormData();
+          form.append('image', photo);
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 8000);
+          try {
+            const response = await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + encodeURIComponent(roomId) + '/images', {
+              method: 'POST',
+              body: form,
+              signal: controller.signal,
+            });
+            if (!response.ok) throw new Error('Photo upload failed');
+            return true;
+          } finally {
+            window.clearTimeout(timeout);
+          }
+        }).catch(() => false)
+      : Promise.resolve(false);
+
+    const [hotelRes, , ratesRes] = await Promise.all([hotelRequest, roomRequest, ratesRequest]);
     if (!hotelRes.ok) throw new Error('Could not save property');
-    if (!roomRes.ok) throw new Error('Could not save room');
     if (!ratesRes.ok) throw new Error('Could not save starting price');
     hotelData = { ...hotelData, name: propertyName };
 
-    const completeRes = await fetch(API + '/api/setup/' + TOKEN + '/complete', {
+    const completeRequest = fetch(API + '/api/setup/' + TOKEN + '/complete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(journeyLinkage()),
     });
+    const [completeRes, photoUploaded] = await Promise.all([completeRequest, photoUpload]);
     const completeData = await completeRes.json();
     if (!completeRes.ok || !completeData.success) throw new Error(completeData.error || 'Could not finish setup');
 
@@ -531,6 +686,7 @@ async function addRoomAndFinish() {
       roomNameLength: roomName.length,
       totalUnits,
       nightly,
+      photoUploaded,
     }, { durationMs: Date.now() - setupStepStartedAt });
     window.MarketelJourney?.track('JourneyPreviewReady', {
       bookingPageReady: true,
@@ -586,6 +742,7 @@ function setSuccessLinkLoading(isLoading, label) {
   }
 }
 
+bindPhotoPicker();
 loadSetup().finally(() => animateVisibleStep(document.getElementById('step-1')));
 </script>
 <script src="/marketel-telemetry.js"></script>
