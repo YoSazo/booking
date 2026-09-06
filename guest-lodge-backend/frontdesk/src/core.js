@@ -3159,7 +3159,23 @@ async function api(method, path, body, requestOptions = {}) {
     error.retryable = true;
     throw error;
   }
-  return res.json();
+  const payload = await res.json();
+  // A write the server refused is a failure, not a value to ignore. Throwing
+  // only on 401/503 meant every `await api('POST', ...)` whose result went
+  // unchecked reported success for a write that never happened: the
+  // returning-guest offer said "saved", survived tab switches on local state
+  // alone, and was gone on reinstall because nothing had reached the database.
+  // Callers that inspect the body themselves are unaffected — they already
+  // throw or toast on success:false, and the payload rides along for the few
+  // that read a `reason`.
+  const writes = normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';
+  if (writes && payload && payload.success === false) {
+    const error = new Error(payload.message || 'That did not save.');
+    error.status = res.status;
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
 }
 
 function showLogin() {

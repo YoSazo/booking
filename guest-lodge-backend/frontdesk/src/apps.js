@@ -87,7 +87,10 @@ async function saveReturnOffer() {
     crm.returnOfferValue = returnOfferValue;
     toast(returnOfferEnabled ? 'Returning-guest offer saved!' : 'Offer turned off', 'success');
   } catch (e) {
-    toast('Could not save offer', 'error');
+    // Do not leave crm holding a value the server rejected — the form would
+    // keep showing it until the next reload and look saved.
+    toast(e?.message || 'Could not save offer', 'error');
+    renderAppsView();
   }
 }
 

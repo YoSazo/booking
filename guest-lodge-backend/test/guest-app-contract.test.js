@@ -350,3 +350,35 @@ test('a property the guest asked to add is not lost when the lookup fails', () =
         /GuestelHandoff\.save\(hotelId: hotelId, domain: domain, handoffToken: handoff\)[\s\S]{0,120}addHandoffHotel/
     );
 });
+
+// ── A refused write must never look saved ──────────────────────────
+// The returning-guest offer reported "saved", survived tab switches, and was
+// gone after a reinstall. api() threw only on 401/503, so a refused write came
+// back as a resolved { success: false } body; saveReturnOffer ignored it,
+// updated crm locally and toasted success. Guestel kept showing the older
+// value that had genuinely persisted, which made it look like a read bug.
+
+const frontdeskCore = fs.readFileSync(
+    path.join(__dirname, '..', 'frontdesk', 'src', 'core.js'), 'utf8'
+);
+const frontdeskApps = fs.readFileSync(
+    path.join(__dirname, '..', 'frontdesk', 'src', 'apps.js'), 'utf8'
+);
+
+test('api() rejects a write the server refused', () => {
+    assert.match(frontdeskCore, /const writes = normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';/);
+    assert.match(frontdeskCore, /if \(writes && payload && payload\.success === false\)/);
+    // The body rides along so a caller reading `reason` still can.
+    assert.match(frontdeskCore, /error\.payload = payload;/);
+});
+
+test('reads are unaffected, so non-error refusals still reach their caller', () => {
+    // /api/crm/billing-portal answers { success: false, reason } on a GET and is
+    // rendered as information, not an error.
+    assert.match(frontdeskCore, /result\?\.reason === 'not-stripe-managed'/);
+});
+
+test('a rejected offer save does not leave the form showing it', () => {
+    assert.match(frontdeskApps, /toast\(e\?\.message \|\| 'Could not save offer', 'error'\);/);
+    assert.match(frontdeskApps, /renderAppsView\(\);/);
+});
