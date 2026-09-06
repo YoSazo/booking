@@ -308,3 +308,45 @@ test('Marketel opens real native SwiftUI message surfaces on iPhone', () => {
     assert.match(nativeMessages, /safeAreaInset\(edge: \.bottom/);
     assert.match(nativeMessages, /Task\.sleep\(nanoseconds: 15_000_000_000\)/);
 });
+
+// ── Adding a property when Guestel is already installed ────────────
+// The Add button builds Apple's hosted App Clip link, and for a branded
+// booking page it identifies the property with `domain=` rather than
+// `hotelId=`. The App Clip resolved that form; the full app did not, so an
+// installed app opened, found no id, and returned — a flicker and no card.
+
+const repoRootDir = path.resolve(__dirname, '..', '..');
+const guestelApp = fs.readFileSync(
+    path.join(repoRootDir, 'marketel-guestel-ios', 'Guestel', 'GuestelApp.swift'),
+    'utf8'
+);
+const clipApp = fs.readFileSync(
+    path.join(repoRootDir, 'marketel-guestel-ios', 'GuestelClip', 'AppClipApp.swift'),
+    'utf8'
+);
+const appClipInstall = fs.readFileSync(
+    path.join(repoRootDir, 'hotel-booking-app', 'src', 'appClipInstall.js'),
+    'utf8'
+);
+
+test('the installed app resolves every invocation form the App Clip does', () => {
+    // The web side still identifies a branded page by domain.
+    assert.match(appClipInstall, /params\.set\('domain', host\)/);
+    // Both targets must therefore understand domain, hotelId and /clip/<id>.
+    for (const source of [guestelApp, clipApp]) {
+        assert.match(source, /name == "domain"/);
+        assert.match(source, /name == "hotelId"/);
+        assert.match(source, /parts\[0\]\.lowercased\(\) == "clip"/);
+        assert.match(source, /hasSuffix\("mktel\.co"\)/);
+    }
+    // And the app must actually resolve a domain to an id rather than give up.
+    assert.match(guestelApp, /BookingAPI\.hotelId\(forDomain: domain\)/);
+});
+
+test('a property the guest asked to add is not lost when the lookup fails', () => {
+    // The handoff is persisted before the network call, so a failure retries.
+    assert.match(
+        guestelApp,
+        /GuestelHandoff\.save\(hotelId: hotelId, domain: domain, handoffToken: handoff\)[\s\S]{0,120}addHandoffHotel/
+    );
+});

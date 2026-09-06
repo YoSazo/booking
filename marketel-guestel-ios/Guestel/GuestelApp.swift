@@ -84,17 +84,37 @@ struct GuestelApp: App {
         return true
     }
 
+    // Mirrors the App Clip's own resolution (GuestelClip/AppClipApp.swift,
+    // `invocation(from:)`). The Add button builds Apple's hosted link, and for a
+    // branded booking page it identifies the property with `domain=` rather than
+    // `hotelId=` — the one form this handler never read. With Guestel already
+    // installed the link opened the app, found no id, and returned without
+    // adding anything: a flicker and no card. A direct visit to a branded host
+    // is resolved the same way, so every invocation surface agrees.
     @MainActor
     private func addHotel(from url: URL) async {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        let handoff = items?.first(where: { $0.name == "handoff" })?.value
         let parts = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
-        let queryId = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
-            .first(where: { $0.name == "hotelId" })?.value
-        let handoff = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
-            .first(where: { $0.name == "handoff" })?.value
-        let hotelId = queryId ?? (parts.count >= 2 && parts[0].lowercased() == "clip" ? parts[1] : "")
+
+        var hotelId = items?.first(where: { $0.name == "hotelId" })?.value ?? ""
+        var domain = items?.first(where: { $0.name == "domain" })?.value ?? ""
+        if hotelId.isEmpty, domain.isEmpty {
+            if parts.count >= 2, parts[0].lowercased() == "clip" {
+                hotelId = parts[1]
+            } else if let host = url.host, host.hasSuffix("mktel.co") {
+                domain = host
+            }
+        }
+        if hotelId.isEmpty, !domain.isEmpty {
+            hotelId = (try? await BookingAPI.hotelId(forDomain: domain)) ?? ""
+        }
         guard !hotelId.isEmpty else { return }
-        let target = GuestelHandoff.Target(hotelId: hotelId, domain: "", handoffToken: handoff)
-        GuestelHandoff.save(hotelId: hotelId, domain: "", handoffToken: handoff)
+
+        let target = GuestelHandoff.Target(hotelId: hotelId, domain: domain, handoffToken: handoff)
+        // Saved before the network call so a failure here is retried later
+        // rather than losing the property the guest just asked to add.
+        GuestelHandoff.save(hotelId: hotelId, domain: domain, handoffToken: handoff)
         if await addHandoffHotel(target) { GuestelHandoff.clear() }
     }
 }
