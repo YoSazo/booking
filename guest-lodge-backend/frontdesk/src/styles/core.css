@@ -4070,3 +4070,5 @@ body.native-ios .marketel-form-keyboard-surface .edit-add-room-card {
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
+
+.trial-action{display:inline-block;border:0;background:transparent;color:#256c4c;font:inherit;font-size:12px;font-weight:700;cursor:pointer;min-height:44px;padding:9px 8px 9px 0;text-align:left}.trial-action:focus-visible{outline:3px solid #5c9aee;outline-offset:2px}

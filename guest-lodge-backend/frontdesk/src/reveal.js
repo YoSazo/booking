@@ -1415,6 +1415,11 @@ export async function showMarketelValueReveal(options = {}) {
   void checkBookingPageStatus();
 }
 
+// A delayed Stripe confirmation can arrive while the preview still covers the desk.
+export function finishActivatedReveal() {
+  if (crm.hotelSubscribed && document.getElementById('marketelValueReveal')) finishReveal();
+}
+
 export function hasPendingMarketelValueReveal() {
   try {
     return localStorage.getItem(PENDING_KEY) === '1';

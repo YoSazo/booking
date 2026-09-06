@@ -65,14 +65,14 @@ test('trial lifecycle and milestones are exact, observable business events', () 
   assert.match(server, /app\.post\('\/api\/crm\/trial-milestone'/);
   assert.match(server, /This property does not have an active trial/);
   assert.match(server, /createdAt: trialBookingWindow/);
-  assert.match(core, /Your \$\{crm\.marketelTrialDays \|\| 14\}-day trial is live/);
+  assert.match(core, /trialSummary\(crm\)/);
   assert.match(core, /if \(!crm\.token \|\| !crm\.activeHotelId\)/);
   assert.doesNotMatch(core, /if \(crm\.marketelSubscriptionStatus !== 'trialing' \|\| !crm\.token/);
   assert.match(core, /trialDaysLeft: trialing/);
   assert.ok(appDelegate.includes('TRIAL · \\(days)D'));
   assert.match(appDelegate, /updateTrialStatus\(/);
   assert.match(core, /confirmTrialLinkPlaced/);
-  assert.match(core, /Manage trial &amp; billing/);
+  assert.match(core, /Manage or cancel in Trial &amp; Billing/);
   assert.match(core, /async function openMarketelBillingPortal/);
   assert.match(core, /action === 'browserClosed'/);
   assert.doesNotMatch(server, /req\.crmIsNativeClient[\s\S]{0,180}Manage your Marketel subscription on the web/);

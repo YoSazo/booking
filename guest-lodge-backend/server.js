@@ -334,14 +334,20 @@ async function sendActivationEmail({
     const billingDate = trialEndsAt instanceof Date && Number.isFinite(trialEndsAt.getTime())
         ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(trialEndsAt)
         : 'the end of your trial';
-    const renewal = `$${Number(renewalAmountUsd || MARKETEL_MONTHLY_PRICE_USD).toLocaleString('en-US')}/${billingInterval === 'year' ? 'year' : 'month'}`;
+    const normalizedBillingInterval = billingInterval === 'year' ? 'year' : 'month';
+    const suppliedRenewalAmount = Number(renewalAmountUsd);
+    const fallbackRenewalAmount = normalizedBillingInterval === 'year'
+        ? MARKETEL_YEARLY_PRICE_USD
+        : MARKETEL_MONTHLY_PRICE_USD;
+    const renewalAmount = suppliedRenewalAmount > 0 ? suppliedRenewalAmount : fallbackRenewalAmount;
+    const renewal = `$${renewalAmount.toLocaleString('en-US')}/${normalizedBillingInterval}`;
     const kicker = trialing ? `${MARKETEL_TRIAL_DAYS}-day trial started` : 'Payment confirmed';
     const headline = trialing ? `${cleanHotelName}'s trial is live` : `${cleanHotelName} is activated`;
     const intro = trialing
-        ? `Your complete Marketel system is live now. Your first ${renewal} charge is scheduled for ${billingDate} unless you cancel before then.`
-        : 'Your direct booking page and Front Desk now have full access.';
+        ? `$0 was charged when your trial started. Your plan automatically renews at ${renewal} on ${billingDate} unless you cancel before then. Your property setup is saved; review rooms, rates, availability, taxes and policies before sharing your booking link.`
+        : 'Your direct booking page and Front Desk now have full access. Review your property details and availability before sharing your booking link.';
     const footer = trialing
-        ? `Questions or want to cancel before ${billingDate}? Reply to this email or contact support@bookmarketel.com.`
+        ? `Manage or cancel in Trial & Billing inside Web Front Desk before ${billingDate}. Questions? Reply to this email or contact support@bookmarketel.com.`
         : 'Questions? Reply to this email or contact support@bookmarketel.com.';
     return sendMarketelLifecycleEmail({
         toEmail,
@@ -356,8 +362,10 @@ async function sendActivationEmail({
             ACTIVATION_HEADLINE: headline,
             ACTIVATION_INTRO: intro,
             ACTIVATION_FOOTER: footer,
+            APP_HANDOFF_URL: MARKETEL_FRONTDESK_APP_STORE_URL || frontdeskUrl,
+            APP_HANDOFF_LABEL: MARKETEL_FRONTDESK_APP_STORE_URL ? 'Download Marketel Front Desk for iPhone' : 'Continue in Web Front Desk',
         },
-        text: `${headline}.\n\n${intro}\n\nOpen Front Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking page: https://${domain}\n\nNext: turn on Front Desk alerts, place your booking link where guests can find it, and make one test booking.\n\n${footer}`,
+        text: `${headline}.\n\n${intro}\n\nOpen Front Desk: ${frontdeskUrl}\nProperty ID: ${hotelId}\nBooking page: https://${domain}\n\nNext: open Marketel Front Desk on iPhone and sign in with your setup email and the six-digit email code. Review property details and availability, turn on booking alerts, and choose your no-answer rule. Preview the booking experience, then share your guest link. A preview does not create a reservation or verify alert delivery.\n\nApp: ${MARKETEL_FRONTDESK_APP_STORE_URL || frontdeskUrl}\nYour web Front Desk remains available for property details and bookings. Guests use your booking link; Guestel is their guest experience.\n\n${footer}`,
     });
 }
 

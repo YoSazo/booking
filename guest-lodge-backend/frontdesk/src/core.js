@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import { trialSummary } from './trial-summary.js';
 import QRCode from 'qrcode';
 import guestelAppIconUrl from './assets/guestel-app-icon.png';
 
@@ -1290,6 +1291,9 @@ function guestBookingEngineUrl(options = {}) {
     url = domain ? 'https://' + domain + '/' : '';
   }
 
+  if (url && options.preview) {
+    url += (url.includes('?') ? '&' : '?') + 'preview=1';
+  }
   if (url && focusInstall) {
     url += (url.includes('?') ? '&' : '?') + 'scroll=install';
   }
@@ -1899,6 +1903,11 @@ function blockedDemandLineHtml() {
 // blocked demand exists, the pill upgrades to a proof-of-demand nudge, since
 // that's the genuine high-intent signal worth re-prominence.
 function goLiveBannerHtml() {
+  try {
+    if (sessionStorage.getItem(`marketelActivationPendingV1.${crm.activeHotelId}`) === '1') {
+      return '<div style="padding:14px;background:#eef6f1;border-radius:14px;font-size:13px;">Your subscription confirmation is pending. Check its status before trying checkout again.<br><button class="trial-action" onclick="openTrialConfirmation()">Check trial status →</button></div>';
+    }
+  } catch (_) {}
   if (isNativeFrontdeskApp()) return '';
   const demand = crm.blockedDemand && crm.blockedDemand.total > 0 ? crm.blockedDemand.total : 0;
   const hasTrial = crm.marketelTrialEligible !== false;
@@ -1919,39 +1928,56 @@ function goLiveBannerHtml() {
     </div>`;
 }
 
-function trialDateLabel(value) {
-  const date = value ? new Date(value) : null;
-  if (!date || !Number.isFinite(date.getTime())) return 'the end of your trial';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+function trialChecklistHtml() {
+  const summary = trialSummary(crm);
+  const milestones = crm.trialStatus?.milestones || {};
+  const native = isNativeFrontdeskApp();
+  return `<section aria-label="Trial launch checklist" style="background:#eef6f1;border:1px solid #cfe6da;border-radius:16px;padding:14px 15px;margin-bottom:14px;color:#183d2e;">
+    <strong style="display:block;font-size:14px;">${summary.canceled ? 'Trial cancellation scheduled' : 'Your trial is active'}</strong>
+    <p style="margin:5px 0 12px;font-size:12px;line-height:1.5;">${summary.daysLeft !== null ? `${summary.daysLeft} days left · ` : ''}${esc(summary.billing)}</p>
+    <details><summary style="cursor:pointer;min-height:44px;font-size:13px;font-weight:700;">Prepare your property, then share your link</summary>
+      <div style="display:grid;gap:12px;font-size:12px;line-height:1.5;padding:8px 0;">
+        <div><strong>1. ${milestones.nativeAppActivated ? 'Front Desk app connected' : 'Open Marketel Front Desk on iPhone'}</strong><br>Sign in with your setup email and the six-digit email code.
+          ${!native ? `<button class="trial-action" onclick="trialLaunchAction('app')">App download &amp; sign-in →</button>` : ''}</div>
+        <div><strong>2. Review your property details</strong><br>Confirm rooms, photos, rates, taxes, policies, and the availability guests should see.
+          <button class="trial-action" onclick="trialLaunchAction('settings')">Review property →</button>
+          <button class="trial-action" onclick="trialLaunchAction('availability')">Review availability →</button></div>
+        <div><strong>3. Set booking alerts and your no-answer rule</strong><br>${native ? 'Choose who receives alerts and what happens if nobody answers.' : 'Set these up in the iPhone app. You can manage property details and bookings on the web.'}
+          <button class="trial-action" onclick="trialLaunchAction('alerts')">${native ? 'Set up alerts &amp; rule' : 'Get the iPhone app'} →</button></div>
+        <div><strong>4. Check the guest experience, then share</strong><br>Previewing does not create a reservation or verify delivery of booking alerts. Keep outside bookings reflected in your availability.
+          <button class="trial-action" onclick="trialLaunchAction('preview')">Preview booking page →</button>
+          <button class="trial-action" onclick="trialLaunchAction('copy')">Copy guest booking link</button>
+          ${milestones.linkPlacementConfirmed ? '<span>Link placement confirmed by you.</span>' : '<button class="trial-action" onclick="confirmTrialLinkPlaced()">I placed my link where guests find me</button>'}</div>
+      </div>
+    </details>
+    <button class="trial-action" onclick="openMarketelBillingPortal()">Manage or cancel in Trial &amp; Billing →</button>
+  </section>`;
 }
 
-function trialChecklistHtml() {
-  const trial = crm.trialStatus || {};
-  const milestones = trial.milestones || {};
-  const endLabel = trialDateLabel(trial.endsAt || crm.marketelSubscriptionPeriodEnd);
-  const interval = trial.billingInterval === 'year' ? 'year' : 'month';
-  const renewal = Number(trial.renewalAmountUsd) || (interval === 'year' ? 1990 : 199);
-  const items = [
-    { done: !!milestones.nativeAppActivated, label: 'Open Marketel Front Desk on your phone' },
-    { done: !!milestones.linkPlacementConfirmed, label: 'Place your booking link where guests find you', action: true },
-    { done: !!milestones.firstBookingReceived, label: 'Receive your first booking' },
-  ];
-  return `<section aria-label="Trial launch checklist" style="background:#eef6f1;border:1px solid #cfe6da;border-radius:16px;padding:14px 15px;margin-bottom:14px;color:#183d2e;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
-      <div><strong style="display:block;font-size:14px;line-height:1.25;">Your ${crm.marketelTrialDays || 14}-day trial is live</strong><span style="display:block;margin-top:3px;font-size:11.5px;color:#577266;line-height:1.35;">${trial.cancellationScheduled ? `Canceled · access remains through ${esc(endLabel)}` : `${Number(trial.daysLeft) || crm.marketelTrialDays || 14} days left · $${renewal.toLocaleString('en-US')}/${interval} on ${esc(endLabel)}`}</span></div>
-      <span style="width:9px;height:9px;border-radius:50%;background:#2E7D5B;box-shadow:0 0 0 5px rgba(46,125,91,.10);margin:5px 4px 0 0;flex:0 0 auto;"></span>
-    </div>
-    <div style="display:grid;gap:7px;">
-      ${items.map((item) => `<div style="display:grid;grid-template-columns:22px minmax(0,1fr)${item.action && !item.done ? ' auto' : ''};align-items:center;gap:8px;min-height:28px;">
-        <span aria-hidden="true" style="display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:${item.done ? '#2E7D5B' : '#fff'};border:1px solid ${item.done ? '#2E7D5B' : '#bdd5c8'};color:#fff;font-size:12px;font-weight:800;">${item.done ? '✓' : ''}</span>
-        <span style="font-size:12px;line-height:1.3;color:${item.done ? '#577266' : '#183d2e'};${item.done ? 'text-decoration:line-through;text-decoration-color:#9db8aa;' : ''}">${esc(item.label)}</span>
-        ${item.action && !item.done ? '<button type="button" onclick="confirmTrialLinkPlaced()" style="border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:11.5px;font-weight:800;padding:5px 0 5px 7px;cursor:pointer;white-space:nowrap;">I added it</button>' : ''}
-      </div>`).join('')}
-    </div>
-    <div style="border-top:1px solid #cfe6da;margin-top:11px;padding-top:9px;text-align:right;">
-      <button type="button" onclick="openMarketelBillingPortal()" style="border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:11.5px;font-weight:800;padding:5px 0;cursor:pointer;">Manage trial &amp; billing&nbsp; →</button>
-    </div>
-  </section>`;
+async function openTrialConfirmation() {
+  try {
+    await loadSettingsModule();
+    window.showActivatedModal?.();
+  } catch (_) {
+    toast('Could not open trial details. Please try again or contact support@bookmarketel.com.', 'error');
+  }
+}
+
+async function trialLaunchAction(action) {
+  window.MarketelJourney?.track('JourneyControlActivated', { controlName: `trial-setup-${action}` });
+  if (action === 'app') return openTrialConfirmation();
+  if (action === 'settings' || action === 'availability') return setFilter(action);
+  if (action === 'alerts') {
+    if (!isNativeFrontdeskApp()) return openTrialConfirmation();
+    return operationalReadinessAction('assistant');
+  }
+  if (action === 'preview') return openGuestBookingEngine({ preview: true });
+  if (action === 'copy') {
+    const url = guestBookingEngineUrl();
+    if (!url) return toast('Your booking domain is still setting up.', 'info');
+    try { await navigator.clipboard.writeText(url); toast('Guest booking link copied.', 'success'); }
+    catch (_) { toast('Could not copy the link. Open your booking page to copy its address.', 'error'); }
+  }
 }
 
 function operationalAccessBannerHtml() {
@@ -1971,27 +1997,43 @@ async function loadMarketelTrialStatus() {
     syncNativeShellState();
     return;
   }
+  const requestedHotelId = crm.activeHotelId;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const data = await api('GET', '/api/crm/trial-status');
+    const data = await api('GET', '/api/crm/trial-status', undefined, { signal: controller.signal });
+    if (crm.activeHotelId !== requestedHotelId) return;
     if (data?.success) {
+      const newlyActivated = !crm.hotelSubscribed && !!data.subscribed;
+      crm.marketelLatestTrialState = data;
       crm.trialStatus = data.trialing ? data : null;
       crm.marketelTrialDays = Math.max(1, Number(data.trialDays) || crm.marketelTrialDays || 14);
       if (data.trialing) {
         crm.marketelSubscriptionStatus = 'trialing';
         crm.marketelSubscriptionPeriodEnd = String(data.endsAt || crm.marketelSubscriptionPeriodEnd || '');
         crm.hotelSubscribed = data.subscribed !== false;
-      } else if (crm.marketelSubscriptionStatus === 'trialing') {
+      } else {
         // Avoid leaving a stale trial banner behind after conversion or
         // cancellation. The normal subscription sync supplies the exact next
         // status; this endpoint only needs to establish that it is no longer a
         // trial.
         crm.marketelSubscriptionStatus = data.subscribed ? 'active' : '';
         crm.hotelSubscribed = !!data.subscribed;
+        crm.operationalAccessOnly = !data.subscribed && (!!data.startedAt || crm.operationalAccessOnly);
+      }
+      if (data.subscribed) {
+        crm.operationalAccessOnly = false;
+        if (newlyActivated && document.getElementById('marketelValueReveal')) {
+          const reveal = await loadRevealModule();
+          reveal.finishActivatedReveal();
+        }
       }
       updateGoLiveBanner();
       syncNativeShellState();
+      return data;
     }
-  } catch (_) { /* Trial status is helpful, never app-blocking. */ }
+  } catch (_) { /* Keep verified access; the confirmation offers a retry. */ }
+  finally { clearTimeout(timeout); }
 }
 
 async function confirmTrialLinkPlaced() {
@@ -2098,9 +2140,11 @@ function updateGoLiveBanner() {
     trialing || operationalOnly || (!isNativeFrontdeskApp() && !crm.hotelSubscribed)
   );
   banner.style.display = shouldShow ? 'block' : 'none';
+  const guideOpen = banner.querySelector('details')?.open;
   if (shouldShow) banner.innerHTML = trialing
     ? trialChecklistHtml()
     : operationalOnly ? operationalAccessBannerHtml() : goLiveBannerHtml();
+  if (guideOpen && banner.querySelector('details')) banner.querySelector('details').open = true;
   const app = document.getElementById('app');
   if (app) app.classList.toggle('has-go-live-banner', shouldShow);
 }
@@ -2646,6 +2690,8 @@ async function startCrmApp(verification, options = {}) {
   crm.supportUnreadCount = 0;
   crm.operationalReadiness = null;
   crm.operationalReadinessLoading = false;
+  crm.marketelLatestTrialState = null;
+  crm.trialStatus = null;
   ensureAvailabilityUi();
   syncNotificationButtonState();
   syncRevenueUi();
@@ -2902,25 +2948,18 @@ async function startCrmApp(verification, options = {}) {
     goLive();
   }
 
-  if (urlParams.get('activated') === '1') {
-    const cleanUrl = new URL(window.location);
-    cleanUrl.searchParams.delete('activated');
-    window.history.replaceState({}, '', cleanUrl);
-    if (crm.hotelSubscribed) {
-      updateGoLiveBanner();
-      const openActivatedModal = () => {
-        const fn = (typeof showActivatedModal === 'function')
-          ? showActivatedModal
-          : (typeof window.showActivatedModal === 'function' ? window.showActivatedModal : null);
-        if (fn) fn();
-      };
-      if (typeof loadSettingsModule === 'function') {
-        loadSettingsModule().then(openActivatedModal).catch(openActivatedModal);
-      } else {
-        openActivatedModal();
-      }
-    } else {
-      toast('Stripe has not confirmed this subscription yet. Refresh in a moment or contact support.', 'error');
+  if (!isNativeFrontdeskApp()) {
+    const pendingKey = `marketelActivationPendingV1.${crm.activeHotelId}`;
+    let pending = false;
+    try {
+      if (urlParams.get('activated') === '1') sessionStorage.setItem(pendingKey, '1');
+      pending = sessionStorage.getItem(pendingKey) === '1';
+    } catch (_) {}
+    if (urlParams.get('activated') === '1' || pending) {
+      const cleanUrl = new URL(window.location);
+      cleanUrl.searchParams.delete('activated');
+      window.history.replaceState({}, '', cleanUrl);
+      void openTrialConfirmation();
     }
   }
 
@@ -2936,10 +2975,12 @@ async function startCrmApp(verification, options = {}) {
   }
 
   if (urlParams.get('activation_error') === '1') {
+    try { sessionStorage.setItem(`marketelActivationPendingV1.${crm.activeHotelId}`, '1'); } catch (_) {}
     const cleanUrl = new URL(window.location);
     cleanUrl.searchParams.delete('activation_error');
     window.history.replaceState({}, '', cleanUrl);
-    toast('We could not verify the Stripe payment. Nothing was activated or charged twice.', 'error');
+    toast('We could not confirm your subscription. Check Trial & Billing or contact support before trying checkout again.', 'error');
+    void openTrialConfirmation();
   }
 
   if (!isEmbeddedEditorPreview && !isFirstWelcome) {
@@ -3075,7 +3116,7 @@ async function sendMagicLink() {
 }
 
 // ── API ────────────────────────────────────────────────
-async function api(method, path, body) {
+async function api(method, path, body, requestOptions = {}) {
   if (!crm.activeHotelId) throw new Error('Property context is not loaded.');
   const url = new URL(path, marketelLocalUrlBase);
   if (!url.searchParams.get('hotelId')) {
@@ -3084,6 +3125,7 @@ async function api(method, path, body) {
 
   const opts = {
     method,
+    ...(requestOptions.signal ? { signal: requestOptions.signal } : {}),
     headers: {
       'Content-Type': 'application/json',
       'x-crm-token': crm.token,
@@ -5902,7 +5944,7 @@ function operationalReadinessHtml() {
   if (readiness.complete) {
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:11px 13px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;">
       <span aria-hidden="true" style="display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2E7D5B;color:#fff;font-size:13px;font-weight:900;">✓</span>
-      <div style="font-size:12px;line-height:1.35;"><strong style="display:block;font-size:13px;">Ready for live bookings</strong>Your page, alert path and fallback rule are verified.</div>
+      <div style="font-size:12px;line-height:1.35;"><strong style="display:block;font-size:13px;">Booking checks completed</strong>Your page, alert path, fallback rule and a direct booking were observed. Keep your rates and availability up to date.</div>
     </div>`;
   }
 
@@ -6856,6 +6898,8 @@ exposeToWindow({
   toggleMessagesInbox,
   closeMessagesWorkspace,
   confirmTrialLinkPlaced,
+  openTrialConfirmation,
+  trialLaunchAction,
   twoRoomExplainerHtml,
   updateBookingsTabBadge,
   updateFrontdeskManifestLink,
