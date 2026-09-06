@@ -1932,11 +1932,19 @@ function trialChecklistHtml() {
   const summary = trialSummary(crm);
   const milestones = crm.trialStatus?.milestones || {};
   const native = isNativeFrontdeskApp();
-  return `<section aria-label="Trial launch checklist" style="background:#eef6f1;border:1px solid #cfe6da;border-radius:16px;padding:14px 15px;margin-bottom:14px;color:#183d2e;">
-    <strong style="display:block;font-size:14px;">${summary.canceled ? 'Trial cancellation scheduled' : 'Your trial is active'}</strong>
-    <p style="margin:5px 0 12px;font-size:12px;line-height:1.5;">${summary.daysLeft !== null ? `${summary.daysLeft} days left · ` : ''}${esc(summary.billing)}</p>
-    <details><summary style="cursor:pointer;min-height:44px;font-size:13px;font-weight:700;">Prepare your property, then share your link</summary>
-      <div style="display:grid;gap:12px;font-size:12px;line-height:1.5;padding:8px 0;">
+  const compactStatus = summary.canceled
+    ? (summary.endLabel ? `Access through ${summary.endLabel}` : 'Cancellation scheduled')
+    : `${summary.daysLeft !== null ? `${summary.daysLeft} days left · ` : ''}$0 today`;
+  return `<section class="trial-overview-card" aria-label="Trial status and launch checklist">
+    <details class="trial-overview-details">
+      <summary class="trial-overview-summary">
+        <span class="trial-overview-heading"><strong>${summary.canceled ? 'Trial cancellation scheduled' : 'Your trial is active'}</strong><small>${esc(compactStatus)}</small></span>
+        <span class="trial-overview-toggle">Trial details</span>
+      </summary>
+      <div class="trial-overview-body">
+        <p class="trial-overview-billing">${esc(summary.billing)}</p>
+        <strong class="trial-overview-launch-title">Prepare your property, then share your link</strong>
+        <div class="trial-overview-checklist">
         <div><strong>1. ${milestones.nativeAppActivated ? 'Front Desk app connected' : 'Open Marketel Front Desk on iPhone'}</strong><br>Sign in with your setup email and the six-digit email code.
           ${!native ? `<button class="trial-action" onclick="trialLaunchAction('app')">App download &amp; sign-in →</button>` : ''}</div>
         <div><strong>2. Review your property details</strong><br>Confirm rooms, photos, rates, taxes, policies, and the availability guests should see.
@@ -1948,9 +1956,10 @@ function trialChecklistHtml() {
           <button class="trial-action" onclick="trialLaunchAction('preview')">Preview booking page →</button>
           <button class="trial-action" onclick="trialLaunchAction('copy')">Copy guest booking link</button>
           ${milestones.linkPlacementConfirmed ? '<span>Link placement confirmed by you.</span>' : '<button class="trial-action" onclick="confirmTrialLinkPlaced()">I placed my link where guests find me</button>'}</div>
+        </div>
+        <button class="trial-action" onclick="openMarketelBillingPortal()">Manage or cancel in Trial &amp; Billing →</button>
       </div>
     </details>
-    <button class="trial-action" onclick="openMarketelBillingPortal()">Manage or cancel in Trial &amp; Billing →</button>
   </section>`;
 }
 

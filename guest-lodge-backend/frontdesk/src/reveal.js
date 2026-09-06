@@ -1438,6 +1438,7 @@ export function clearPendingMarketelValueReveal() {
 
 const revealExports = {
   clearPendingMarketelValueReveal,
+  finishActivatedReveal,
   hasPendingMarketelValueReveal,
   showMarketelValueReveal,
 };

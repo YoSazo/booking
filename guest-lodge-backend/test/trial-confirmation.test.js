@@ -5,6 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../frontdesk/src/core.js'), 'utf8');
 const activationSource = fs.readFileSync(path.join(__dirname, '../frontdesk/src/activation.js'), 'utf8');
+const assistantSource = fs.readFileSync(path.join(__dirname, '../frontdesk/src/assistant.js'), 'utf8');
 const serverSource = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
 const statusFunction = source.slice(source.indexOf('async function loadMarketelTrialStatus()'), source.indexOf('\nasync function confirmTrialLinkPlaced()'));
 const summaryModule = import('../frontdesk/src/trial-summary.js');
@@ -35,6 +36,15 @@ test('missing billing values never become a guessed price or a fresh trial date'
 test('activation exposes the booking domain and keeps annual fallback terms annual', () => {
   assert.match(activationSource, /Review \$\{esc\(bookingDomain\)\}/);
   assert.match(serverSource, /normalizedBillingInterval === 'year'[\s\S]{0,120}MARKETEL_YEARLY_PRICE_USD/);
+});
+
+test('web trial handoff preserves navigation and keeps compact guidance closed by default', () => {
+  assert.match(activationSource, /window\.finishActivatedReveal\?\.\(\);[\s\S]{0,100}window\.setFilter\?\.\('bookings'\)/);
+  assert.doesNotMatch(activationSource, /guide\.open\s*=\s*true/);
+  assert.match(source, /<details class="trial-overview-details">/);
+  assert.doesNotMatch(source, /<details class="trial-overview-details" open/);
+  assert.match(assistantSource, /marketel-frontdesk-icon\.png/);
+  assert.match(assistantSource, /fda-card-app-icon/);
 });
 
 test('canceled, paid and expired access each have distinct billing language', async () => {

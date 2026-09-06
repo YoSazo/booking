@@ -39,10 +39,13 @@ export function showActivationConfirmation() {
   };
   const continueWeb = () => {
     track('continue-web');
+    // Stripe can confirm after the dashboard has already painted, leaving the
+    // pre-checkout reveal underneath this confirmation. Close it now, before
+    // selecting Bookings, so a late cleanup cannot override the owner's next
+    // tab selection.
+    window.finishActivatedReveal?.();
     dismiss();
     window.setFilter?.('bookings');
-    const guide = document.querySelector('#goLiveBanner details');
-    if (guide) guide.open = true;
   };
   overlay.addEventListener('keydown', event => {
     if (event.key === 'Escape') { event.preventDefault(); continueWeb(); }

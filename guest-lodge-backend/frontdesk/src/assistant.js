@@ -1,5 +1,6 @@
 import { crm } from './state.js';
 import { exposeToWindow } from './utils.js';
+import frontdeskAppIcon from './assets/marketel-frontdesk-icon.png';
 
 let installed = false;
 let loadPromise = null;
@@ -210,6 +211,8 @@ function ensureStyles() {
     .fda-card-row{position:relative;z-index:1;display:flex;align-items:center;gap:13px;}
     .fda-card-icon{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:rgba(255,255,255,.14);font-size:20px;}
     .fda-card.is-off .fda-card-icon{background:#eaf5ef;color:#2e7d5b;}
+    .fda-card-app-icon{overflow:hidden;background:#eaf5ef!important;}
+    .fda-card-app-icon img{display:block;width:100%;height:100%;object-fit:cover;border-radius:12px;}
     .fda-card-copy{min-width:0;flex:1;}
     .fda-eyebrow{font-size:10px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;opacity:.72;margin-bottom:3px;}
     .fda-card-title{font-size:15px;font-weight:850;line-height:1.25;}
@@ -411,7 +414,7 @@ export function renderFrontDeskAssistantCard() {
   if (!isNativeFrontDesk()) {
     panel.innerHTML = `<div class="fda-card is-off">
       <div class="fda-card-row">
-        <div class="fda-card-icon"><i data-lucide="arrow-up-right" style="width:16px;height:16px;"></i></div>
+        <div class="fda-card-icon fda-card-app-icon"><img src="${frontdeskAppIcon}" width="42" height="42" alt=""></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk app</div>
           <div class="fda-card-title">Assistant lives on your phone.</div>
