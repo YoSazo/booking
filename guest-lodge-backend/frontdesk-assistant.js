@@ -328,11 +328,57 @@ function classifyDeterministicIntent(body, rooms = [], todayIso = '', contextTyp
     if (/^(undo|undo that|undo the last change|revert|revert that|reverse that|change that back|put it back|restore it|that was wrong)$/.test(lower)) {
         return { intent: 'undo' };
     }
+    // A pending block question asks one thing: should the room come out of
+    // inventory. Answer it here so the general rules below cannot claim "no" or
+    // "leave it" for a booking decision that has already been made.
+    if (contextType === 'block_question') {
+        // Negation is read first: "don't block it" contains the word block, and
+        // checking the bare verb ahead of it turned a refusal into a block.
+        const refusesBlock = /\b(?:don'?t|do not|dont|never|no need to)\s+(?:block|take)\b/.test(lower)
+            || /^(?:no|n|nope|nah)\b/.test(lower)
+            || /\b(?:still (?:free|open|available)|leave it|keep it bookable)\b/.test(lower);
+        if (refusesBlock) return { intent: 'decline_block' };
+        if (/\b(?:block|take it out|make it unavailable|it'?s taken|not free|occupied)\b/.test(lower)
+            || /^(?:yes|y|yeah|yep|please|do it|go ahead)\b/.test(lower)) {
+            return { intent: 'confirm_block' };
+        }
+    }
     if (/^(cancel|cancel it|cancel booking|yes cancel|go ahead and cancel(?: it)?|cancel the online booking)$/.test(lower)) {
         return { intent: 'cancel_booking' };
     }
     if (/^(keep|keep it|leave it|leave it alone|do not cancel|don't cancel|don't cancel it|no leave it)$/.test(lower)) {
         return { intent: 'keep_booking' };
+    }
+    // Owners answer an alert in sentences, not keywords. "No don't keep it,
+    // cancel it" carries an unambiguous verb, but the ^no prefix rule further
+    // down would read it as a walk-in report and then ask which room and which
+    // night — for a booking whose room and nights we already know. An explicit
+    // verb with a direct object beats tone, so check it first.
+    //
+    // Two guards keep this from firing on language that only sounds decisive:
+    // hedges ("I think we may need to cancel something") stay with the model,
+    // and negated verbs are read before the bare verb so "don't cancel" cannot
+    // register as a cancel.
+    const hedged = /\b(?:i think|i guess|maybe|might|may need|not sure|probably|should we|do i|do you think|what if)\b/.test(lower);
+    if (!hedged) {
+        const object = '(?:it|that|this|the\\s+(?:booking|request|reservation))';
+        const negatedDecline = new RegExp(`\\b(?:don'?t|do not|dont|never)\\s+(?:cancel|release|decline|reject|void)\\b`);
+        const negatedKeep = new RegExp(`\\b(?:don'?t|do not|dont)\\s+keep\\b`);
+        const decline = new RegExp(
+            `\\b(?:cancel|release|decline|reject|void|drop|kill)\\s+${object}\\b`
+            + `|\\bturn\\s+${object}\\s+down\\b`
+            + `|\\bget\\s+rid\\s+of\\s+${object}\\b`
+            + `|^no\\s+thanks?\\b`
+        );
+        const keep = new RegExp(
+            `\\b(?:keep|accept|confirm|approve|honou?r)\\s+${object}\\b`
+            + `|\\bleave\\s+${object}\\b`
+            + `|\\b(?:that'?s|thats)\\s+fine\\b`
+            + `|\\b(?:sounds|looks)\\s+good\\b`
+        );
+        if (negatedDecline.test(lower)) return { intent: 'keep_booking' };
+        if (negatedKeep.test(lower) || decline.test(lower)) return { intent: 'cancel_booking' };
+        if (keep.test(lower)) return { intent: 'keep_booking' };
     }
     if (/^(yes|y|available|still available|it is available)$/.test(lower)) {
         if (contextType === 'cancel_question') return { intent: 'cancel_booking' };
@@ -1784,11 +1830,21 @@ function createFrontDeskAssistant({
     }
 
     async function getRecentOutboundContext(recipient) {
-        const [cancelQuestion, activity] = await Promise.all([
+        const [cancelQuestion, blockQuestion, activity] = await Promise.all([
             prisma.frontDeskAssistantPendingAction.findFirst({
                 where: {
                     hotelId: recipient.hotelId,
                     kind: 'cancel_booking',
+                    status: 'pending',
+                    expiresAt: { gt: new Date() },
+                },
+                select: { id: true },
+                orderBy: { createdAt: 'desc' },
+            }),
+            prisma.frontDeskAssistantPendingAction.findFirst({
+                where: {
+                    hotelId: recipient.hotelId,
+                    kind: 'block_question',
                     status: 'pending',
                     expiresAt: { gt: new Date() },
                 },
@@ -1808,6 +1864,7 @@ function createFrontDeskAssistant({
             }),
         ]);
         if (cancelQuestion) return 'cancel_question';
+        if (blockQuestion) return 'block_question';
         return activity?.type || '';
     }
 
@@ -1932,6 +1989,22 @@ function createFrontDeskAssistant({
         return { ...extracted, interpretedBy: 'openai', model: openaiModel };
     }
 
+    // The generic fallback used to ask which room was taken and which night —
+    // for a booking alert whose room and nights we are holding. Ask only the
+    // question the context actually leaves open.
+    function clarificationFor(contextType) {
+        if (contextType === 'booking_alert') {
+            return 'Do you want that request kept or released? Say keep or cancel.';
+        }
+        if (contextType === 'block_question') {
+            return 'Should I block that room for those dates? Say block, or no to leave it bookable.';
+        }
+        if (contextType === 'cancel_question') {
+            return 'Say cancel to cancel that booking, or keep to leave it alone.';
+        }
+        return 'Tell me which room was taken and which night.';
+    }
+
     async function understandInbound(recipient, body) {
         const [rooms, config, contextType] = await Promise.all([
             prisma.manualRoom.findMany({
@@ -1960,7 +2033,7 @@ function createFrontDeskAssistant({
             });
             return extracted ? { ...extracted, todayIso, rooms, contextType } : {
                 intent: 'unknown',
-                clarification: 'Tell me which room was taken and which night.',
+                clarification: clarificationFor(contextType),
                 todayIso,
                 rooms,
                 contextType,
@@ -1969,12 +2042,69 @@ function createFrontDeskAssistant({
             console.error('frontdesk-assistant extraction:', error.message);
             return {
                 intent: 'unknown',
-                clarification: 'Tell me which room was taken and which night.',
+                clarification: clarificationFor(contextType),
                 todayIso,
                 rooms,
                 contextType,
             };
         }
+    }
+
+    // "Cancel it" answers what to do with the online request. It says nothing
+    // about whether the room is physically free, so this releases the request
+    // and then *asks* about inventory instead of assuming a walk-in — which is
+    // what booking_taken does, and why a plain decline used to demand a room
+    // name and a night for a booking whose room and nights we already hold.
+    async function releaseAlertedBooking(recipient) {
+        const action = await getRecentBookingAction(recipient.hotelId, recipient.id);
+        if (!action) return 'There is no request waiting for that decision.';
+        const bookingId = String(action?.payload?.bookingId || '');
+        const booking = bookingId
+            ? await prisma.booking.findFirst({ where: { id: bookingId, hotelId: recipient.hotelId } })
+            : null;
+        if (!booking) return 'I could not find the booking from that message. Open Front Desk to review it.';
+        const status = String(booking.status || '').toLowerCase();
+        if (status !== 'pending' || !applyBookingApprovalDecision) {
+            return `That request is already ${status || 'resolved'} — there is nothing left to release.`;
+        }
+        const decision = await applyBookingApprovalDecision(booking.id, 'release', 'assistant');
+        if (!decision?.ok) return 'I could not safely release that booking. Open Front Desk to review it.';
+        await prisma.frontDeskAssistantPendingAction.update({
+            where: { id: action.id },
+            data: { status: 'applied', appliedAt: new Date() },
+        }).catch(() => {});
+        await createActivity({
+            hotelId: recipient.hotelId,
+            recipientId: recipient.id,
+            direction: 'system',
+            type: 'booking_decision',
+            summary: `${booking.roomName} released from your reply`,
+            status: bookingOutcomeActivityStatus(decision),
+            metadata: { bookingId: booking.id, outcome: 'owner_released' },
+        });
+
+        const stayDates = manualBookingStayDates(booking.checkinDate, booking.checkoutDate);
+        const stayLabel = bookingDateContext(booking).stayLabel;
+        await prisma.frontDeskAssistantPendingAction.create({
+            data: {
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                kind: 'block_question',
+                payload: {
+                    bookingId: booking.id,
+                    roomName: booking.roomName,
+                    startDate: stayDates[0] || null,
+                    endDate: stayDates[stayDates.length - 1] || null,
+                    units: 1,
+                },
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            },
+        }).catch(() => {});
+
+        const releaseLine = fulfillmentFinished(decision)
+            ? `Released ${booking.roomName} — I voided the $1 hold and let the guest know.`
+            : `Released ${booking.roomName} — I'm finishing the card-hold and guest updates.`;
+        return `${releaseLine}\nWant me to block it for ${stayLabel} too? Say block, or say no and I'll leave it bookable.`;
     }
 
     async function handleInbound(recipient, body) {
@@ -2013,8 +2143,56 @@ function createFrontDeskAssistant({
         }
         if (intent.intent === 'cancel_booking') {
             const action = await getPendingCancelAction(recipient.hotelId);
-            if (!action) return 'There is no booking waiting to be cancelled.';
-            return (await cancelBookingAndReplaceWithWalkIn(action, recipient)).message;
+            if (action) return (await cancelBookingAndReplaceWithWalkIn(action, recipient)).message;
+            // Declining straight off an alert: no cancel question exists yet.
+            return releaseAlertedBooking(recipient);
+        }
+        if (intent.intent === 'confirm_block' || intent.intent === 'decline_block') {
+            const pending = await prisma.frontDeskAssistantPendingAction.findFirst({
+                where: {
+                    hotelId: recipient.hotelId,
+                    kind: 'block_question',
+                    status: 'pending',
+                    expiresAt: { gt: new Date() },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (!pending) return 'There is no room waiting on a block decision.';
+            await prisma.frontDeskAssistantPendingAction.update({
+                where: { id: pending.id },
+                data: { status: intent.intent === 'confirm_block' ? 'applied' : 'cancelled', appliedAt: new Date() },
+            }).catch(() => {});
+            const payload = pending.payload || {};
+            if (intent.intent === 'decline_block') {
+                return `Left ${payload.roomName || 'the room'} bookable. Nothing else changed.`;
+            }
+            const result = await consumeWalkInInventory({
+                hotelId: recipient.hotelId,
+                recipientId: recipient.id,
+                roomName: payload.roomName,
+                startDate: payload.startDate,
+                endDate: payload.endDate,
+                units: Number(payload.units) || 1,
+                createUndo: true,
+            }).catch(() => ({ ok: false, code: 'update_failed' }));
+            const stayLabel = payload.startDate && payload.endDate
+                ? dateRangeLabel(payload.startDate, payload.endDate)
+                : 'those dates';
+            if (result.ok) {
+                await createActivity({
+                    hotelId: recipient.hotelId,
+                    recipientId: recipient.id,
+                    direction: 'system',
+                    type: 'availability_update',
+                    summary: `${payload.roomName} blocked for ${stayLabel}`,
+                    metadata: { ...payload, source: 'block_question_reply' },
+                });
+                return `Blocked one ${payload.roomName} for ${stayLabel}. Say undo within 10 minutes if that was wrong.`;
+            }
+            if (result.code === 'conflict') {
+                return `${payload.roomName} was already unavailable for ${stayLabel}, so I did not subtract another room.`;
+            }
+            return `I could not block ${payload.roomName} safely. Open Availability and block it for ${stayLabel}.`;
         }
         if (intent.intent === 'keep_booking') {
             const action = await getPendingCancelAction(recipient.hotelId);
@@ -2167,7 +2345,7 @@ function createFrontDeskAssistant({
             return answerFrontDeskQuestion(recipient, body, intent.todayIso);
         }
         if (intent.intent !== 'block_room') {
-            return intent.clarification || 'Ask me what is available, or tell me which room was taken and which night.';
+            return intent.clarification || clarificationFor(intent.contextType);
         }
 
         const room = intent.rooms.find((entry) =>

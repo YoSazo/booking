@@ -421,3 +421,72 @@ test('the Contacts entry uses the shipped app icon', () => {
     assert.match(nativeAppDelegate, /forResource: "marketel-frontdesk-icon"/);
     assert.match(viteConfig, /'marketel-frontdesk-icon\.png'/);
 });
+
+// ── Answering a booking alert in sentences ─────────────────────────
+// The reported failure: "no don't keep it, cancel it" was read as a walk-in
+// report, which then asked which room was taken and which night — about a
+// booking whose room and nights the alert itself carried.
+
+const alertRooms = [{ name: 'Test Suite', totalUnits: 1 }];
+const onAlert = (message) =>
+    classifyDeterministicIntent(message, alertRooms, '2026-09-06', 'booking_alert');
+
+test('an explicit decline in a sentence cancels rather than reporting a walk-in', () => {
+    for (const message of [
+        "no don't keep it, cancel it",
+        'no dont keep it cancel it',
+        "don't keep it",
+        'release it',
+        'decline it',
+        'reject it',
+        'cancel the booking',
+        'get rid of it',
+        'turn it down',
+    ]) {
+        assert.equal(onAlert(message).intent, 'cancel_booking', message);
+    }
+});
+
+test('an explicit keep in a sentence is never read as a cancellation', () => {
+    for (const message of ['yes keep it', "that's fine keep it", 'keep the booking', 'accept it']) {
+        assert.equal(onAlert(message).intent, 'keep_booking', message);
+    }
+    // Negation is read before the bare verb.
+    assert.equal(onAlert("don't cancel it").intent, 'keep_booking');
+    assert.equal(onAlert('do not release it').intent, 'keep_booking');
+});
+
+test('hedged language still goes to the model rather than acting destructively', () => {
+    for (const message of [
+        'I think we may need to cancel something',
+        'should we cancel it?',
+        'not sure if we should keep it',
+    ]) {
+        assert.equal(onAlert(message), null, message);
+    }
+});
+
+test('a bare NO on an alert still means the room is gone, not merely declined', () => {
+    // Unchanged on purpose: NO answers "is it still free?".
+    assert.deepEqual(onAlert('NO'), { intent: 'booking_taken' });
+});
+
+test('the block follow-up reads negation before the verb', () => {
+    const onBlock = (message) =>
+        classifyDeterministicIntent(message, alertRooms, '2026-09-06', 'block_question');
+    for (const message of ['block it', 'yes', 'yes block it', 'take it out', 'block the room']) {
+        assert.equal(onBlock(message).intent, 'confirm_block', message);
+    }
+    for (const message of ["don't block it", 'no', "no it's still free", 'leave it', 'nah']) {
+        assert.equal(onBlock(message).intent, 'decline_block', message);
+    }
+});
+
+test('a booking alert is never asked for a room and a night it already carries', () => {
+    const src = readRepo('guest-lodge-backend', 'frontdesk-assistant.js');
+    assert.match(src, /function clarificationFor\(contextType\)/);
+    assert.match(src, /Do you want that request kept or released\?/);
+    // Releasing must ask about inventory rather than assume a walk-in.
+    assert.match(src, /async function releaseAlertedBooking/);
+    assert.match(src, /kind: 'block_question'/);
+});
