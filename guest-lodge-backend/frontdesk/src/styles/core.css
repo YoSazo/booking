@@ -48,7 +48,7 @@
       padding: 40px 32px;
     }
     .login-logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
-    .login-logo-icon { height: 48px; width: auto; }
+    .login-logo-icon { height: 48px; width: 48px; border-radius: 14px; object-fit: cover; }
     .login-logo-text { height: 28px; width: auto; }
     .login-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
     /* D21: hotel-led login brand */
@@ -184,7 +184,7 @@
       gap: 8px; flex-wrap: wrap;
     }
     .header-logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; color: var(--text); flex-shrink: 0; }
-    .header-logo-icon { height: 32px; width: auto; }
+    .header-logo-icon { height: 32px; width: 32px; border-radius: 9px; object-fit: cover; }
     .header-logo-text { height: 20px; width: auto; }
     .header-logo-suffix { margin-left: 2px; color: var(--text-muted); font-weight: 600; }
     .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -735,6 +735,24 @@
       91.67% { background-position: -81px -160px; }
       94.44% { background-position: -108px -160px; }
       97.22% { background-position: -135px -160px; }
+    }
+
+    /* Keep every Front Desk loading state on the same identity as the app
+       header and the "Assistant lives on your phone" card. This override also
+       retires the legacy frame-by-frame logo animation without changing the
+       loading markup shared across feature modules. */
+    .logo-sprite-bounce {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: url('../assets/marketel-frontdesk-icon.png') center / cover no-repeat;
+      box-shadow: 0 5px 14px rgba(30, 106, 76, 0.18);
+      animation: frontdeskLogoBreathe 1.15s ease-in-out infinite;
+    }
+
+    @keyframes frontdeskLogoBreathe {
+      0%, 100% { transform: translateY(0) scale(0.96); opacity: 0.82; }
+      50% { transform: translateY(-2px) scale(1); opacity: 1; }
     }
 
     /* ── TOAST ── */

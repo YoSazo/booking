@@ -2,6 +2,7 @@ import { crm } from './state.js';
 import { trialSummary } from './trial-summary.js';
 import QRCode from 'qrcode';
 import guestelAppIconUrl from './assets/guestel-app-icon.png';
+import frontdeskAppIconUrl from './assets/marketel-frontdesk-icon.png';
 
 import { ensureLucideLoaded, isDeadBooking, optimizeRoomPhotoForUpload, scheduleDeferredMessagesLoad, exposeToWindow } from './utils.js';
 import { bindChatKeyboardViewport } from './chatKeyboard.js';
@@ -331,7 +332,7 @@ function updateFrontdeskManifestLink() {
       appleLink.rel = 'apple-touch-icon';
       document.head.appendChild(appleLink);
     }
-    appleLink.href = '/apple-touch-icon.png';
+    appleLink.href = frontdeskAppIconUrl;
     // Home-screen label should be short — just the hotel name (iOS shows the
     // app full-screen so "Front Desk" context is obvious once it's open).
     const titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');

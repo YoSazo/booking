@@ -21,6 +21,27 @@ const productCopy = files
 const revealCopy = fs.readFileSync(path.join(backendRoot, 'frontdesk/src/reveal.js'), 'utf8');
 const landingCopy = fs.readFileSync(path.join(backendRoot, 'landing.html'), 'utf8');
 
+test('every Front Desk brand surface uses the App Store icon', () => {
+    const brandedFiles = [
+        'frontdesk/index.html',
+        'frontdesk/src/core.js',
+        'frontdesk/src/native-onboarding.js',
+        'frontdesk/src/reveal.js',
+        'frontdesk/src/tour-settings.js',
+        'frontdesk/src/styles/core.css',
+    ];
+    const brandedCopy = brandedFiles
+        .map((file) => fs.readFileSync(path.join(backendRoot, file), 'utf8'))
+        .join('\n');
+
+    assert.doesNotMatch(brandedCopy, /marketellogo\.svg|apple-touch-icon\.png/);
+    for (const file of brandedFiles) {
+        const source = fs.readFileSync(path.join(backendRoot, file), 'utf8');
+        assert.match(source, /marketel-frontdesk-icon\.png|frontdeskAppIconUrl/,
+            `${file} must use the canonical Front Desk icon`);
+    }
+});
+
 test('owner and guest products never collapse into ambiguous app language', () => {
     assert.doesNotMatch(productCopy, /\bGuest App\b/);
     assert.doesNotMatch(productCopy, /\bguest app\b/);

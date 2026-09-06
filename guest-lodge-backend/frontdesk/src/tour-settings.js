@@ -1,5 +1,6 @@
 import { crm } from './state.js';
 import { createAdaptiveTourLayout, createTourSpotlightClone } from './tour-layout.js';
+import frontdeskAppIconUrl from './assets/marketel-frontdesk-icon.png';
 
 function windowFn(name) {
   return typeof window !== 'undefined' && typeof window[name] === 'function'
@@ -1616,7 +1617,7 @@ function startSettingsTour() {
             <div style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif;background:rgba(247,247,249,.94);border:.5px solid rgba(255,255,255,.78);border-radius:19px;padding:11px 13px 12px;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.11);backdrop-filter:blur(18px);">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
                 <div style="width:23px;height:23px;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-                  <img src="/marketellogo.svg" alt="" style="width:18px;height:18px;object-fit:contain;">
+                  <img src="${frontdeskAppIconUrl}" alt="" style="width:18px;height:18px;border-radius:5px;object-fit:cover;">
                 </div>
                 <div style="font-size:10px;font-weight:600;letter-spacing:.02em;color:#737477;">FRONT DESK</div>
                 <div style="margin-left:auto;font-size:10px;color:#8E8E93;">now</div>

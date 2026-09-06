@@ -1,4 +1,5 @@
 import { crm } from './state.js';
+import frontdeskAppIconUrl from './assets/marketel-frontdesk-icon.png';
 
 const DONE_KEY = 'marketelNativeOnboardingV2Done';
 const STATE_KEY = 'marketelNativeOnboardingV2State';
@@ -296,10 +297,11 @@ function ensureStyles() {
 
     .mno-mark {
       width: 27px;
-      height: 30px;
+      height: 27px;
+      border-radius: 8px;
       flex: 0 0 auto;
       display: block;
-      object-fit: contain;
+      object-fit: cover;
     }
 
     .mno-skip,
@@ -887,10 +889,11 @@ function ensureStyles() {
 
     .mno-la-mark {
       width: 16px;
-      height: 17px;
+      height: 16px;
+      border-radius: 5px;
       flex: 0 0 auto;
       display: block;
-      object-fit: contain;
+      object-fit: cover;
     }
 
     .mno-la-badge {
@@ -1249,7 +1252,7 @@ function pillStageHtml() {
         <div class="mno-ls-time">9:41</div>
         <div class="mno-la">
           <div class="mno-la-head">
-            <span class="mno-la-brand"><img class="mno-la-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</span>
+            <span class="mno-la-brand"><img class="mno-la-mark" src="${frontdeskAppIconUrl}" alt="" aria-hidden="true">Front Desk</span>
             <span class="mno-la-badge${authorized ? ' is-live' : ''}">${badge}</span>
           </div>
           <div class="mno-la-guest">Jordan M.<i>·</i>Queen Suite</div>
@@ -1389,7 +1392,7 @@ function renderIntro() {
   overlay.innerHTML = `
     <section class="mno-intro" role="dialog" aria-modal="true" aria-label="Front Desk setup">
       <div class="mno-topline">
-        <div class="mno-wordmark"><img class="mno-mark" src="/marketellogo.svg" alt="" aria-hidden="true">Front Desk</div>
+        <div class="mno-wordmark"><img class="mno-mark" src="${frontdeskAppIconUrl}" alt="" aria-hidden="true">Front Desk</div>
         <button class="mno-skip" type="button" data-mno-action="skip">Skip</button>
       </div>
       <main class="mno-main">${introStageHtml(session.step)}</main>

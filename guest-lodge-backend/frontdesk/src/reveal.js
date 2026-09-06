@@ -13,6 +13,7 @@ import guestelChooseRoomUrl from './assets/guestel-choose-room.webp';
 import guestelHotelsUrl from './assets/guestel-hotels.webp';
 import guestelPropertySavedUrl from './assets/guestel-property-saved.webp';
 import guestelWalletReadyUrl from './assets/guestel-wallet-ready.webp';
+import frontdeskAppIconUrl from './assets/marketel-frontdesk-icon.png';
 
 // The hub shows these only after someone opens a sheet, which gives us a
 // useful preload window. Warming them as soon as this chunk is requested makes
@@ -728,7 +729,7 @@ function activationHubCtaHtml() {
 function hubHtml() {
   return `<div class="mvr-hub">
     <header class="mvr-hub-head">
-      <div class="mvr-brand"><img src="/marketellogo.svg" alt=""><span>Marketel</span></div>
+      <div class="mvr-brand"><img src="${frontdeskAppIconUrl}" alt=""><span>Marketel</span></div>
       <h1>${crm.hotelSubscribed && !activationPreviewMode
         ? `${esc(propertyName())} is live.`
         : 'Your Marketel is ready.'}</h1>
