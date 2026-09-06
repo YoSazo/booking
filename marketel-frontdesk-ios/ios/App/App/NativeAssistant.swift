@@ -923,13 +923,17 @@ private struct MarketelNativePeopleView: View {
             // on top of this one, which reads as an unexplained system prompt in the
             // middle of adding a phone. Keep them, but well away from that step.
             if !model.assistantPhone.isEmpty {
-                Section("Front Desk's own number") {
+                // A header and a footer together need the closure form; there is
+                // no Section(_:content:footer:) taking a string title.
+                Section {
                     Button { onSaveContact(model.assistantPhone) } label: {
                         Label("Save Marketel Front Desk to Contacts", systemImage: "person.crop.circle.badge.plus")
                     }
                     if let sms = assistantSMSURL(model.assistantPhone) {
                         Link(destination: sms) { Label("Text Front Desk", systemImage: "message.fill") }
                     }
+                } header: {
+                    Text("Front Desk's own number")
                 } footer: {
                     Text("Verification records consent and prevents a mistyped number from receiving property messages. Reply STOP anytime to disconnect.")
                 }
