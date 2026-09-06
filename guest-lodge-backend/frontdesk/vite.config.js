@@ -99,8 +99,8 @@ export default defineConfig(({ mode }) => {
       target: 'es2020',
       rollupOptions: {
         output: {
-          // JS chunks must be content-addressed. The server cache-busts the
-          // generated HTML, so Cloudflare sees fresh URLs for updated modules.
+          // Content hashes version every JS chunk. HTML and module imports
+          // must use these same canonical URLs so each module executes once.
           entryFileNames: 'assets/[name]-[hash].js',
           chunkFileNames: 'assets/[name]-[hash].js',
           assetFileNames: (assetInfo) => {

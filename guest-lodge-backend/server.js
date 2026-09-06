@@ -1081,10 +1081,10 @@ function serveFrontdesk(_req, res) {
             return res.type('html').send(cachedFrontdeskHtml);
         }
         const file = fs.existsSync(FRONTDESK_BUILT) ? FRONTDESK_BUILT : FRONTDESK_LEGACY;
-        let html = fs.readFileSync(file, 'utf8');
-        const stats = fs.statSync(file);
-        const version = Math.floor(stats.mtimeMs);
-        html = html.replace(/\/frontdesk\/assets\/([^"']+)/g, '/frontdesk/assets/$1?v=' + version);
+        // Vite's content hashes already version these assets. Preserve canonical
+        // module URLs: adding ?v= to the entry makes a lazy chunk's import of
+        // that same entry execute startup again, resetting the owner's tab.
+        const html = fs.readFileSync(file, 'utf8');
         if (process.env.NODE_ENV === 'production') cachedFrontdeskHtml = html;
         res.send(html);
     } catch (e) {
