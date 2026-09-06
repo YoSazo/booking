@@ -6685,6 +6685,23 @@ app.post('/api/push/live-activity/register', crmAuth, async (req, res) => {
             create: { activityId, updateToken, bookingId, hotelId, environment, state: 'active' },
             update: { updateToken, environment, state: 'active', endedAt: null },
         });
+
+        // The device registers this token asynchronously, seconds after the
+        // push-to-start. A decision made inside that gap — an SMS reply is fast
+        // enough to land there — ran the lifecycle sync while no activity row
+        // existed yet, so it correctly found nothing to end and skipped the end
+        // push. Nothing would ever send one afterwards, leaving a card on the
+        // Lock Screen counting down a booking that was already resolved.
+        // Reconcile here, now that a token finally exists: whichever of the two
+        // arrives second closes the card.
+        const registeredBooking = await prisma.booking.findFirst({
+            where: { id: bookingId, hotelId },
+        }).catch(() => null);
+        if (registeredBooking && String(registeredBooking.status || '').trim().toLowerCase() !== 'pending') {
+            console.log(`🎬 [live-activity] late registration for already-${registeredBooking.status} booking=${bookingId} — ending card`);
+            syncBookingLiveActivity(registeredBooking, { decidedBy: 'late-registration' }).catch(() => {});
+        }
+
         res.json({ success: true });
     } catch (error) {
         console.error('live-activity register failed:', error.message);
@@ -8180,6 +8197,40 @@ const LIVE_ACTIVITY_DEAD_REASONS = new Set([
  * the same way. Best-effort throughout: a failed push must never change the
  * outcome of the booking that triggered it.
  */
+// A card can outlive its booking two ways: the end push had no token yet
+// (the device registers one asynchronously), or the push itself failed. Both
+// leave an active row whose booking is already resolved and nothing else will
+// ever close it. Reconciling on the approval sweep's cadence means a single
+// failed delivery cannot strand a countdown on someone's Lock Screen.
+async function reconcileOrphanedLiveActivities(limit = 25) {
+    if (!APNS_CONFIGURED || !prisma.liveActivity) return { ended: 0 };
+    const active = await prisma.liveActivity.findMany({
+        where: { state: 'active' },
+        orderBy: { createdAt: 'asc' },
+        take: limit,
+    }).catch(() => []);
+    let ended = 0;
+    for (const activity of active) {
+        const booking = await prisma.booking.findUnique({
+            where: { id: activity.bookingId },
+        }).catch(() => null);
+        if (!booking) {
+            // No booking left to push about — stop tracking rather than retry.
+            await prisma.liveActivity.update({
+                where: { id: activity.id },
+                data: { state: 'ended', endedAt: new Date() },
+            }).catch(() => {});
+            ended += 1;
+            continue;
+        }
+        if (String(booking.status || '').trim().toLowerCase() === 'pending') continue;
+        await syncBookingLiveActivity(booking, { decidedBy: 'reconcile-sweep' });
+        ended += 1;
+    }
+    if (ended) console.log(`🎬 [live-activity] reconcile closed ${ended} stale card(s)`);
+    return { ended };
+}
+
 async function syncBookingLiveActivity(booking, options = {}) {
     if (!APNS_CONFIGURED || !booking?.id || !prisma.liveActivity) return;
     try {
@@ -18609,7 +18660,11 @@ function startServer() {
     // interval because the window is minutes; a restart mid-window is harmless
     // since the query re-derives what's overdue from the database.
     if (process.env.ENABLE_BOOKING_APPROVAL_SWEEP !== 'false') {
-        const sweep = () => runBookingApprovalSweep().catch((e) => console.error('Booking approval sweep:', e.message));
+        const sweep = async () => {
+            await runBookingApprovalSweep().catch((e) => console.error('Booking approval sweep:', e.message));
+            await reconcileOrphanedLiveActivities()
+                .catch((e) => console.error('Live Activity reconcile:', e.message));
+        };
         setTimeout(sweep, 15_000);
         setInterval(sweep, BOOKING_APPROVAL_SWEEP_INTERVAL_MS);
     }

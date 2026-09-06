@@ -175,3 +175,41 @@ test('Live Activity intents are compiled into the app as well as the widget', ()
   const sourceMemberships = project.match(/BookingDecisionIntents\.swift in Sources \*\//g) || [];
   assert.ok(sourceMemberships.length >= 4, 'intent source must appear in both target source phases');
 });
+
+// ── The card must not outlive its booking ──────────────────────────
+// Observed: a booking released by SMS at 19:01:47 kept its Lock Screen card
+// until 19:18. The device registers the activity's update token seconds after
+// the push-to-start, so the decision ran the lifecycle sync while no activity
+// row existed, correctly found nothing to end, and skipped the end push —
+// which nothing would ever send afterwards.
+
+const fs = require('node:fs');
+const path = require('node:path');
+const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+
+test('a decision made before the device registers still closes the card', () => {
+  // Registration reconciles against the booking's current status.
+  assert.match(serverSource, /const registeredBooking = await prisma\.booking\.findFirst/);
+  assert.match(
+    serverSource,
+    /registeredBooking && String\(registeredBooking\.status \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== 'pending'/
+  );
+  assert.match(serverSource, /decidedBy: 'late-registration'/);
+});
+
+test('a failed end push cannot strand a card forever', () => {
+  assert.match(serverSource, /async function reconcileOrphanedLiveActivities/);
+  assert.match(serverSource, /decidedBy: 'reconcile-sweep'/);
+  // It runs on the approval sweep's cadence, not once at boot.
+  assert.match(serverSource, /await reconcileOrphanedLiveActivities\(\)/);
+});
+
+test('every terminal status ends the card, whatever route decided it', () => {
+  for (const status of ['confirmed', 'released', 'cancelled', 'canceled']) {
+    assert.equal(
+      liveActivityActionForBooking(pendingBooking({ status }), { state: 'active' }).action,
+      'end',
+      status
+    );
+  }
+});
