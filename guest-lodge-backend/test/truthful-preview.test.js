@@ -44,9 +44,10 @@ test('room setup advances immediately to ready while the property builds in the 
         setup.indexOf('async function addRoomAndFinish'),
         setup.indexOf('window._siteReady = false')
     );
-    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(4\);/);
-    assert.match(roomStep, /Promise\.all\(\[roomRequest, ratesRequest\]\)/);
+    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(2\);/);
+    assert.match(roomStep, /Promise\.all\(\[hotelRequest, roomRequest, ratesRequest\]\)/);
     assert.doesNotMatch(roomStep, /showLoading\(/);
+    assert.match(roomStep, /handoffToReveal\('automatic'\)/);
 
     const completeRoute = server.slice(
         server.indexOf("app.post('/api/setup/:token/complete'"),
@@ -56,24 +57,15 @@ test('room setup advances immediately to ready while the property builds in the 
     assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 4/);
 });
 
-test('demand fit comes first and follows the owner through the funnel', () => {
-    assert.ok(
-        setup.indexOf('id="demandFitQuestion"') < setup.indexOf('id="hotelName"'),
-        'the fit question must be the first easy commitment after email capture'
-    );
-    assert.match(setup, /data\.demandFitAnswer/);
+test('setup defers qualification and configuration that are not needed for the preview', () => {
+    assert.doesNotMatch(setup, /id="demandFitQuestion"|data\.demandFitAnswer/);
+    assert.doesNotMatch(setup, /id="rmPhoto"|id="hotelAddress"|id="hotelPhone"/);
+    assert.match(setup, /id="rmUnits" value="1"/);
     assert.match(server, /demandFitAnswer/);
     assert.match(server, /marketelDemandFitMessage/);
     assert.match(server, /demandFit,/);
     assert.match(reveal, /demandFitRevealMessage/);
     assert.match(reveal, /result\?\.demandFit/);
-    assert.match(setup, /Give callers, walk-ins, and past guests one place to book directly with us again/);
-    assert.match(setup, /Replace our PMS or channel manager and automatically sync every OTA/);
-    assert.ok(
-        setup.indexOf('demand-ota-leakage') < setup.indexOf('demand-new-travelers')
-        && setup.indexOf('demand-direct-guest-relationships') < setup.indexOf('demand-pms-sync'),
-        'the two qualified uses should appear before the two mismatch choices'
-    );
 });
 
 test('the owner preview explains activation and the room-money flow honestly', () => {
@@ -81,9 +73,8 @@ test('the owner preview explains activation and the room-money flow honestly', (
     assert.doesNotMatch(installBanner, /\{locked \? 'Locked'/);
     assert.match(installBanner, /This is what Add opens for guests/);
     assert.match(installBanner, /This turns on when you activate Marketel/);
-    assert.match(reveal, /Your room money stays yours/);
-    assert.match(reveal, /temporary \$1 card verification/);
-    assert.match(reveal, /Marketel never holds the room payment/);
+    assert.match(reveal, /temporary \$1 hold/);
+    assert.match(reveal, /Marketel never holds your room revenue/);
 
     assert.doesNotMatch(reveal, /function startBookingChallenge|function showBookingChallengePrompt/);
     const livePreview = reveal.slice(

@@ -20,11 +20,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .setup-logo { height: 36px; margin-bottom: 12px; }
 .setup-title { font-size: 20px; font-weight: 700; }
 
-.progress-bar { display: flex; gap: 6px; margin-bottom: 28px; }
-.progress-step { flex: 1; height: 5px; border-radius: 3px; background: var(--border); transition: background 0.3s; }
-.progress-step.done { background: var(--green); }
-.progress-step.active { background: var(--green); opacity: 0.6; }
-
 .step { display: none; }
 .step.active { display: block; }
 @keyframes fadeUp {
@@ -48,6 +43,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: var(--r); padding: 24px; box-shadow: var(--shadow-md); margin-bottom: 12px;
 }
 .form-card h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.setup-intro { margin: -8px 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.setup-footnote { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; text-align: center; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
 .field input {
@@ -55,8 +52,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: 10px; font-family: inherit; font-size: 16px; outline: none;
 }
 .field input:focus { border-color: var(--green); }
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
 .btn {
   width: 100%; padding: 14px; border-radius: 10px; font-family: inherit;
   font-size: 15px; font-weight: 600; cursor: pointer; border: none;
@@ -64,38 +59,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .btn-primary { background: var(--green); color: white; }
 .btn-primary:hover { background: var(--green-dark); }
-.btn-back {
-  background: none; border: 1.5px solid var(--border); color: var(--muted);
-  margin-top: 8px;
-}
-.btn-back:hover { border-color: var(--green); color: var(--green); }
-
-/* Room cards */
-.room-item {
-  background: var(--bg); border: 1.5px solid var(--border); border-radius: 12px;
-  padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px;
-}
-.room-item img { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; }
-.room-item-placeholder { width: 50px; height: 50px; border-radius: 8px; background: var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 18px; }
-.room-item-info { flex: 1; }
-.room-item-name { font-size: 14px; font-weight: 700; }
-.room-item-actions { display: flex; gap: 6px; }
-.room-item-btn { background: none; border: none; font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 4px; }
-.room-item-btn:hover { color: var(--red); background: #fef2f2; }
-
-/* Image upload */
-.upload-area {
-  border: 2px dashed var(--border); border-radius: 12px; padding: 24px;
-  text-align: center; cursor: pointer; transition: all 0.15s; margin-top: 8px;
-}
-.upload-area:hover { border-color: var(--green); }
-.upload-area p { font-size: 13px; color: var(--muted); }
-.upload-area.has-photo { border-style: solid; border-color: #b9dcc9; background: #f2faf5; }
-.upload-preview { display: none; margin: 0 auto 10px; }
-.upload-preview.has-photo { display: block; }
-.upload-preview img { width: 88px; height: 70px; border-radius: 10px; object-fit: cover; }
-.upload-title { font-size: 13px; color: var(--text); font-weight: 700; margin-bottom: 3px; }
-
 /* Final ready card */
 .final-card { text-align: center; padding: 32px 24px; overflow: hidden; }
 .final-panel { display: block; }
@@ -148,24 +111,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   vertical-align: -2px;
   animation: spin 0.75s linear infinite;
 }
-.final-status {
-  display: grid; gap: 8px; text-align: left; margin: 18px 0 6px;
-}
-.final-status-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 10px; background: #f8faf9;
-  border: 1px solid var(--border); font-size: 13px; color: var(--text);
-}
-.status-dot {
-  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: #e8f5ee; color: var(--green); font-size: 12px; font-weight: 800;
-}
-.status-dot.spin {
-  border: 2px solid #bbf7d0; border-top-color: var(--green);
-  background: transparent; animation: spin 0.75s linear infinite;
-}
-
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   background: var(--green); color: white; padding: 10px 20px; border-radius: 10px;
@@ -219,132 +164,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   97.22% { background-position: -135px -160px; }
 }
 
-/* Full-page iframe steps (mobile only) */
-.step-fullpage {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 200;
-  background: var(--bg);
-  display: none;
-  flex-direction: column;
-}
-.step-fullpage.active {
-  display: flex !important;
-}
-.fullpage-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  padding-top: calc(10px + env(safe-area-inset-top, 0px));
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.fullpage-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-.fullpage-back {
-  background: none;
-  border: none;
-  font-size: 18px;
-  color: var(--green);
-  cursor: pointer;
-  padding: 4px 8px;
-  font-weight: 600;
-}
-.fullpage-iframe-wrap {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-.fullpage-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
-.fullpage-loading {
-  position: absolute;
-  inset: 0;
-  background: var(--card);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-.fullpage-bottombar {
-  padding: 14px 16px;
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  background: #f0fdf4;
-  border-top: 1.5px solid #bbf7d0;
-  flex-shrink: 0;
-}
-.fullpage-bottombar .btn {
-  width: 100%;
-}
-
-/* Desktop: revert to inline iframe layout */
-@media (min-width: 769px) {
-  .step-fullpage {
-    position: static;
-    z-index: auto;
-    background: none;
-    flex-direction: column;
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 20px 40px;
-  }
-  .step-fullpage.active {
-    display: block !important;
-  }
-  .fullpage-topbar {
-    display: none;
-  }
-  .fullpage-iframe-wrap {
-    border: 1px solid var(--border);
-    border-radius: var(--r);
-    overflow: hidden;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-    height: 80vh;
-    flex: none;
-  }
-  .fullpage-bottombar {
-    background: none;
-    border: none;
-    box-shadow: none;
-    padding: 16px 0;
-  }
-}
-
-.loading-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.8);
-  z-index: 250; align-items: center; justify-content: center;
-}
-.loading-overlay.show { display: flex; }
-.spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 430px) {
-  .field-grid { grid-template-columns: 1fr; gap: 0; }
   .setup-container { padding-left: 16px; padding-right: 16px; }
-}
-.demand-question-copy { margin:-6px 0 18px; color:var(--muted); font-size:14px; line-height:1.5; }
-.demand-options { display:flex; flex-direction:column; gap:10px; }
-.demand-options .btn { margin:0; text-align:left; padding:14px 16px; font-size:14px; line-height:1.42; }
-.demand-fit-warning { text-align:center; }
-.demand-fit-warning .fit-mark {
-  display:grid; place-items:center; width:42px; height:42px; margin:0 auto 14px;
-  border-radius:50%; background:#edf7f1; color:var(--green); font-size:20px; font-weight:800;
-}
-.demand-fit-warning p { color:var(--muted); font-size:14px; line-height:1.6; margin:10px 0 18px; }
-.demand-fit-warning .fit-change {
-  display:inline-block; margin-top:12px; padding:8px; border:0; background:transparent;
-  color:var(--muted); font:inherit; font-size:12px; text-decoration:underline; cursor:pointer;
 }
 </style>
 <!-- Meta Pixel Code -->
@@ -361,107 +183,52 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="setup-title">Set up your booking page</div>
   </div>
 
-  <div class="progress-bar">
-    <div class="progress-step done" id="prog-1"></div>
-    <div class="progress-step" id="prog-2"></div>
-    <div class="progress-step" id="prog-3"></div>
-    <div class="progress-step" id="prog-4"></div>
-  </div>
-
-  <!-- STEP 1: Existing demand / fit -->
+  <!-- One useful decision screen: only what the personalized page needs. -->
   <div class="step active" id="step-1">
-    <div class="form-card fade-stagger" id="demandFitQuestion">
-      <h2>What would you mainly use Marketel for?</h2>
-      <p class="demand-question-copy">Choose the one job you need it to do most.</p>
-      <div class="demand-options">
-        <button class="btn btn-back" data-journey="demand-ota-leakage" onclick="answerQualityQ('ota_leakage')">Give guests who already find us a direct way to book instead of using an OTA</button>
-        <button class="btn btn-back" data-journey="demand-direct-guest-relationships" onclick="answerQualityQ('direct_guest_relationships')">Give callers, walk-ins, and past guests one place to book directly with us again</button>
-        <button class="btn btn-back" data-journey="demand-new-travelers" onclick="answerQualityQ('new_traveler_demand')">Bring new travelers to our property who haven&apos;t found us yet</button>
-        <button class="btn btn-back" data-journey="demand-pms-sync" onclick="answerQualityQ('pms_channel_sync')">Replace our PMS or channel manager and automatically sync every OTA</button>
-      </div>
-    </div>
-    <div class="form-card fade-stagger demand-fit-warning" id="demandFitWarning" hidden>
-      <div class="fit-mark">i</div>
-      <h2 id="demandFitWarningTitle"></h2>
-      <p id="demandFitWarningBody"></p>
-      <button class="btn btn-primary" data-journey="demand-mismatch-continue" onclick="continueDemandFitMismatch()">I understand — continue anyway</button>
-      <button class="fit-change" type="button" onclick="resetDemandFitQuestion()">Choose a different answer</button>
-    </div>
-  </div>
-
-  <!-- STEP 2: Property Name -->
-  <div class="step" id="step-2">
     <div class="form-card fade-stagger">
-      <h2>Your property</h2>
+      <h2>Build your booking page</h2>
+      <p class="setup-intro">Three details. We&apos;ll create your live preview immediately.</p>
       <div class="field">
-        <label>Property Name</label>
-        <input type="text" id="hotelName" placeholder="e.g. Sunset Inn or Lakeview Cabin">
-      </div>
-      <button class="btn btn-primary" data-journey="setup-property-next" onclick="saveStep1()">Next &rarr;</button>
-      <button class="btn btn-back" data-journey="setup-property-back" onclick="goToStep(1)">&larr; Back</button>
-    </div>
-  </div>
-
-  <!-- STEP 3: Add first bookable room or unit -->
-  <div class="step" id="step-3">
-    <div class="form-card fade-stagger">
-      <h2>Add your first room or unit</h2>
-      <div class="field">
-        <label>Room or Unit Name</label>
-        <input type="text" id="rmName" placeholder="e.g. King Suite or Lakeview Cabin">
-      </div>
-      <div class="field-grid">
-        <div class="field">
-          <label>How many like this?</label>
-          <input type="number" id="rmUnits" min="1" max="999" inputmode="numeric" value="1">
-        </div>
-        <div class="field">
-          <label>Starting nightly price</label>
-          <input type="number" id="rmNightly" min="1" max="100000" step="1" inputmode="decimal" value="99">
-        </div>
+        <label for="hotelName">Property name</label>
+        <input type="text" id="hotelName" placeholder="e.g. Sunset Inn" autocomplete="organization">
       </div>
       <div class="field">
-        <label>One photo <span style="font-weight:500;color:var(--muted);">(optional)</span></label>
-        <div class="upload-area" id="setupPhotoArea" onclick="document.getElementById('setupRoomPhoto').click()">
-          <input type="file" id="setupRoomPhoto" accept="image/jpeg,image/png,image/webp" hidden onchange="previewSetupPhoto(this)">
-          <div class="upload-preview" id="setupPhotoPreview"></div>
-          <div class="upload-title" id="setupPhotoTitle">Add a room photo</div>
-          <p id="setupPhotoHint">It makes your personalized preview feel like yours. You can add the rest later.</p>
-        </div>
+        <label for="rmName">First room or unit</label>
+        <input type="text" id="rmName" placeholder="e.g. King Suite" autocomplete="off">
       </div>
+      <div class="field">
+        <label for="rmNightly">Starting nightly price</label>
+        <input type="number" id="rmNightly" min="1" max="100000" step="1" inputmode="decimal" value="99">
+      </div>
+      <input type="hidden" id="rmUnits" value="1">
       <button class="btn btn-primary" data-journey="setup-build-booking-page" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
-      <button class="btn btn-back" data-journey="setup-room-back" onclick="goToStep(2)">&larr; Back</button>
+      <p class="setup-footnote">You can add photos, more rooms, taxes, and policies after your preview opens.</p>
     </div>
   </div>
 
-  <!-- STEP 4: Site readiness + handoff to the personalized reveal -->
-  <div class="step" id="step-4">
+  <!-- STEP 2: Build and automatically hand off to the personalized reveal. -->
+  <div class="step" id="step-2">
     <div class="form-card final-card">
       <div class="final-panel fade-stagger" id="finalPreparingPanel">
         <div class="final-logo-wrap"><div class="logo-sprite-bounce"></div></div>
         <h2>Building Marketel for you</h2>
-        <p>We&apos;re creating your direct booking page and connecting it to Marketel Front Desk.</p>
+        <p>Creating your booking page and opening your personalized preview.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="preparingDomain">Preparing domain…</div>
         </div>
-        <div class="final-status">
-          <div class="final-status-row"><span class="status-dot">✓</span><span>Booking page created</span></div>
-          <div class="final-status-row"><span class="status-dot">✓</span><span>Front Desk dashboard prepared</span></div>
-          <div class="final-status-row"><span class="status-dot">✓</span><span>Personalized preview prepared</span></div>
-        </div>
       </div>
       <div class="final-panel fade-stagger" id="finalReadyPanel" hidden>
         <div class="final-check">✓</div>
-        <h2>Your Marketel is ready</h2>
-        <p>Guests book on your direct page and keep your property in Guestel. You manage bookings and availability in the Marketel Front Desk app.</p>
+        <h2>Opening what you built</h2>
+        <p>Your booking page is ready. Taking you there now.</p>
         <div class="final-domain-box">
           <div class="final-domain-label">Your Booking Page</div>
           <div class="final-domain-value" id="successDomain"></div>
           <div style="font-size:12px; color:#166534; margin-top:10px; line-height:1.45;">Personalized preview ready</div>
         </div>
         <a class="btn btn-primary final-dashboard-cta" data-journey="setup-open-personalized-reveal" id="successLink" href="#" style="text-decoration:none; text-align:center; font-size:16px; padding:16px;">
-          See what you built →
+          Open My Booking Page →
         </a>
       </div>
     </div>
@@ -470,7 +237,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="loading-overlay" id="loadingOverlay"><div class="logo-sprite-bounce"></div></div>
 
 <script src="/marketel-journey.js"></script>
 <script>
@@ -480,26 +246,18 @@ const requestedAngle = new URLSearchParams(window.location.search).get('angle') 
 const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
 let hotelData = {};
 let rooms = [];
-let pendingFile = null;
-// Resolves when background photo compression finishes, so the save step can
-// wait for it without the picker ever blocking the UI.
-let pendingPhotoPrep = null;
-// Resolves when the room photo has finished uploading. Nothing before the
-// handoff to Front Desk needs the photo, so the build never waits on it.
-let pendingPhotoUpload = null;
-let qualifiedLeadTracked = false;
 let currentSetupStep = 1;
 let setupStepStartedAt = Date.now();
 let setupCompleteData = null;
 let setupBuildInFlight = false;
-let selectedDemandFit = '';
+let handoffStarted = false;
 
 window.MarketelJourney?.init({
   surface: 'setup',
   setupToken: TOKEN,
   context: { acquisitionAngle: ACQUISITION_ANGLE },
 });
-window.MarketelJourney?.track('JourneySetupStepViewed', { step: 1, stepName: 'demand-fit' });
+window.MarketelJourney?.track('JourneySetupStepViewed', { step: 1, stepName: 'booking-page-essentials' });
 function journeyLinkage() {
   return window.MarketelJourney?.linkage?.() || {};
 }
@@ -510,8 +268,6 @@ function showToast(msg, isError) {
   t.className = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => t.className = 'toast', 3000);
 }
-function showLoading(s) { document.getElementById('loadingOverlay').className = 'loading-overlay' + (s ? ' show' : ''); }
-
 function setupHandoffUrl(data) {
   const returnToken = String(data?.frontdeskReturnToken || '').trim();
   const legacyPin = String(data?.crmPin || '').trim();
@@ -537,41 +293,41 @@ function configureReadyHandoff(data, bookingDomain) {
   updateFinalStepState(false);
   if (successLink.dataset.bound === '1') return;
   successLink.dataset.bound = '1';
-  successLink.addEventListener('click', async function(ev) {
+  successLink.addEventListener('click', function(ev) {
     ev.preventDefault();
-    if (successLink.dataset.opening === '1') return;
-    setSuccessLinkLoading(true);
-    window.MarketelJourney?.track('JourneyHandoffStarted', {
-      from: 'setup',
-      to: 'frontdesk-reveal',
-    }, { durationMs: Date.now() - setupStepStartedAt });
-    if (pendingPhotoUpload) {
-      await Promise.race([
-        pendingPhotoUpload,
-        new Promise((resolve) => setTimeout(resolve, 6000)),
-      ]);
-    }
-    if (!successLink.dataset.finalized) {
-      try {
-        const finalResponse = await fetch(API + '/api/setup/' + TOKEN + '/finalize', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          keepalive: true,
-          body: JSON.stringify({ email: '', phone: '', pin: setupCompleteData?.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
-        });
-        if (!finalResponse.ok) throw new Error('finalize-failed');
-        successLink.dataset.finalized = '1';
-      } catch (_) {
-        // Completion already sent the recovery email and the scoped handoff
-        // remains valid. Never trap the owner because an optional finalization
-        // retry lost its network connection.
-      }
-    }
-    window.MarketelJourney?.track('JourneyHandoffCompleted', {
-      from: 'setup',
-      to: 'frontdesk-reveal',
-    }, { immediate: true, keepalive: true });
-    window.location.href = window._dashboardUrl || successLink.href;
+    handoffToReveal('manual');
   });
+}
+
+function handoffToReveal(reason = 'automatic') {
+  if (handoffStarted || !window._dashboardUrl) return;
+  handoffStarted = true;
+  const successLink = document.getElementById('successLink');
+  setSuccessLinkLoading(true, 'Opening your booking page…');
+  window.MarketelJourney?.track('JourneyHandoffStarted', {
+    from: 'setup',
+    to: 'frontdesk-reveal',
+    reason,
+  }, { durationMs: Date.now() - setupStepStartedAt });
+
+  // Completion already assigned the domain, created the secure handoff and
+  // sent recovery email. Finalization only rotates the now-used setup token,
+  // so keep it alive in the background instead of making the owner watch a
+  // second network round trip.
+  if (successLink && !successLink.dataset.finalized) {
+    successLink.dataset.finalized = '1';
+    fetch(API + '/api/setup/' + TOKEN + '/finalize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ email: '', phone: '', pin: setupCompleteData?.crmPin || '', domainPref: 'subdomain', customDomain: '' }),
+    }).catch(() => {});
+  }
+  window.MarketelJourney?.track('JourneyHandoffCompleted', {
+    from: 'setup',
+    to: 'frontdesk-reveal',
+    reason,
+  }, { immediate: true, keepalive: true });
+  window.location.replace(window._dashboardUrl);
 }
 
 function showSetupRecoveryError(message) {
@@ -603,7 +359,7 @@ function animateVisibleStep(stepEl) {
 }
 
 function goToStep(n) {
-  const nextStepName = { 1: 'demand-fit', 2: 'property', 3: 'room', 4: 'ready' }[n] || 'unknown';
+  const nextStepName = { 1: 'booking-page-essentials', 2: 'building' }[n] || 'unknown';
   window.MarketelJourney?.track('JourneySetupNavigation', {
     fromStep: currentSetupStep,
     toStep: n,
@@ -618,132 +374,10 @@ function goToStep(n) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   const nextStep = document.getElementById('step-' + n);
   nextStep.classList.add('active');
-  document.querySelectorAll('.progress-step').forEach((s, i) => {
-    s.className = 'progress-step' + (i < n - 1 ? ' done' : i === n - 1 ? ' active' : '');
-  });
-  if (n === 4) updateFinalStepState(true);
+  if (n === 2) updateFinalStepState(true);
   else animateVisibleStep(nextStep);
   window.scrollTo(0, 0);
   window.MarketelJourney?.track('JourneySetupStepViewed', { step: n, stepName: nextStepName });
-}
-
-function normalizeDemandFitAnswer(answer) {
-  const aliases = {
-    online_ota_leakage: 'ota_leakage',
-    ota_marketplaces: 'ota_leakage',
-    branded_ota_leakage: 'ota_leakage',
-    existing_online_traffic: 'existing_online_demand',
-    google_website: 'existing_online_demand',
-    social_ads: 'existing_online_demand',
-    direct_calls_messages: 'direct_guest_relationships',
-    repeat_guests: 'direct_guest_relationships',
-    repeat_guest_leakage: 'direct_guest_relationships',
-    building_demand: 'new_traveler_demand',
-    referrals_offline: 'new_traveler_demand',
-    low_online_demand: 'new_traveler_demand',
-  };
-  return aliases[answer] || answer || '';
-}
-
-function isDemandFitMismatch(answer) {
-  return answer === 'new_traveler_demand' || answer === 'pms_channel_sync';
-}
-
-function showDemandFitWarning(answer = selectedDemandFit, animate = true) {
-  const question = document.getElementById('demandFitQuestion');
-  const warning = document.getElementById('demandFitWarning');
-  const title = document.getElementById('demandFitWarningTitle');
-  const body = document.getElementById('demandFitWarningBody');
-  const expectsSync = answer === 'pms_channel_sync';
-  if (title) title.textContent = expectsSync
-    ? 'Marketel works alongside your current setup.'
-    : 'Marketel captures demand. It doesn’t create new travelers.';
-  if (body) body.textContent = expectsSync
-    ? 'Front Desk helps protect availability, but Marketel does not replace or automatically sync a PMS, channel manager, or every OTA.'
-    : 'It helps guests who already find, contact, walk into, or return to your property book directly.';
-  if (question) question.hidden = true;
-  if (warning) {
-    warning.hidden = false;
-    if (animate) restartFadeUp(warning);
-  }
-}
-
-function resetDemandFitQuestion() {
-  const question = document.getElementById('demandFitQuestion');
-  const warning = document.getElementById('demandFitWarning');
-  if (warning) warning.hidden = true;
-  if (question) {
-    question.hidden = false;
-    restartFadeUp(question);
-  }
-}
-
-function continueDemandFitMismatch() {
-  window.MarketelJourney?.track('JourneyControlActivated', {
-    controlName: 'continue-after-fit-correction',
-    demandFit: selectedDemandFit,
-  });
-  fetch('/api/funnel/onboarding', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      eventName: 'FitMismatchContinued',
-      eventId: 'marketel-fit-continued.' + (hotelData.id || TOKEN),
-      setupToken: TOKEN,
-      contentName: selectedDemandFit,
-      ...journeyLinkage(),
-    }),
-  }).catch(() => {});
-  goToStep(2);
-}
-
-function answerQualityQ(answer) {
-  answer = normalizeDemandFitAnswer(answer);
-  selectedDemandFit = answer;
-  // Qualification is intentionally identical for every acquisition angle so
-  // Meta compares the ads against the same commercial standard.
-  const isQualifiedLead = answer === 'ota_leakage'
-    || answer === 'direct_guest_relationships'
-    || answer === 'existing_online_demand';
-  window.MarketelJourney?.track('JourneyQualitySelected', {
-    answer,
-    qualified: isQualifiedLead,
-    acquisitionAngle: ACQUISITION_ANGLE,
-  });
-  if (isQualifiedLead && !qualifiedLeadTracked) {
-    qualifiedLeadTracked = true;
-    // Lead now fires on the landing page the moment an email is submitted.
-    // This is the deeper first-party signal: the owner answered, and answered
-    // in a way that says they already have demand to redirect. It is not sent
-    // to Meta — CompleteRegistration is the deep event the ad account uses.
-    fetch('/api/funnel/onboarding', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        eventName: 'QualifiedLead',
-        eventId: 'marketel-qualified.' + (hotelData.id || TOKEN),
-        setupToken: TOKEN,
-        contentName: answer,
-        ...journeyLinkage(),
-      }),
-    }).catch(() => {});
-  }
-  // Track all answers
-  fetch('/api/funnel/onboarding', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      eventName: 'QualityAnswer',
-      setupToken: TOKEN,
-      contentName: answer,
-      ...journeyLinkage(),
-    }),
-  }).catch(() => {});
-  if (isDemandFitMismatch(answer)) {
-    showDemandFitWarning(answer);
-  } else {
-    goToStep(2);
-  }
 }
 
 // Load existing data
@@ -765,7 +399,6 @@ async function loadSetup() {
     }
     const data = await res.json();
     hotelData = data.hotel || {};
-    selectedDemandFit = normalizeDemandFitAnswer(data.demandFitAnswer || '');
     window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });
     hotelData.rates = data.rates || null;
     rooms = data.rooms || [];
@@ -774,8 +407,6 @@ async function loadSetup() {
     if (firstRoom) {
       document.getElementById('rmName').value = firstRoom.name || '';
       document.getElementById('rmUnits').value = Math.max(1, Number(firstRoom.totalUnits) || 1);
-      const firstImage = firstRoom.images && firstRoom.images[0];
-      if (firstImage?.url) renderSetupPhoto(firstImage.url, 'Current room photo');
     }
     if (data.rates?.nightly) document.getElementById('rmNightly').value = Number(data.rates.nightly) || 99;
     window.MarketelJourney?.track('JourneyRequestCompleted', {
@@ -783,30 +414,18 @@ async function loadSetup() {
       existingRooms: rooms.length,
       propertyAlreadyNamed: !!hotelData.name,
     }, { durationMs: Date.now() - requestStartedAt });
-    const resumeStep = Math.max(1, Math.min(4, Number(data.resumeStep) || 1));
     if (hotelData.setupComplete) {
       configureReadyHandoff({
         hotelId: hotelData.id,
         bookingUrl: data.domain ? 'https://' + data.domain : '',
         frontdeskReturnToken: data.frontdeskReturnToken || '',
       }, data.domain || '');
-      const completedResumeStep = 4;
-      if (completedResumeStep !== currentSetupStep) goToStep(completedResumeStep);
+      if (currentSetupStep !== 2) goToStep(2);
       window.MarketelJourney?.track('JourneySetupResumed', {
-        step: completedResumeStep,
+        step: 2,
         setupComplete: true,
       });
-    } else if (resumeStep > 1) {
-      const resumedStep = Math.min(3, resumeStep);
-      if (isDemandFitMismatch(selectedDemandFit) && !hotelData.name && resumedStep === 2) {
-        showDemandFitWarning(selectedDemandFit, false);
-      } else {
-        goToStep(resumedStep);
-      }
-      window.MarketelJourney?.track('JourneySetupResumed', {
-        step: resumedStep,
-        setupComplete: false,
-      });
+      window.setTimeout(() => handoffToReveal('resume'), 120);
     }
   } catch (e) {
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', reason: 'network-or-parse' }, { durationMs: Date.now() - requestStartedAt });
@@ -814,122 +433,20 @@ async function loadSetup() {
   }
 }
 
-function renderSetupPhoto(url, label) {
-  const preview = document.getElementById('setupPhotoPreview');
-  const area = document.getElementById('setupPhotoArea');
-  const title = document.getElementById('setupPhotoTitle');
-  const hint = document.getElementById('setupPhotoHint');
-  if (!preview || !area) return;
-  preview.innerHTML = '<img src="' + String(url).replace(/"/g, '&quot;') + '" alt="Room preview">';
-  preview.classList.add('has-photo');
-  area.classList.add('has-photo');
-  if (title) title.textContent = label || 'Photo selected';
-  if (hint) hint.textContent = 'Tap here if you want to choose a different photo.';
-}
-
-function renderSetupPhotoCleared() {
-  const preview = document.getElementById('setupPhotoPreview');
-  const area = document.getElementById('setupPhotoArea');
-  const title = document.getElementById('setupPhotoTitle');
-  const hint = document.getElementById('setupPhotoHint');
-  if (preview) { preview.innerHTML = ''; preview.classList.remove('has-photo'); }
-  if (area) area.classList.remove('has-photo');
-  if (title) title.textContent = 'Add a photo';
-  if (hint) hint.textContent = 'Tap to choose a photo of this room.';
-}
-
-async function prepareSetupPhoto(file) {
-  if (!file || !file.type.startsWith('image/')) return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const maxW = 1600;
-    const maxH = 1200;
-    const scale = Math.min(1, maxW / bitmap.width, maxH / bitmap.height);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Photo conversion failed')), 'image/webp', 0.82);
-    });
-    return new File([blob], (file.name || 'room-photo').replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' });
-  } catch (_) {
-    return file;
-  }
-}
-
-async function previewSetupPhoto(input) {
-  const file = input?.files?.[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/')) {
-    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'unsupported-type' });
-    input.value = '';
-    showToast('Choose a JPG, PNG, or WebP image', true);
-    return;
-  }
-  // Paint the preview from the original straight away. Resizing and re-encoding
-  // a phone photo is main-thread canvas work measured in seconds, and nothing
-  // needs the smaller file until the room is saved — so it runs in the
-  // background while the owner answers the next question.
-  renderSetupPhoto(URL.createObjectURL(file), 'Photo selected');
-  pendingFile = file;
-  pendingPhotoPrep = (async () => {
-    const prepared = await prepareSetupPhoto(file);
-    if (prepared.size > 5 * 1024 * 1024) {
-      window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room-photo', reason: 'too-large', bytes: prepared.size });
-      pendingFile = null;
-      input.value = '';
-      renderSetupPhotoCleared();
-      showToast('That photo is too large. Choose one under 5 MB.', true);
-      return null;
-    }
-    pendingFile = prepared;
-    window.MarketelJourney?.track('JourneyPhotoSelected', {
-      mimeType: prepared.type || file.type || '',
-      originalBytes: file.size,
-      preparedBytes: prepared.size,
-    });
-    return prepared;
-  })();
-}
-
-// Step 1: Save hotel info
-async function saveStep1() {
-  const name = document.getElementById('hotelName').value.trim();
-  if (!name) {
-    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'property', field: 'property-name', reason: 'empty' });
+// Save the only three inputs needed for a believable preview. Property, room,
+// and rate are independent writes, so one tap starts all three together.
+async function addRoomAndFinish() {
+  if (setupBuildInFlight) return;
+  const propertyName = document.getElementById('hotelName').value.trim();
+  const roomName = document.getElementById('rmName').value.trim();
+  const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
+  const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
+  if (!propertyName) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'booking-page-essentials', field: 'property-name', reason: 'empty' });
     showToast('Enter your property name', true);
     return;
   }
-
-  showLoading(true);
-  const requestStartedAt = Date.now();
-  window.MarketelJourney?.track('JourneyRequestStarted', { request: 'save-property', nameLength: name.length });
-  try {
-    const response = await fetch(API + '/api/setup/' + TOKEN + '/hotel', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (!response.ok) throw new Error('save-property-failed');
-    hotelData = { ...hotelData, name };
-    window.MarketelJourney?.track('JourneySetupStepCompleted', { step: 2, stepName: 'property', nameLength: name.length }, { durationMs: Date.now() - setupStepStartedAt });
-    window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'save-property' }, { durationMs: Date.now() - requestStartedAt });
-    goToStep(3);
-  } catch (e) {
-    window.MarketelJourney?.track('JourneyRequestFailed', { request: 'save-property', reason: 'request-failed' }, { durationMs: Date.now() - requestStartedAt });
-    showToast('Failed to save', true);
-  }
-  showLoading(false);
-}
-
-// Step 2: Rooms
-async function addRoomAndFinish() {
-  if (setupBuildInFlight) return;
-  const name = document.getElementById('rmName').value.trim();
-  const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
-  const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
-  if (!name) {
+  if (!roomName) {
     window.MarketelJourney?.track('JourneyValidationFailed', { form: 'room', field: 'room-name', reason: 'empty' });
     showToast('Enter a room or unit name', true);
     return;
@@ -941,26 +458,27 @@ async function addRoomAndFinish() {
   }
   const nightly = Math.max(1, nightlyInput);
 
-  // The room, rate, domain and recovery-email work takes a few seconds. The
-  // fit question was answered first, so none of this work should block the
-  // ready screen. Move immediately and finish the build behind it.
+  // Move immediately. The owner sees one short build state while all network
+  // work completes, then lands directly on the personalized reveal.
   setupBuildInFlight = true;
-  goToStep(4);
+  goToStep(2);
   const buildStartedAt = Date.now();
   window.MarketelJourney?.track('JourneyRequestStarted', {
     request: 'build-marketel',
-    roomNameLength: name.length,
+    propertyNameLength: propertyName.length,
+    roomNameLength: roomName.length,
     totalUnits,
     nightly,
-    hasPhoto: !!pendingFile,
   });
   try {
     const existingRates = hotelData.rates || {};
-    // Room catalog and rates are independent. Starting them together removes
-    // another full network round-trip from the background build.
+    const hotelRequest = fetch(API + '/api/setup/' + TOKEN + '/hotel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: propertyName }),
+    });
     const roomRequest = fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: rooms[0]?.id, name, maxOccupancy: 4, totalUnits }),
+      body: JSON.stringify({ id: rooms[0]?.id, name: roomName, maxOccupancy: 4, totalUnits }),
     });
     const ratesRequest = fetch(API + '/api/setup/' + TOKEN + '/rates', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -974,35 +492,12 @@ async function addRoomAndFinish() {
         taxRate: existingRates.taxRate ?? 0,
       }),
     });
-    const [res, ratesRes] = await Promise.all([roomRequest, ratesRequest]);
-    if (!res.ok) throw new Error('Could not save room');
+    const [hotelRes, roomRes, ratesRes] = await Promise.all([hotelRequest, roomRequest, ratesRequest]);
+    if (!hotelRes.ok) throw new Error('Could not save property');
+    if (!roomRes.ok) throw new Error('Could not save room');
     if (!ratesRes.ok) throw new Error('Could not save starting price');
-    const roomResult = await res.json();
-    const roomId = roomResult?.room?.id || rooms[0]?.id;
+    hotelData = { ...hotelData, name: propertyName };
 
-    // Compressing and uploading the photo is the slowest part of the build and
-    // nothing between here and the success step needs it, so it runs alongside
-    // the rest. The handoff to Front Desk awaits it, which is the first moment
-    // the photo has to exist.
-    if (roomId) {
-      pendingPhotoUpload = (async () => {
-        if (pendingPhotoPrep) {
-          try { await pendingPhotoPrep; } catch (_) { /* keep the original file */ }
-        }
-        if (!pendingFile) return;
-        const form = new FormData();
-        form.append('image', pendingFile);
-        const photoRes = await fetch(API + '/api/setup/' + TOKEN + '/rooms/' + encodeURIComponent(roomId) + '/images', {
-          method: 'POST',
-          body: form,
-        });
-        if (!photoRes.ok) throw new Error('photo-upload-failed');
-      })().catch(() => {
-        showToast('Your page was built, but the photo did not upload. You can add it in Front Desk.', true);
-      });
-    }
-
-    // Complete setup — get domain + PIN
     const completeRes = await fetch(API + '/api/setup/' + TOKEN + '/complete', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(journeyLinkage()),
@@ -1021,9 +516,7 @@ async function addRoomAndFinish() {
       }, { eventID: completeData.registrationEventId });
     }
 
-    // Show success
-    console.log('Complete response:', completeData);
-    const domain = completeData.bookingUrl || 'https://' + (hotelData.name || 'your-property').toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
+    const domain = completeData.bookingUrl || 'https://' + propertyName.toLowerCase().replace(/['\u2019]s\b/g, 's').replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '') + '.mktel.co';
     configureReadyHandoff(completeData, domain);
     window.MarketelJourney?.configure({ hotelId: hotelData.id || '' });
 
@@ -1032,12 +525,12 @@ async function addRoomAndFinish() {
     window._siteReady = true;
     updateFinalStepState(true);
     window.MarketelJourney?.track('JourneySetupStepCompleted', {
-      step: 3,
-      stepName: 'room',
-      roomNameLength: name.length,
+      step: 1,
+      stepName: 'booking-page-essentials',
+      propertyNameLength: propertyName.length,
+      roomNameLength: roomName.length,
       totalUnits,
       nightly,
-      photoUploaded: !!pendingFile,
     }, { durationMs: Date.now() - setupStepStartedAt });
     window.MarketelJourney?.track('JourneyPreviewReady', {
       bookingPageReady: true,
@@ -1046,12 +539,12 @@ async function addRoomAndFinish() {
     }, { durationMs: Date.now() - buildStartedAt });
     window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'build-marketel' }, { durationMs: Date.now() - buildStartedAt });
     setupBuildInFlight = false;
+    window.setTimeout(() => handoffToReveal('automatic'), 120);
   } catch (e) {
     setupBuildInFlight = false;
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'build-marketel', reason: 'request-failed' }, { durationMs: Date.now() - buildStartedAt });
-    // A failed background build must stay recoverable. Return to the populated
-    // room form so one tap retries without losing anything the owner entered.
-    if (currentSetupStep === 4) goToStep(3);
+    // Keep all three inputs populated so one tap can retry.
+    if (currentSetupStep === 2) goToStep(1);
     showToast('We couldn’t finish building your page. Try again.', true);
   }
 }

@@ -63,7 +63,9 @@ test('the exact setup and reveal stages are durable', () => {
     for (const field of ['setupProgressStep', 'revealProgressStep', 'checkoutStartedAt', 'checkoutRecoveryEmailSentAt']) {
         assert.match(schema, new RegExp(`\\b${field}\\b`));
     }
-    assert.match(setup, /data\.resumeStep/);
+    assert.doesNotMatch(setup, /data\.resumeStep/);
+    assert.match(setup, /handoffToReveal\('resume'\)/);
+    assert.match(setup, /window\.location\.replace\(window\._dashboardUrl\)/);
     assert.match(core, /\^step-\(\[0-2\]\)\$/);
     assert.match(server, /const revealDepth = revealStepByEvent\[eventName\]/);
     assert.match(server, /revealProgressStep: \{ lt: revealDepth \}/);

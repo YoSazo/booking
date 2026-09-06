@@ -827,10 +827,6 @@
       <div class="stat-value" id="stat-leads">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Qualified leads</div>
-      <div class="stat-value" id="stat-started">0</div>
-    </div>
-    <div class="stat-card">
       <div class="stat-label">Setup done</div>
       <div class="stat-value" id="stat-step4">0</div>
     </div>
@@ -953,7 +949,6 @@
   <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
   <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
   <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Email lead</button>
-  <button class="filter-btn" data-filter="QualifiedLead" onclick="setFilter('QualifiedLead')">Qualified</button>
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
   <button class="filter-btn" data-filter="BookingEngineRevealViewed" onclick="setFilter('BookingEngineRevealViewed')">Booking Reveal</button>
   <button class="filter-btn" data-filter="GuestAppRevealViewed" onclick="setFilter('GuestAppRevealViewed')">Guestel</button>
@@ -1620,7 +1615,6 @@ function renderEvents() {
     .reduce((sum, e) => sum + (Number(e.value) || 0), 0);
   document.getElementById('stat-revenue').textContent = '$' + revenue.toLocaleString('en-US', { maximumFractionDigits: 2 });
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
-  document.getElementById('stat-started').textContent = allCounts.QualifiedLead || 0;
   document.getElementById('stat-leads').textContent = allCounts.Lead || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
   document.getElementById('stat-booking-reveal').textContent = allCounts.BookingEngineRevealViewed || 0;

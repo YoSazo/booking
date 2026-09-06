@@ -63,13 +63,6 @@ let openSheetId = null;
 // hub lets someone reopen the offer freely. Fire it once per reveal so the one
 // metric this redesign exists to move stays countable.
 let activationOfferTracked = false;
-let activationFramingTracked = false;
-// null = not asked yet. A bracket id or 'skipped' once answered, which also
-// stops the question being re-asked when the sheet is reopened.
-let activationFramingAnswer = null;
-// Checkout returns go straight to the price. Internal subscribed replays still
-// show the framing question so QA sees the same path a prospect sees.
-let skipActivationFraming = false;
 let bookingCheckoutReachedTracked = false;
 let guestelAutoplayId = 0;
 // Scroll position of the page underneath, restored when the reveal closes.
@@ -91,7 +84,6 @@ let appCarouselIndex = { frontdesk: 0, guestel: 0 };
 let revealStartedAt = 0;
 let stageStartedAt = 0;
 let billingInterval = 'month';
-let activationNightlyRate = null;
 let activationPreviewMode = false;
 let bookingPreviewUnavailable = false;
 let nextStageViewIsResume = false;
@@ -119,104 +111,8 @@ function esc(value) {
   }[char]));
 }
 
-function money(value) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '$99';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-  }).format(amount);
-}
-
 function propertyName() {
   return crm.activeHotelName || 'Your Property';
-}
-
-function nightlyRate() {
-  return revealData.rates?.nightly || 99;
-}
-
-function normalizedActivationRate(value, fallback = 99) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric <= 0) return fallback;
-  return Math.min(5000, Math.max(25, Math.round(numeric * 100) / 100));
-}
-
-function currentActivationRate() {
-  const savedRate = normalizedActivationRate(revealData.rates?.nightly, 99);
-  return normalizedActivationRate(activationNightlyRate, savedRate);
-}
-
-function activationBreakEven(rate = currentActivationRate()) {
-  const normalizedRate = normalizedActivationRate(rate);
-  const monthlyCost = billingInterval === 'year' ? 1990 / 12 : 199;
-  const commissionPerNight = normalizedRate * 0.15;
-  const roomNights = Math.max(1, Math.ceil(monthlyCost / commissionPerNight));
-  const avoidedCommission = roomNights * commissionPerNight;
-  return { rate: normalizedRate, roomNights, avoidedCommission };
-}
-
-function activationRateCalculatorHtml() {
-  const { rate, roomNights, avoidedCommission } = activationBreakEven();
-  const unit = roomNights === 1 ? 'room-night' : 'room-nights';
-  const result = billingInterval === 'year'
-    ? `could avoid about ${money(avoidedCommission)} in OTA commission — enough to offset the yearly plan's average monthly cost.`
-    : `could avoid about ${money(avoidedCommission)} in OTA commission — more than one month of Marketel.`;
-  return `<div class="mvr-rate-calculator">
-    <div class="mvr-rate-heading"><span>Your nightly rate</span><small>Adjust it</small></div>
-    <div class="mvr-rate-stepper" role="group" aria-label="Nightly room rate">
-      <button type="button" data-mvr-rate-step="-5" aria-label="Lower nightly rate by five dollars">−</button>
-      <label><span>$</span><input type="number" id="mvrActivationRate" min="25" max="5000" step="1" inputmode="decimal" value="${rate}" aria-label="Nightly room rate in dollars"></label>
-      <button type="button" data-mvr-rate-step="5" aria-label="Raise nightly rate by five dollars">+</button>
-    </div>
-    <div class="mvr-rate-result" aria-live="polite">
-      <strong id="mvrBreakEvenNights">${roomNights} direct ${unit}</strong>
-      <span id="mvrBreakEvenContext">${result}</span>
-    </div>
-    <small>Estimate uses a 15% OTA commission. Actual savings depend on your rates and channels.</small>
-  </div>`;
-}
-
-function directBookingProofHtml() {
-  return `<div class="mvr-direct-proof">
-    <strong>$5,800 booked direct</strong>
-    <span>in one recorded month through this booking engine for Suite Stay, Alabama.</span>
-  </div>`;
-}
-
-// Safari has no field-sizing: content, so the input cannot shrink to its digits
-// on its own. Setting the width from the digit count keeps the $ and the number
-// together as one centred figure instead of leaving a gap between them.
-function sizeRateInput(input) {
-  if (!input) return;
-  const digits = String(input.value ?? '').replace(/[^\d]/g, '').length;
-  input.style.width = Math.min(5, Math.max(2, digits)) + 'ch';
-}
-
-function updateActivationRateCalculator(value, options = {}) {
-  const rate = normalizedActivationRate(value, currentActivationRate());
-  activationNightlyRate = rate;
-  const { roomNights, avoidedCommission } = activationBreakEven(rate);
-  const input = document.getElementById('mvrActivationRate');
-  const nights = document.getElementById('mvrBreakEvenNights');
-  const context = document.getElementById('mvrBreakEvenContext');
-  if (options.syncInput !== false && input) input.value = String(rate);
-  sizeRateInput(input);
-  if (nights) nights.textContent = `${roomNights} direct ${roomNights === 1 ? 'room-night' : 'room-nights'}`;
-  if (context) {
-    context.textContent = billingInterval === 'year'
-      ? `could avoid about ${money(avoidedCommission)} in OTA commission — enough to offset the yearly plan's average monthly cost.`
-      : `could avoid about ${money(avoidedCommission)} in OTA commission — more than one month of Marketel.`;
-  }
-  if (options.track) {
-    trackJourney('JourneyControlActivated', {
-      controlName: 'activation-nightly-rate',
-      nightlyRate: rate,
-      breakEvenRoomNights: roomNights,
-      billingInterval,
-    });
-  }
 }
 
 function bookingUrl() {
@@ -292,11 +188,8 @@ const HUB_ITEMS = [
     id: 'activation',
     step: 3,
     event: 'ActivationOfferViewed',
-    // Price acceptance happens before the framing question. The question then
-    // explains the economics of a figure the owner knowingly chose to inspect,
-    // rather than feeling like a gate hiding a surprise price.
     title: 'Start your 14-day free trial',
-    body: '$0 today. Full access. Then $199/month. Cancel anytime.',
+    body: '$0 today. Everything unlocked. Cancel anytime.',
     cta: '',
   },
 ];
@@ -313,12 +206,6 @@ function persistVisitedItems() {
   try {
     localStorage.setItem(visitedStorageKey(), JSON.stringify([...visitedItems]));
   } catch (_) {}
-}
-
-// Exactly one item is emphasized at a time, and this decides which one.
-function nextHubItemId() {
-  const pending = HUB_ITEMS.find((item) => !visitedItems.has(item.id));
-  return (pending || HUB_ITEMS[HUB_ITEMS.length - 1]).id;
 }
 
 // `overflow: hidden` does not lock scrolling on iOS. The document behind kept
@@ -692,50 +579,6 @@ function bindAppCarousels() {
   });
 }
 
-// One question between the hub and the price. Its job is to change what $199 is
-// compared against: not "the nothing I pay today" but "the commission I already
-// tolerate". Every bracket makes $199 look small, including "not sure" — which
-// is why this axis was chosen over typical stay length, where a one-night answer
-// produces "11 bookings to break even" and argues against the product.
-const ACTIVATION_FRAMING_CHOICES = [
-  { id: 'under_500', label: 'Under $500' },
-  { id: '500_1500', label: '$500 – $1,500' },
-  { id: '1500_5000', label: '$1,500 – $5,000' },
-  { id: 'over_5000', label: 'More than $5,000' },
-  { id: 'not_sure', label: "I'm not sure" },
-];
-
-// "not_sure" deliberately asserts no figure. Inventing an industry average here
-// would be the same fabrication that got cut from the earlier money slide.
-const ACTIVATION_FRAMING_LINES = {
-  under_500: 'You paid <strong>under $500 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
-  '500_1500': 'You paid <strong>$500–$1,500 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
-  '1500_5000': 'You paid <strong>$1,500–$5,000 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
-  over_5000: 'You paid <strong>over $5,000 last month</strong> in OTA commission. Each booking moved direct keeps more of that money at your property.',
-  not_sure: "Most owners don't know the exact number because it comes out before the payout lands. Front Desk tracks the OTA fees your direct bookings avoid.",
-};
-
-function activationFramingHtml() {
-  return `<section class="mvr-framing">
-    <div class="mvr-eyebrow">Before the price</div>
-    <h2>What did you pay Booking.com, Expedia or Airbnb last month?</h2>
-    <p class="mvr-framing-hint">Roughly is fine.</p>
-    <div class="mvr-framing-choices">
-      ${ACTIVATION_FRAMING_CHOICES.map((choice) => `<button type="button" class="mvr-row is-choice" data-framing-answer="${choice.id}">
-        <span class="mvr-row-text"><strong>${esc(choice.label)}</strong></span>
-        <span class="mvr-row-chevron" aria-hidden="true">›</span>
-      </button>`).join('')}
-    </div>
-    <button type="button" class="mvr-framing-skip" data-framing-answer="skipped">Skip to plans →</button>
-  </section>`;
-}
-
-function framingLineHtml(answer) {
-  const line = ACTIVATION_FRAMING_LINES[answer];
-  if (!line) return '';
-  return `<div class="mvr-framing-line">${line}</div>`;
-}
-
 function trialOfferAvailable() {
   return !crm.hotelSubscribed && crm.marketelTrialEligible !== false;
 }
@@ -766,24 +609,9 @@ function activationCtaLabel() {
 function activationPriceHtml() {
   if (!activationOfferTracked) {
     activationOfferTracked = true;
-    trackReveal('ActivationOfferViewed', activationFramingAnswer || '');
+    trackReveal('ActivationOfferViewed');
   }
-  return framingLineHtml(activationFramingAnswer) + finaleHtml();
-}
-
-function answerActivationFraming(value) {
-  const known = ACTIVATION_FRAMING_CHOICES.some((choice) => choice.id === value);
-  activationFramingAnswer = known ? value : 'skipped';
-  trackReveal('ActivationFramingAnswered', activationFramingAnswer);
-  trackJourney('JourneyControlActivated', {
-    controlName: 'activation-framing',
-    answer: activationFramingAnswer,
-  });
-  const body = document.querySelector('#mvrSheet .mvr-sheet-body');
-  if (!body) return;
-  body.innerHTML = activationPriceHtml();
-  body.scrollTop = 0;
-  bindSheetEvents();
+  return finaleHtml();
 }
 
 function finaleHtml() {
@@ -799,11 +627,11 @@ function finaleHtml() {
     : hasTrial ? `${trialDays()}-day free trial` : 'Ready to activate';
   const finaleTitle = isSubscribed
     ? `${esc(propertyName())} is ready.`
-    : hasTrial ? `Try everything free for ${trialDays()} days.` : `Marketel is ready for ${esc(propertyName())}.`;
+    : hasTrial ? `Start free. Run everything.` : `Marketel is ready for ${esc(propertyName())}.`;
   const finaleIntro = isSubscribed
     ? 'Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.'
     : hasTrial
-      ? `${esc(propertyName())} gets full Marketel access now. There is no charge today, and you can cancel before ${renewalDate} without paying anything.`
+      ? `${esc(propertyName())} gets full access for ${trialDays()} days. There is no charge today.`
       : 'Take direct bookings without OTA commission, stay in control of availability, and give every guest a direct way back.';
   const includedValueHtml = `<div class="mvr-value-list">
     <div style="--stagger:0"><span>1</span><p><strong>Direct Booking Page</strong><small>Take bookings on your own page without OTA commission</small></p></div>
@@ -834,11 +662,6 @@ function finaleHtml() {
           <div class="mvr-price-detail${isYearly || hasTrial ? ' is-visible' : ''}">${hasTrial
             ? `First ${displayedPrice} charge ${renewalDate}`
             : isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
-          ${activationRateCalculatorHtml()}
-          <div class="mvr-payment-flow">
-            <strong>Your room money stays yours.</strong>
-            <span>Guests use a temporary $1 card verification, then pay your property directly at check-in. Marketel never holds the room payment.</span>
-          </div>
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
           ${hasTrial ? `<div class="mvr-guarantee"><span>${trialDays()}</span><p><strong>${trialDays()} days of full access. $0 today.</strong><b>Card required. Cancel before ${renewalDate} and you will not be charged.</b><small>${isYearly ? `Then $1,990 for one year on ${renewalDate}.` : `Then $199/month starting ${renewalDate}.`} Cancel anytime.</small></p></div>
           <div class="mvr-secure-note">Stripe securely stores your card · <a href="/terms" target="_blank" rel="noopener">Trial terms</a></div>`
@@ -847,8 +670,7 @@ function finaleHtml() {
           <button type="button" id="mvrAskBeforeActivating" style="display:block;margin:10px auto 0;padding:8px 10px;border:0;background:transparent;color:#2E7D5B;font:inherit;font-size:12px;font-weight:750;cursor:pointer;">Question before activating? Message Salah</button>
         </div>
         <div class="mvr-activation-proof">
-          ${directBookingProofHtml()}
-          <div class="mvr-included-label">Three things you're activating</div>
+          <div class="mvr-included-label">Everything included in your trial</div>
           ${includedValueHtml}
         </div>`}
     </div>
@@ -879,29 +701,32 @@ function demandFitRevealMessage() {
   }
 }
 
-function hubRowHtml(item, nextId) {
-  const done = visitedItems.has(item.id);
-  const classes = ['mvr-row', `is-${item.id}`];
-  if (done) classes.push('is-done');
-  if (item.id === nextId) classes.push('is-next');
-  const title = item.id === 'activation' && !crm.hotelSubscribed && crm.marketelTrialEligible === false
-    ? 'Activate everything — $199/month'
-    : item.title;
-  const body = item.id === 'activation' && !crm.hotelSubscribed && crm.marketelTrialEligible === false
-    ? 'Full access. Cancel anytime.'
-    : item.body;
-  return `<button type="button" class="${classes.join(' ')}" data-hub-item="${item.id}">
-    <span class="mvr-row-mark" aria-hidden="true">${done ? '✓' : ''}</span>
+function hubProofRowHtml(item) {
+  return `<button type="button" class="mvr-row mvr-proof-row is-${item.id}" data-hub-item="${item.id}">
     <span class="mvr-row-text">
-      <strong>${esc(title)}</strong>
-      <small>${esc(body)}</small>
+      <strong>${esc(item.title)}</strong>
+      <small>${esc(item.body)}</small>
     </span>
     <span class="mvr-row-chevron" aria-hidden="true">›</span>
   </button>`;
 }
 
+function activationHubCtaHtml() {
+  const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
+  const trialAvailable = trialOfferAvailable();
+  const title = isSubscribed
+    ? 'Open Marketel Front Desk'
+    : trialAvailable ? `Start your ${trialDays()}-day free trial` : 'Activate Marketel';
+  const body = isSubscribed
+    ? 'Your complete system is live.'
+    : trialAvailable ? '$0 today. Everything unlocked. Cancel anytime.' : '$199/month. Cancel anytime.';
+  return `<button type="button" class="mvr-hub-trial-cta" data-hub-item="activation">
+    <span><strong>${esc(title)}</strong><small>${esc(body)}</small></span>
+    <b aria-hidden="true">→</b>
+  </button>`;
+}
+
 function hubHtml() {
-  const nextId = nextHubItemId();
   return `<div class="mvr-hub">
     <header class="mvr-hub-head">
       <div class="mvr-brand"><img src="/marketellogo.svg" alt=""><span>Marketel</span></div>
@@ -914,9 +739,11 @@ function hubHtml() {
       </button>
       ${bookingPageStatusHtml()}
     </header>
-    <div class="mvr-hub-hero${visitedItems.has('booking') ? '' : ' is-next'}">${bookingPreviewCardHtml()}</div>
+    <div class="mvr-hub-hero">${bookingPreviewCardHtml()}</div>
+    <div class="mvr-hub-trial-dock">${activationHubCtaHtml()}</div>
+    <div class="mvr-proof-label"><strong>See how the rest works</strong><span>Optional</span></div>
     <div class="mvr-hub-rows">
-      ${HUB_ITEMS.filter((item) => item.id !== 'booking').map((item) => hubRowHtml(item, nextId)).join('')}
+      ${HUB_ITEMS.filter((item) => item.id === 'frontdesk' || item.id === 'guestel').map(hubProofRowHtml).join('')}
     </div>
   </div>`;
 }
@@ -943,22 +770,8 @@ function renderReveal() {
 // would tear down the hero iframe, which is exactly the "page rebuilds itself"
 // bug the old render guard existed to stop.
 function refreshHubState() {
-  const layer = document.querySelector('.mvr-hub');
-  if (!layer) return;
-  const nextId = nextHubItemId();
-  HUB_ITEMS.forEach((item) => {
-    const row = layer.querySelector(`[data-hub-item="${item.id}"]`);
-    if (!row) return;
-    const done = visitedItems.has(item.id);
-    row.classList.toggle('is-done', done);
-    row.classList.toggle('is-next', item.id === nextId);
-    const mark = row.querySelector('.mvr-row-mark');
-    if (mark) mark.textContent = done ? '✓' : '';
-  });
-  const hero = layer.querySelector('.mvr-hub-hero');
-  if (hero) {
-    hero.classList.toggle('is-next', nextId === 'booking');
-  }
+  // Optional proof has no visual completion state. Visiting a carousel remains
+  // measurable and resumable, but never makes the hub look like a checklist.
   lastRenderedRevealHtml = hubHtml();
 }
 
@@ -1028,9 +841,8 @@ function openHubItem(id) {
 
   // Only fire the stage event on open. The server writes revealProgressStep on
   // every call and follows backward moves, so firing on close would rewrite a
-  // lower step. Activation is the exception: its event fires when the price
-  // actually renders (activationPriceHtml), because a framing question now sits
-  // in front of it and ActivationOfferViewed has to keep meaning "saw the price".
+  // lower step. Activation is the exception: its event fires only when the
+  // price content actually renders, keeping "offer viewed" literal.
   if (item.id !== 'activation') trackReveal(item.event);
   recordHubDepth(item.step);
   trackJourney('JourneyRevealStageViewed', {
@@ -1228,17 +1040,11 @@ function onRevealKeydown(event) {
 function presentSheet(id) {
   const root = document.getElementById('marketelValueReveal');
   if (!root || document.getElementById('mvrSheet')) return;
-  const showFraming = id === 'activation'
-    && !activationFramingAnswer
-    && !skipActivationFraming
-    && !(crm.hotelSubscribed && !activationPreviewMode);
   const body = id === 'frontdesk'
     ? frontdeskSheetBodyHtml()
     : id === 'guestel'
       ? guestelSheetBodyHtml()
-      : showFraming
-        ? activationFramingHtml()
-        : activationPriceHtml();
+      : activationPriceHtml();
   const sheet = document.createElement('div');
   sheet.id = 'mvrSheet';
   sheet.className = `mvr-sheet is-${id}`;
@@ -1256,10 +1062,6 @@ function presentSheet(id) {
       </div>
     </div>`;
   root.appendChild(sheet);
-  if (showFraming && !activationFramingTracked) {
-    activationFramingTracked = true;
-    trackReveal('ActivationFramingViewed');
-  }
   sheet.querySelectorAll('[data-sheet-dismiss]').forEach((control) => {
     control.addEventListener('click', () => closeSheet('sheet-closed'));
   });
@@ -1358,9 +1160,6 @@ function bindRevealEvents() {
 // Activation lives in a sheet now, so its controls bind when that sheet is
 // presented rather than with the hub.
 function bindSheetEvents() {
-  document.querySelectorAll('#mvrSheet [data-framing-answer]').forEach((control) => {
-    control.addEventListener('click', () => answerActivationFraming(control.dataset.framingAnswer));
-  });
   document.getElementById('mvrAskBeforeActivating')?.addEventListener('click', () => {
     window.openMarketelSupport?.();
   });
@@ -1378,27 +1177,10 @@ function bindSheetEvents() {
       });
       const body = document.querySelector('#mvrSheet .mvr-sheet-body');
       if (body) {
-        body.innerHTML = framingLineHtml(activationFramingAnswer) + finaleHtml();
+        body.innerHTML = finaleHtml();
         bindSheetEvents();
       }
       refreshHubState();
-    });
-  });
-  const rateInput = document.getElementById('mvrActivationRate');
-  sizeRateInput(rateInput);
-  rateInput?.addEventListener('input', () => {
-    sizeRateInput(rateInput);
-    if (rateInput.value.trim() === '') return;
-    updateActivationRateCalculator(rateInput.value, { syncInput: false });
-  });
-  rateInput?.addEventListener('change', () => {
-    updateActivationRateCalculator(rateInput.value, { track: true });
-  });
-  document.querySelectorAll('[data-mvr-rate-step]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const delta = Number(button.dataset.mvrRateStep) || 0;
-      const current = Number(rateInput?.value) || currentActivationRate();
-      updateActivationRateCalculator(current + delta, { track: true });
     });
   });
   bindAppCarousels();
@@ -1589,12 +1371,8 @@ export async function showMarketelValueReveal(options = {}) {
   seedVisitedFromStep(currentStep);
   openSheetId = null;
   activationOfferTracked = false;
-  activationFramingTracked = false;
-  activationFramingAnswer = null;
-  skipActivationFraming = currentStep >= 3;
   bookingCheckoutReachedTracked = false;
   appCarouselIndex = { frontdesk: 0, guestel: 0 };
-  activationNightlyRate = null;
   bookingPreviewUnavailable = false;
   lastRenderedRevealHtml = '';
   revealStartedAt = Date.now();

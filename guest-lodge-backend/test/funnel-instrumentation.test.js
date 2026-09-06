@@ -39,7 +39,7 @@ test('every reveal event the client fires is accepted by the server', () => {
         for (const match of stageArray[1].matchAll(/'([A-Za-z]+)'/g)) fired.add(match[1]);
     }
 
-    assert.ok(fired.size >= 8, `expected the compact reveal milestone set, saw ${fired.size}`);
+    assert.ok(fired.size >= 6, `expected the compact reveal milestone set, saw ${fired.size}`);
     for (const required of [
         'ValueRevealStarted',
         'BookingEngineRevealViewed',
@@ -64,7 +64,7 @@ test('interaction telemetry is blocked before it can write to Neon', () => {
 
 test('the dashboard presents the compact commercial path', () => {
     assert.match(dashboard, /Email leads/);
-    assert.match(dashboard, /Qualified leads/);
+    assert.doesNotMatch(dashboard, /<div class="stat-label">Qualified leads/);
     assert.match(dashboard, /Saw Guestel/);
     assert.match(dashboard, /Saw Front Desk/);
     assert.doesNotMatch(dashboard, /Where the reveal loses people|REVEAL_WALK|renderBeatFunnel/);
@@ -167,32 +167,17 @@ test('Meta setup completion is a deduplicated standard CompleteRegistration even
     assert.match(setup, /completeData\.registrationNewlyCompleted/);
 });
 
-test('Lead qualification describes a current monetizable problem and is identical across ad angles', () => {
-    for (const answer of ['ota_leakage', 'direct_guest_relationships']) {
-        assert.match(setup, new RegExp(`answer === '${answer}'`), `${answer} is not qualified in setup`);
-        assert.match(server, new RegExp(`'${answer}'`), `${answer} is not accepted by the server`);
-    }
-    for (const mismatch of ['new_traveler_demand', 'pms_channel_sync']) {
-        assert.match(setup, new RegExp(`answerQualityQ\\('${mismatch}'\\)`));
-    }
-    const leadValidation = server.slice(
-        server.indexOf("if (eventName === 'QualifiedLead')"),
-        server.indexOf('// A setup can qualify only once')
-    );
-    assert.doesNotMatch(leadValidation, /acquisitionAngle|AcquisitionAngle/);
-    assert.doesNotMatch(leadValidation, /new_traveler_demand|pms_channel_sync/);
-    assert.match(setup, /Marketel captures demand\. It doesn’t create new travelers\./);
-    assert.match(setup, /Marketel works alongside your current setup\./);
-    assert.match(setup, /I understand — continue anyway/);
-    assert.doesNotMatch(setup, /Exit for now/);
-    assert.match(setup, /eventName: 'FitMismatchContinued'/);
-    assert.match(server, /MARKETEL_DEMAND_FIT_MISMATCH_TYPES/);
-    assert.match(dashboard, /Demand fit/);
-    assert.match(dashboard, /byDemandFit/);
-    assert.match(dashboard, /Continued anyway/);
+test('setup asks only for the three details needed to build the preview', () => {
+    assert.match(setup, /id="hotelName"/);
+    assert.match(setup, /id="rmName"/);
+    assert.match(setup, /id="rmNightly"/);
+    assert.match(setup, /id="rmUnits" value="1"/);
+    assert.doesNotMatch(setup, /id="demandFitQuestion"|function answerQualityQ/);
+    assert.doesNotMatch(setup, /id="rmPhoto"|uploadRoomPhoto/);
+    assert.match(setup, /photos, more rooms, taxes, and policies after your preview opens/i);
 });
 
-test('email submission is the deduplicated Meta Lead while qualification remains first-party', () => {
+test('email submission is the deduplicated Meta Lead and setup completion is the next commercial signal', () => {
     const setupStart = server.slice(
         server.indexOf("app.post('/api/setup/start'"),
         server.indexOf('// Serve setup wizard')
@@ -206,19 +191,9 @@ test('email submission is the deduplicated Meta Lead while qualification remains
     assert.match(landing, /fbq\('track', 'Lead'/);
     assert.match(landing, /eventID: 'marketel-lead\.' \+ data\.hotelId/);
 
-    const answer = setup.slice(
-        setup.indexOf('function answerQualityQ'),
-        setup.indexOf('// Load existing data')
-    );
-    assert.match(answer, /eventName: 'QualifiedLead'/);
-    assert.doesNotMatch(answer, /fbq\('track', 'Lead'/);
-
-    const onboarding = server.slice(
-        server.indexOf("app.post('/api/funnel/onboarding'"),
-        server.indexOf('const MARKETEL_ATTRIBUTION_MILESTONES', server.indexOf("app.post('/api/funnel/onboarding'"))
-    );
-    assert.match(onboarding, /if \(eventName === 'QualifiedLead'\)/);
-    assert.doesNotMatch(onboarding, /queueMarketelCAPI\('QualifiedLead'/);
+    assert.doesNotMatch(setup, /eventName: 'QualifiedLead'/);
+    assert.match(setup, /fbq\('track', 'CompleteRegistration'/);
+    assert.match(setup, /eventID: completeData\.registrationEventId/);
 });
 
 test('reveal completion survives return visits without marking pricing as paid', () => {

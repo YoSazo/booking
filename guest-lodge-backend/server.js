@@ -7286,11 +7286,6 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'GuestAppRevealViewed',
     'AssistantRevealViewed',
     'ActivationOfferViewed',
-    // The activation sheet asks one framing question before showing the price.
-    // Neither of these moves revealProgressStep — only ActivationOfferViewed does,
-    // and that now fires when the price itself renders.
-    'ActivationFramingViewed',
-    'ActivationFramingAnswered',
     'BookingPreviewCheckoutReached',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
@@ -13587,9 +13582,8 @@ app.post('/api/setup/:token/complete', async (req, res) => {
                 where: { id: hotel.id },
                 data: { setupComplete: true, active: true },
             }),
-            // The owner can answer the qualification question while this
-            // request finishes. Never overwrite a concurrently persisted step
-            // 4 with an earlier step when the background build completes.
+            // All setup writes run concurrently. Never let a retry move the
+            // durable setup marker backwards after completion.
             prisma.hotelConfig.updateMany({
                 where: { id: hotel.id, setupProgressStep: { lt: 4 } },
                 data: { setupProgressStep: 4 },

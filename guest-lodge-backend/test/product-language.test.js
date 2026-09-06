@@ -83,7 +83,8 @@ test('activation discloses a card-required trial and its paid renewal before che
     assert.doesNotMatch(landingCopy, /Card required/);
     assert.doesNotMatch(landingCopy, /\$199|\$1,990/);
     assert.match(revealCopy, /Start your \$\{trialDays\(\)\}-day free trial/);
-    assert.match(revealCopy, /Try everything free for \$\{trialDays\(\)\} days/);
+    assert.match(revealCopy, /Start free\. Run everything\./);
+    assert.match(revealCopy, /gets full access for \$\{trialDays\(\)\} days\. There is no charge today\./);
     assert.match(revealCopy, /\$0 <b>today<\/b>/);
     assert.match(revealCopy, /Only after your \$\{trialDays\(\)\} free days/);
     assert.match(revealCopy, /First \$\{displayedPrice\} charge \$\{renewalDate\}/);
@@ -92,28 +93,19 @@ test('activation discloses a card-required trial and its paid renewal before che
     assert.doesNotMatch(revealCopy, /money-back guarantee|Try Marketel for 7 days/);
 });
 
-test('activation turns the nightly rate into an editable break-even decision', () => {
-    assert.match(revealCopy, /id="mvrActivationRate"/);
-    assert.match(revealCopy, /data-mvr-rate-step="-5"/);
-    assert.match(revealCopy, /Estimate uses a 15% OTA commission/);
-    assert.match(revealCopy, /Three things you're activating/);
+test('activation makes the full trial understandable without another calculator step', () => {
+    assert.doesNotMatch(revealCopy, /id="mvrActivationRate"|data-mvr-rate-step|Estimate uses a 15% OTA commission/);
+    assert.match(revealCopy, /Everything included in your trial/);
     assert.match(revealCopy, /Direct Booking Page/);
     assert.match(revealCopy, /Marketel Front Desk/);
     assert.match(revealCopy, /Guestel/);
     assert.match(productCopy, /previewActivation/);
     assert.match(revealCopy, /activationPreviewMode && crm\.hotelSubscribed/);
-    assert.match(revealCopy, /could avoid about.*in OTA commission/);
-    assert.doesNotMatch(revealCopy, /could cover one month of Marketel/);
 });
 
-test('activation framing stays optional, measurable, and economically honest', () => {
-    assert.match(revealCopy, /What did you pay Booking\.com, Expedia or Airbnb last month\?/);
-    assert.match(revealCopy, /data-framing-answer="skipped">Skip to plans/);
-    assert.match(revealCopy, /ActivationFramingViewed/);
-    assert.match(revealCopy, /ActivationFramingAnswered/);
-    assert.match(revealCopy, /ActivationOfferViewed.*saw the price/s);
-    assert.match(revealCopy, /You paid <strong>under \$500 last month<\/strong>/);
-    assert.match(revealCopy, /skipActivationFraming = currentStep >= 3;/);
-    assert.doesNotMatch(revealCopy, /skipActivationFraming = currentStep >= 3 \|\| activationPreviewMode/);
-    assert.doesNotMatch(revealCopy, /every direct booking after that is yours/i);
+test('activation opens directly to the measurable trial offer', () => {
+    assert.doesNotMatch(revealCopy, /What did you pay Booking\.com|data-framing-answer|ActivationFraming/);
+    assert.match(revealCopy, /function activationPriceHtml\(\)/);
+    assert.match(revealCopy, /trackReveal\('ActivationOfferViewed'\)/);
+    assert.match(revealCopy, /: activationPriceHtml\(\)/);
 });

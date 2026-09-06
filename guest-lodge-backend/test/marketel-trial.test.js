@@ -96,7 +96,8 @@ test('trial lifecycle and milestones are exact, observable business events', () 
 });
 
 test('trial terms are explicit before Stripe and existing trial users do not get another trial', () => {
-  assert.match(reveal, /Try everything free for \$\{trialDays\(\)\} days/);
+  assert.match(reveal, /Start free\. Run everything\./);
+  assert.match(reveal, /gets full access for \$\{trialDays\(\)\} days\. There is no charge today\./);
   assert.match(reveal, /\$0 <b>today<\/b>/);
   assert.match(reveal, /Only after your \$\{trialDays\(\)\} free days/);
   assert.match(reveal, /First \$\{displayedPrice\} charge \$\{renewalDate\}/);
