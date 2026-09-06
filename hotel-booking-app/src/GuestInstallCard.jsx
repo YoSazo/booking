@@ -23,6 +23,10 @@ function GuestInstallCard({
 }) {
   const [showQr, setShowQr] = useState(false);
   const [qrHandoff, setQrHandoff] = useState(handoffToken || '');
+  // Minted ahead of the tap. iOS only presents the App Clip card for a
+  // navigation that happens inside the tap's own user activation, so the token
+  // has to be in hand before the button is pressed rather than fetched during it.
+  const [readyHandoff, setReadyHandoff] = useState(handoffToken || '');
   const ios = isIos();
   const android = isAndroid();
   const inGuestelClip = typeof window !== 'undefined'
@@ -39,6 +43,25 @@ function GuestInstallCard({
       reservationCode: effectiveCode,
     });
   }, [android, apiBaseUrl, effectiveCode, hotelId, touchpoint]);
+
+  // Only the confirmation variant sends a handoff token, and only it needs the
+  // network. Minting it on render keeps the tap itself synchronous.
+  useEffect(() => {
+    if (android || !isConfirmation || !reservationAccessToken) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/guest/native/handoff/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${reservationAccessToken}` },
+          body: '{}',
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && data.handoffToken) setReadyHandoff(data.handoffToken);
+      } catch (_) { /* the prop token remains the fallback */ }
+    })();
+    return () => { cancelled = true; };
+  }, [android, isConfirmation, reservationAccessToken, apiBaseUrl]);
 
   if (android) return null;
 
@@ -65,10 +88,18 @@ function GuestInstallCard({
 
   const handlePrimary = async () => {
     trackCta();
-    const effectiveHandoff = await freshHandoff();
+    // Navigate inside the gesture. Awaiting anything first — even a promise that
+    // resolves without a network call, as freshHandoff() does on the add path —
+    // returns control to the event loop, and Safari then declines to present the
+    // App Clip card. That is what made this button need a second tap;
+    // InstallAppBanner navigates synchronously and never showed it.
+    // Inside the clip this is a postMessage, not a navigation, so it is not
+    // gesture-gated and can wait for a token. It must be tested before `ios`,
+    // which is also true in there.
     if (inGuestelClip) {
-      if (effectiveHandoff) {
-        window.webkit.messageHandlers.guestelClip.postMessage({ type: 'handoff', token: effectiveHandoff });
+      const clipHandoff = await freshHandoff();
+      if (clipHandoff) {
+        window.webkit.messageHandlers.guestelClip.postMessage({ type: 'handoff', token: clipHandoff });
       }
       window.webkit.messageHandlers.guestelClip.postMessage({ type: 'requestInstall' });
       return;
@@ -77,10 +108,11 @@ function GuestInstallCard({
       window.location.assign(guestelInvocationUrl({
         hotelId,
         intent: isConfirmation ? 'stay' : 'add',
-        handoffToken: isConfirmation ? effectiveHandoff : undefined,
+        handoffToken: isConfirmation ? (readyHandoff || handoffToken) : undefined,
       }));
       return;
     }
+    const effectiveHandoff = await freshHandoff();
     setQrHandoff(effectiveHandoff || '');
     setShowQr(true);
   };
