@@ -88,7 +88,7 @@ function legalAccountCardHtml(deletionStatus = null) {
   const scheduled = request?.scheduledFor
     ? new Date(request.scheduledFor).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' })
     : '';
-  const deletionControls = !native ? '' : request
+  const deletionControls = request
     ? `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
         <div style="font-size:13px;font-weight:700;color:#9a3412;">Account deletion scheduled</div>
         <p style="font-size:12px;color:var(--text-muted);line-height:1.5;margin:5px 0 10px;">Your property and account data will be deleted${scheduled ? ` on ${scheduled}` : ''}. You can cancel until processing begins.</p>
@@ -123,9 +123,7 @@ async function loadSettings() {
   try {
     const [hotelRes, deletionStatus] = await Promise.all([
       api('GET', '/api/crm/verify'),
-      isNativeApp()
-        ? api('GET', '/api/crm/account-deletion/status').catch(() => null)
-        : Promise.resolve(null),
+      api('GET', '/api/crm/account-deletion/status').catch(() => null),
     ]);
     const bookingDomain = hotelRes?.domain || (crm.activeHotelId + '.mktel.co');
     const bookingUrl = 'https://' + bookingDomain;
@@ -828,9 +826,7 @@ async function loadEditRooms() {
     const [res, hotelRes, deletionStatus] = await Promise.all([
       api('GET', '/api/crm/rooms'),
       api('GET', '/api/crm/verify'),
-      isNativeApp()
-        ? api('GET', '/api/crm/account-deletion/status').catch(() => null)
-        : Promise.resolve(null),
+      api('GET', '/api/crm/account-deletion/status').catch(() => null),
     ]);
     if (!res.rooms) throw new Error('No data');
     crm.editRooms = res.rooms;

@@ -995,10 +995,25 @@ async function refreshNativeProperties() {
 function setNotificationButtonState(enabled) {
   const btn = document.getElementById('btnNotify');
   if (!btn) return;
+  // The button ships as style="display:none" and nothing ever cleared it, so the
+  // only way to grant push permission was a one-shot modal that requires the PWA
+  // to already be installed. Web push is wired end to end and counts toward
+  // countBookingApprovalChannels, which means an owner who never saw that modal
+  // could not turn on booking alerts *or* save a booking rule. Owning visibility
+  // here is what opens both.
+  const available = pushSupported() && !isNativeFrontdeskApp();
+  btn.style.display = available ? '' : 'none';
+  const denied = available && 'Notification' in window && Notification.permission === 'denied';
   btn.classList.toggle('notify-on', !!enabled);
   btn.classList.toggle('notify-off', !enabled);
   btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-  btn.textContent = enabled ? 'Notifications: On' : 'Notifications: Off';
+  btn.disabled = denied;
+  btn.title = denied
+    ? 'Your browser is blocking notifications for this site. Allow them in site settings, then reload.'
+    : '';
+  btn.textContent = denied
+    ? 'Alerts blocked'
+    : (enabled ? 'Notifications: On' : 'Turn on booking alerts');
 }
 
 async function syncNotificationButtonState() {
@@ -1951,7 +1966,7 @@ function trialChecklistHtml() {
         <div><strong>2. Review your property details</strong><br>Confirm rooms, photos, rates, taxes, policies, and the availability guests should see.
           <button class="trial-action" onclick="trialLaunchAction('settings')">Review property →</button>
           <button class="trial-action" onclick="trialLaunchAction('availability')">Review availability →</button></div>
-        <div><strong>3. Set booking alerts and your no-answer rule</strong><br>${native ? 'Choose who receives alerts and what happens if nobody answers.' : 'Set these up in the iPhone app. You can manage property details and bookings on the web.'}
+        <div><strong>3. Set booking alerts and your no-answer rule</strong><br>Choose who receives alerts and what happens if nobody answers.
           <button class="trial-action" onclick="trialLaunchAction('alerts')">${native ? 'Set up alerts &amp; rule' : 'Get the iPhone app'} →</button></div>
         <div><strong>4. Check the guest experience, then share</strong><br>Previewing does not create a reservation or verify delivery of booking alerts. Keep outside bookings reflected in your availability.
           <button class="trial-action" onclick="trialLaunchAction('preview')">Preview booking page →</button>
@@ -1978,7 +1993,8 @@ async function trialLaunchAction(action) {
   if (action === 'app') return openTrialConfirmation();
   if (action === 'settings' || action === 'availability') return setFilter(action);
   if (action === 'alerts') {
-    if (!isNativeFrontdeskApp()) return openTrialConfirmation();
+    // Was a bounce back to the activation modal on web — the one checklist item
+    // a trialing owner most needs, doing nothing on 40% of devices.
     return operationalReadinessAction('assistant');
   }
   if (action === 'preview') return openGuestBookingEngine({ preview: true });
@@ -3458,9 +3474,9 @@ async function loadMessages() {
 }
 
 function updateMessageBadges() {
-  const appOnlySurface = isNativeFrontdeskApp()
-    || document.body.classList.contains('frontdesk-editor-preview')
-    || new URLSearchParams(window.location.search).get('previewEditor') === '1';
+  // Was native-only, so web owners saw a zero badge while guest messages went
+  // unanswered — the tab that shows them is available everywhere now.
+  const appOnlySurface = true;
   const loadedUnread = crm.guestMessages.filter(
     message => !message.read && (message.sender || 'guest') !== 'hotel'
   ).length;
@@ -4808,14 +4824,10 @@ function applyFilter() {
     loadAppsModule().then(() => {
       const appsTourOpen = !!document.getElementById('appsTourLightbox');
       if (!appsTourOpen) ensureAppsViewRendered();
-      const embeddedNativePreview = document.body.classList.contains('frontdesk-editor-preview')
-        || new URLSearchParams(window.location.search).get('previewEditor') === '1';
-      if (isNativeFrontdeskApp() || embeddedNativePreview) {
-        const guestMessagesPanel = document.getElementById('messagesPanel');
-        if (guestMessagesPanel) guestMessagesPanel.style.display = 'block';
-        if (!crm.guestMessages.length) loadMessages();
-        else renderMessages();
-      }
+      const guestMessagesPanel = document.getElementById('messagesPanel');
+      if (guestMessagesPanel) guestMessagesPanel.style.display = 'block';
+      if (!crm.guestMessages.length) loadMessages();
+      else renderMessages();
     }).catch(() => {
       if (appsEl2) appsEl2.innerHTML = '<div class="empty-state"><div class="empty-text">Could not load Guestel</div></div>';
     });
@@ -5908,10 +5920,8 @@ async function loadOperationalReadiness({ force = false } = {}) {
 
 function operationalReadinessAction(action) {
   if (action === 'assistant') {
-    if (!isNativeFrontdeskApp()) {
-      openFrontdeskAppDownload();
-      return;
-    }
+    // The sheet works on every platform now, so this readiness step opens it
+    // rather than sending the owner to an app they may not be able to install.
     loadAssistantModule().then((module) => module.openFrontDeskAssistant()).catch(() => {
       toast('Could not open Front Desk Assistant.', 'error');
     });
@@ -5924,6 +5934,14 @@ function operationalReadinessAction(action) {
 
 function openFrontdeskAppDownload() {
   const appStoreUrl = String(crm.frontdeskAppStoreUrl || '').trim();
+  // The listing is iOS-only and this opened it regardless of device, so an
+  // Android owner got an App Store page they cannot install from — usually while
+  // trying to set something up mid-trial. Say what is true instead.
+  const android = /android/i.test(navigator.userAgent || '');
+  if (android) {
+    toast('The Front Desk app is iPhone-only for now. Everything works here in your browser — add Front Desk to your home screen to get booking alerts.', 'info');
+    return;
+  }
   if (appStoreUrl) {
     window.open(appStoreUrl, '_blank', 'noopener');
     return;

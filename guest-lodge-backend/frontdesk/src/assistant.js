@@ -411,20 +411,6 @@ export function renderFrontDeskAssistantCard() {
     && !crm.settingsTourActive;
   panel.style.display = visible ? 'block' : 'none';
   if (!visible) return;
-  if (!isNativeFrontDesk()) {
-    panel.innerHTML = `<div class="fda-card is-off">
-      <div class="fda-card-row">
-        <div class="fda-card-icon fda-card-app-icon"><img src="${frontdeskAppIcon}" width="42" height="42" alt=""></div>
-        <div class="fda-card-copy">
-          <div class="fda-eyebrow">Front Desk app</div>
-          <div class="fda-card-title">Assistant lives on your phone.</div>
-          <div class="fda-card-sub">Download Marketel Front Desk from the App Store to connect phone numbers, choose your no-answer rule and manage Assistant activity.</div>
-        </div>
-        <button type="button" class="fda-card-btn" onclick="openFrontdeskAppDownload()">Download</button>
-      </div>
-    </div>`;
-    return;
-  }
   if (isNativeFrontDesk()) {
     const activity = latestMeaningfulActivity();
     if (!crm.assistantData || !activity) {
@@ -739,10 +725,9 @@ export function updateAssistantTimeDisplay(input) {
 
 
 function openAssistantSheetNow() {
-  if (!isNativeFrontDesk()) {
-    window.openFrontdeskAppDownload?.();
-    return;
-  }
+  // This sheet was written for every platform and then locked to iOS, which left
+  // web and Android owners unable to connect a phone or configure the booking
+  // rule at all — with no alternative path anywhere in settings.
   // Hide native chrome before any lazy rendering or network work so it can
   // never sit above the web sheet.
   setNativeShellForAssistant(false);
@@ -775,10 +760,8 @@ function openAssistantSheetNow() {
 // morph from — a View Transition can only interpolate between two things the
 // browser draws, and the pill is drawn by UIKit.
 export function openFrontDeskAssistant() {
-  if (!isNativeFrontDesk()) {
-    window.openFrontdeskAppDownload?.();
-    return;
-  }
+  // iOS hands off to its own sheet; everyone else gets this one, which is the
+  // implementation the native sheet was derived from.
   if (openNativeAssistant()) return;
   openAssistantSheetNow();
 }

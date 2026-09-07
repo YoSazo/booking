@@ -276,21 +276,13 @@ function renderAppsView() {
     ${nativeGuestShareHtml}
     ${guestMessagesPanelHtml}
     ${guestBroadcastCardHtml({ compact: true })}`;
-  const appStoreReady = !!String(crm.frontdeskAppStoreUrl || '').trim();
-  const webAppLockHtml = `
-    <section style="min-height:52vh;display:grid;place-items:center;padding:34px 0;">
-      <div style="width:min(100%,430px);padding:28px 24px;border:1.5px solid var(--border);border-radius:22px;background:#fff;text-align:center;box-shadow:0 14px 40px rgba(26,43,34,.09);">
-        <div style="width:58px;height:58px;display:grid;place-items:center;margin:0 auto 16px;border-radius:17px;background:var(--green-pale);color:var(--green);font-size:25px;"><i data-lucide="arrow-up-right" style="width:15px;height:15px;"></i></div>
-        <div style="font-size:11px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;color:var(--green);">Guestel tools</div>
-        <h2 style="margin:7px 0 9px;color:var(--text);font-size:23px;line-height:1.18;">Manage Guestel from the owner app.</h2>
-        <p style="margin:0 0 20px;color:var(--text-muted);font-size:14px;line-height:1.55;">Download Marketel Front Desk to share your Guestel QR, reply to verified guests, and send updates to guests who opt in.</p>
-        <button type="button" onclick="openFrontdeskAppDownload()" ${appStoreReady ? '' : 'aria-disabled="true"'} style="width:100%;min-height:50px;border:0;border-radius:13px;background:${appStoreReady ? 'var(--green)' : '#dce8e1'};color:${appStoreReady ? '#fff' : '#527061'};font-family:inherit;font-size:15px;font-weight:800;cursor:${appStoreReady ? 'pointer' : 'default'};">${appStoreReady ? 'Download Marketel Front Desk' : 'Front Desk app coming soon'}</button>
-      </div>
-    </section>`;
 
-  const appsMainHtml = nativePresentation
-    ? nativeGuestToolsHtml
-    : webAppLockHtml;
+  // The guest tools were locked to the app, which put the wallet card, the
+  // returning-guest offer, the QR and every guest conversation behind a
+  // download button on web and Android. Nothing in this branch touches a native
+  // API — the only webkit references here are CSS prefixes — and the handlers it
+  // wires (openMessagesWorkspace included) all fall through to a web path.
+  const appsMainHtml = nativeGuestToolsHtml;
 
   const appsFootnoteHtml = nativePresentation
     ? ''
