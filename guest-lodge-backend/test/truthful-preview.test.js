@@ -92,7 +92,12 @@ test('the owner preview explains activation and the room-money flow honestly', (
 
 test('Guestel preview stays inside the owner reveal', () => {
     assert.match(installBanner, /marketel:guestel-preview-requested/);
-    assert.match(installBanner, /ownerPreview \? 'Preview'/);
+    // Only an embedded preview is intercepted. ownerPreview is also true in a
+    // standalone "Preview your site" tab, where there is no reveal to stay
+    // inside and the owner should see their real App Clip open.
+    assert.match(installBanner, /ownerPreview && embeddedPreview \? 'Preview'/);
+    assert.match(installBanner, /const embeddedPreview = typeof window !== 'undefined' && window\.parent !== window;/);
+    assert.match(installBanner, /if \(ownerPreview && embeddedPreview\) \{/);
     assert.match(guestInfo, /hotelSubscribed=\{hotel\?\.subscribed !== false\}/);
     assert.match(reveal, /messageType === 'marketel:guestel-preview-requested'/);
     assert.match(reveal, /openGuestelPreviewFromBooking\(\)/);

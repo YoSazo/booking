@@ -25,6 +25,10 @@ function InstallAppBanner({
   const android = isAndroid();
   const inGuestelClip = typeof window !== 'undefined'
     && !!window.webkit?.messageHandlers?.guestelClip;
+  // ownerPreview covers two different situations — inside the reveal's iframe,
+  // and a standalone "Preview your site" tab. Only the first can be navigated
+  // away from something the owner wanted to stay in.
+  const embeddedPreview = typeof window !== 'undefined' && window.parent !== window;
 
   useEffect(() => {
     if (ownerPreview || android) return;
@@ -40,16 +44,16 @@ function InstallAppBanner({
     // not get thrown out of the Marketel reveal and onto Apple's website. The
     // parent reveal owns the full showcase; a standalone preview falls back to
     // the compact explanation below.
-    if (ownerPreview) {
-      if (typeof window !== 'undefined' && window.parent !== window) {
-        window.parent.postMessage({
-          type: 'marketel:guestel-preview-requested',
-          hotelId,
-          touchpoint,
-        }, '*');
-        return;
-      }
-      setShowUnavailableInfo(true);
+    // Only an *embedded* preview needs intercepting: navigating the reveal's
+    // iframe to Apple would throw the owner out of the showcase. A standalone
+    // preview tab has no parent to be thrown out of, so the owner should get the
+    // real thing — seeing their own App Clip open is the point of previewing.
+    if (ownerPreview && embeddedPreview) {
+      window.parent.postMessage({
+        type: 'marketel:guestel-preview-requested',
+        hotelId,
+        touchpoint,
+      }, '*');
       return;
     }
     if (hotelSubscribed !== true) {
@@ -75,7 +79,7 @@ function InstallAppBanner({
     zIndex: 8500, padding: '0 14px', pointerEvents: 'none',
   } : {};
   const locked = hotelSubscribed !== true;
-  const unavailable = locked && !ownerPreview;
+  const unavailable = locked && !(ownerPreview && embeddedPreview);
   const bannerCopy = ownerPreview
     ? 'See how guests keep your property, rebook, and message you.'
     : locked
@@ -108,7 +112,7 @@ function InstallAppBanner({
             color: unavailable ? '#276648' : 'white', fontSize: 13, fontWeight: 800,
             cursor: 'pointer', fontFamily: 'inherit',
           }}>
-            {ownerPreview ? 'Preview' : locked ? 'Not live' : ios || inGuestelClip ? 'Add' : 'Show QR'}
+            {ownerPreview && embeddedPreview ? 'Preview' : locked ? 'Not live' : ios || inGuestelClip ? 'Add' : 'Show QR'}
           </button>
         </div>
       </div>
@@ -129,10 +133,10 @@ function InstallAppBanner({
             }}>
             <HotelIcon hotelName={hotelName} appIconUrl={appIconUrl} size={58} style={{ margin: '0 auto 14px' }} />
             <h2 id="owner-install-preview-title" style={{ margin: 0, color: '#1a2b22', fontSize: 21, lineHeight: 1.2 }}>
-              {ownerPreview ? 'This is what Add opens for guests.' : 'Guestel is not live for this property yet.'}
+              {ownerPreview && embeddedPreview ? 'This is what Add opens for guests.' : 'Guestel is not live for this property yet.'}
             </h2>
             <p style={{ margin: '11px 0 18px', color: '#66756c', fontSize: 14, lineHeight: 1.55 }}>
-              {ownerPreview
+              {ownerPreview && embeddedPreview
                 ? <>Apple opens {hotelName || 'your property'} in Guestel, where guests can book direct, keep their stay, and message your Front Desk.{locked ? ' This turns on when you activate Marketel.' : ''}</>
                 : 'The property must activate Marketel before guests can keep it in Guestel.'}
             </p>
