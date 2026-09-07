@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Marketel · Front Desk</title>
+  <!-- The reveal, setup and landing all ask for DM Sans, but only landing.html
+       and setup.html ever loaded it. Front Desk fell back to -apple-system, so
+       an owner walking setup -> /frontdesk?reveal=step-0 watched the typeface
+       change mid-funnel — most visibly on desktop, where the booking-engine
+       iframe loads its own DM Sans and the chrome around it did not. -->
   <meta name="theme-color" content="#EFF4F0">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -13,7 +18,7 @@
   <!-- Session replay is disabled by the loader inside the native app. The web
        setup/reveal journey uses both Clarity and Smartlook. -->
   <script id="marketel-web-analytics"  defer src="/marketel-session-replay.js"></script>
-  <script type="module" crossorigin src="./assets/index-DwjBwcg_.js"></script>
+  <script type="module" crossorigin src="./assets/index-CE2SFUbM.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/settings-BP6Fp25k.js">
   <link rel="stylesheet" crossorigin href="./assets/settings-CQDpMbOW.css">
   <link rel="stylesheet" crossorigin href="./assets/index-BFTENirB.css">
@@ -142,6 +147,7 @@
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;margin:0;"></div>
+    <div id="iosAppBanner" style="display:none;margin:0;"></div>
     <div id="bookingsSubtabs" style="display:none;"></div>
     <div id="frontDeskAssistantPanel" style="display:none;"></div>
     <div id="bookingFilterChips" style="display:none;"></div>

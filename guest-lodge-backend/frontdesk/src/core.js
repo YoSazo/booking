@@ -2157,6 +2157,56 @@ async function loadBlockedDemand() {
   } catch (e) { /* non-fatal */ }
 }
 
+// An owner on an iPhone who chose "continue on web" gets no further mention of
+// the app, and the app is where the things web genuinely cannot do live: Lock
+// Screen booking cards and alerts that arrive without the browser open. Android
+// must never see this — there is no app to send them to, which was the dead end
+// this release fixed.
+const IOS_APP_BANNER_KEY = 'marketelIosAppBannerDismissedV1';
+const IOS_APP_BANNER_SNOOZE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isIosWebBrowser() {
+  if (isNativeFrontdeskApp()) return false;
+  const ua = navigator.userAgent || '';
+  // iPadOS reports MacIntel, so touch points are what separate it from a Mac.
+  return /iPhone|iPad|iPod/i.test(ua)
+    || (navigator.platform === 'MacIntel' && Number(navigator.maxTouchPoints || 0) > 1);
+}
+
+function iosAppBannerSnoozed() {
+  try {
+    const at = Number(localStorage.getItem(IOS_APP_BANNER_KEY) || 0);
+    return at > 0 && (Date.now() - at) < IOS_APP_BANNER_SNOOZE_MS;
+  } catch (_) { return false; }
+}
+
+function dismissIosAppBanner() {
+  try { localStorage.setItem(IOS_APP_BANNER_KEY, String(Date.now())); } catch (_) {}
+  updateIosAppBanner();
+}
+
+function updateIosAppBanner() {
+  const banner = document.getElementById('iosAppBanner');
+  if (!banner) return;
+  const url = String(crm.frontdeskAppStoreUrl || '').trim();
+  const show = isIosWebBrowser()
+    && /^https:\/\/apps\.apple\.com\//i.test(url)
+    && !iosAppBannerSnoozed();
+  banner.style.display = show ? 'block' : 'none';
+  if (!show) { banner.innerHTML = ''; return; }
+  banner.innerHTML = `<div style="display:flex;align-items:center;gap:13px;margin:0 0 14px;padding:14px 15px;border:1.5px solid #cfe6da;border-radius:16px;background:linear-gradient(145deg,#f4fbf7,#fff);box-shadow:0 6px 20px rgba(25,70,45,.07);">
+    <img src="${frontdeskAppIconUrl}" width="46" height="46" alt="" style="flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:block;">
+    <div style="min-width:0;flex:1;">
+      <div style="font-size:14.5px;font-weight:850;color:#1a2b22;line-height:1.25;">Get Front Desk on your iPhone</div>
+      <div style="font-size:12px;color:#577266;line-height:1.4;margin-top:3px;">Booking requests on your Lock Screen, and alerts that reach you without the browser open.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto;">
+      <button type="button" onclick="openFrontdeskAppDownload()" style="border:0;border-radius:10px;background:#2E7D5B;color:#fff;padding:10px 14px;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap;">Get the app</button>
+      <button type="button" onclick="dismissIosAppBanner()" style="border:0;background:transparent;color:#7b9188;padding:2px 0;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;">Not now</button>
+    </div>
+  </div>`;
+}
+
 function updateGoLiveBanner() {
   const banner = document.getElementById('goLiveBanner');
   if (!banner) return;
@@ -2173,6 +2223,7 @@ function updateGoLiveBanner() {
   if (guideOpen && banner.querySelector('details')) banner.querySelector('details').open = true;
   const app = document.getElementById('app');
   if (app) app.classList.toggle('has-go-live-banner', shouldShow);
+  updateIosAppBanner();
 }
 
 function updateBookingsTabBadge() {
@@ -6813,6 +6864,7 @@ exposeToWindow({
   guestBookingEngineUrl,
   openGuestBookingEngine,
   openFrontdeskAppDownload,
+  dismissIosAppBanner,
   getContextParam,
   getDetectedHostname,
   getManualRoomByName,

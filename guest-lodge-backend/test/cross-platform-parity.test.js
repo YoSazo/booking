@@ -70,3 +70,28 @@ test('checkout stays web-side, which is what Apple requires', () => {
     assert.ok(at > -1);
     assert.match(settings.slice(at, at + 320), /if \(isNativeApp\(\)\)/);
 });
+
+test('the app is promoted on iPhone web only, never on Android', () => {
+    // There is no Android app; promoting one there recreates the dead end this
+    // release removed.
+    assert.match(core, /function isIosWebBrowser\(\)/);
+    assert.match(core, /if \(isNativeFrontdeskApp\(\)\) return false;/);
+    // iPadOS reports MacIntel, so touch points are the discriminator.
+    assert.match(core, /navigator\.platform === 'MacIntel' && Number\(navigator\.maxTouchPoints \|\| 0\) > 1/);
+    // Only shown against a real Apple listing, and snoozeable.
+    assert.ok(core.includes("apps\\.apple\\.com") && core.includes('.test(url)'), 'banner is gated on a real Apple listing');
+    assert.match(core, /function dismissIosAppBanner\(\)/);
+    assert.match(core, /IOS_APP_BANNER_SNOOZE_MS/);
+    // It must ride the same refresh as the other banner rather than paint once.
+    assert.match(core, /if \(app\) app\.classList\.toggle\('has-go-live-banner', shouldShow\);\s*\n\s*updateIosAppBanner\(\);/);
+});
+
+test('Front Desk loads the typeface its stylesheets ask for', () => {
+    // reveal.css asks for DM Sans; only landing.html and setup.html ever loaded
+    // it, so the typeface changed between setup and the reveal.
+    const shell = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'index.html'), 'utf8');
+    assert.match(shell, /fonts\.googleapis\.com\/css2\?family=DM\+Sans/);
+    // ...but the native app keeps SF Pro rather than fetching a web font.
+    const viteConfig = fs.readFileSync(path.join(__dirname, '..', 'frontdesk', 'vite.config.js'), 'utf8');
+    assert.match(viteConfig, /fonts\\\.googleapis\\\.com/);
+});

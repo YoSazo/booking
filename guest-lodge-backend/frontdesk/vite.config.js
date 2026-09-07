@@ -130,7 +130,13 @@ export default defineConfig(({ mode }) => {
           .replace(/<script id="marketel-web-analytics">[\s\S]*?<\/script>/, '')
           .replace(/\s*<script[^>]*src="\/marketel-journey\.js"[^>]*><\/script>/, '')
           .replace(/\s*<script id="frontdesk-boot-guard">[\s\S]*?<\/script>/, '')
-          .replace(/\s*<link rel="manifest"[^>]*>/, '');
+          .replace(/\s*<link rel="manifest"[^>]*>/, '')
+          // The native app should not fetch a web font at launch: on iOS the
+          // -apple-system fallback is SF Pro, which is the correct typeface
+          // there anyway. DM Sans is for the browser, where the reveal sits
+          // next to setup.html and has to match it.
+          .replace(/\s*<link rel="preconnect" href="https:\/\/fonts\.(googleapis|gstatic)\.com"[^>]*>/g, '')
+          .replace(/\s*<link href="https:\/\/fonts\.googleapis\.com[^>]*>/g, '');
       },
       closeBundle() {
         const publicRoot = path.resolve(__dirname, '../public');

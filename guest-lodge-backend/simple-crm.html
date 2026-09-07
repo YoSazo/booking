@@ -5,6 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Marketel · Front Desk</title>
+  <!-- The reveal, setup and landing all ask for DM Sans, but only landing.html
+       and setup.html ever loaded it. Front Desk fell back to -apple-system, so
+       an owner walking setup -> /frontdesk?reveal=step-0 watched the typeface
+       change mid-funnel — most visibly on desktop, where the booking-engine
+       iframe loads its own DM Sans and the chrome around it did not. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="manifest" href="/manifest-simple-crm.json">
   <meta name="theme-color" content="#EFF4F0">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -76,7 +84,7 @@
     }, 15000);
   })();
   </script>
-  <script type="module" crossorigin src="/frontdesk/assets/index-TOZ1nxsc.js"></script>
+  <script type="module" crossorigin src="/frontdesk/assets/index-L7POzMDG.js"></script>
   <link rel="modulepreload" crossorigin href="/frontdesk/assets/settings-Bc7IRK4y.js">
   <link rel="stylesheet" crossorigin href="/frontdesk/assets/settings-CQDpMbOW.css">
   <link rel="stylesheet" crossorigin href="/frontdesk/assets/index-DjTA9Knh.css">
@@ -205,6 +213,7 @@
       </button>
     </div>
     <div id="goLiveBanner" style="display:none;margin:0;"></div>
+    <div id="iosAppBanner" style="display:none;margin:0;"></div>
     <div id="bookingsSubtabs" style="display:none;"></div>
     <div id="frontDeskAssistantPanel" style="display:none;"></div>
     <div id="bookingFilterChips" style="display:none;"></div>
