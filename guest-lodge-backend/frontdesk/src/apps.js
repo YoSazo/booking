@@ -301,7 +301,7 @@ function renderAppsView() {
     .apps-offer-row input { flex:0 0 92px;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;outline:none;font-family:inherit; }
     .apps-offer-row select { flex:1;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;font-family:inherit; }
     .apps-offer-preview { font-size:12px;color:var(--green);font-weight:700;min-height:16px;margin-bottom:10px; }
-    .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px; }
+    .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px;max-width:420px; }
     .guestel-wallet-card { position:relative;aspect-ratio:1.6/1;overflow:hidden;border:1px solid rgba(34,75,52,.16);border-radius:19px;background:linear-gradient(145deg,#4e9a72,#235f46);box-shadow:0 12px 30px rgba(22,55,36,.11); }
     .guestel-wallet-card::after { content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.43),rgba(0,0,0,.02) 62%);pointer-events:none; }
     .guestel-wallet-cover { position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#4e9a72,#235f46);color:rgba(255,255,255,.8);font-size:12px;font-weight:750; }

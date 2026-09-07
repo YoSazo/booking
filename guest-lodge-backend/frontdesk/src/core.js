@@ -5987,7 +5987,7 @@ function operationalReadinessHtml() {
 
   if (readiness.complete) {
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:11px 13px;border:1px solid #cce4d5;border-radius:13px;background:#f2fbf6;color:#1a5c3f;">
-      <span aria-hidden="true" style="display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#2E7D5B;color:#fff;font-size:13px;font-weight:900;">✓</span>
+      <span aria-hidden="true" style="display:grid;place-items:center;flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#2E7D5B;color:#fff;font-size:13px;font-weight:900;">✓</span>
       <div style="font-size:12px;line-height:1.35;"><strong style="display:block;font-size:13px;">Booking checks completed</strong>Your page, alert path, fallback rule and a direct booking were observed. Keep your rates and availability up to date.</div>
     </div>`;
   }
@@ -5996,7 +5996,7 @@ function operationalReadinessHtml() {
     const actionLabel = item.action === 'assistant' ? 'Set up' : item.action === 'preview' ? 'Test it' : 'Open';
     const action = item.done ? '' : `<button type="button" onclick="operationalReadinessAction('${esc(item.action)}')" style="flex:0 0 auto;border:0;background:none;color:#2E7D5B;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer;padding:8px;">${actionLabel}</button>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(46,125,91,.11);">
-      <span aria-hidden="true" style="display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${item.done ? '#2E7D5B' : '#eef2ef'};color:${item.done ? '#fff' : '#829087'};font-size:12px;font-weight:900;">${item.done ? '✓' : '·'}</span>
+      <span aria-hidden="true" style="display:grid;place-items:center;flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:${item.done ? '#2E7D5B' : '#eef2ef'};color:${item.done ? '#fff' : '#829087'};font-size:12px;font-weight:900;">${item.done ? '✓' : '·'}</span>
       <div style="min-width:0;flex:1;"><div style="font-size:12px;font-weight:800;color:#1a1a2e;">${esc(item.label)}</div><div style="font-size:11px;color:#6b7280;line-height:1.35;">${esc(item.detail)}</div></div>
       ${action}
     </div>`;

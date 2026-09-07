@@ -1,4 +1,4 @@
-import{c as a,a as J,b as X,e as ee}from"./settings-DSThNNbx.js";function c(e){return typeof window<"u"&&typeof window[e]=="function"?window[e]:null}function H(...e){return c("ensureAppsViewRendered")?.(...e)}function U(...e){return c("showFinaleMockModal")?.(...e)}function N(...e){return c("finishTourHydration")?.(...e)}function q(...e){return c("goLive")?.(...e)}function V(...e){return c("toast")?.(...e)}function te(...e){return c("appsCloseLightbox")?.(...e)}let I=[],p=0,z=!1,w=null,S=null,B=null,h=null;function oe(){if(document.getElementById("frontdeskAppsTourStyle"))return;const e=document.createElement("style");e.id="frontdeskAppsTourStyle",e.textContent=`
+import{c as a,a as J,b as X,e as ee}from"./settings-Bc7IRK4y.js";function c(e){return typeof window<"u"&&typeof window[e]=="function"?window[e]:null}function H(...e){return c("ensureAppsViewRendered")?.(...e)}function U(...e){return c("showFinaleMockModal")?.(...e)}function N(...e){return c("finishTourHydration")?.(...e)}function q(...e){return c("goLive")?.(...e)}function V(...e){return c("toast")?.(...e)}function te(...e){return c("appsCloseLightbox")?.(...e)}let I=[],p=0,z=!1,w=null,S=null,B=null,h=null;function oe(){if(document.getElementById("frontdeskAppsTourStyle"))return;const e=document.createElement("style");e.id="frontdeskAppsTourStyle",e.textContent=`
     #appsTourLightbox {
       -webkit-backdrop-filter: blur(2.5px);
       backdrop-filter: blur(2.5px);
@@ -213,7 +213,7 @@ import{c as a,a as J,b as X,e as ee}from"./settings-DSThNNbx.js";function c(e){r
     .apps-offer-row input { flex:0 0 92px;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;outline:none;font-family:inherit; }
     .apps-offer-row select { flex:1;min-width:0;padding:11px 13px;font-size:14px;border:1.5px solid var(--border);border-radius:11px;background:#fff;font-family:inherit; }
     .apps-offer-preview { font-size:12px;color:var(--green);font-weight:700;min-height:16px;margin-bottom:10px; }
-    .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px; }
+    .guestel-wallet-editor { display:grid;gap:11px;margin-top:4px;max-width:420px; }
     .guestel-wallet-card { position:relative;aspect-ratio:1.6/1;overflow:hidden;border:1px solid rgba(34,75,52,.16);border-radius:19px;background:linear-gradient(145deg,#4e9a72,#235f46);box-shadow:0 12px 30px rgba(22,55,36,.11); }
     .guestel-wallet-card::after { content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.43),rgba(0,0,0,.02) 62%);pointer-events:none; }
     .guestel-wallet-cover { position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#4e9a72,#235f46);color:rgba(255,255,255,.8);font-size:12px;font-weight:750; }

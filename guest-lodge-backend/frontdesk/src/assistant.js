@@ -1,6 +1,6 @@
 import { crm } from './state.js';
-import { exposeToWindow } from './utils.js';
 import frontdeskAppIcon from './assets/marketel-frontdesk-icon.png';
+import { exposeToWindow } from './utils.js';
 
 let installed = false;
 let loadPromise = null;
@@ -440,7 +440,7 @@ export function renderFrontDeskAssistantCard() {
     const loadFailed = !!crm.assistantError && !crm.assistantLoading;
     panel.innerHTML = `<div class="fda-card is-off">
       <div class="fda-card-row">
-        <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
+        <div class="fda-card-icon fda-card-app-icon"><img src="${frontdeskAppIcon}" width="42" height="42" alt=""></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow">Front Desk Assistant</div>
           <div class="fda-card-title">${crm.assistantLoading ? 'Connecting your assistant…' : (loadFailed ? 'Assistant could not connect' : 'Tell Front Desk when a room is taken')}</div>
@@ -463,7 +463,7 @@ export function renderFrontDeskAssistantCard() {
       : '';
     panel.innerHTML = `<div class="fda-card">
       <div class="fda-card-row">
-        <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
+        <div class="fda-card-icon fda-card-app-icon"><img src="${frontdeskAppIcon}" width="42" height="42" alt=""></div>
         <div class="fda-card-copy">
           <div class="fda-eyebrow fda-live">Assistant on</div>
           <div class="fda-card-title">Front Desk is watching ${recipients.length} phone${recipients.length === 1 ? '' : 's'}</div>
@@ -478,7 +478,7 @@ export function renderFrontDeskAssistantCard() {
   const locked = !isSubscribed();
   panel.innerHTML = `<div class="fda-card is-off">
     <div class="fda-card-row">
-      <div class="fda-card-icon"><i data-lucide="message-circle" style="width:16px;height:16px;"></i></div>
+      <div class="fda-card-icon fda-card-app-icon"><img src="${frontdeskAppIcon}" width="42" height="42" alt=""></div>
       <div class="fda-card-copy">
         <div class="fda-eyebrow">${locked ? 'Included when activated' : 'Front Desk Assistant'}</div>
         <div class="fda-card-title">Text Front Desk. It handles availability.</div>
