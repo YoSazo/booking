@@ -77,6 +77,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .cta-status.show { display: block; }
 .proof { max-width: 560px; margin: 0 auto 64px; padding: 0 24px; text-align: center; }
+/* A glimpse, not a destination: cropped to the part that reads as a real
+   property page and faded out, so it reassures without inviting exploration. */
+.proof-shot {
+  display: block; width: 100%; max-width: 250px; height: 290px;
+  margin: 0 auto 18px; object-fit: cover; object-position: top center;
+  border-radius: 20px;
+  -webkit-mask-image: linear-gradient(180deg, #000 66%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 66%, transparent 100%);
+}
 .proof p { font-size: 14px; line-height: 1.6; color: var(--muted); }
 .proof strong { font-size: 26px; font-weight: 800; color: var(--green); display: block; margin-bottom: 4px; }
 
@@ -121,6 +130,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 </section>
 
 <section class="proof">
+  <img src="/booking-page-studios17.webp" alt="A Marketel booking page on a phone" class="proof-shot" loading="lazy" decoding="async">
   <p><strong>$5,800</strong> booked direct in one recorded month &mdash; Suite Stay, Alabama.
   At a 20% OTA commission, that&apos;s up to $1,160 kept by the property.</p>
 </section>
