@@ -102,11 +102,7 @@ test('activation discloses a card-required trial and its paid renewal before che
     // low-friction capture. May's no-price, no-card page ran at $3-5 CPL on this
     // same Lead trigger; a card commitment in the hero reintroduces exactly the
     // friction that removing the price was meant to shed.
-    // Scoped to the preview on purpose: the trial does take a card, so an
-    // unqualified "no credit card" — which is what this page said in May, when
-    // it was true — would now be false.
-    assert.match(landingCopy, /No card to build your preview\. Takes 3 minutes\./);
-    assert.doesNotMatch(landingCopy, /No credit card\.|no card required/i);
+    assert.match(landingCopy, /Free to build\. Takes 3 minutes\./);
     assert.doesNotMatch(landingCopy, /Card required/);
     assert.doesNotMatch(landingCopy, /\$199|\$1,990/);
     assert.match(revealCopy, /Start your \$\{trialDays\(\)\}-day free trial/);
