@@ -10996,6 +10996,7 @@ app.post('/api/funnel/onboarding', funnelOnboardingRateLimit, async (req, res) =
 const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
     'Lead',
     'SetupCompleted',
+    'ValueRevealStarted',
     'ActivationOfferViewed',
     'CheckoutStarted',
     'TrialStarted',
@@ -11005,9 +11006,29 @@ const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
     'TrialConverted',
     'TrialCanceled',
     'PaymentSucceeded',
-    'FitMismatchContinued',
 ]);
-const MARKETEL_ACQUISITION_ANGLES = ['direct', 'guest_app', 'assistant'];
+// /funnel is the operating dashboard for Marketel acquisition. Product-detail
+// views, setup mechanics, email delivery guards and guest booking telemetry are
+// still retained where they are operationally useful, but they do not belong
+// in the one conversion path Salah uses to make spend decisions.
+const MARKETEL_FUNNEL_DASHBOARD_EVENT_NAMES = [
+    'LandingPageView',
+    'Lead',
+    'SetupCompleted',
+    'ValueRevealStarted',
+    'ActivationOfferViewed',
+    'CheckoutStarted',
+    'TrialStarted',
+    'TrialWillEnd',
+    'TrialNativeAppActivated',
+    'TrialLinkPlacementConfirmed',
+    'TrialFirstBookingReceived',
+    'TrialCancellationScheduled',
+    'TrialCancellationReversed',
+    'TrialCanceled',
+    'TrialConverted',
+    'PaymentSucceeded',
+];
 
 // These are Marketel's own QA/App Review properties. They must keep working in
 // the product, but counting them as customers, MRR, booking volume or funnel
@@ -11098,11 +11119,6 @@ function funnelDashboardWhere(where, exclusions) {
     return filters.length === 1 ? where : { AND: filters };
 }
 
-function normalizedMarketelAngle(value) {
-    const angle = String(value || '').trim().toLowerCase();
-    return MARKETEL_ACQUISITION_ANGLES.includes(angle) ? angle : 'direct';
-}
-
 function marketelAttributionTouchFromMetadata(metadata, preferLatest = false) {
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
     const attribution = metadata.attribution && typeof metadata.attribution === 'object'
@@ -11118,12 +11134,11 @@ function marketelAttributionTouchFromMetadata(metadata, preferLatest = false) {
     return {};
 }
 
-function marketelAttributionDimensions(touch, fallbackAngle = 'direct') {
+function marketelAttributionDimensions(touch) {
     const clean = sanitizeMarketelAttributionTouch(touch);
     let source = String(clean.utm_source || '').trim().toLowerCase();
     if (!source && /facebook|instagram|meta/i.test(clean.referrer || '')) source = 'meta';
     return {
-        angle: normalizedMarketelAngle(clean.angle || fallbackAngle),
         source: source || 'unknown',
         medium: String(clean.utm_medium || '').trim().toLowerCase() || 'unknown',
         campaign: String(clean.utm_campaign || '').trim() || 'unlabeled',
@@ -11139,9 +11154,9 @@ function emptyMarketelAttributionGroup(dimensions) {
         started: 0,
         leads: 0,
         setupCompleted: 0,
+        revealStarted: 0,
         offerViewed: 0,
         checkoutStarted: 0,
-        mismatchContinued: 0,
         trialsStarted: 0,
         trialAppsOpened: 0,
         trialLinksPlaced: 0,
@@ -11158,6 +11173,15 @@ function finalizeMarketelAttributionGroup(group) {
     return {
         ...group,
         revenue: Math.round(Number(group.revenue || 0) * 100) / 100,
+        visitToLeadRate: group.landingViews
+            ? Math.round((group.leads / group.landingViews) * 10000) / 100
+            : 0,
+        leadToTrialRate: group.leads
+            ? Math.round((group.trialsStarted / group.leads) * 10000) / 100
+            : 0,
+        trialToPaidRate: group.trialsStarted
+            ? Math.round((group.paid / group.trialsStarted) * 10000) / 100
+            : 0,
         startToPaidRate: group.started
             ? Math.round((group.paid / group.started) * 10000) / 100
             : 0,
@@ -11168,9 +11192,9 @@ function addMarketelAttributionProperty(group, property) {
     group.started += 1;
     if (property.milestones.has('Lead')) group.leads += 1;
     if (property.milestones.has('SetupCompleted')) group.setupCompleted += 1;
+    if (property.milestones.has('ValueRevealStarted')) group.revealStarted += 1;
     if (property.milestones.has('ActivationOfferViewed')) group.offerViewed += 1;
     if (property.milestones.has('CheckoutStarted')) group.checkoutStarted += 1;
-    if (property.milestones.has('FitMismatchContinued')) group.mismatchContinued += 1;
     if (property.milestones.has('TrialStarted')) group.trialsStarted += 1;
     if (property.milestones.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
     if (property.milestones.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;
@@ -11218,7 +11242,7 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         if (!acquisitionByHotel.has(row.hotelId)) acquisitionByHotel.set(row.hotelId, row);
     });
     const hotelIds = Array.from(acquisitionByHotel.keys());
-    const [milestoneRows, journeyFallbackRows, demandFitRows] = hotelIds.length
+    const [milestoneRows, journeyFallbackRows] = hotelIds.length
         ? await Promise.all([
             withRetry(() => prisma.funnelEvent.findMany({
                 where: {
@@ -11247,17 +11271,8 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
                 orderBy: { createdAt: 'asc' },
                 select: { hotelId: true, metadata: true },
             })),
-            withRetry(() => prisma.funnelEvent.findMany({
-                where: {
-                    hotelId: { in: hotelIds },
-                    eventName: 'QualityAnswer',
-                    createdAt: { lte: until },
-                },
-                orderBy: { createdAt: 'desc' },
-                select: { hotelId: true, contentName: true },
-            })),
         ])
-        : [[], [], []];
+        : [[], []];
 
     const fallbackTouchByHotel = new Map();
     journeyFallbackRows.forEach((row) => {
@@ -11265,21 +11280,13 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         const touch = marketelAttributionTouchFromMetadata(row.metadata);
         if (Object.keys(touch).length) fallbackTouchByHotel.set(row.hotelId, touch);
     });
-    const demandFitByHotel = new Map();
-    demandFitRows.forEach((row) => {
-        if (!demandFitByHotel.has(row.hotelId)) {
-            demandFitByHotel.set(row.hotelId, normalizeMarketelDemandFit(row.contentName));
-        }
-    });
-
     const properties = new Map();
     acquisitionByHotel.forEach((row, hotelId) => {
         const storedTouch = marketelAttributionTouchFromMetadata(row.metadata);
         const touch = Object.keys(storedTouch).length ? storedTouch : (fallbackTouchByHotel.get(hotelId) || {});
         properties.set(hotelId, {
             hotelId,
-            dimensions: marketelAttributionDimensions(touch, row.contentName),
-            demandFit: demandFitByHotel.get(hotelId) || 'not_answered',
+            dimensions: marketelAttributionDimensions(touch),
             milestones: new Set(),
             paymentEventIds: new Set(),
             revenue: 0,
@@ -11298,56 +11305,41 @@ async function buildMarketelFunnelAttribution(since, until, exclusions = { hotel
         }
     });
 
-    const angleGroups = new Map(MARKETEL_ACQUISITION_ANGLES.map((angle) => [
-        angle,
-        emptyMarketelAttributionGroup({ angle }),
-    ]));
-    const demandFitGroups = new Map([
-        ...MARKETEL_DEMAND_FIT_TYPES,
-        'not_answered',
-    ].map((demandFit) => [
-        demandFit,
-        emptyMarketelAttributionGroup({ demandFit }),
-    ]));
+    const overall = emptyMarketelAttributionGroup({ site: 'bookmarketel.com' });
     const campaignGroups = new Map();
     const campaignGroup = (dimensions) => {
-        const key = [dimensions.angle, dimensions.source, dimensions.medium, dimensions.campaign, dimensions.content, dimensions.term].join('\u001f');
+        const key = [dimensions.source, dimensions.medium, dimensions.campaign, dimensions.content, dimensions.term].join('\u001f');
         if (!campaignGroups.has(key)) campaignGroups.set(key, emptyMarketelAttributionGroup(dimensions));
         return campaignGroups.get(key);
     };
 
     properties.forEach((property) => {
-        addMarketelAttributionProperty(angleGroups.get(property.dimensions.angle), property);
-        addMarketelAttributionProperty(demandFitGroups.get(property.demandFit), property);
+        addMarketelAttributionProperty(overall, property);
         addMarketelAttributionProperty(campaignGroup(property.dimensions), property);
     });
 
-    // Landing views are authoritative at the angle level. New milestone rows
-    // also carry the sanitized UTM touch, so campaign-level visits can be
-    // compared with server-owned starts and Stripe-confirmed paid outcomes.
+    // Landing views are authoritative for bookmarketel.com. UTM touches keep
+    // campaign-level visits comparable with server-owned starts and
+    // Stripe-confirmed paid outcomes without splitting the product by pitch.
     const seenLanding = new Set();
     landingRows.forEach((row) => {
         const identity = row.sessionId || row.eventId || row.id;
         if (seenLanding.has(identity)) return;
         seenLanding.add(identity);
-        const angle = normalizedMarketelAngle(row.contentName);
-        angleGroups.get(angle).landingViews += 1;
+        overall.landingViews += 1;
         const touch = marketelAttributionTouchFromMetadata(row.metadata);
         if (Object.keys(touch).length) {
-            campaignGroup(marketelAttributionDimensions(touch, angle)).landingViews += 1;
+            campaignGroup(marketelAttributionDimensions(touch)).landingViews += 1;
         }
     });
 
-    const byAngle = MARKETEL_ACQUISITION_ANGLES.map((angle) => finalizeMarketelAttributionGroup(angleGroups.get(angle)));
-    const byDemandFit = Array.from(demandFitGroups.values()).map(finalizeMarketelAttributionGroup);
     const byCampaign = Array.from(campaignGroups.values())
         .map(finalizeMarketelAttributionGroup)
         .sort((left, right) => right.paid - left.paid || right.started - left.started || left.campaign.localeCompare(right.campaign));
     return {
         model: 'first-touch acquisition cohort',
         range: { from: since.toISOString(), to: until.toISOString() },
-        byAngle,
-        byDemandFit,
+        overall: finalizeMarketelAttributionGroup(overall),
         byCampaign,
     };
 }
@@ -11371,21 +11363,17 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
             since.setHours(0, 0, 0, 0);
         }
 
-        // Filter by source: 'onboarding' shows marketel funnel, default shows booking engine
-        const source = req.query.source || 'all';
-        const where = { createdAt: { gte: since, lte: until } };
-        if (source === 'onboarding') {
-            where.eventName = { in: MARKETEL_ONBOARDING_EVENT_NAMES };
-        } else if (source === 'bookings') {
-            where.eventName = { notIn: MARKETEL_ONBOARDING_EVENT_NAMES };
-        }
+        const where = {
+            createdAt: { gte: since, lte: until },
+            eventName: { in: MARKETEL_FUNNEL_DASHBOARD_EVENT_NAMES },
+        };
 
         const exclusions = await funnelDashboardExclusions();
         const visibleWhere = funnelDashboardWhere(where, exclusions);
         const requestedLimit = parseInt(req.query.limit, 10);
         const eventLimit = Number.isFinite(requestedLimit)
             ? Math.max(100, Math.min(5000, requestedLimit))
-            : (source === 'onboarding' ? 2000 : 500);
+            : 2000;
         const events = await withRetry(() => prisma.funnelEvent.findMany({
             where: visibleWhere,
             orderBy: { createdAt: 'desc' },
@@ -11421,9 +11409,7 @@ app.get('/api/funnel', adminAuth, async (req, res) => {
             external_id: e.externalId,
         }));
 
-        const attribution = source === 'bookings'
-            ? null
-            : await buildMarketelFunnelAttribution(since, until, exclusions);
+        const attribution = await buildMarketelFunnelAttribution(since, until, exclusions);
         res.json({ counts, recent, attribution });
     } catch (e) {
         console.error('Funnel API error:', e.message);

@@ -64,9 +64,11 @@ test('interaction telemetry is blocked before it can write to Neon', () => {
 
 test('the dashboard presents the compact commercial path', () => {
     assert.match(dashboard, /Email leads/);
+    assert.match(dashboard, /Reveal opened/);
+    assert.match(dashboard, /Checkout started/);
     assert.doesNotMatch(dashboard, /<div class="stat-label">Qualified leads/);
-    assert.match(dashboard, /Saw Guestel/);
-    assert.match(dashboard, /Saw Front Desk/);
+    assert.doesNotMatch(dashboard, /Saw booking page|Saw Guestel|Saw Front Desk|Activation clicks/);
+    assert.doesNotMatch(dashboard, /source=onboarding/);
     assert.doesNotMatch(dashboard, /Where the reveal loses people|REVEAL_WALK|renderBeatFunnel/);
 });
 
@@ -294,17 +296,27 @@ test('QA properties and their sessions never inflate the business dashboard', ()
     assert.match(portfolio, /hotelId: \{ notIn: exclusions\.hotelIds \}/);
 });
 
-test('funnel dashboard attributes each ad angle and UTM through paid activation', () => {
+test('funnel dashboard has one BookMarketel path with UTM attribution through paid activation', () => {
     assert.match(server, /async function buildMarketelFunnelAttribution/);
     assert.match(server, /eventName: 'AcquisitionAngle'/);
     assert.match(server, /'PaymentSucceeded'/);
+    assert.match(server, /site: 'bookmarketel\.com'/);
+    assert.match(server, /overall: finalizeMarketelAttributionGroup\(overall\)/);
+    assert.match(server, /MARKETEL_FUNNEL_DASHBOARD_EVENT_NAMES/);
     assert.match(server, /utm_campaign/);
     assert.match(server, /utm_content/);
-    assert.match(server, /startToPaidRate/);
-    assert.match(dashboard, /Which ads become subscribers/);
+    assert.match(server, /visitToLeadRate/);
+    assert.match(server, /leadToTrialRate/);
+    assert.match(server, /trialToPaidRate/);
+    assert.doesNotMatch(server, /const MARKETEL_ACQUISITION_ANGLES/);
+    assert.match(dashboard, /BookMarketel conversion path/);
+    assert.match(dashboard, /All acquisition traffic/);
+    assert.doesNotMatch(dashboard, /ATTRIBUTION_ANGLE_LABELS|Demand fit/);
     assert.match(dashboard, /Campaign and creative/);
     assert.match(dashboard, /row\.paid/);
     assert.match(dashboard, /row\.revenue/);
+    assert.doesNotMatch(marketelReport, /by acquisition angle|by demand already present/);
+    assert.match(marketelReport, /complete funnel:/);
 });
 
 test('purging activity is confirmed, scoped, and never touches business records', () => {

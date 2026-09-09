@@ -831,24 +831,16 @@
       <div class="stat-value" id="stat-step4">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Saw booking page</div>
-      <div class="stat-value" id="stat-booking-reveal">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Saw Guestel</div>
-      <div class="stat-value" id="stat-app-reveal">0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Saw Front Desk</div>
-      <div class="stat-value" id="stat-assistant-reveal">0</div>
+      <div class="stat-label">Reveal opened</div>
+      <div class="stat-value" id="stat-reveal">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Saw trial offer</div>
       <div class="stat-value" id="stat-offer-reveal">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Activation clicks</div>
-      <div class="stat-value" id="stat-cta">0</div>
+      <div class="stat-label">Checkout started</div>
+      <div class="stat-value" id="stat-checkout">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Trials started</div>
@@ -878,8 +870,8 @@
 
   <div class="panel">
     <div class="panel-head">
-      <h2>Which ads become subscribers</h2>
-      <span class="panel-note">First-touch properties started in the selected dates</span>
+      <h2>BookMarketel conversion path</h2>
+      <span class="panel-note">One first-touch funnel from visit to Stripe-confirmed revenue</span>
     </div>
     <div id="attributionTable"><div class="loading">Loading attribution…</div></div>
     <div class="panel-hint">Use a unique <b>utm_campaign</b> for the campaign and <b>utm_content</b> for each creative. Paid and revenue come from Stripe-confirmed activations, not browser guesses.</div>
@@ -950,11 +942,8 @@
   <button class="filter-btn" data-filter="LandingPageView" onclick="setFilter('LandingPageView')">Landing</button>
   <button class="filter-btn" data-filter="Lead" onclick="setFilter('Lead')">Email lead</button>
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
-  <button class="filter-btn" data-filter="BookingEngineRevealViewed" onclick="setFilter('BookingEngineRevealViewed')">Booking Reveal</button>
-  <button class="filter-btn" data-filter="GuestAppRevealViewed" onclick="setFilter('GuestAppRevealViewed')">Guestel</button>
-  <button class="filter-btn" data-filter="AssistantRevealViewed" onclick="setFilter('AssistantRevealViewed')">Front Desk</button>
+  <button class="filter-btn" data-filter="ValueRevealStarted" onclick="setFilter('ValueRevealStarted')">Reveal</button>
   <button class="filter-btn" data-filter="ActivationOfferViewed" onclick="setFilter('ActivationOfferViewed')">Offer</button>
-  <button class="filter-btn" data-filter="GoLiveClicked" onclick="setFilter('GoLiveClicked')">Activation</button>
   <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
   <button class="filter-btn" data-filter="TrialStarted" onclick="setFilter('TrialStarted')">Trial</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
@@ -1617,11 +1606,9 @@ function renderEvents() {
   document.getElementById('stat-landing').textContent = allCounts.LandingPageView || 0;
   document.getElementById('stat-leads').textContent = allCounts.Lead || 0;
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
-  document.getElementById('stat-booking-reveal').textContent = allCounts.BookingEngineRevealViewed || 0;
-  document.getElementById('stat-app-reveal').textContent = allCounts.GuestAppRevealViewed || 0;
-  document.getElementById('stat-assistant-reveal').textContent = allCounts.AssistantRevealViewed || 0;
+  document.getElementById('stat-reveal').textContent = allCounts.ValueRevealStarted || 0;
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
-  document.getElementById('stat-cta').textContent = allCounts.GoLiveClicked || 0;
+  document.getElementById('stat-checkout').textContent = allCounts.CheckoutStarted || 0;
   document.getElementById('stat-trials').textContent = allCounts.TrialStarted || 0;
   document.getElementById('stat-trial-app').textContent = allCounts.TrialNativeAppActivated || 0;
   document.getElementById('stat-trial-link').textContent = allCounts.TrialLinkPlacementConfirmed || 0;
@@ -1670,87 +1657,49 @@ function renderEvents() {
   }).join('');
 }
 
-const ATTRIBUTION_ANGLE_LABELS = {
-  direct: 'Direct booking',
-  guest_app: 'Guestel / home screen',
-  assistant: 'Front Desk Assistant',
-};
-const DEMAND_FIT_LABELS = {
-  ota_leakage: 'Existing guests finish on OTAs',
-  direct_guest_relationships: 'Callers, walk-ins and past guests',
-  existing_online_demand: 'Existing online traffic (legacy)',
-  new_traveler_demand: 'Expects new traveler demand',
-  pms_channel_sync: 'Expects PMS / OTA synchronization',
-  not_answered: 'Question not answered',
-};
-
 function attributionMoney(value) {
   return '$' + Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
-function attributionTable(rows, includeCampaign) {
+function attributionTable(rows, campaignRows) {
   if (!rows.length) return '<div class="portfolio-empty">No attributed traffic in this range yet.</div>';
   return `<div class="portfolio-scroll"><table class="portfolio-table attribution-table"><thead><tr>
-    <th>${includeCampaign ? 'Campaign / creative' : 'Ad angle'}</th>
+    <th>${campaignRows ? 'Campaign / creative' : 'Source'}</th>
     <th style="text-align:right">Visits</th>
-    <th style="text-align:right">Started</th>
     <th style="text-align:right">Leads</th>
     <th style="text-align:right">Setup</th>
+    <th style="text-align:right">Reveal</th>
+    <th style="text-align:right">Offer</th>
     <th style="text-align:right">Checkout</th>
     <th style="text-align:right">Trial</th>
     <th style="text-align:right">Paid</th>
-    <th style="text-align:right">Start → paid</th>
+    <th style="text-align:right">Visit → lead</th>
+    <th style="text-align:right">Lead → trial</th>
+    <th style="text-align:right">Trial → paid</th>
     <th style="text-align:right">Cash</th>
   </tr></thead><tbody>${rows.map((row) => {
-    const title = includeCampaign
+    const title = campaignRows
       ? `${row.campaign || 'unlabeled'} · ${row.content || 'unlabeled'}`
-      : (ATTRIBUTION_ANGLE_LABELS[row.angle] || row.angle || 'Unknown');
-    const sub = includeCampaign
-      ? `${ATTRIBUTION_ANGLE_LABELS[row.angle] || row.angle} · ${row.source || 'unknown'} / ${row.medium || 'unknown'}`
-      : `?angle=${row.angle}`;
+      : 'bookmarketel.com';
+    const sub = campaignRows
+      ? `${row.source || 'unknown'} / ${row.medium || 'unknown'}`
+      : 'All acquisition traffic';
     return `<tr>
       <td><span class="attribution-name">${escapeHtml(title)}</span><span class="attribution-sub">${escapeHtml(sub)}</span></td>
       <td class="num">${Number(row.landingViews || 0)}</td>
-      <td class="num">${Number(row.started || 0)}</td>
       <td class="num">${Number(row.leads || 0)}</td>
       <td class="num">${Number(row.setupCompleted || 0)}</td>
+      <td class="num">${Number(row.revealStarted || 0)}</td>
+      <td class="num">${Number(row.offerViewed || 0)}</td>
       <td class="num">${Number(row.checkoutStarted || 0)}</td>
       <td class="num">${Number(row.trialsStarted || 0)}</td>
       <td class="num">${Number(row.paid || 0)}</td>
-      <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
+      <td class="num attribution-rate">${Number(row.visitToLeadRate || 0).toFixed(2)}%</td>
+      <td class="num attribution-rate">${Number(row.leadToTrialRate || 0).toFixed(2)}%</td>
+      <td class="num attribution-rate">${Number(row.trialToPaidRate || 0).toFixed(2)}%</td>
       <td class="num">${attributionMoney(row.revenue)}</td>
     </tr>`;
   }).join('')}</tbody></table></div>`;
-}
-
-function demandFitTable(rows) {
-  const visible = rows.filter((row) => row.started || row.paid);
-  if (!visible.length) return '<div class="portfolio-empty">No demand-fit answers in this range yet.</div>';
-  return `<div class="portfolio-scroll"><table class="portfolio-table attribution-table"><thead><tr>
-    <th>Demand already present</th>
-    <th style="text-align:right">Properties</th>
-    <th style="text-align:right">Leads</th>
-    <th style="text-align:right">Setup</th>
-    <th style="text-align:right">Offer</th>
-    <th style="text-align:right">Continued anyway</th>
-    <th style="text-align:right">Checkout</th>
-    <th style="text-align:right">Trial</th>
-    <th style="text-align:right">Paid</th>
-    <th style="text-align:right">Start → paid</th>
-    <th style="text-align:right">Cash</th>
-  </tr></thead><tbody>${visible.map((row) => `<tr>
-    <td><span class="attribution-name">${escapeHtml(DEMAND_FIT_LABELS[row.demandFit] || row.demandFit || 'Unknown')}</span></td>
-    <td class="num">${Number(row.started || 0)}</td>
-    <td class="num">${Number(row.leads || 0)}</td>
-    <td class="num">${Number(row.setupCompleted || 0)}</td>
-    <td class="num">${Number(row.offerViewed || 0)}</td>
-    <td class="num">${Number(row.mismatchContinued || 0)}</td>
-    <td class="num">${Number(row.checkoutStarted || 0)}</td>
-    <td class="num">${Number(row.trialsStarted || 0)}</td>
-    <td class="num">${Number(row.paid || 0)}</td>
-    <td class="num attribution-rate">${Number(row.startToPaidRate || 0).toFixed(2)}%</td>
-    <td class="num">${attributionMoney(row.revenue)}</td>
-  </tr>`).join('')}</tbody></table></div>`;
 }
 
 function renderAttribution(attribution) {
@@ -1760,12 +1709,8 @@ function renderAttribution(attribution) {
     host.innerHTML = '<div class="portfolio-empty">Attribution is unavailable for this range.</div>';
     return;
   }
-  const angleRows = attribution.byAngle || [];
-  const demandFitRows = attribution.byDemandFit || [];
   const campaignRows = (attribution.byCampaign || []).filter((row) => row.landingViews || row.started || row.paid);
-  host.innerHTML = attributionTable(angleRows, false)
-    + '<div class="attribution-section-title">Demand fit</div>'
-    + demandFitTable(demandFitRows)
+  host.innerHTML = attributionTable(attribution.overall ? [attribution.overall] : [], false)
     + '<div class="attribution-section-title">Campaign and creative</div>'
     + attributionTable(campaignRows, true);
 }
@@ -2074,7 +2019,7 @@ async function loadEvents() {
   const from = fmtDate(calStart);
   const to = fmtDate(calEnd);
   try {
-    const res = await adminFetch('/api/funnel?from=' + from + '&to=' + to + '&source=onboarding');
+    const res = await adminFetch('/api/funnel?from=' + from + '&to=' + to);
     if (!res.ok) throw new Error('Failed to load');
     const data = await res.json();
     allEvents = data.recent || [];

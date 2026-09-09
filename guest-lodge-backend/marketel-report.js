@@ -14,37 +14,6 @@ const QA_HOTEL_IDS = [
 const QA_OWNER_EMAILS = [
   'bro2theno@gmail.com',
 ];
-const ANGLES = ['direct', 'guest_app', 'assistant'];
-const DEMAND_FITS = [
-  'ota_leakage',
-  'direct_guest_relationships',
-  'existing_online_demand',
-  'new_traveler_demand',
-  'pms_channel_sync',
-  'not_answered',
-];
-const DEMAND_FIT_ALIASES = {
-  online_ota_leakage: 'ota_leakage',
-  ota_marketplaces: 'ota_leakage',
-  branded_ota_leakage: 'ota_leakage',
-  existing_online_traffic: 'existing_online_demand',
-  google_website: 'existing_online_demand',
-  social_ads: 'existing_online_demand',
-  direct_calls_messages: 'direct_guest_relationships',
-  repeat_guests: 'direct_guest_relationships',
-  repeat_guest_leakage: 'direct_guest_relationships',
-  building_demand: 'new_traveler_demand',
-  referrals_offline: 'new_traveler_demand',
-  low_online_demand: 'new_traveler_demand',
-};
-const DEMAND_FIT_LABELS = {
-  ota_leakage: 'existing guests finish on OTAs',
-  direct_guest_relationships: 'callers, walk-ins and past guests',
-  existing_online_demand: 'existing online traffic (legacy)',
-  new_traveler_demand: 'expects new traveler demand',
-  pms_channel_sync: 'expects PMS / OTA synchronization',
-  not_answered: 'question not answered',
-};
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
 const TOKEN = process.env.MARKETEL_META_ADS_READ_TOKEN || process.env.MARKETEL_META_ACCESS_TOKEN;
 const ACCOUNT_ID = String(process.env.MARKETEL_META_AD_ACCOUNT_ID || '').replace(/^act_/, '');
@@ -62,19 +31,6 @@ function money(value) {
 
 function pct(numerator, denominator) {
   return denominator ? `${(100 * numerator / denominator).toFixed(1)}%` : '—';
-}
-
-function normalizeAngle(value) {
-  const angle = String(value || '').trim().toLowerCase();
-  return ANGLES.includes(angle) ? angle : 'direct';
-}
-
-function normalizeDemandFit(value) {
-  const clean = String(value || '').trim().toLowerCase();
-  const normalized = DEMAND_FIT_ALIASES[clean] || clean;
-  return DEMAND_FITS.includes(normalized) && normalized !== 'not_answered'
-    ? normalized
-    : 'not_answered';
 }
 
 function actionValue(actions, preferredTypes) {
@@ -230,10 +186,9 @@ function attributionTouch(metadata) {
   return attribution.firstTouch || attribution.latestTouch || {};
 }
 
-function dimensions(metadata, fallbackAngle) {
+function dimensions(metadata) {
   const touch = attributionTouch(metadata);
   return {
-    angle: normalizeAngle(touch.angle || fallbackAngle),
     source: String(touch.utm_source || 'unknown').trim().toLowerCase() || 'unknown',
     campaign: String(touch.utm_campaign || 'unlabeled').trim() || 'unlabeled',
     content: String(touch.utm_content || 'unlabeled').trim() || 'unlabeled',
@@ -246,13 +201,10 @@ function emptyGroup(label) {
     landingViews: 0,
     started: 0,
     leads: 0,
-    qualified: 0,
     completed: 0,
     revealEntered: 0,
-    revealEngaged: 0,
     offerViewed: 0,
     checkoutStarted: 0,
-    mismatchContinued: 0,
     trialsStarted: 0,
     trialAppsOpened: 0,
     trialLinksPlaced: 0,
@@ -267,13 +219,10 @@ function emptyGroup(label) {
 function addProperty(group, property) {
   group.started += 1;
   if (property.events.has('Lead')) group.leads += 1;
-  if (property.events.has('QualifiedLead')) group.qualified += 1;
   if (property.events.has('SetupCompleted')) group.completed += 1;
   if (property.events.has('ValueRevealStarted')) group.revealEntered += 1;
-  if (property.events.has('JourneyRevealStageCompleted')) group.revealEngaged += 1;
   if (property.events.has('ActivationOfferViewed')) group.offerViewed += 1;
   if (property.events.has('CheckoutStarted')) group.checkoutStarted += 1;
-  if (property.events.has('FitMismatchContinued')) group.mismatchContinued += 1;
   if (property.events.has('TrialStarted')) group.trialsStarted += 1;
   if (property.events.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
   if (property.events.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;
@@ -347,8 +296,7 @@ async function dbSection() {
   for (const [hotelId, event] of acquisition) {
     properties.set(hotelId, {
       hotelId,
-      dimensions: dimensions(event.metadata, event.contentName),
-      demandFit: 'not_answered',
+      dimensions: dimensions(event.metadata),
       events: new Set(),
       paymentIds: new Set(),
       revenue: 0,
@@ -358,9 +306,6 @@ async function dbSection() {
     const property = properties.get(event.hotelId);
     if (!property) continue;
     property.events.add(event.eventName);
-    if (event.eventName === 'QualityAnswer') {
-      property.demandFit = normalizeDemandFit(event.contentName);
-    }
     if (event.eventName === 'PaymentSucceeded') {
       const paymentId = event.eventId || event.id;
       if (!property.paymentIds.has(paymentId)) {
@@ -370,19 +315,17 @@ async function dbSection() {
     }
   }
 
-  const angleGroups = new Map(ANGLES.map((angle) => [angle, emptyGroup(angle)]));
-  const demandFitGroups = new Map(DEMAND_FITS.map((fit) => [fit, emptyGroup(DEMAND_FIT_LABELS[fit])]));
+  const overall = emptyGroup('bookmarketel.com');
   const campaignGroups = new Map();
   const getCampaignGroup = (d) => {
-    const key = `${d.angle}\u001f${d.source}\u001f${d.campaign}\u001f${d.content}`;
+    const key = `${d.source}\u001f${d.campaign}\u001f${d.content}`;
     if (!campaignGroups.has(key)) {
-      campaignGroups.set(key, emptyGroup(`${d.angle} | ${d.source} | ${d.campaign} | ${d.content}`));
+      campaignGroups.set(key, emptyGroup(`${d.source} | ${d.campaign} | ${d.content}`));
     }
     return campaignGroups.get(key);
   };
   for (const property of properties.values()) {
-    addProperty(angleGroups.get(property.dimensions.angle), property);
-    addProperty(demandFitGroups.get(property.demandFit), property);
+    addProperty(overall, property);
     addProperty(getCampaignGroup(property.dimensions), property);
   }
 
@@ -392,8 +335,8 @@ async function dbSection() {
     const identity = event.sessionId || event.eventId || event.id;
     if (seenLandings.has(identity)) continue;
     seenLandings.add(identity);
-    const d = dimensions(event.metadata, event.contentName);
-    angleGroups.get(d.angle).landingViews += 1;
+    const d = dimensions(event.metadata);
+    overall.landingViews += 1;
     if (Object.keys(attributionTouch(event.metadata)).length) getCampaignGroup(d).landingViews += 1;
   }
 
@@ -421,22 +364,17 @@ async function dbSection() {
 
   const renderGroup = (group) =>
     `  ${group.label.padEnd(44).slice(0, 44)} ` +
-    `${String(group.landingViews).padStart(3)} land | ${String(group.started).padStart(3)} start | ` +
-    `${String(group.leads).padStart(3)} Lead | ${String(group.qualified).padStart(3)} qual | ` +
+    `${String(group.landingViews).padStart(3)} land | ${String(group.leads).padStart(3)} Lead | ` +
     `${String(group.completed).padStart(3)} setup | ` +
-    `${String(group.revealEntered).padStart(3)} reveal | ${String(group.revealEngaged).padStart(3)} engaged | ` +
-    `${String(group.offerViewed).padStart(3)} offer | ${String(group.mismatchContinued).padStart(3)} override | ` +
+    `${String(group.revealEntered).padStart(3)} reveal | ${String(group.offerViewed).padStart(3)} offer | ` +
     `${String(group.checkoutStarted).padStart(3)} checkout | ` +
     `${String(group.trialsStarted).padStart(3)} trial | ${String(group.trialsConverted).padStart(3)} convert | ` +
     `${String(group.paid).padStart(3)} paid | ${money(group.revenue)}`;
 
   const out = [
-    `DB FUNNEL — rolling ${DAYS}d, first-touch cohorts (QA sessions excluded)`,
-    '  by acquisition angle:',
-    ...ANGLES.map((angle) => renderGroup(angleGroups.get(angle))),
-    '',
-    '  by demand already present:',
-    ...DEMAND_FITS.map((fit) => renderGroup(demandFitGroups.get(fit))),
+    `DB FUNNEL — rolling ${DAYS}d, bookmarketel.com first-touch cohorts (QA sessions excluded)`,
+    '  complete funnel:',
+    renderGroup(overall),
   ];
   const nonemptyCampaigns = [...campaignGroups.values()]
     .filter((group) => group.landingViews || group.started)
@@ -448,8 +386,7 @@ async function dbSection() {
     '',
     `  cash collected during window: ${money(cashCollected)} (${seenPayments.size} Stripe-confirmed payment${seenPayments.size === 1 ? '' : 's'})`,
     `  currently paid non-QA accounts: ${activeAccounts} | currently trialing: ${trialingAccounts}`,
-    `  trial launch milestones: ${events.filter((e) => e.eventName === 'TrialNativeAppActivated').length} app opened | ${events.filter((e) => e.eventName === 'TrialLinkPlacementConfirmed').length} link placed (self-reported) | ${events.filter((e) => e.eventName === 'TrialFirstBookingReceived').length} first booking`,
-    '  Note: “engaged” means at least one reveal-stage completion, not the raw number of carousel events.'
+    `  trial launch milestones: ${events.filter((e) => e.eventName === 'TrialNativeAppActivated').length} app opened | ${events.filter((e) => e.eventName === 'TrialLinkPlacementConfirmed').length} link placed (self-reported) | ${events.filter((e) => e.eventName === 'TrialFirstBookingReceived').length} first booking`
   );
   return out.join('\n');
 }
