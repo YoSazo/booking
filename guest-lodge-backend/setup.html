@@ -43,6 +43,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: var(--r); padding: 24px; box-shadow: var(--shadow-md); margin-bottom: 12px;
 }
 .form-card h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.setup-step-label {
+  margin-bottom: 9px; color: var(--green); font-size: 11px; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
 .setup-intro { margin: -8px 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .setup-footnote { margin: 12px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; text-align: center; }
 .field { margin-bottom: 14px; }
@@ -76,6 +80,10 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .btn-primary { background: var(--green); color: white; }
 .btn-primary:hover { background: var(--green-dark); }
+.btn-back {
+  margin-top: 8px; background: transparent; color: var(--muted); font-size: 13px;
+}
+.btn-back:hover { color: var(--text); background: #f5f7f6; }
 /* Final ready card */
 .final-card { text-align: center; padding: 32px 24px; overflow: hidden; }
 .final-panel { display: block; }
@@ -169,15 +177,27 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
     <div class="setup-title">Set up your booking page</div>
   </div>
 
-  <!-- One useful decision screen: only what the personalized page needs. -->
+  <!-- One easy first commitment: name the asset being built. -->
   <div class="step active" id="step-1">
     <div class="form-card fade-stagger">
-      <h2>Build your booking page</h2>
-      <p class="setup-intro">Three details. We&apos;ll create your live preview immediately.</p>
+      <div class="setup-step-label">Step 1 of 2</div>
+      <h2>What&apos;s your property called?</h2>
+      <p class="setup-intro">This is the name guests will see on your booking page.</p>
       <div class="field">
         <label for="hotelName">Property name</label>
         <input type="text" id="hotelName" placeholder="e.g. Sunset Inn" autocomplete="organization">
       </div>
+      <button class="btn btn-primary" data-journey="setup-continue-to-room" onclick="savePropertyAndContinue()">Continue &rarr;</button>
+      <p class="setup-footnote">We&apos;ll save your progress as you go.</p>
+    </div>
+  </div>
+
+  <!-- The only related room details needed for a believable preview. -->
+  <div class="step" id="step-2">
+    <div class="form-card fade-stagger">
+      <div class="setup-step-label">Step 2 of 2</div>
+      <h2>Add your first room</h2>
+      <p class="setup-intro">Just enough to make your booking page feel real. You can change everything later.</p>
       <div class="field">
         <label for="rmName">First room or unit</label>
         <input type="text" id="rmName" placeholder="e.g. King Suite" autocomplete="off">
@@ -196,12 +216,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
       </div>
       <input type="hidden" id="rmUnits" value="1">
       <button class="btn btn-primary" data-journey="setup-build-booking-page" onclick="addRoomAndFinish()">Build My Booking Page &rarr;</button>
+      <button class="btn btn-back" type="button" onclick="goToStep(1)">&larr; Back</button>
       <p class="setup-footnote">You can add more photos, rooms, taxes, and policies after your preview opens.</p>
     </div>
   </div>
 
-  <!-- STEP 2: Build and automatically hand off to the personalized reveal. -->
-  <div class="step" id="step-2">
+  <!-- STEP 3: Build and automatically hand off to the personalized reveal. -->
+  <div class="step" id="step-3">
     <div class="form-card final-card">
       <div class="final-panel fade-stagger" id="finalPreparingPanel">
         <div class="final-logo-wrap"><div class="logo-sprite-bounce"></div></div>
@@ -249,13 +270,15 @@ let setupStepStartedAt = Date.now();
 let setupCompleteData = null;
 let setupBuildInFlight = false;
 let handoffStarted = false;
+let propertySavePromise = null;
+let propertySaveName = '';
 
 window.MarketelJourney?.init({
   surface: 'setup',
   setupToken: TOKEN,
   context: { acquisitionAngle: ACQUISITION_ANGLE },
 });
-window.MarketelJourney?.track('JourneySetupStepViewed', { step: 1, stepName: 'booking-page-essentials' });
+window.MarketelJourney?.track('JourneySetupStepViewed', { step: 1, stepName: 'property-name' });
 function journeyLinkage() {
   return window.MarketelJourney?.linkage?.() || {};
 }
@@ -453,7 +476,7 @@ function bindPhotoPicker() {
 }
 
 function goToStep(n) {
-  const nextStepName = { 1: 'booking-page-essentials', 2: 'building' }[n] || 'unknown';
+  const nextStepName = { 1: 'property-name', 2: 'first-room', 3: 'building' }[n] || 'unknown';
   window.MarketelJourney?.track('JourneySetupNavigation', {
     fromStep: currentSetupStep,
     toStep: n,
@@ -468,10 +491,61 @@ function goToStep(n) {
   document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
   const nextStep = document.getElementById('step-' + n);
   nextStep.classList.add('active');
-  if (n === 2) updateFinalStepState(true);
+  if (n === 3) updateFinalStepState(true);
   else animateVisibleStep(nextStep);
   window.scrollTo(0, 0);
   window.MarketelJourney?.track('JourneySetupStepViewed', { step: n, stepName: nextStepName });
+}
+
+function beginPropertySave(propertyName) {
+  const precedingSave = propertySavePromise;
+  propertySaveName = propertyName;
+  const requestStartedAt = Date.now();
+  // Serialize edits so a slower first request can never overwrite a newer name
+  // after someone taps Back and changes it. This queue does not block the UI.
+  const request = (precedingSave ? precedingSave.catch(() => null) : Promise.resolve())
+    .then(() => fetch(API + '/api/setup/' + TOKEN + '/hotel', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: propertyName }),
+    }))
+    .then(async (response) => {
+      if (!response.ok) throw new Error('Could not save property');
+      hotelData = { ...hotelData, name: propertyName };
+      window.MarketelJourney?.track('JourneyRequestCompleted', {
+        request: 'save-property-name',
+      }, { durationMs: Date.now() - requestStartedAt });
+      return response;
+    });
+  propertySavePromise = request;
+  // The room step should appear instantly. Keep a rejection handler attached
+  // now, then surface the failure if the owner taps Build.
+  request.catch(() => {
+    if (propertySavePromise === request) {
+      propertySavePromise = null;
+      propertySaveName = '';
+    }
+    window.MarketelJourney?.track('JourneyRequestFailed', {
+      request: 'save-property-name',
+      reason: 'request-failed',
+    }, { durationMs: Date.now() - requestStartedAt });
+  });
+  return request;
+}
+
+function savePropertyAndContinue() {
+  const propertyName = document.getElementById('hotelName').value.trim();
+  if (!propertyName) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'property-name', field: 'property-name', reason: 'empty' });
+    showToast('Enter your property name', true);
+    return;
+  }
+  window.MarketelJourney?.track('JourneySetupStepCompleted', {
+    step: 1,
+    stepName: 'property-name',
+    propertyNameLength: propertyName.length,
+  }, { durationMs: Date.now() - setupStepStartedAt });
+  beginPropertySave(propertyName);
+  goToStep(2);
 }
 
 // Load existing data
@@ -515,12 +589,22 @@ async function loadSetup() {
         bookingUrl: data.domain ? 'https://' + data.domain : '',
         frontdeskReturnToken: data.frontdeskReturnToken || '',
       }, data.domain || '');
-      if (currentSetupStep !== 2) goToStep(2);
+      if (currentSetupStep !== 3) goToStep(3);
       window.MarketelJourney?.track('JourneySetupResumed', {
-        step: 2,
+        step: 3,
         setupComplete: true,
       });
       window.setTimeout(() => handoffToReveal('resume'), 120);
+    } else if (hotelData.name) {
+      // A recovery link should honor the first completed micro-commitment
+      // instead of making the owner re-enter their property name.
+      propertySaveName = hotelData.name;
+      propertySavePromise = Promise.resolve({ ok: true });
+      if (currentSetupStep !== 2) goToStep(2);
+      window.MarketelJourney?.track('JourneySetupResumed', {
+        step: 2,
+        setupComplete: false,
+      });
     }
   } catch (e) {
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'load-setup', reason: 'network-or-parse' }, { durationMs: Date.now() - requestStartedAt });
@@ -528,8 +612,9 @@ async function loadSetup() {
   }
 }
 
-// Save the only three inputs needed for a believable preview. Property, room,
-// and rate are independent writes, so one tap starts all three together.
+// Save the related room details needed for a believable preview. The property
+// name was already started in the background on step one; Build awaits it while
+// room, rate, photo, and completion work continue in parallel.
 async function addRoomAndFinish() {
   if (setupBuildInFlight) return;
   const propertyName = document.getElementById('hotelName').value.trim();
@@ -537,7 +622,8 @@ async function addRoomAndFinish() {
   const totalUnits = Math.max(1, parseInt(document.getElementById('rmUnits').value, 10) || 1);
   const nightlyInput = parseFloat(document.getElementById('rmNightly').value);
   if (!propertyName) {
-    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'booking-page-essentials', field: 'property-name', reason: 'empty' });
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'property-name', field: 'property-name', reason: 'empty' });
+    goToStep(1);
     showToast('Enter your property name', true);
     return;
   }
@@ -556,7 +642,9 @@ async function addRoomAndFinish() {
   // Move immediately. The owner sees one short build state while all network
   // work completes, then lands directly on the personalized reveal.
   setupBuildInFlight = true;
-  goToStep(2);
+  const buildingTitle = document.querySelector('#finalPreparingPanel h2');
+  if (buildingTitle && propertyName) buildingTitle.textContent = `Building Marketel for ${propertyName}`;
+  goToStep(3);
   const buildStartedAt = Date.now();
   window.MarketelJourney?.track('JourneyRequestStarted', {
     request: 'build-marketel',
@@ -568,10 +656,9 @@ async function addRoomAndFinish() {
   });
   try {
     const existingRates = hotelData.rates || {};
-    const hotelRequest = fetch(API + '/api/setup/' + TOKEN + '/hotel', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: propertyName }),
-    });
+    const hotelRequest = propertySavePromise && propertySaveName === propertyName
+      ? propertySavePromise
+      : beginPropertySave(propertyName);
     const roomRequest = fetch(API + '/api/setup/' + TOKEN + '/rooms', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: rooms[0]?.id, name: roomName, maxOccupancy: 4, totalUnits }),
@@ -649,8 +736,8 @@ async function addRoomAndFinish() {
     window._siteReady = true;
     updateFinalStepState(true);
     window.MarketelJourney?.track('JourneySetupStepCompleted', {
-      step: 1,
-      stepName: 'booking-page-essentials',
+      step: 2,
+      stepName: 'first-room',
       propertyNameLength: propertyName.length,
       roomNameLength: roomName.length,
       totalUnits,
@@ -668,8 +755,8 @@ async function addRoomAndFinish() {
   } catch (e) {
     setupBuildInFlight = false;
     window.MarketelJourney?.track('JourneyRequestFailed', { request: 'build-marketel', reason: 'request-failed' }, { durationMs: Date.now() - buildStartedAt });
-    // Keep all three inputs populated so one tap can retry.
-    if (currentSetupStep === 2) goToStep(1);
+    // Keep all room inputs populated so one tap can retry.
+    if (currentSetupStep === 3) goToStep(2);
     showToast('We couldn’t finish building your page. Try again.', true);
   }
 }
@@ -712,7 +799,7 @@ function setSuccessLinkLoading(isLoading, label) {
 }
 
 bindPhotoPicker();
-loadSetup().finally(() => animateVisibleStep(document.getElementById('step-1')));
+loadSetup().finally(() => animateVisibleStep(document.querySelector('.step.active')));
 </script>
 <script src="/marketel-telemetry.js"></script>
 </body>

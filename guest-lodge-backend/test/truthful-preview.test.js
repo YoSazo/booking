@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const backend = path.resolve(__dirname, '..');
 const repo = path.resolve(backend, '..');
@@ -39,12 +40,17 @@ test('self-serve setup does not silently invent discounts or tax', () => {
     assert.doesNotMatch(setupRatesRoute, /taxRate: taxRate \|\| 0\.10/);
 });
 
-test('room setup advances immediately to ready while the property builds in the background', () => {
+test('property setup uses two small decisions and advances immediately while the page builds', () => {
+    assert.match(setup, /Step 1 of 2[\s\S]*What&apos;s your property called\?/);
+    assert.match(setup, /Step 2 of 2[\s\S]*Add your first room/);
+    assert.match(setup, /function savePropertyAndContinue\(\)/);
+    assert.match(setup, /beginPropertySave\(propertyName\);\s*goToStep\(2\);/);
+
     const roomStep = setup.slice(
         setup.indexOf('async function addRoomAndFinish'),
         setup.indexOf('window._siteReady = false')
     );
-    assert.match(roomStep, /setupBuildInFlight = true;\s*goToStep\(2\);/);
+    assert.match(roomStep, /setupBuildInFlight = true;[\s\S]*goToStep\(3\);/);
     assert.match(roomStep, /Promise\.all\(\[hotelRequest, roomRequest, ratesRequest\]\)/);
     assert.doesNotMatch(roomStep, /showLoading\(/);
     assert.match(roomStep, /handoffToReveal\('automatic'\)/);
@@ -55,6 +61,19 @@ test('room setup advances immediately to ready while the property builds in the 
     );
     assert.match(completeRoute, /setupProgressStep: \{ lt: 4 \}/);
     assert.doesNotMatch(completeRoute, /setupComplete: true, active: true, setupProgressStep: 4/);
+});
+
+test('every inline setup script parses before a prospect can reach it', () => {
+    const inlineScripts = [...setup.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
+        .map((match) => match[1].trim())
+        .filter(Boolean);
+    assert.ok(inlineScripts.length >= 2);
+    inlineScripts.forEach((source, index) => {
+        assert.doesNotThrow(
+            () => new vm.Script(source, { filename: `setup-inline-${index + 1}.js` }),
+            `setup inline script ${index + 1} contains a syntax error`
+        );
+    });
 });
 
 test('setup defers qualification and extended configuration while keeping one photo optional', () => {
