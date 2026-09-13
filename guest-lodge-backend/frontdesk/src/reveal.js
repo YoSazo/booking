@@ -716,12 +716,17 @@ function activationHubCtaHtml() {
   const trialAvailable = trialOfferAvailable();
   const title = isSubscribed
     ? 'Open Marketel Front Desk'
-    : trialAvailable ? `Start your ${trialDays()}-day free trial` : 'Activate Marketel';
+    : trialAvailable ? 'Get started' : 'Activate Marketel';
+  // The trial CTA carries no subtitle. "Free trial" and "cancel anytime" both
+  // announce that a card is about to be asked for, and this dock is the step
+  // losing two thirds of the owners who reach it. Nothing is hidden by moving
+  // them: the offer sheet still discloses the card, the price and the renewal
+  // date before any billing information is collected.
   const body = isSubscribed
     ? 'Your complete system is live.'
-    : trialAvailable ? '$0 today. Everything unlocked. Cancel anytime.' : '$199/month. Cancel anytime.';
+    : trialAvailable ? '' : '$199/month. Cancel anytime.';
   return `<button type="button" class="mvr-hub-trial-cta" data-hub-item="activation">
-    <span><strong>${esc(title)}</strong><small>${esc(body)}</small></span>
+    <span><strong>${esc(title)}</strong>${body ? `<small>${esc(body)}</small>` : ''}</span>
     <b aria-hidden="true">→</b>
   </button>`;
 }
