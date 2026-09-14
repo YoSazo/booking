@@ -109,6 +109,13 @@ test('trial terms are explicit before Stripe and existing trial users do not get
   assert.match(server, /subscriptions\.cancel\(subscriptionId\)/);
 });
 
+test('subscribed activation replay previews the current trial without reopening checkout', () => {
+  assert.match(reveal, /return activationPreviewMode \|\| \(!crm\.hotelSubscribed && crm\.marketelTrialEligible !== false\);/);
+  assert.match(reveal, /if \(activationPreviewMode && crm\.hotelSubscribed\) \{[\s\S]*?is already active/);
+  assert.match(reveal, /const trialAvailable = trialOfferAvailable\(\);[\s\S]*?trialAvailable \? 'Get started'/);
+  assert.match(reveal, /const hasTrial = trialOfferAvailable\(\);[\s\S]*?\$0 <b>today<\/b>/);
+});
+
 test('expired properties stop new Guestel bookings without erasing stays or messages', () => {
   assert.match(hotelSheet, /private var acceptsBookings: Bool \{ hotelData\?\.subscribed != false \}/);
   assert.match(hotelSheet, /Your saved stays and messages remain here/);

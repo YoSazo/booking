@@ -581,7 +581,10 @@ function bindAppCarousels() {
 }
 
 function trialOfferAvailable() {
-  return !crm.hotelSubscribed && crm.marketelTrialEligible !== false;
+  // A subscribed owner's activation replay should show the same offer a new
+  // prospect sees. Preview mode never opens checkout (activateMarketel guards
+  // it), and the server remains authoritative about real trial eligibility.
+  return activationPreviewMode || (!crm.hotelSubscribed && crm.marketelTrialEligible !== false);
 }
 
 function trialDays() {
