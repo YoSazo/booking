@@ -9,6 +9,11 @@ app, but keep it unadvertised and `noindex` until approval.
 - Create a private Cloudflare R2 bucket used only by Inspect. Public development
   URLs and anonymous object reads must be disabled. Set `INSPECT_R2_BUCKET`; it
   must not equal the booking-photo `R2_BUCKET`.
+- Create an Object Read & Write R2 token scoped to that bucket and set
+  `INSPECT_R2_ACCESS_KEY_ID` and `INSPECT_R2_SECRET_ACCESS_KEY`. Set
+  `INSPECT_R2_ENDPOINT` when it differs from the booking-photo account endpoint.
+  Inspect falls back to the shared `R2_*` values only when dedicated values are
+  absent.
 - Set a distinct random `INSPECT_AUTH_SECRET` of at least 32 characters and keep
   it stable; it also keys the non-readable lifetime-free-report claim.
 - Confirm `support@bookmarketel.com` is an authenticated sender for email codes.

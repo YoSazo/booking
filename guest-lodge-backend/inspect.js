@@ -68,9 +68,12 @@ function entitlement(account, now = Date.now()) {
 /** Sync env checks for /api/admin/launch-readiness. Critical only when Inspect is enabled. */
 function inspectEnvReadiness(env = process.env) {
   const clean = name => String(env[name] || '').trim();
+  const usable = (value, minimumLength = 1) => {
+    const normalized = String(value || '').trim();
+    return normalized.length >= minimumLength && !/replace|example|your[-_]?|paste[_-]?me/i.test(normalized);
+  };
   const present = (name, minimumLength = 1) => {
-    const value = clean(name);
-    return value.length >= minimumLength && !/replace|example|your[-_]?|paste[_-]?me/i.test(value);
+    return usable(clean(name), minimumLength);
   };
   const item = (id, label, ok, action, critical) => ({ id, label, ok: !!ok, action, critical: !!critical });
   const enabled = clean('INSPECT_ENABLED') === 'true';
@@ -79,7 +82,10 @@ function inspectEnvReadiness(env = process.env) {
   const inspectBucket = clean('INSPECT_R2_BUCKET');
   const bookingBucket = clean('R2_BUCKET') || 'marketel-uploads';
   const privateBucketOk = !!inspectBucket && present('INSPECT_R2_BUCKET') && inspectBucket !== bookingBucket;
-  const storageCredsOk = ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].every(name => present(name));
+  const inspectEndpoint = clean('INSPECT_R2_ENDPOINT') || clean('R2_ENDPOINT');
+  const inspectAccessKey = clean('INSPECT_R2_ACCESS_KEY_ID') || clean('R2_ACCESS_KEY_ID');
+  const inspectSecretKey = clean('INSPECT_R2_SECRET_ACCESS_KEY') || clean('R2_SECRET_ACCESS_KEY');
+  const storageCredsOk = [inspectEndpoint, inspectAccessKey, inspectSecretKey].every(value => usable(value));
   const stripeKey = clean('STRIPE_INSPECT_SECRET_KEY') || clean('STRIPE_MARKETEL_SECRET_KEY');
   const stripeKeyOk = stripeKey.startsWith('sk_');
   const priceIdOk = present('STRIPE_INSPECT_PRICE_ID') && clean('STRIPE_INSPECT_PRICE_ID').startsWith('price_');
@@ -93,7 +99,7 @@ function inspectEnvReadiness(env = process.env) {
         ? 'INSPECT_ENABLED=true (product is live for App Review / internal QA).'
         : 'INSPECT_ENABLED is false; leave it off until R2, Stripe, and migration are ready.', false),
       item('inspect-auth-secret', 'Inspect auth secret', authOk, 'Set a distinct 32+ character INSPECT_AUTH_SECRET and keep it stable.', requireWhenEnabled),
-      item('inspect-private-bucket', 'Inspect private R2 bucket', privateBucketOk && storageCredsOk, 'Create a private INSPECT_R2_BUCKET that differs from R2_BUCKET and share the existing R2 credentials.', requireWhenEnabled),
+      item('inspect-private-bucket', 'Inspect private R2 bucket', privateBucketOk && storageCredsOk, 'Create a private INSPECT_R2_BUCKET that differs from R2_BUCKET and give INSPECT_R2_* credentials read/write access to it.', requireWhenEnabled),
       item('inspect-stripe-price', 'Inspect $29/mo Stripe price id', priceIdOk, 'Create a USD 29 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
       item('inspect-stripe-webhook', 'Inspect Stripe webhook secret', webhookOk, 'Point a webhook at /api/inspect-stripe-webhook and set STRIPE_INSPECT_WEBHOOK_SECRET.', requireWhenEnabled),
       item('inspect-stripe-portal', 'Inspect billing portal configuration', portalOk, 'Create a Customer Portal config and set STRIPE_INSPECT_PORTAL_CONFIGURATION_ID.', requireWhenEnabled),
@@ -110,12 +116,15 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
   const bucket = env.INSPECT_R2_BUCKET;
   const origin = env.INSPECT_PUBLIC_ORIGIN || 'https://bookmarketel.com';
   const secret = env.INSPECT_AUTH_SECRET;
+  const r2Endpoint = env.INSPECT_R2_ENDPOINT || env.R2_ENDPOINT;
+  const r2AccessKeyId = env.INSPECT_R2_ACCESS_KEY_ID || env.R2_ACCESS_KEY_ID;
+  const r2SecretAccessKey = env.INSPECT_R2_SECRET_ACCESS_KEY || env.R2_SECRET_ACCESS_KEY;
   const storageConfigured = !!bucket && bucket !== (env.R2_BUCKET || 'marketel-uploads')
-    && !!env.R2_ENDPOINT && !!env.R2_ACCESS_KEY_ID && !!env.R2_SECRET_ACCESS_KEY;
+    && !!r2Endpoint && !!r2AccessKeyId && !!r2SecretAccessKey;
   const launchConfigured = !!mail && !!stripe
     && readiness.checks.filter(check => check.critical).every(check => check.ok);
-  const s3 = new S3Client({ region: 'auto', endpoint: env.R2_ENDPOINT,
-    credentials: { accessKeyId: env.R2_ACCESS_KEY_ID || '', secretAccessKey: env.R2_SECRET_ACCESS_KEY || '' } });
+  const s3 = new S3Client({ region: 'auto', endpoint: r2Endpoint,
+    credentials: { accessKeyId: r2AccessKeyId || '', secretAccessKey: r2SecretAccessKey || '' } });
   const guarded = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
   const codeHash = (email, code) => crypto.createHmac('sha256', secret).update(`inspect:${email}:${code}`).digest('hex');
   const freeClaimHash = email => crypto.createHmac('sha256', secret).update(`inspect-free:${email}`).digest('hex');
@@ -357,8 +366,13 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
     const originalKey = `${key}/original`; const objectKey = `${key}/display.jpg`;
     // Queue first, then remove only after ownership is durably committed.
     await prisma.inspectGarbage.createMany({ data: [{ objectKey }, { objectKey: originalKey }] });
-    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: req.file.buffer, ContentType: 'application/octet-stream' }));
-    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: objectKey, Body: bytes, ContentType: 'image/jpeg' }));
+    try {
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: originalKey, Body: req.file.buffer, ContentType: 'application/octet-stream' }));
+      await s3.send(new PutObjectCommand({ Bucket: bucket, Key: objectKey, Body: bytes, ContentType: 'image/jpeg' }));
+    } catch (error) {
+      console.error('Inspect photo storage failed:', error.name, error.$metadata?.httpStatusCode || 'unknown');
+      throw fail(503, 'Photo storage is temporarily unavailable. Your report and photo remain on this device; try again shortly.');
+    }
     const attachment = await prisma.$transaction(async tx => {
       await lockAccount(tx, req.inspect.id);
       const current = await owned(tx, req.inspect.id, report.id); mutable(current);

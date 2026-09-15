@@ -44,6 +44,7 @@ async function run(fn) {
 }
 function modal(content) { $('dialog-body').innerHTML = content; if (!$('dialog').open) $('dialog').showModal(); }
 $('dialog-close').onclick = () => $('dialog').close();
+function setActiveNav(page) { document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page)); }
 function updateHeader() { $('account-button').textContent = account ? 'Account' : 'Sign in'; $('nav').hidden = !draft && !account;const current=$('current-report');if(current){const unfinished=draft&&!draft.finalizedAt;current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'Current report':'+ New report';} }
 function photoURL(id) {
   if (urls.has(id)) return urls.get(id);
@@ -64,6 +65,7 @@ async function start(propertyName = '') {
 }
 function editor() {
   if (!draft) return landing(); updateHeader();
+  setActiveNav('current');
   const d = draft.document;
   if (preview || draft.finalizedAt) return reportPreview();
   $('app').innerHTML = `<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>What did you observe?</h1></div><span class="status">${draft.serverId ? 'Draft · save changes online' : 'Draft stored on this device'}</span></div><p class="muted">Add photos and your own observations. Preview first; no account needed yet.</p><section class="card grid"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label>Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div id="rooms">${d.rooms.map((r,i) => `<section class="card" data-room="${i}"><div class="row spread"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><button class="quiet danger" data-remove-room="${i}">Remove room</button></div><div class="row"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div><div class="photo-grid">${r.photos.map((id,p) => `<figure><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><div class="photo-actions"><button class="quiet" data-move="${i},${p},-1" aria-label="Move photo earlier">←</button><button class="quiet" data-delete="${i},${p}" aria-label="Remove photo">Remove</button><button class="quiet" data-move="${i},${p},1" aria-label="Move photo later">→</button></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed. Use your keyboard microphone to dictate.">${esc(r.observation)}</textarea></label><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="quiet" data-ai="${i}">Help word this clearly</button></section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
@@ -129,7 +131,7 @@ async function save() {
   await api(`/reports/${draft.serverId}`,{method:'PUT',body:doc});await persist();
 }
 function reportPreview(){
-  updateHeader();const d=draft.document;
+  updateHeader();setActiveNav('current');const d=draft.document;
   $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${d.rooms.map(r=>`<section><h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article><div class="actions row">${draft.finalizedAt?'<button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button><button id="revoke" class="quiet">Revoke link</button>':'<button id="finalize">Save & export my report →</button>'}</div><p class="muted">${draft.finalizedAt?'This version cannot change. Create a new report for corrections.':'Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.'}</p>`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   if($('finalize'))$('finalize').onclick=()=>ensureAuth(()=>run(async()=>{
@@ -166,7 +168,7 @@ async function offer(){
 function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openBrowser',url});else location.assign(url);}
 async function list(page='reports',append=false){
   if(!account)return ensureAuth(()=>run(()=>list(page)));
-  updateHeader();
+  updateHeader();setActiveNav(page);
   if(page==='properties'){
     const names=(await api('/properties')).properties;
     $('app').innerHTML=`<h1>Properties</h1><p class="muted">Properties appear here when you save a report. No booking setup required.</p>${names.map((n,i)=>`<section class="card row spread"><strong>${esc(n)}</strong><button class="secondary" data-property="${i}">New report</button></section>`).join('')}`;
@@ -202,7 +204,18 @@ $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();loc
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
 window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
+function showNativeKeyboardDoneButton(){
+  if(!native)return;
+  let attempts=0;
+  const show=()=>{
+    attempts+=1;
+    const keyboard=window.Capacitor?.Plugins?.Keyboard;
+    if(typeof keyboard?.setAccessoryBarVisible==='function')return Promise.resolve(keyboard.setAccessoryBarVisible({isVisible:true})).catch(()=>{});
+    if(attempts<8)setTimeout(show,attempts*100);
+  };
+  show();
+}
 window.addEventListener('pagehide',()=>remember());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session)run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh();});});
-if(native){localStorage.setItem('marketel.product','inspect');window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'visibility',visible:false});window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
+if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'visibility',visible:false});window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 try{draft=await stored('get');await refresh();if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}

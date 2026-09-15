@@ -98,6 +98,28 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
   });
   assert.equal(ready.checks.every(c => c.ok), true);
   assert.equal(ready.checks.find(c => c.id === 'inspect-price-validation').ok, true);
+
+  const dedicatedStorage = inspectEnvReadiness({
+    INSPECT_ENABLED: 'true',
+    INSPECT_AUTH_SECRET: 'a'.repeat(32),
+    INSPECT_R2_BUCKET: 'marketel-inspect-private',
+    R2_BUCKET: 'marketel-uploads',
+    INSPECT_R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+    INSPECT_R2_ACCESS_KEY_ID: 'inspect-key',
+    INSPECT_R2_SECRET_ACCESS_KEY: 'inspect-secret',
+    STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
+    STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
+    STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
+    STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_inspect',
+  });
+  assert.equal(dedicatedStorage.checks.find(c => c.id === 'inspect-private-bucket').ok, true);
+  assert.equal(dedicatedStorage.checks.find(c => c.id === 'inspect-enabled-flag').ok, true);
+});
+
+test('Inspect photo uploads preserve the local-work recovery message when storage fails', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  assert.match(source, /Inspect photo storage failed:/);
+  assert.match(source, /Your report and photo remain on this device; try again shortly\./);
 });
 
 test('Inspect API is dark behind its flag and requires a bearer session', async () => {
