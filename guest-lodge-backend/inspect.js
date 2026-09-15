@@ -65,6 +65,44 @@ function entitlement(account, now = Date.now()) {
     periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true, price: 29, limits: LIMITS };
 }
 
+/** Sync env checks for /api/admin/launch-readiness. Critical only when Inspect is enabled. */
+function inspectEnvReadiness(env = process.env) {
+  const clean = name => String(env[name] || '').trim();
+  const present = (name, minimumLength = 1) => {
+    const value = clean(name);
+    return value.length >= minimumLength && !/replace|example|your[-_]?/i.test(value);
+  };
+  const item = (id, label, ok, action, critical) => ({ id, label, ok: !!ok, action, critical: !!critical });
+  const enabled = clean('INSPECT_ENABLED') === 'true';
+  const requireWhenEnabled = enabled;
+  const authOk = present('INSPECT_AUTH_SECRET', 32);
+  const inspectBucket = clean('INSPECT_R2_BUCKET');
+  const bookingBucket = clean('R2_BUCKET') || 'marketel-uploads';
+  const privateBucketOk = !!inspectBucket && present('INSPECT_R2_BUCKET') && inspectBucket !== bookingBucket;
+  const storageCredsOk = ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].every(name => present(name));
+  const stripeKey = clean('STRIPE_INSPECT_SECRET_KEY') || clean('STRIPE_MARKETEL_SECRET_KEY');
+  const stripeKeyOk = stripeKey.startsWith('sk_');
+  const priceIdOk = present('STRIPE_INSPECT_PRICE_ID');
+  const webhookOk = clean('STRIPE_INSPECT_WEBHOOK_SECRET').startsWith('whsec_');
+  const portalOk = present('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID');
+  const priceValidationReady = stripeKeyOk && priceIdOk;
+  return {
+    enabled,
+    checks: [
+      item('inspect-enabled', 'Inspect product flag', true, enabled
+        ? 'INSPECT_ENABLED=true (product is live for App Review / internal QA).'
+        : 'INSPECT_ENABLED is false; leave it off until R2, Stripe, and migration are ready.', false),
+      item('inspect-auth-secret', 'Inspect auth secret', authOk, 'Set a distinct 32+ character INSPECT_AUTH_SECRET and keep it stable.', requireWhenEnabled),
+      item('inspect-private-bucket', 'Inspect private R2 bucket', privateBucketOk && storageCredsOk, 'Create a private INSPECT_R2_BUCKET that differs from R2_BUCKET and share the existing R2 credentials.', requireWhenEnabled),
+      item('inspect-stripe-price', 'Inspect $29/mo Stripe price id', priceIdOk, 'Create a USD 29 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
+      item('inspect-stripe-webhook', 'Inspect Stripe webhook secret', webhookOk, 'Point a webhook at /api/inspect-stripe-webhook and set STRIPE_INSPECT_WEBHOOK_SECRET.', requireWhenEnabled),
+      item('inspect-stripe-portal', 'Inspect billing portal configuration', portalOk, 'Create a Customer Portal config and set STRIPE_INSPECT_PORTAL_CONFIGURATION_ID.', requireWhenEnabled),
+      item('inspect-price-validation', 'Inspect Stripe price can be retrieved', priceValidationReady, 'Set STRIPE_INSPECT_SECRET_KEY or reuse STRIPE_MARKETEL_SECRET_KEY with STRIPE_INSPECT_PRICE_ID so checkout can validate USD 29/mo.', requireWhenEnabled),
+      item('inspect-enabled-flag', 'Inspect enabled only when configured', !enabled || (authOk && privateBucketOk && storageCredsOk && priceIdOk && webhookOk && portalOk && priceValidationReady), 'Do not set INSPECT_ENABLED=true until the Inspect auth, R2, and Stripe values above are present.', true),
+    ],
+  };
+}
+
 function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
   const enabled = env.INSPECT_ENABLED === 'true';
   const router = express.Router();
@@ -541,4 +579,14 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
   return { sweep, close: () => clearInterval(timer) };
 }
 
-module.exports = { registerInspect, validateDocument, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, LIMITS, hash };
+module.exports = {
+  registerInspect,
+  validateDocument,
+  validateInspectPrice,
+  shouldIgnoreSubscription,
+  startsNewPaidPeriod,
+  entitlement,
+  inspectEnvReadiness,
+  LIMITS,
+  hash,
+};

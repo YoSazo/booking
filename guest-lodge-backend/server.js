@@ -12781,6 +12781,7 @@ function productionLaunchReadiness() {
         item('assistant-intelligence', 'Front Desk Assistant language model', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY.', false),
         item('meta-attribution', 'Meta Pixel/CAPI attribution', ENABLE_META_CAPI && present('MARKETEL_META_PIXEL_ID') && present('MARKETEL_META_ACCESS_TOKEN'), 'Enable Meta CAPI and set the Marketel Pixel and CAPI credentials.'),
         item('meta-test-mode-disabled', 'Meta production events are not in Test Events mode', !MARKETEL_META_TEST_EVENT_CODE, 'Remove MARKETEL_META_TEST_EVENT_CODE before paid traffic.'),
+        ...require('./inspect').inspectEnvReadiness(process.env).checks,
     ];
     const critical = checks.filter(check => check.critical);
     return {
@@ -12794,6 +12795,7 @@ function productionLaunchReadiness() {
             'Upload privacy-safe App Store screenshots and complete privacy/export declarations.',
             'Run the signed build on a real iPhone over Wi-Fi and cellular, then test TestFlight.',
             'Smoke monthly and annual live Checkout, guest $1 authorization, webhook activation, email, SMS, and push before ads.',
+            'Before enabling Inspect: private R2 bucket, Stripe $29 price/webhook/portal, migrate 20260915000000_inspect, then set INSPECT_ENABLED=true for App Review only.',
         ],
     };
 }

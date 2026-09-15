@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
-const { registerInspect, validateDocument, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, LIMITS, hash } = require('../inspect');
+const { registerInspect, validateDocument, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, inspectEnvReadiness, LIMITS, hash } = require('../inspect');
 
 const validDocument = () => ({
   propertyName: 'Oak Street · Unit 2',
@@ -61,6 +61,34 @@ async function request(app, path) {
     await new Promise(resolve => server.close(resolve));
   }
 }
+
+test('Inspect launch-readiness stays non-blocking while disabled and blocks when enabled without infra', () => {
+  const dark = inspectEnvReadiness({ INSPECT_ENABLED: 'false' });
+  assert.equal(dark.enabled, false);
+  assert.equal(dark.checks.find(c => c.id === 'inspect-enabled-flag').ok, true);
+  assert.equal(dark.checks.find(c => c.id === 'inspect-auth-secret').critical, false);
+
+  const incomplete = inspectEnvReadiness({ INSPECT_ENABLED: 'true' });
+  assert.equal(incomplete.enabled, true);
+  assert.equal(incomplete.checks.find(c => c.id === 'inspect-enabled-flag').ok, false);
+  assert.equal(incomplete.checks.find(c => c.id === 'inspect-auth-secret').critical, true);
+
+  const ready = inspectEnvReadiness({
+    INSPECT_ENABLED: 'true',
+    INSPECT_AUTH_SECRET: 'a'.repeat(32),
+    INSPECT_R2_BUCKET: 'marketel-inspect-private',
+    R2_BUCKET: 'marketel-uploads',
+    R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+    R2_ACCESS_KEY_ID: 'key',
+    R2_SECRET_ACCESS_KEY: 'secret',
+    STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
+    STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
+    STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
+    STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_inspect',
+  });
+  assert.equal(ready.checks.every(c => c.ok), true);
+  assert.equal(ready.checks.find(c => c.id === 'inspect-price-validation').ok, true);
+});
 
 test('Inspect API is dark behind its flag and requires a bearer session', async () => {
   const off = express();
