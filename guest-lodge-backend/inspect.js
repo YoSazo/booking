@@ -70,7 +70,7 @@ function inspectEnvReadiness(env = process.env) {
   const clean = name => String(env[name] || '').trim();
   const present = (name, minimumLength = 1) => {
     const value = clean(name);
-    return value.length >= minimumLength && !/replace|example|your[-_]?/i.test(value);
+    return value.length >= minimumLength && !/replace|example|your[-_]?|paste[_-]?me/i.test(value);
   };
   const item = (id, label, ok, action, critical) => ({ id, label, ok: !!ok, action, critical: !!critical });
   const enabled = clean('INSPECT_ENABLED') === 'true';
@@ -82,9 +82,9 @@ function inspectEnvReadiness(env = process.env) {
   const storageCredsOk = ['R2_ENDPOINT', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'].every(name => present(name));
   const stripeKey = clean('STRIPE_INSPECT_SECRET_KEY') || clean('STRIPE_MARKETEL_SECRET_KEY');
   const stripeKeyOk = stripeKey.startsWith('sk_');
-  const priceIdOk = present('STRIPE_INSPECT_PRICE_ID');
-  const webhookOk = clean('STRIPE_INSPECT_WEBHOOK_SECRET').startsWith('whsec_');
-  const portalOk = present('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID');
+  const priceIdOk = present('STRIPE_INSPECT_PRICE_ID') && clean('STRIPE_INSPECT_PRICE_ID').startsWith('price_');
+  const webhookOk = present('STRIPE_INSPECT_WEBHOOK_SECRET') && clean('STRIPE_INSPECT_WEBHOOK_SECRET').startsWith('whsec_');
+  const portalOk = present('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID') && clean('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID').startsWith('bpc_');
   const priceValidationReady = stripeKeyOk && priceIdOk;
   return {
     enabled,
@@ -105,15 +105,15 @@ function inspectEnvReadiness(env = process.env) {
 
 function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
   const enabled = env.INSPECT_ENABLED === 'true';
+  const readiness = inspectEnvReadiness(env);
   const router = express.Router();
   const bucket = env.INSPECT_R2_BUCKET;
   const origin = env.INSPECT_PUBLIC_ORIGIN || 'https://bookmarketel.com';
   const secret = env.INSPECT_AUTH_SECRET;
   const storageConfigured = !!bucket && bucket !== (env.R2_BUCKET || 'marketel-uploads')
     && !!env.R2_ENDPOINT && !!env.R2_ACCESS_KEY_ID && !!env.R2_SECRET_ACCESS_KEY;
-  const launchConfigured = !!secret && secret.length >= 32 && storageConfigured && !!mail && !!stripe
-    && !!env.STRIPE_INSPECT_PRICE_ID && !!env.STRIPE_INSPECT_WEBHOOK_SECRET
-    && !!env.STRIPE_INSPECT_PORTAL_CONFIGURATION_ID;
+  const launchConfigured = !!mail && !!stripe
+    && readiness.checks.filter(check => check.critical).every(check => check.ok);
   const s3 = new S3Client({ region: 'auto', endpoint: env.R2_ENDPOINT,
     credentials: { accessKeyId: env.R2_ACCESS_KEY_ID || '', secretAccessKey: env.R2_SECRET_ACCESS_KEY || '' } });
   const guarded = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
@@ -186,7 +186,9 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
     const code = String(crypto.randomInt(100000, 1000000));
     await prisma.$transaction(async tx => {
       // A transaction-level advisory lock also covers the first request for a new email.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`inspect-code:${email}`}))`;
+      // Select a supported scalar alongside the lock. PostgreSQL declares
+      // pg_advisory_xact_lock as void, which Prisma cannot deserialize.
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`inspect-code:${email}`}))`;
       const existing = await tx.inspectChallenge.findUnique({ where: { email } });
       if (existing && Date.now() - existing.sentAt.getTime() < 60000) throw fail(429, 'Please wait a minute before requesting another code.');
       const data = { codeHash: codeHash(email, code), expiresAt: new Date(Date.now() + 600000), attempts: 0, sentAt: new Date() };

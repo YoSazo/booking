@@ -51,12 +51,12 @@ test('Inspect billing accepts only the promised price and ignores stale subscrip
   assert.equal(startsNewPaidPeriod({ ...active, subscriptionStatus: 'past_due' }, 'active', new Date('2026-09-01')), true);
 });
 
-async function request(app, path) {
+async function request(app, path, options) {
   const server = http.createServer(app);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try {
     const address = server.address();
-    return await fetch(`http://127.0.0.1:${address.port}${path}`);
+    return await fetch(`http://127.0.0.1:${address.port}${path}`, options);
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -72,6 +72,16 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
   assert.equal(incomplete.enabled, true);
   assert.equal(incomplete.checks.find(c => c.id === 'inspect-enabled-flag').ok, false);
   assert.equal(incomplete.checks.find(c => c.id === 'inspect-auth-secret').critical, true);
+
+  const placeholders = inspectEnvReadiness({
+    INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
+    INSPECT_R2_BUCKET: 'marketel-inspect-private', R2_BUCKET: 'marketel-uploads',
+    R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com', R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
+    STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel', STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
+    STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_PASTE_ME', STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_PASTE_ME',
+  });
+  assert.equal(placeholders.checks.find(c => c.id === 'inspect-stripe-webhook').ok, false);
+  assert.equal(placeholders.checks.find(c => c.id === 'inspect-stripe-portal').ok, false);
 
   const ready = inspectEnvReadiness({
     INSPECT_ENABLED: 'true',
@@ -105,8 +115,9 @@ test('Inspect API is dark behind its flag and requires a bearer session', async 
     stripe: {},
     env: {
       INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
-      INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://example.invalid',
+      INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
       R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
+      STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
       STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
       STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
     },
@@ -116,4 +127,43 @@ test('Inspect API is dark behind its flag and requires a bearer session', async 
   assert.deepEqual(await config.json(), { enabled: true, limits: { reports: 30, photos: 100 } });
   assert.equal((await request(on, '/api/inspect/account')).status, 401);
   onRegistration.close();
+});
+
+test('Inspect email-code requests acquire a Prisma-safe advisory lock', async () => {
+  let lockQuery = '';
+  let challengeCreated = false;
+  let emailSent = false;
+  const transaction = {
+    $queryRaw: async strings => { lockQuery = strings.join('?'); return [{ locked: 1 }]; },
+    inspectChallenge: {
+      findUnique: async () => null,
+      upsert: async () => { challengeCreated = true; },
+      deleteMany: async () => {},
+    },
+  };
+  const prisma = { $transaction: async callback => callback(transaction) };
+  const app = express();
+  app.use(express.json());
+  const registration = registerInspect(app, {
+    prisma,
+    mail: { sendMail: async () => { emailSent = true; } },
+    stripe: {},
+    env: {
+      INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
+      INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+      R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
+      STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
+      STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
+      STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
+    },
+  });
+  const response = await request(app, '/api/inspect/auth/request', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'owner@example.com' }),
+  });
+  assert.equal(response.status, 200);
+  assert.match(lockQuery, /SELECT 1 AS locked FROM pg_advisory_xact_lock/);
+  assert.equal(challengeCreated, true);
+  assert.equal(emailSent, true);
+  registration.close();
 });
