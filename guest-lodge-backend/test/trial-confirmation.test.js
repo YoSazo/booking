@@ -11,7 +11,7 @@ const statusFunction = source.slice(source.indexOf('async function loadMarketelT
 const summaryModule = import('../frontdesk/src/trial-summary.js');
 const trial = (overrides = {}) => ({
   hotelSubscribed: true, marketelSubscriptionStatus: 'trialing', marketelTrialDays: 14,
-  trialStatus: { trialing: true, endsAt: '2026-09-20T16:00:00Z', renewalAmountUsd: 199, billingInterval: 'month', daysLeft: 0 },
+  trialStatus: { trialing: true, endsAt: '2026-09-20T16:00:00Z', renewalAmountUsd: 149, billingInterval: 'month', daysLeft: 0 },
   ...overrides,
 });
 
@@ -19,9 +19,9 @@ test('renewal summary uses the selected annual charge and preserves zero remaini
   const {trialSummary} = await summaryModule;
   const state = trial();
   assert.equal(trialSummary(state).daysLeft, 0);
-  assert.match(trialSummary(state).billing, /\$199\/month/);
-  state.trialStatus.billingInterval = 'year'; state.trialStatus.renewalAmountUsd = 1990;
-  assert.match(trialSummary(state).billing, /\$1,990\/year/);
+  assert.match(trialSummary(state).billing, /\$149\/month/);
+  state.trialStatus.billingInterval = 'year'; state.trialStatus.renewalAmountUsd = 1490;
+  assert.match(trialSummary(state).billing, /\$1,490\/year/);
 });
 
 test('missing billing values never become a guessed price or a fresh trial date', async () => {
@@ -30,7 +30,7 @@ test('missing billing values never become a guessed price or a fresh trial date'
   assert.equal(summary.price, ''); assert.equal(summary.endLabel, '');
   assert.equal(summary.daysLeft, null);
   assert.match(summary.billing, /loading/);
-  assert.doesNotMatch(summary.billing, /\$199|Automatically renews/);
+  assert.doesNotMatch(summary.billing, /\$149|Automatically renews/);
 });
 
 test('activation exposes the booking domain and keeps annual fallback terms annual', () => {

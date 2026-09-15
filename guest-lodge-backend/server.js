@@ -7365,7 +7365,7 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
             });
         }
         // The activation screen is the first point where the owner has seen
-        // the complete product and the $199 offer. Send one standard server
+        // the complete product and the activation offer. Send one standard server
         // ViewContent event here; the individual reveal beats stay in our rich
         // first-party telemetry and do not muddy Meta's optimization signal.
         if (eventName === 'ActivationOfferViewed') {
@@ -7385,7 +7385,7 @@ app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
                     sourceUrl: meta.sourceUrl,
                     fbp: meta.fbp,
                     fbc: meta.fbc,
-                    value: 199,
+                    value: MARKETEL_MONTHLY_PRICE_USD,
                     currency: 'USD',
                     eventId: `marketel-offer.${hotelId}`,
                     contentName: 'Marketel activation offer',
@@ -12427,9 +12427,9 @@ app.delete('/api/setup/:token/rooms/:roomId/images/:imageId', async (req, res) =
 const marketelStripe = process.env.STRIPE_MARKETEL_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_MARKETEL_SECRET_KEY)
     : null;
-const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_Uls6PKBuIH3dFL';
-const MARKETEL_MONTHLY_PRICE_USD = 199;
-const MARKETEL_YEARLY_PRICE_USD = 1990;
+const MARKETEL_SUBSCRIPTION_PRODUCT_ID = process.env.STRIPE_MARKETEL_PRODUCT_ID || 'prod_VGGee14Dv0mdw5';
+const MARKETEL_MONTHLY_PRICE_USD = 149;
+const MARKETEL_YEARLY_PRICE_USD = 1490;
 const MARKETEL_BILLING_PLANS = Object.freeze({
     month: Object.freeze({
         interval: 'month',
@@ -12751,7 +12751,7 @@ function productionLaunchReadiness() {
         item('guest-stripe-live', 'Guest $1 verification billing', clean('STRIPE_SECRET_KEY').startsWith('sk_live_'), 'Replace STRIPE_SECRET_KEY with the live guest-booking key.'),
         item('guest-stripe-webhook', 'Guest Stripe recovery webhook', clean('STRIPE_WEBHOOK_SECRET').startsWith('whsec_'), 'Set the signing secret for /api/stripe-webhook.'),
         item('marketel-stripe-live', 'Marketel subscription billing', MARKETEL_STRIPE_KEY_MODE === 'live', 'Set STRIPE_MARKETEL_SECRET_KEY to the live Marketel key.'),
-        item('marketel-stripe-price', '$199 monthly Stripe object', present('STRIPE_MARKETEL_PRICE_ID') || present('STRIPE_MARKETEL_PRODUCT_ID'), 'Set STRIPE_MARKETEL_PRICE_ID or STRIPE_MARKETEL_PRODUCT_ID.'),
+        item('marketel-stripe-price', '$149 monthly Stripe object', present('STRIPE_MARKETEL_PRICE_ID') || present('STRIPE_MARKETEL_PRODUCT_ID'), 'Set STRIPE_MARKETEL_PRICE_ID or STRIPE_MARKETEL_PRODUCT_ID.'),
         item('marketel-stripe-webhook', 'Marketel subscription webhook', clean('STRIPE_MARKETEL_WEBHOOK_SECRET').startsWith('whsec_'), 'Set the signing secret for /api/marketel-stripe-webhook.'),
         item('test-billing-disabled', 'Launch billing is not in QA mode', !MARKETEL_ALLOW_TEST_BILLING, 'Remove MARKETEL_ALLOW_TEST_BILLING=true before ads.'),
         item('frontdesk-app-store', 'Front Desk App Store handoff', !!appStoreUrl, 'Set MARKETEL_FRONTDESK_APP_STORE_URL after Apple publishes the listing.'),
@@ -13147,7 +13147,7 @@ app.post('/api/admin/meta-capi/test', adminAuth, async (req, res) => {
             sourceUrl: meta.sourceUrl || `${req.protocol}://${req.get('host')}/funnel`,
             fbp: meta.fbp,
             fbc: meta.fbc,
-            value: eventName === 'StartTrial' ? 0 : 199,
+            value: eventName === 'StartTrial' ? 0 : MARKETEL_MONTHLY_PRICE_USD,
             currency: 'USD',
             eventId,
             contentName: 'Marketel CAPI delivery test',
@@ -15864,7 +15864,7 @@ async function recordMarketelPaymentSuccess({
     });
 
     // An invoice states exactly what was collected. Never fall back to the plan price
-    // from an invoice — a zero there means a trial invoice, not a $199 purchase.
+    // from an invoice — a zero there means a trial invoice, not a paid purchase.
     let amountUsd;
     if (invoice) {
         amountUsd = Number(invoice.amount_paid) / 100;

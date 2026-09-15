@@ -1481,7 +1481,7 @@ async function goLive(options = {}) {
   } catch (_) {}
   if (goLiveInFlight) return;
   const billingInterval = options?.billingInterval === 'year' ? 'year' : 'month';
-  const checkoutPrice = billingInterval === 'year' ? 1990 : 199;
+  const checkoutPrice = billingInterval === 'year' ? 1490 : 149;
   goLiveInFlight = true;
   showGoLiveOverlay();
   const journey = window.MarketelJourney;

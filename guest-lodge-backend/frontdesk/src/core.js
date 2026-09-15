@@ -2112,8 +2112,8 @@ function goLiveInlineCardHtml() {
         <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">${hasTrial ? 'Start your 14-day free trial' : 'Ready to reactivate'}</div>
         <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:0 0 14px;line-height:1.55;">Your page is built. ${hasTrial ? 'Start full access to accept reservations and run Front Desk for $0 today.' : 'Reactivate to accept reservations and run Front Desk again.'}</p>
         ${blockedDemandLineHtml()}
-        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${hasTrial ? 'Start 14 days free' : 'Reactivate — $199/month'} →</button>
-        <div style="font-size:10px;color:rgba(255,255,255,0.68);margin-top:8px;">${hasTrial ? 'Card required · Then $199/month · Cancel anytime' : 'Billed monthly · Cancel anytime'}</div>
+        <button onclick="goLive()" style="width:100%;padding:12px;border-radius:10px;border:none;background:white;color:#1a5c3f;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${hasTrial ? 'Start 14 days free' : 'Reactivate — $149/month'} →</button>
+        <div style="font-size:10px;color:rgba(255,255,255,0.68);margin-top:8px;">${hasTrial ? 'Card required · Then $149/month · Cancel anytime' : 'Billed monthly · Cancel anytime'}</div>
       </div>
     </div>`;
 }
@@ -4422,7 +4422,7 @@ function renderBookings(fullList) {
           <div class="empty-icon"><i data-lucide="rocket" style="width:34px;height:34px;color:#2E7D5B;"></i></div>
           <div class="empty-text">Your page is ready to go live</div>
           <div class="empty-sub" style="margin-bottom:12px;">Everything&apos;s set up. ${crm.marketelTrialEligible !== false ? 'Start 14 days of full access for $0 today.' : 'Reactivate to start accepting direct bookings again.'}${crm.blockedDemand && crm.blockedDemand.total > 0 ? ` <strong>${crm.blockedDemand.total} guest${crm.blockedDemand.total>1?'s':''} already tried to book.</strong>` : ''}</div>
-          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate — $199/month'} →</button>
+          <button onclick="goLive()" style="padding:12px 24px;border-radius:10px;border:none;background:#2E7D5B;color:white;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">${crm.marketelTrialEligible !== false ? 'Start 14 days free' : 'Reactivate — $149/month'} →</button>
         </div>`;
       if (typeof lucide !== 'undefined') setTimeout(() => lucide.createIcons(), 0);
     } else {

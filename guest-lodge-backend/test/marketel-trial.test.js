@@ -16,6 +16,8 @@ const rebook = read('marketel-guestel-ios', 'Guestel', 'RebookView.swift');
 const clip = read('marketel-guestel-ios', 'GuestelClip', 'ClipRootView.swift');
 
 test('both Marketel checkout paths create one card-required 14-day trial', () => {
+  assert.match(server, /const MARKETEL_MONTHLY_PRICE_USD = 149/);
+  assert.match(server, /const MARKETEL_YEARLY_PRICE_USD = 1490/);
   assert.match(server, /const MARKETEL_TRIAL_DAYS = 14/);
   assert.ok((server.match(/trial_period_days: trialDays/g) || []).length >= 2);
   assert.ok((server.match(/missing_payment_method: 'cancel'/g) || []).length >= 2);
@@ -42,7 +44,9 @@ test('a free trial is access but never cash or a Meta purchase', () => {
   assert.match(server, /converted: !!trialStarted && !priorPayment/);
   assert.match(server, /reportSubscribe: !priorPayment/);
   assert.match(server, /if \(reportSubscribe\) \{[\s\S]*?queueMarketelCAPI\('Subscribe'/);
-  assert.doesNotMatch(server, /recordMarketelPaymentSuccess\([\s\S]{0,250}value:\s*199/);
+  assert.match(server, /value: MARKETEL_MONTHLY_PRICE_USD/);
+  assert.match(server, /value: eventName === 'StartTrial' \? 0 : MARKETEL_MONTHLY_PRICE_USD/);
+  assert.doesNotMatch(server, /recordMarketelPaymentSuccess\([\s\S]{0,250}value:\s*149/);
 });
 
 test('trial lifecycle and milestones are exact, observable business events', () => {
@@ -102,7 +106,7 @@ test('trial terms are explicit before Stripe and existing trial users do not get
   assert.match(reveal, /Only after your \$\{trialDays\(\)\} free days/);
   assert.match(reveal, /First \$\{displayedPrice\} charge \$\{renewalDate\}/);
   assert.match(reveal, /Card required\. Cancel before \$\{renewalDate\}/);
-  assert.match(reveal, /Then \$1,990 for one year/);
+  assert.match(reveal, /Then \$1,490 for one year/);
   assert.match(reveal, /crm\.marketelTrialEligible !== false/);
   assert.match(server, /trialEligible/);
   assert.match(server, /Duplicate Marketel trial rejected/);

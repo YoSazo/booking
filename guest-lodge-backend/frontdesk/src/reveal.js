@@ -604,8 +604,8 @@ function firstTrialBillingDate() {
 function activationCtaLabel() {
   if (trialOfferAvailable()) return `Start your ${trialDays()}-day free trial`;
   return billingInterval === 'year'
-    ? 'Activate Marketel — $1,990/year'
-    : 'Activate Marketel — $199/month';
+    ? 'Activate Marketel — $1,490/year'
+    : 'Activate Marketel — $149/month';
 }
 
 // Screen B. ActivationOfferViewed fires here rather than when the sheet opens,
@@ -622,7 +622,7 @@ function finaleHtml() {
   const isSubscribed = crm.hotelSubscribed && !activationPreviewMode;
   const isYearly = billingInterval === 'year';
   const hasTrial = trialOfferAvailable();
-  const displayedPrice = isYearly ? '$1,990' : '$199';
+  const displayedPrice = isYearly ? '$1,490' : '$149';
   const displayedInterval = isYearly ? '/year' : '/month';
   const activationLabel = activationCtaLabel();
   const renewalDate = firstTrialBillingDate();
@@ -659,17 +659,17 @@ function finaleHtml() {
           </div>` : ''}
           <div class="mvr-billing-toggle" role="radiogroup" aria-label="Billing frequency">
           <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-billing="month">Monthly</button>
-          <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $398</span></button>
+          <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-billing="year">Yearly <span>Save $298</span></button>
           </div>
           ${hasTrial ? `<div class="mvr-renewal-label">Only after your ${trialDays()} free days</div>` : ''}
           <div class="mvr-price"><strong>${displayedPrice}</strong><span>${displayedInterval}</span></div>
           <div class="mvr-price-detail${isYearly || hasTrial ? ' is-visible' : ''}">${hasTrial
             ? `First ${displayedPrice} charge ${renewalDate}`
-            : isYearly ? 'Two months free · $398 saved' : '&nbsp;'}</div>
+            : isYearly ? 'Two months free · $298 saved' : '&nbsp;'}</div>
           <button type="button" class="mvr-primary mvr-final-cta" id="mvrFinalCta">${activationLabel}</button>
-          ${hasTrial ? `<div class="mvr-guarantee"><span>${trialDays()}</span><p><strong>${trialDays()} days of full access. $0 today.</strong><b>Card required. Cancel before ${renewalDate} and you will not be charged.</b><small>${isYearly ? `Then $1,990 for one year on ${renewalDate}.` : `Then $199/month starting ${renewalDate}.`} Cancel anytime.</small></p></div>
+          ${hasTrial ? `<div class="mvr-guarantee"><span>${trialDays()}</span><p><strong>${trialDays()} days of full access. $0 today.</strong><b>Card required. Cancel before ${renewalDate} and you will not be charged.</b><small>${isYearly ? `Then $1,490 for one year on ${renewalDate}.` : `Then $149/month starting ${renewalDate}.`} Cancel anytime.</small></p></div>
           <div class="mvr-secure-note">Stripe securely stores your card · <a href="/terms" target="_blank" rel="noopener">Trial terms</a></div>`
-            : `<div class="mvr-guarantee"><span>✓</span><p><strong>Full Marketel access.</strong><b>${isYearly ? '$1,990 is billed yearly.' : '$199 is billed monthly.'}</b><small>Cancel anytime. Charges already processed are non-refundable.</small></p></div>
+            : `<div class="mvr-guarantee"><span>✓</span><p><strong>Full Marketel access.</strong><b>${isYearly ? '$1,490 is billed yearly.' : '$149 is billed monthly.'}</b><small>Cancel anytime. Charges already processed are non-refundable.</small></p></div>
           <div class="mvr-secure-note">Billing starts when you complete secure Stripe checkout · <a href="/terms" target="_blank" rel="noopener">Billing terms</a></div>`}
         </div>
         <div class="mvr-activation-proof">
@@ -727,7 +727,7 @@ function activationHubCtaHtml() {
   // date before any billing information is collected.
   const body = isSubscribed
     ? 'Your complete system is live.'
-    : trialAvailable ? '' : '$199/month. Cancel anytime.';
+    : trialAvailable ? '' : '$149/month. Cancel anytime.';
   return `<button type="button" class="mvr-hub-trial-cta" data-hub-item="activation">
     <span><strong>${esc(title)}</strong>${body ? `<small>${esc(body)}</small>` : ''}</span>
     <b aria-hidden="true">→</b>
@@ -1177,7 +1177,7 @@ function bindSheetEvents() {
       try { localStorage.setItem(BILLING_KEY, billingInterval); } catch (_) {}
       trackJourney('JourneyBillingIntervalSelected', {
         billingInterval,
-        price: billingInterval === 'year' ? 1990 : 199,
+        price: billingInterval === 'year' ? 1490 : 149,
         currency: 'USD',
       });
       const body = document.querySelector('#mvrSheet .mvr-sheet-body');

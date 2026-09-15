@@ -1742,7 +1742,7 @@ function eventInitials(label) {
   const clean = String(label || '').replace(/^[·\s]+/, '').trim();
   const beat = clean.match(/^Beat (\d+)/i);
   if (beat) return 'B' + beat[1];
-  // Only letter-led words count, so "Paid $199" reads PA rather than P$.
+  // Only letter-led words count, so "Paid $149" reads PA rather than P$.
   const words = clean.split(/[\s—–-]+/).filter((w) => /^[A-Za-z]/.test(w));
   if (!words.length) return clean.slice(0, 2).toUpperCase() || '··';
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
@@ -1937,7 +1937,7 @@ async function loadPortfolio() {
     // MRR is the headline the overview opens with, and it comes from the same
     // portfolio query, so it is filled here rather than fetched twice.
     const paying = t.payingProperties || 0;
-    const mrr = paying * 199;
+    const mrr = paying * 149;
     const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
     setText('stat-mrr', money(mrr));
     setText('stat-mrr-count', String(paying));
