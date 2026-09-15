@@ -8,6 +8,87 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// Inspect is independent of booking-property access and subscription state.
+model InspectAccount {
+  id String @id @default(cuid())
+  email String @unique
+  createdAt DateTime @default(now())
+  freeReportUsed Boolean @default(false)
+  stripeCustomerId String? @unique
+  stripeSubscriptionId String? @unique
+  subscriptionStatus String?
+  periodStart DateTime?
+  periodEnd DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  reportsUsed Int @default(0)
+  reports InspectReport[]
+  sessions InspectSession[]
+}
+
+model InspectChallenge {
+  email String @id
+  codeHash String
+  expiresAt DateTime
+  attempts Int @default(0)
+  sentAt DateTime @default(now())
+}
+
+// Keyed, non-readable proof that an email already consumed its lifetime free
+// report. It remains after account deletion solely to prevent free-tier abuse.
+model InspectFreeClaim {
+  emailHash String @id
+  claimedAt DateTime @default(now())
+}
+
+model InspectSession {
+  tokenHash String @id
+  accountId String
+  expiresAt DateTime
+  account InspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId])
+}
+
+model InspectReport {
+  id String @id @default(cuid())
+  accountId String
+  propertyName String
+  document Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  finalizedAt DateTime?
+  shareHash String? @unique
+  aiRewrites Int @default(0)
+  account InspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  attachments InspectAttachment[]
+  @@index([accountId, createdAt])
+}
+
+model InspectAttachment {
+  id String @id @default(cuid())
+  reportId String
+  objectKey String @unique
+  originalKey String @unique
+  source String
+  createdAt DateTime @default(now())
+  report InspectReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([reportId])
+}
+
+model InspectEvent {
+  id String @id @default(cuid())
+  accountId String?
+  name String
+  sourceId String? @unique
+  createdAt DateTime @default(now())
+  @@index([createdAt, name])
+}
+
+// Durable private-object deletion queue; never fall back to public uploads.
+model InspectGarbage {
+  objectKey String @id
+  createdAt DateTime @default(now())
+}
+
 model Booking {
   id                    String   @id @default(cuid())
   createdAt             DateTime @default(now())

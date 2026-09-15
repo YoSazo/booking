@@ -152,6 +152,12 @@ export default defineConfig(({ mode }) => {
         ]) {
           fs.copyFileSync(path.join(publicRoot, filename), path.join(nativeWwwRoot, filename));
         }
+        // Inspect is a dependency-free surface. Bundle it beside Front Desk
+        // so local drafts and the editor do not depend on a hosted web shell.
+        fs.cpSync(path.join(publicRoot, 'inspect'), path.join(nativeWwwRoot, 'inspect'), {
+          recursive: true,
+          force: true,
+        });
       },
     }] : [rollingWebAssetsPlugin(webOutDir, webAssetHistoryPath, webAssetHistory)],
     server: {

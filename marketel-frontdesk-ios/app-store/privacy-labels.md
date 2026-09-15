@@ -8,9 +8,10 @@ submission.
 
 - Contact info: name, email address, phone number, physical address
 - User content: guest and Front Desk Assistant messages, property descriptions,
-  room details, photos, support messages, and reservation information
+  room details, inspection observations and reports, photos, support messages,
+  and reservation information
 - Identifiers: Marketel property/account identifier and native push/device token
-- Purchases: Marketel subscription status and payment history metadata; card
+- Purchases: Marketel booking and Inspect subscription status and payment history metadata; card
   numbers are handled by Stripe and are not stored by Marketel
 - Usage data: product interaction used for service operation and improvement
 

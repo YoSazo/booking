@@ -1,1 +1,1 @@
-hotel,booking,front desk,reservations,availability,property,rooms,guest,inn,lodging
+inspection,property,report,walkthrough,rental,photos,hotel,booking,front desk,rooms

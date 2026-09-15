@@ -6,6 +6,7 @@ import Contacts
 import ContactsUI
 import UserNotifications
 import SafariServices
+import StoreKit
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -448,6 +449,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) { [weak self] _ in
             self?.sendWebAction("account")
         }
+        let inspectAction = UIAction(
+            title: "Open Marketel Inspect",
+            image: UIImage(systemName: "checklist")
+        ) { [weak self] _ in
+            self?.setShellVisible(false, animated: false)
+            self?.webView?.evaluateJavaScript(
+                "localStorage.setItem('marketel.product','inspect');location.href='../inspect/index.html'"
+            )
+        }
         let signOutAction = UIAction(
             title: "Sign out",
             image: UIImage(systemName: "rectangle.portrait.and.arrow.right"),
@@ -466,6 +476,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 notificationSettingsAction,
                 refreshAction,
                 tourAction,
+                inspectAction,
                 accountAction,
                 signOutAction,
             ]
@@ -1044,6 +1055,77 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         present(browser, animated: true)
     }
 
+    private func sendInspectStorefront() {
+        Task { @MainActor [weak self] in
+            let country = await Storefront.current?.countryCode ?? ""
+            self?.callWeb(function: "marketelInspectStorefront", argument: country)
+        }
+    }
+
+    private func exportInspectPDF(reportId: String, token: String) {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_-"))
+        let validId = reportId.count <= 64
+            && reportId.unicodeScalars.allSatisfy { allowed.contains($0) }
+        let validToken = token.count == 43
+            && token.unicodeScalars.allSatisfy { allowed.contains($0) }
+        guard validId, validToken,
+              let url = URL(string: "/api/inspect/reports/\(reportId)/pdf", relativeTo: backendOrigin) else {
+            callWeb(function: "marketelInspectExportResult", argument: "invalid")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        URLSession.shared.downloadTask(with: request) { [weak self] temporary, response, error in
+            guard let self else { return }
+            guard error == nil,
+                  let temporary,
+                  let http = response as? HTTPURLResponse,
+                  http.statusCode == 200,
+                  http.mimeType == "application/pdf" else {
+                DispatchQueue.main.async {
+                    self.callWeb(function: "marketelInspectExportResult", argument: "failed")
+                }
+                return
+            }
+            let values = try? temporary.resourceValues(forKeys: [.fileSizeKey])
+            guard let fileSize = values?.fileSize,
+                  fileSize > 0,
+                  fileSize <= 100 * 1024 * 1024 else {
+                DispatchQueue.main.async {
+                    self.callWeb(function: "marketelInspectExportResult", argument: "failed")
+                }
+                return
+            }
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent("Marketel-Inspection-\(UUID().uuidString).pdf")
+            do {
+                try FileManager.default.moveItem(at: temporary, to: destination)
+            } catch {
+                DispatchQueue.main.async {
+                    self.callWeb(function: "marketelInspectExportResult", argument: "failed")
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                guard self.presentedViewController == nil else {
+                    try? FileManager.default.removeItem(at: destination)
+                    self.callWeb(function: "marketelInspectExportResult", argument: "busy")
+                    return
+                }
+                let share = UIActivityViewController(activityItems: [destination], applicationActivities: nil)
+                if let popover = share.popoverPresentationController {
+                    popover.sourceView = self.view
+                    popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 1, height: 1)
+                }
+                share.completionWithItemsHandler = { [weak self] _, _, _, _ in
+                    try? FileManager.default.removeItem(at: destination)
+                    self?.callWeb(function: "marketelInspectExportResult", argument: "complete")
+                }
+                self.present(share, animated: true)
+            }
+        }.resume()
+    }
+
     func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
         sendWebAction("browserClosed")
     }
@@ -1171,6 +1253,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":
             presentInAppBrowser(payload["url"] as? String ?? "")
+        case "inspectStorefront":
+            sendInspectStorefront()
+        case "inspectExportPDF":
+            exportInspectPDF(
+                reportId: payload["reportId"] as? String ?? "",
+                token: payload["token"] as? String ?? ""
+            )
+        case "inspectSignOut":
+            // Inspect owns a separate bearer session in web storage. Do not
+            // clear Front Desk credentials when only Inspect signs out.
+            break
         case "openGuestMessages":
             presentNativeGuestMessages()
         case "openSupport":

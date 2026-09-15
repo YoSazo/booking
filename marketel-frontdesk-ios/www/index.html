@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#EEF2EF">
-    <title>Marketel Front Desk</title>
+    <link rel="icon" href="marketel-icon.png">
+    <title>Marketel</title>
     <style>
       :root {
         color: #17231d;
@@ -33,17 +34,55 @@
       p {
         color: #607067;
         font-size: 14px;
+        line-height: 1.5;
       }
+      .choices { display: grid; gap: 12px; width: min(100%, 430px); margin-top: 28px; }
+      .choice { appearance: none; border: 1px solid #d4ded6; border-radius: 18px; background: white; color: inherit; padding: 19px; text-align: left; font: inherit; }
+      .choice:disabled { opacity: .55; }
+      .choice strong, .choice span { display: block; }
+      .choice strong { font-size: 18px; }
+      .choice span { color: #607067; margin-top: 5px; }
+      .hidden { display: none; }
     </style>
   </head>
   <body>
     <main>
       <img src="marketel-icon.png" alt="">
-      <h1>Marketel Front Desk</h1>
-      <p>Opening your front desk…</p>
+      <h1>Marketel</h1>
+      <p id="intro">Opening your workspace…</p>
+      <div id="choices" class="choices hidden">
+        <button class="choice" data-product="bookings"><strong>Front Desk</strong><span>Bookings, availability and your guest page</span></button>
+        <button class="choice" data-product="inspect"><strong>Inspect</strong><span>Walkthrough photos and finished condition reports</span></button>
+      </div>
     </main>
     <script>
-      window.location.replace('frontdesk/index.html?native=ios');
+      (() => {
+        const open = product => {
+          localStorage.setItem('marketel.product', product);
+          location.replace(product === 'inspect' ? 'inspect/index.html' : 'frontdesk/index.html?native=ios');
+        };
+        const selected = localStorage.getItem('marketel.product');
+        const choosing = new URLSearchParams(location.search).get('choose') === '1';
+        if (!choosing && selected === 'inspect') return open('inspect');
+        if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
+        const inspect = document.querySelector('[data-product="inspect"]');
+        const inspectDetail = inspect.querySelector('span');
+        inspect.disabled = true;
+        inspectDetail.textContent = 'Checking availability…';
+        document.querySelector('[data-product="bookings"]').onclick = () => open('bookings');
+        inspect.onclick = () => open('inspect');
+        document.getElementById('intro').textContent = 'What are you working on?';
+        document.getElementById('choices').classList.remove('hidden');
+        fetch('https://bookmarketel.com/api/inspect/config', { cache: 'no-store' })
+          .then(response => response.ok ? response.json() : null)
+          .then(value => {
+            inspect.disabled = value?.enabled !== true;
+            inspectDetail.textContent = value?.enabled === true
+              ? 'Walkthrough photos and finished condition reports'
+              : 'Inspect is not available yet';
+          })
+          .catch(() => { inspectDetail.textContent = 'Inspect is temporarily unavailable'; });
+      })();
     </script>
   </body>
 </html>

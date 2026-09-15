@@ -1045,6 +1045,7 @@ const corsOptions = {
 // Stripe webhooks need their untouched raw body for signature verification.
 app.use('/api/stripe-webhook', express.raw({type: 'application/json'}));
 app.use('/api/marketel-stripe-webhook', express.raw({type: 'application/json'}));
+app.use('/api/inspect-stripe-webhook', express.raw({type: 'application/json'}));
 app.use(cors(corsOptions));
 
 // Apple App Site Association — served explicitly because express.static ignores
@@ -1164,6 +1165,21 @@ app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'fron
     maxAge: '365d',
     immutable: true,
 }));
+
+// Inspect stays dark until its private storage, authentication, billing and
+// App Store surface are configured. Guard the HTML/assets as well as the API,
+// so a guessed URL cannot expose a half-configured product.
+const INSPECT_PUBLIC_ROOT = path.join(__dirname, 'public', 'inspect');
+app.use(['/inspect', '/inspect/'], (req, res, next) => {
+    if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), payment=()');
+    if (req.path === '/' || req.path === '') return res.sendFile(path.join(INSPECT_PUBLIC_ROOT, 'index.html'));
+    next();
+});
+app.use('/inspect', express.static(INSPECT_PUBLIC_ROOT, { index: false, maxAge: 0 }));
 
 app.use('/uploads', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18630,6 +18646,10 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 });
 
 // Mount telemetry routes (LLM-optimized session intelligence)
+const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
+    ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
+    : marketelStripe;
+require('./inspect').registerInspect(app, { prisma, mail: emailTransporter, stripe: inspectStripe });
 telemetry.setupRoutes(app);
 
 function startServer() {

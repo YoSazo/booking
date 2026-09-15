@@ -5,15 +5,17 @@ Do not show real guest names, emails, phone numbers, addresses, or card data.
 
 Required iPhone set:
 
-1. **Your direct bookings, one Front Desk** — Your Page with a polished demo
+1. **Your walkthrough, a finished report** — Inspect report editor with safe synthetic photos.
+2. **Clear condition reports before you leave** — a finalized Inspect preview.
+3. **Your direct bookings, one Front Desk** — Your Page with a polished demo
    property.
-2. **See every stay that needs attention** — Bookings with several safe demo
+4. **See every stay that needs attention** — Bookings with several safe demo
    reservations.
-3. **Keep room nights up to date** — Availability with a clear open/closed
+5. **Keep room nights up to date** — Availability with a clear open/closed
    calendar.
-4. **Act from a booking alert** — an iOS notification with Review or
+6. **Act from a booking alert** — an iOS notification with Review or
    Confirm/Release actions.
-5. **Manage more than one property** — the native property picker, only if the
+7. **Manage more than one property** — the native property picker, only if the
    review account has two safe demo properties.
 
 Capture every iPhone size App Store Connect marks as required for the current

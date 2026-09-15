@@ -10,142 +10,102 @@ what the funnel looked like during each campaign.
 
 ## THE OBJECTIVE: $18,000 cash collected, as fast as possible
 
-Everything below was written before you told me this. It changes the ordering
-materially, so read this section first and treat the rest as supporting evidence.
+> **Revision note, after review.** The first version of this section was built on a
+> misreading. You wrote "3 30 min sessions"; I read it as three *booked sales calls*
+> and it meant three cold prospects each spending ~30 minutes customising their
+> engine. Everything I derived from the wrong reading — "$39 per booked call", a 25%
+> call close rate, "the path runs through your mouth", a nine-conversation forecast,
+> four warm annual closes waiting — is withdrawn. What follows is the corrected
+> version.
 
-### The arithmetic decides the strategy
+### What the corrected fact actually tells us
 
-| Route | Price | Customers needed | Time to cash |
-|---|---|---|---|
-| Monthly | $199/mo | **~90 subscription-months** | 6+ months minimum |
-| **Annual prepaid** | **$1,990/yr** | **9 customers** | **immediate on close** |
-| Annual + setup fee | $500 + $1,990 | **8 customers** | immediate on close |
-| "Founding property" | $1,490/yr prepaid | 12 customers | immediate on close |
+Three cold clicks each spending half an hour inside the product is *strong*
+engagement — that is not idle curiosity, it is an owner doing real work. They didn't
+convert because **activation was hidden inside the booking engine and nobody found
+it**.
 
-Monthly billing cannot produce $18k quickly at any plausible volume. Thirty
-customers retained three months is $17,910 — that's 30 closes *and* a three-month
-wait. **The goal is nine annual prepays.** Every recommendation in this document
-should be re-read through that lens.
+So you have now run two experiments, and they failed at two different points:
 
-### Immediate consequence: annual is not your default, and it should be
+| | What worked | Where it died |
+|---|---|---|
+| **FUNNEL** (May) | deep engagement, ~30-min sessions | the offer was never discoverable |
+| **WEB2APP** (Aug) | offer is discoverable; 100% open the reveal, 67% start the challenge | the road to the offer contradicts itself |
 
-On the activation screen, **Monthly** is the pre-selected toggle and the CTA reads
-"Activate Marketel — $199/month". Yearly is the secondary option behind a tab.
+**Neither experiment has tested whether $199 is acceptable to someone who saw a
+coherent product.** That is the single most important sentence in this document, and
+my first draft talked past it.
 
-Flip the default to Yearly. Lead with **$1,990/year**, show the monthly equivalent
-underneath ("$166/mo, billed yearly"), keep "Two months free · $398 saved" as the
-badge. That is a one-line change that multiplies cash-per-conversion by ten. If the
-objective is cash by a date, this is the highest ratio of impact to effort anywhere
-in the codebase.
+### The arithmetic still holds; the prescription does not
 
-Consider going further: **$500 done-for-you setup + $1,990/year = $2,490 per close,
-so eight closes clears the goal.** And "done for you" is what this buyer is actually
-asking for — the owner who emailed you "where is the app and how do I get money"
-was asking for a human, not a feature. A setup fee is easier to sell to a
-non-technical motel owner than self-serve is, and it collects cash on day one.
+$18,000 at $199/mo is ~90 subscription-months. At $1,990/yr prepaid it is 9
+customers. That maths is unchanged.
 
-### Where nine closes actually come from, ranked by speed
+What I got wrong was the leap to *therefore default cold traffic to annual*. "Ten
+times the cash per conversion" is true per-conversion and misleading as a business
+claim, because the conversion rate will obviously not survive the immediate charge
+going from $199 to $1,990. With one person having ever seen the activation page, we
+have no basis to trade conversion for AOV.
 
-**Tier 1 — people who already know you. Zero ad spend. Start today.**
+**Corrected recommendation:**
 
-This is the fastest money in the building and it involves no code.
+- Keep **monthly** selected by default for cold traffic.
+- Keep yearly prominent on the same screen with the $398 saving legible — that costs
+  no conversion and lifts AOV for anyone who would have taken it anyway.
+- Offer annual **personally**, to warm operators, in conversation.
+- Revisit yearly-first only after you have real monthly conversions to trade against.
 
-The database has **12 properties total**. Notably, **Suite Stay, St Croix Falls and
-Home Place Suites are not among them** — they live on `clickinns.com`, the legacy
-platform, not on Marketel self-serve. So the "$5,800 booked direct" proof on your
-landing page is real but it is not proof of *this* funnel. More importantly: those
-are three operators who already run your software daily and are not on a $199 plan.
+### The instrument that decides everything: ~8–10 activation-page visitors
 
-Your warm list, by name:
+Right now exactly **one** person has seen the offer. Until roughly 8–10 have, you
+cannot distinguish between three completely different diseases:
 
-- Suite Stay (AL), St Croix Falls (WI), Home Place Suites (OK) — legacy platform
-- Studios 17 — `subscribed = true`, status `active`, created May 28
-- Jack's Inn — `subscribed = true`, no Stripe status recorded
-- The three owners who took 30-minute calls in May/June
-- Rocky Hide A Way Cottages, Studio 53, Puukala Sunset Estates — signed up in the
-  last week, all gave *qualified* answers, all abandoned at the reveal
+1. They reach the offer and refuse it → **the offer is wrong.** Test price/terms.
+2. They never reach the offer → **progression is broken.** Fix the reveal.
+3. They start Stripe and stop → **trust or payment friction.** Fix that.
 
-That is roughly **eight to eleven named humans** who have already used or seen the
-product. Four of them converting at $1,990 is **$7,960 — 44% of the goal — from a
-phone and a calendar.** Do this before you touch a line of code.
+**We currently have evidence for (2) only.** Every recommendation I made about the
+offer — pay-on-first-booking, annual-first, the setup fee — was optimising a variable
+nobody has measured. Withdrawn until the data exists.
 
-For the three recent abandoners specifically: they are days old and they left at a
-broken screen. A personal email — *"I saw you built Rocky Hide A Way Cottages, I
-noticed the preview didn't show your photos, can I finish it with you on a
-15-minute call?"* — is a genuinely strong open, because it's true.
+### How much does the reveal fix accelerate the signal?
 
-**Tier 2 — outbound with the page already built. Zero ad spend.**
+This is the strongest argument for doing the trust fixes first, and it is arithmetic
+rather than rhetoric. Cost per completed setup is about **$25**.
 
-This is the strongest idea in the document and it converts your funnel's biggest
-weakness into an unignorable cold open.
+| Offer pass-through | Setups needed for 10 offer views | Ad spend |
+|---|---|---|
+| **17%** (today) | ~59 | **~$1,475** |
+| **60%** (fixed reveal) | ~17 | **~$425** |
 
-Independent motels are fully enumerable through the Google Places API: name, phone,
-address, photos, rating, review count, for every property in a state. You already
-have machinery that builds a booking page from exactly that data.
+Fixing the first personalised screen is worth roughly **$1,000 of ad spend purely in
+time-to-signal**, before it converts a single extra customer. That is why it comes
+first — not because the reveal is ugly, but because it is the thing standing between
+you and the ability to test anything else.
 
-So: pre-build the page. Then the outreach is not "would you like a booking page" —
-it's *"I built yours. It's live at `rockyhideaway.mktel.co`. Here's the link. It's
-free to keep. Want me to turn it on?"*
+### Where the $18k realistically comes from
 
-Nobody deletes that email. And it solves, in one move, the empty-photo problem, the
-"who would visit my page" objection, and the cold-open problem. Your demo properties
-are in Alabama, Wisconsin, Oklahoma and Texas — start where you already have
-references you can name.
+Being honest about the warm list, which I inflated:
 
-At a 1% close rate, 900 properties gets you nine. That's grindy, but it's free, it's
-under your control, and it doesn't depend on Meta's algorithm.
+- **Jack's Inn** — your testing property. Not a prospect.
+- **Studios 17** — already activated. Not a new close.
+- **Suite Stay / St Croix / Home Place** — legacy `clickinns.com`. They validate the
+  booking-engine technology; they are not evidence for the current $199 funnel, and
+  they may have commercial arrangements that predate it. Worth a conversation, not a
+  forecast.
+- **Rocky Hide A Way Cottages, Studio 53, Puukala Sunset Estates** — genuine warm
+  follow-up, days old, qualified answers, abandoned at a broken screen. Contact them
+  for **qualitative feedback**, not as probable annual customers.
 
-**Tier 3 — paid ads to a booked call, not to self-serve.**
+That last group is the highest-value thing you can do this week, and the reason is
+information, not revenue: three people who abandoned at the exact screen this audit
+indicts can tell you in ten minutes whether the diagnosis is right.
 
-Look at the two results side by side:
-
-- **Self-serve funnel:** $363 spent → 6 people saw the reveal → **0 closes**
-- **The old simple funnel:** $117 spent → **3 people took 30-minute calls**
-
-Three calls for $117 is **$39 per call**. Even at a pessimistic $80/call and a 25%
-close rate, nine closes costs about **$2,880 in ad spend** — and each one is worth
-$1,990 to $2,490. That's the only advertising math in this account that reaches
-$18k.
-
-Concretely: keep the free build (it qualifies people and creates commitment), but at
-the reveal, put a **calendar link** where "Message Salah" currently sits in 13px
-green text. Not "message" — *book*. "Book 15 minutes with Salah and we'll finish
-your page together." On the call you customize their page live, which answers every
-objection this document lists, because a human is there to answer it.
-
-**Tier 4 — fixing the self-serve funnel.** Still worth doing, and everything below
-still applies. But be clear-eyed: it has closed zero customers in four months, and
-rebuilding it is a multi-week project with an uncertain payoff. **It is not the path
-to $18k by a date.** Do the minimum that stops it embarrassing you in front of the
-people Tiers 1–3 send into it, and spend your remaining hours selling.
-
-### The honest risk
-
-You have closed **zero** customers through the self-serve funnel. Every projection
-above extrapolates from a three-call sample and possibly one or two founder-led
-closes I can't verify from this machine (`.env` here holds the *test* Stripe key,
-so live revenue is invisible to me — you know the real number). Treat the CAC and
-close-rate figures as directional.
-
-The one thing I'd say with confidence: **$18k is reachable, and the path runs
-through your mouth, not your funnel.** Nine conversations, not nine thousand
-impressions. Your ad account has $11.41 in it and has never produced a customer;
-your phone has produced three calls from $117 and a platform with live properties on
-it. Weight your next four weeks accordingly.
-
-### What NOT to do, given the deadline
-
-- **Don't raise ad budget to hit the number.** Advertising is the least certain path
-  here and the deadline will tempt you to buy volume. Volume into a funnel that
-  converts at zero is just a faster way to spend $11.41.
-- **Don't rebuild the reveal from scratch.** Fix the four things that break trust
-  (§9), then leave it alone.
-- **Don't discount below $1,490.** At $999 you need 18 closes, which is more selling
-  than the discount saves you.
-- **Don't build Stripe Connect.** It's weeks of KYC and liability work. Write the one
-  sentence explaining the $1-hold model instead (§4.3).
-
----
+**I am not going to give you a forecast for nine closes.** I don't have the data to
+support one, and the first version of this document produced a confident number out
+of a misreading. The honest statement is: fix the contradictions, get 8–10 people to
+the offer, and *then* the conversion rate you observe will tell you what $18k costs
+and how long it takes.
 
 ## 0. Method, and what to distrust
 
@@ -464,7 +424,7 @@ views, 0 leads, for $4.75. It is corrupting your reporting *and* teaching a
 conversion-optimized pixel that cheap landing page views live inside mobile games.
 Free to fix, immediate.
 
-**2. Reels is 57% of lifetime spend and has produced zero registrations.**
+**2. Reels — flagged, not concluded.**
 
 ```
 facebook / facebook_reels    $132.67 → 43 LPV → 16 leads → 0 registrations
@@ -473,8 +433,15 @@ facebook / feed               $62.70 → 16 LPV →  3 leads → 3 registrations
 instagram / feed              $36.44 →  9 LPV →  2 leads → 2 registrations
 ```
 
-Feed converted 5 of 5 leads through to completed setup. Reels converted 0 of 19.
-Small n, but the direction is unambiguous and consolidating costs nothing.
+Feed converted 5 of 5 leads through to completed setup; Reels converted 0 of 19.
+
+**Correction:** this comparison spans both campaigns, and I spent a whole section of
+this document explaining that `Lead` means different things across that boundary —
+then made a cross-period comparison anyway. `CompleteRegistration` also wasn't wired
+during FUNNEL, so the "0 registrations" is partly an artefact of instrumentation, not
+behaviour. Treat this as *worth watching within WEB2APP only*, not as a decision.
+Reallocating placement mid-learning would also reset delivery again, which you have
+already done once this week.
 
 **3. The targeting spec is chain employees, not owners.**
 
@@ -588,25 +555,50 @@ Slide 1 today is your product. Make it their P&L:
 > Booking.com at 18%, you hand over roughly **$900 a month — $10,800 a year**.
 > Marketel is $1,990 a year.
 
-You already have rooms and rate. You need one more input, and you should **replace
-the current step-3 question with it**: *"Roughly how much of your business comes
-through Booking.com, Expedia or Airbnb?"* — most / about half / some / none. Same
-friction, but it feeds the pitch instead of only scoring the lead. (Keep the
-qualification logic; just change what you ask.)
+**Correction — withdrawn.** I proposed replacing the step-3 question with "roughly
+how much of your business comes through Booking.com / Expedia / Airbnb?". That is
+worse than what you have. It narrows Marketel to a single angle when the current
+question deliberately captures three valid buyers (OTA leakage, direct
+calls/messages, repeat guests), and it invites a guessed number that then propagates
+into a headline figure.
 
-### Cut the reveal from seven beats to three
+My proposed money slide had the same flaw: stacking assumed occupancy on top of
+assumed OTA share produces an impressive-looking number that an owner who knows their
+own book will immediately catch. The conservative calculator you have is more honest.
+
+The wording is still worth tightening, e.g.:
+
+> At a $129 nightly rate and 15% OTA commission, 11 direct room-nights avoid about
+> $213 in commission — enough to cover one month of Marketel.
+
+My only remaining preference is that owners count in *bookings*, not room-nights, so
+"about two direct bookings" may land better than "11 room-nights" for the same
+arithmetic. That is a wording preference, not a correction — and labelling each
+figure (15–25% range on the landing page, 20% for the Suite Stay example, 15% in the
+calculator) resolves the inconsistency I flagged without changing any number.
+
+### Fix beat one. Do not cut beats two through five.
 
 1. **Your money** (above)
 2. **Your page** — real photos, and let them change one thing live. Edit the rate,
    watch the page update. Interaction beats animation.
 3. **Your price** — with the new offer, and one sentence about how they get paid.
 
-Guestel, App Clips, Live Activities and "the complete loop" are product depth.
-Genuinely differentiated, and they belong in onboarding and the nurture sequence.
-Right now your four most beautiful screens sell sophistication to someone who hasn't
-decided whether the basic thing works — and they're about **Studios 17**, not the
-prospect. You spend three steps personalizing setup and then show them a stranger's
-pool.
+**Correction.** I originally said to cut this to three beats and move Guestel, the
+App Clip and Live Activities into onboarding. That's wrong, and the reason is
+pricing: a bare booking engine at $199/mo competes with Cloudbeds and Little Hotelier
+and loses. The bundle — engine converts, Guestel keeps the relationship, Front Desk
+controls availability — is *what justifies the price*. Deleting the differentiators
+would make $199 look worse, not better.
+
+What the data actually indicts is **beat one**, not the existence of beats two
+through five. Every prospect opened the reveal; the recorded `revealProgressStep = 0`
+means they stopped at the booking-page stage specifically. Fix that screen, keep each
+carousel skippable with one unambiguous forward action, and leave the value story
+intact.
+
+The narrower true criticism survives: beats two to five are about **Studios 17**, not
+the prospect. Personalising those visuals is worth doing. Deleting them is not.
 
 ### Fix the break-even sentence
 
@@ -622,27 +614,25 @@ And pick one commission number. You currently use 15–25% in the headline, 20% 
 proof line, and 15% in the reveal calculator. Use 18% everywhere — it's the honest
 Booking.com median and it's defensible if anyone checks.
 
-### Build the follow-up. You have none.
+### The follow-up gap is narrower than I first said
 
-`send-comeback-emails.js` is explicitly a one-time manual script for legacy owners.
-`sendPreviewReadyEmailOnce` fires exactly one email at setup completion. Then
-silence. This is the direct cause of the thing you already observed: *"they never
-came back post customizing their engine."*
+**Correction.** I wrote "you have none." That is wrong, and I had contradicting
+evidence in my own query output at the time. What exists today:
 
-- **+20 min** — email with a screenshot of *their* page embedded, subject line =
-  their domain (`cedarhollowinn.mktel.co is ready`). One-click magic link **straight
-  to the activation screen**.
-- **+1 hour** — SMS, if you took the phone number. Motel owners answer texts.
-- **Day 2** — the owner video (below).
-- **Day 4** — pure value, no ask: *"Add your booking link to your Google Business
-  Profile — here's how."* This is the demand-side proof, given away free.
-- **Day 7** — the loss math with their numbers.
+- `sendSetupResumeEmail` — `server.js:219` (8 `SetupResumeEmailSent` events in the DB)
+- `sendPreviewReadyEmailOnce` — `server.js:13075`
+- exact-stage reveal persistence — `server.js:7297`
+- email-first recovery with signed magic links — `server.js:14984`
+- checkout-abandonment recovery — `server.js:14923`
 
-And: **a returning prospect must never hit the login wall.** Right now reopening the
-reveal without the hash token lands on *"Front Desk — continue securely by email /
-Use Front Desk PIN instead."* They never had a PIN and don't know what one is. A
-long-lived cookie plus the magic link should drop them back on their own reveal, at
-the price.
+The magic-link path also means my "returning prospects hit a hostile PIN wall" claim
+was overstated: the PIN is a fallback, and the email-first path is the primary route.
+
+**The one genuine gap:** the checkout-recovery loop keys on `checkoutStartedAt`, so
+somebody who *viewed the offer and never started checkout* is not covered by
+anything. Given that this is currently the largest cohort at the bottom of your
+funnel, it's worth adding — after the reveal fixes, since right now the cohort is one
+person.
 
 ### Proof
 
@@ -679,45 +669,67 @@ targeting.
 
 ---
 
-## 9. The two-week plan, given the $18k
+## 9. The plan, corrected
 
-**Week 1 — sell, and fix only what embarrasses you.**
+The ordering principle is no longer "sell your way to $18k." It is: **remove the
+contradictions that make the funnel untestable, then buy enough traffic to read the
+offer.**
 
-Selling (most of your hours):
+### Now — the trust and accuracy fixes
 
-1. **Write the warm list down.** Eight to eleven names from §"THE OBJECTIVE" Tier 1.
-   Personal email or call to every one, today and tomorrow. Lead with the annual
-   price. Target: four conversations booked.
-2. **Email the three recent abandoners** — Rocky Hide A Way Cottages, Studio 53,
-   Puukala Sunset Estates. They signed up in the last week and gave qualified
-   answers. Reference the broken preview honestly and offer to finish it with them.
-3. **Put a calendar link in the reveal**, replacing the 13px "Message Salah" line.
+These are the ones the evidence actually supports, and none of them is a strategy
+bet.
 
-Fixing (a few hours total, all small):
+1. **Remove invented amenities when none were supplied.** `RoomCard.jsx:280`. Right
+   now a live guest page advertises Free WiFi, Smart TV, Free Parking and Weekly
+   Cleaning for properties that never claimed them.
+2. **Give the no-photo state an intentional fallback** instead of a grey placeholder
+   bed captioned "Add your room photo".
+3. **Remove the contradictory Guestel "Locked / finish setup" treatment.**
+   Preview-only is fine; appearing broken is not, especially two inches under
+   "✓ Your live guest page is online".
+4. **Stop silently inventing weekly/monthly discounts and a 10% tax** —
+   `setup.html:863`, `server.js:13237`. This is the strongest technical finding in
+   the audit and it must be fixed before challenge-completion data means anything.
+5. **Explain the $1 verification and how the property gets paid**, one sentence:
+   *"Guests verify their card with a temporary $1 hold, then pay your property
+   directly. Marketel never holds your room revenue."*
+6. **Make sure the challenge CTA doesn't compete with the challenge.** While the
+   60-second timer runs, the largest control on screen is the exit.
+7. **Test stage-aware email return on a second device** — the machinery exists at
+   `server.js:7297` and `:14984`; confirm it lands people where they stopped.
+8. **Exclude Audience Network.** The one ad change I'd still make unreservedly:
+   within WEB2APP alone it is $4.75 for 74 clicks, 65 landing page views and zero
+   leads, and rewarded-video traffic structurally cannot contain this buyer.
 
-4. **Flip the activation default to Yearly** and change the CTA to
-   "Activate Marketel — $1,990/year". One line. Ten times the cash per close.
-5. **Exclude Audience Network; consolidate to Feed.** Ten minutes in Ads Manager.
-   Un-poisons 57% of your click data immediately.
-6. **Fix `nightly * 6`, `nightly * 24`, `taxRate || 0.10`** — `setup.html:863`,
-   `server.js:13237`. This is the one that makes you look dishonest on a live demo,
-   and you will be doing live demos this week.
-7. **Kill the `Locked` badge and the empty-photo state** on reveal slide 1.
-8. **Add one sentence about how they get paid** to the activation screen.
+### Then — freeze and measure
 
-**Week 2 — build the outbound engine, keep selling.**
+9. **Freeze the funnel** and run the existing campaign, unchanged, until **8–10 real
+   people reach the activation page.** Post-fix that is roughly $425 of spend; today
+   it would be $1,475. Do not touch targeting, placement mix, optimisation event or
+   ad rotation during this window — you have already reset learning once this week.
 
-9. **Pull 300–500 independent properties** from Google Places in AL / MS / OK / TX
-   — the states where you have references you can name.
-10. **Script the pre-built page** so each one gets a real page with their real
-    photos at `<slug>.mktel.co`, and send the "I built yours" email.
-11. **Keep the ad running at $25/day, unchanged**, pointed at the calendar link.
-    Don't touch the targeting mid-learning; you already reset it once this week.
+10. **Contact the three recent abandoners** — Rocky Hide A Way Cottages, Studio 53,
+    Puukala Sunset Estates — for *qualitative* feedback. They abandoned at exactly
+    the screen this audit indicts. Ten minutes with any one of them is worth more
+    than the rest of this document.
 
-**What "done" looks like:** nine annual prepays. Four from the warm list, three from
-outbound, two from ads is a realistic split. If the warm list over-delivers you're
-done in three weeks; if it under-delivers, outbound is the volume lever, not ad
-spend.
+### Only then — the offer questions
+
+Once 8–10 people have seen the price, the data tells you which experiment to run, and
+none of these should be run before that:
+
+- They see it and refuse → test price, term, or a trial.
+- They start Stripe and stop → payment trust.
+- They still don't reach it → progression is still broken; the reveal fixes weren't
+  enough.
+
+### What I'd hold back
+
+**Annual-first defaults, pay-on-first-booking, the $500 setup fee, cutting the reveal
+to three beats, and replacing the qualification question** are all withdrawn as
+immediate actions. Each is a plausible experiment; none is supported by data that
+exists today; and several would destroy the very signal you're about to collect.
 
 ## 10. Things I'd want to know that I couldn't determine
 
@@ -731,7 +743,9 @@ spend.
   that anyone will pay for this came from you in a room, not from the funnel — which
   is fine, but it means the funnel has never once closed a customer and you should
   size your confidence accordingly.
-- **Is `revealProgressStep` written anywhere on the client?** Every real prospect
-  sits at 0 while `JourneyRevealStageCompleted` fired for two of them. Either the
-  persist call is broken or it only writes on later stages; worth a look, because
-  it's your resume-where-they-left-off mechanism.
+- ~~**Is `revealProgressStep` written at all?**~~ **Answered, and it strengthens the
+  central finding.** `server.js:7292` maps `BookingEngineRevealViewed → 0`, so 0 is a
+  *written* value meaning "stopped at the booking-page stage", not an unwritten
+  default. `BookingEngineRevealViewed` fired for six hotels. So it is now confirmed
+  rather than inferred: every real prospect reached the first personalised screen and
+  stopped there.

@@ -1,6 +1,12 @@
-Run your property’s direct bookings from one clear Front Desk.
+Run direct bookings and document property walkthroughs from one clear Marketel app.
 
-Marketel Front Desk gives active Marketel customers a fast place to manage the booking page their guests use and the reservations that arrive through it.
+MARKETEL INSPECT
+Walk through a unit or property, group photos by room, record exactly what you observe, flag an issue, and produce a clean condition-report PDF before you leave. Finalized reports stay frozen, and private sharing links can be replaced or revoked.
+
+Your first complete Inspect report is free with no card. Optional wording help can make your own observation clearer for review; it does not diagnose damage or add facts.
+
+FRONT DESK FOR LODGING OPERATORS
+Active Marketel booking customers can manage the direct booking page their guests use and the reservations that arrive through it.
 
 BOOKINGS AT A GLANCE
 See new and upcoming stays, review guest details, track booking status, and take action when a reservation needs attention.
@@ -14,10 +20,7 @@ Update rooms, rates, property information, and photos from the same system that 
 NATIVE BOOKING ALERTS
 Receive timely iPhone notifications for booking activity. Supported alerts let you confirm, release, or review a booking without searching through the app.
 
-GUEST REACH, CLEARLY SEPARATED
-Marketel Front Desk is the App Store app for owners and staff. Guests never download it. Guests can save the property from its direct booking page to their Home Screen, while the owner shares the QR or link and sends guest notifications from Guest Reach inside Front Desk.
+BUILT FOR SMALL OPERATORS
+Inspect works for a property manager documenting units. Front Desk works for independent lodging teams running Marketel direct bookings. A simple product switch keeps each job focused.
 
-BUILT FOR SMALL PROPERTIES
-The interface stays focused on the daily decisions an independent property actually makes, with quick property switching for owners who manage more than one location.
-
-Marketel Front Desk requires an active Marketel property account.
+Inspect reports record user-provided observations and are not professional building inspections, safety assessments, or legal certifications. Some Marketel booking features require an active property account.

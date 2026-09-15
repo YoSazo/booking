@@ -30,6 +30,15 @@ The App Store Connect API key needs permission to upload builds.
 
 - [ ] Deploy the Prisma migration
   `20260729213000_ios_app_store_readiness`.
+- [ ] Create a private, non-public R2 bucket for Inspect and set
+  `INSPECT_R2_BUCKET`; it must differ from `R2_BUCKET`.
+- [ ] Create and verify the $29 monthly Inspect Price, dedicated Stripe webhook,
+  and billing-portal configuration. Set the four `STRIPE_INSPECT_*` values.
+- [ ] Set a distinct 32+ character `INSPECT_AUTH_SECRET`, configure outbound
+  email, and set `INSPECT_PUBLIC_ORIGIN=https://bookmarketel.com`.
+- [ ] Deploy migration `20260915000000_inspect`, complete web and iPhone QA,
+  then set `INSPECT_ENABLED=true` for App Review. Keep the noindex product
+  unadvertised until Apple approves the updated build.
 - [ ] Set stable, distinct `SESSION_SECRET`, `MAGIC_LINK_SECRET`, and
   `CRM_RETURN_TOKEN_SECRET` values.
 - [ ] Set `CRM_PIN_HASH_SECRET` to a separate long random secret.
@@ -44,7 +53,7 @@ The App Store Connect API key needs permission to upload builds.
 
 ## App Store Connect
 
-- [ ] App name: `Marketel Front Desk`
+- [ ] App name: `Marketel`
 - [ ] Primary category: Business
 - [ ] Secondary category: Travel, if desired
 - [ ] Subtitle, description, keywords, and promotional text from this folder
@@ -68,6 +77,10 @@ The App Store Connect API key needs permission to upload builds.
 - [ ] Install that artifact on a real iPhone and test sign-in, property
   switching, every tab, photo permissions, contact creation, notifications,
   notification actions, sign-out, and deletion cancellation.
+- [ ] Test Inspect on a clean install and an existing Front Desk install: local
+  draft recovery, camera and library photos, email verification, free-report
+  finalization, native PDF sharing, private-link revoke, account deletion, US
+  Stripe purchase, and non-US suppression of purchase links.
 - [ ] Run again with TestFlight upload enabled.
 - [ ] Test the TestFlight build over Wi-Fi and cellular data.
 - [ ] Verify the production backend is awake and review credentials work before

@@ -34,6 +34,8 @@ const delegate = read('ios/App/App/AppDelegate.swift');
 const capacitor = read('capacitor.config.json');
 const exportOptions = read('ios/ExportOptions.plist');
 const bundledFrontDesk = read('www/frontdesk/index.html');
+const bundledInspect = read('www/inspect/index.html');
+const bundledRoot = read('www/index.html');
 
 // The Home Screen label truncates around 11-12 characters, so the icon uses the
 // short brand name. "Marketel Front Desk" rendered as "MarketelFr…", cutting off
@@ -58,6 +60,10 @@ expect(delegate, /marketelNativeContactResult/,
   'AppDelegate does not return the native contact result to Front Desk');
 expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
   'AppDelegate does not keep booking-page previews inside the app');
+expect(delegate, /case "inspectStorefront":[\s\S]{0,100}sendInspectStorefront/,
+  'AppDelegate does not provide the App Store storefront to Inspect');
+expect(delegate, /case "inspectExportPDF":[\s\S]{0,220}exportInspectPDF/,
+  'AppDelegate does not provide a native Inspect PDF export');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
 expect(delegate, /case "openAssistant":[\s\S]{0,120}presentNativeAssistant\(\)/,
@@ -82,12 +88,20 @@ if (/"url"\s*:\s*"https?:\/\//.test(capacitor)) {
 if (/clarity\.ms|unpkg\.com/.test(bundledFrontDesk)) {
   failures.push('Bundled Front Desk must not load analytics or executable JavaScript from a CDN');
 }
+if (/<script[^>]+src=["']https?:/i.test(bundledInspect)) {
+  failures.push('Bundled Inspect must not load executable JavaScript from a remote origin');
+}
+expect(bundledRoot, /marketel\.product[\s\S]{0,800}data-product="inspect"/,
+  'The native app entry does not preserve a focused Marketel product choice');
 const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');
 const bundledAssets = fs.existsSync(bundledAssetsPath)
   ? fs.readdirSync(bundledAssetsPath)
   : [];
 if (!bundledAssets.some(filename => /^native-onboarding-.*\.js$/.test(filename))) {
   failures.push('Bundled Front Desk is missing the native onboarding module');
+}
+for (const relativePath of ['www/inspect/index.html', 'www/inspect/inspect.js', 'www/inspect/inspect.css']) {
+  if (!fs.existsSync(path.resolve(root, relativePath))) failures.push(`Missing ${relativePath}`);
 }
 for (const match of bundledFrontDesk.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
   const referencedFile = path.resolve(root, 'www/frontdesk', match[1]);
