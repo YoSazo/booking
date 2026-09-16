@@ -7,6 +7,13 @@ let session = localStorage.getItem('inspect.session') || '';
 let account = null, draft = null, reports = [], nextReportCursor = null, preview = false, storefront = null, storefrontWaiters = [];
 let currentPage = 'current';
 let reportsCache = null, propertiesCache = null, listRequest = 0;
+// $29 x 12 = $348, so the annual plan saves $149 — and its report allowance is
+// the monthly one times twelve, because the quota resets per billing period.
+const PLANS = Object.freeze({
+  year: Object.freeze({ price: 199, per: '/year', save: 'Save $149', reports: 360, terms: '$199 charged today, then yearly until cancelled.' }),
+  month: Object.freeze({ price: 29, per: '/month', save: '', reports: 30, terms: '$29 charged today, then monthly until cancelled.' }),
+});
+let planInterval = 'year';
 const urls = new Map();
 const attributionKey = 'inspect.metaAttribution.v1';
 const cookieValue = name => {
@@ -68,12 +75,30 @@ async function stored(action, value) {
 function notice(message) { $('notice').textContent = message; $('notice').style.display = 'block'; clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').style.display = 'none', 9000); }
 async function persist() { if (draft) await stored('put', draft); }
 function remember() { persist().catch(() => notice('Device storage is full or unavailable. Keep this page open and save your report online.')); }
+function dropSession() { session = ''; account = null; try { localStorage.removeItem('inspect.session'); } catch {} }
+// A 401 from any single call is not proof the session is gone. Background and
+// optional calls — /billing/refresh on every foreground, for one — used to sign
+// the operator out silently, because their errors are swallowed by .catch().
+// Re-check /account before believing it, and never touch the local draft: it
+// lives in IndexedDB and must survive an expired token.
+let sessionCheck = null;
+function confirmSessionLost() {
+  if (!session) return Promise.resolve(true);
+  if (!sessionCheck) sessionCheck = (async () => {
+    let lost = false;
+    try { lost = (await fetch(`${API}/account`, { headers: { Authorization: `Bearer ${session}` } })).status === 401; }
+    catch { lost = false; }
+    if (lost) { dropSession(); updateHeader(); notice('Signed out. Your report is safe on this device — sign in again to keep saving it.'); }
+    return lost;
+  })().finally(() => { sessionCheck = null; });
+  return sessionCheck;
+}
 async function api(path, options = {}) {
   const headers = { ...(session ? { Authorization: `Bearer ${session}` } : {}), ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) };
   const response = await fetch(API + path, { ...options, headers: { ...headers, ...options.headers }, body: options.body && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    if (response.status === 401) { session = ''; account = null; localStorage.removeItem('inspect.session'); }
+    if (response.status === 401) await confirmSessionLost();
     throw Object.assign(new Error(error.error || 'Could not complete that action. Please retry.'), { status: response.status });
   }
   return options.blob ? response.blob() : response.json();
@@ -180,15 +205,51 @@ async function addPhotos(input) {
   }
   await persist();editor();
 }
+// One step visible at a time. Both forms used to sit in the sheet together, so
+// the six-digit field appeared directly under "Send sign-in code" and the sheet
+// carried two inputs and two buttons at once.
 function ensureAuth(after) {
   if(session && account) return after();
-  modal(`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email"></label><button>Send sign-in code</button></form><form id="code-form" hidden><label>Six-digit code<input id="code" inputmode="numeric" pattern="[0-9]{6}" required autocomplete="one-time-code"></label><button>Verify and continue</button></form>`);
   let email='';
-  $('email-form').onsubmit=e=>{e.preventDefault();run(async()=>{email=$('email').value;await api('/auth/request',{method:'POST',body:{email}});$('code-form').hidden=false;notice('Check your email for the code.');});};
-  $('code-form').onsubmit=e=>{e.preventDefault();run(async()=>{
-    const result=await api('/auth/verify',{method:'POST',body:{email,code:$('code').value,attribution:inspectAttribution}});
-    session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
-  }).then(()=>{if(account) after();});};
+  const codeStep=()=>{
+    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p>We sent a six-digit code to ${esc(email)}.</p><form id="code-form"><label>Six-digit code<input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label></form><button type="button" id="auth-back" class="quiet auth-back">← Use a different email</button>`;
+    const input=$('code');
+    // Synchronous focus inside the same user gesture: an await here would let
+    // iOS dismiss the keyboard before the code field exists.
+    input.focus();
+    let verifying=false;
+    const attempt=()=>{
+      const code=input.value.replace(/\D/g,'').slice(0,6);
+      if(verifying||code.length!==6)return;
+      // Deliberately not disabled while verifying: disabling a focused input
+      // drops the iOS keyboard, and re-focusing outside a user gesture will not
+      // bring it back. The flag alone prevents a second submit.
+      verifying=true;
+      run(async()=>{
+        const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
+        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
+      },null).then(()=>{
+        verifying=false;
+        if(account)after();else{input.value='';input.focus();}
+      });
+    };
+    input.oninput=attempt;
+    $('code-form').onsubmit=event=>{event.preventDefault();attempt();};
+    $('auth-back').onclick=()=>emailStep(false);
+  };
+  const emailStep=open=>{
+    const html=`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
+    if(open)modal(html);else $('dialog-body').innerHTML=html;
+    if(!open)$('email').focus();
+    $('email-form').onsubmit=event=>{
+      event.preventDefault();
+      email=$('email').value.trim();
+      if(!email)return;
+      codeStep();
+      run(async()=>{await api('/auth/request',{method:'POST',body:{email}});notice('Check your email for the code.');},null);
+    };
+  };
+  emailStep(true);
 }
 async function refresh(){if(session){account=await api('/account');updateHeader();}}
 async function syncInspectAttribution(){
@@ -270,7 +331,7 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}<div class="actions row">${draft.finalizedAt?'<button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button><button id="revoke" class="quiet">Revoke link</button>':'<button id="finalize">Save & export my report →</button>'}</div><p class="muted">${draft.finalizedAt?'This version cannot change. Create a new report for corrections.':'Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.'}</p>`;
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}<div class="actions row">${draft.finalizedAt?'<button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button>':'<button id="finalize">Save & export my report →</button>'}</div><p class="muted">${draft.finalizedAt?'This version cannot change. Create a new report for corrections.':'Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.'}</p>`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
   if($('finalize'))$('finalize').onclick=()=>ensureAuth(()=>run(async()=>{
@@ -283,8 +344,9 @@ function reportPreview(){
     const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='inspection-report.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
   });
-  if($('share'))$('share').onclick=()=>run(async()=>{const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link">Copy link</button>`);$('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});});
-  if($('revoke'))$('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});notice('Shared link revoked.');});
+  // Revoke lives inside the share sheet rather than the floating action bar:
+  // it is rare, destructive, and only means anything once a link exists.
+  if($('share'))$('share').onclick=()=>run(async()=>{const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);$('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});$('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});});
 }
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
@@ -316,8 +378,20 @@ async function offer(){
   await requestStorefront();
   if(session)api('/events',{method:'POST',body:{name:'AdditionalReportOfferViewed'}}).catch(()=>{});
   if(native&&storefront!=='USA')return modal('<h2>Your free report is yours.</h2><p>This account has no additional report allowance available. Existing subscribers can refresh their account access.</p><button id="refresh-access">Refresh access</button>'),$('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();});
-  modal(`<h2>Ready for the next property?</h2><div class="price">$29 <small>/month</small></div><p>30 reports per billing period · One operator<br>Up to 100 photos per report<br>10 optional wording suggestions per report</p><button id="buy" class="wide">Continue with Inspect — $29/month</button><p><small>$29 charged today, then monthly until cancelled. Cancel renewal anytime. Existing finalized reports remain available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`);
-  $('buy').onclick=()=>run(async()=>{const r=await api('/checkout',{method:'POST',body:{native}});openExternal(r.url);});
+  // Annual is preselected — $29/month takes over three months to repay what one
+  // customer costs to acquire — but only intervals the server has a price for
+  // are offered, so a missing annual price degrades to monthly, not a dead tap.
+  const available=(Array.isArray(account?.plans)&&account.plans.length?account.plans:['month']).filter(value=>PLANS[value]);
+  if(!available.includes(planInterval))planInterval=available[0];
+  const paint=first=>{
+    const plan=PLANS[planInterval];
+    const toggle=available.length>1?`<div class="billing-toggle" role="radiogroup" aria-label="Billing period">${available.map(value=>`<button type="button" role="radio" aria-checked="${planInterval===value}" data-plan="${value}">${value==='year'?'Annual':'Monthly'}</button>`).join('')}</div>`:'';
+    const html=`<h2>Ready for the next property?</h2>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${plan.save?`<p class="price-save">${plan.save}</p>`:''}<p>${plan.reports} reports per billing period · One operator<br>Up to 100 photos and 10 wording suggestions per report</p><button id="buy" class="wide">Continue with Inspect</button><p><small>${plan.terms} Cancel renewal anytime. Existing finalized reports remain available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
+    if(first)modal(html);else $('dialog-body').innerHTML=html;
+    document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{planInterval=button.dataset.plan==='year'?'year':'month';paint(false);};});
+    $('buy').onclick=()=>run(async()=>{const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
+  };
+  paint(true);
 }
 function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openBrowser',url});else location.assign(url);}
 function renderProperties(data){
@@ -377,7 +451,7 @@ function prefetchLists(){if(!account)return;api('/properties').then(result=>{pro
 $('account-button').onclick=async()=>{
   if(!account)return ensureAuth(()=>draft?editor():run(()=>list()));
   await requestStorefront();
-  modal(`<h2>Inspect account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} reports left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:'One complete report free. Existing reports stay available.'}</p><div class="stack"><button id="refresh">Refresh billing status</button>${(!native||storefront==='USA')?'<button id="manage" class="secondary">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button><button id="delete-account" class="quiet danger">Delete Inspect account</button></div><p><a href="https://bookmarketel.com/inspect/terms.html">Inspect terms & privacy</a></p>`);
+  modal(`<h2>Inspect account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} reports left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:'One complete report free. Existing reports stay available.'}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete Inspect account</button></div></details><p><a href="https://bookmarketel.com/inspect/terms.html">Inspect terms & privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
   $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
@@ -411,7 +485,31 @@ function showNativeKeyboardDoneButton(){
   };
   show();
 }
+// iOS keeps the layout viewport at full height when the keyboard opens, so the
+// sheet has to be told where the visible area actually is.
+function trackVisualViewport(){
+  const viewport=window.visualViewport;
+  if(!viewport)return;
+  const apply=()=>{
+    const root=document.documentElement;
+    root.style.setProperty('--vv-height',`${Math.round(viewport.height)}px`);
+    root.style.setProperty('--vv-top',`${Math.round(viewport.offsetTop)}px`);
+    root.classList.toggle('kb-open',window.innerHeight-viewport.height>120);
+  };
+  viewport.addEventListener('resize',apply);
+  viewport.addEventListener('scroll',apply);
+  apply();
+}
+trackVisualViewport();
 window.addEventListener('pagehide',()=>remember());
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session)run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh();});});
+// Every foreground used to fire two calls; errors are swallowed here so a
+// background refresh can never overwrite the sign-out notice or disable a button.
+let lastForegroundSync=0;
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!session)return;
+  if(Date.now()-lastForegroundSync<60000)return;
+  lastForegroundSync=Date.now();
+  run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});},null);
+});
 if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 try{draft=await stored('get');await refresh();if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}

@@ -56,12 +56,20 @@ test('Inspect entitlement is separate, period-bound, and keeps the lifetime free
   const future = new Date(Date.now() + 86400000);
   assert.deepEqual(entitlement({ subscriptionStatus: null, periodEnd: null, freeReportUsed: false, reportsUsed: 0 }), {
     active: false, freeAvailable: true, remaining: 0, periodEnd: null,
-    cancellationScheduled: false, price: 29, limits: LIMITS,
+    cancellationScheduled: false, price: 29, interval: 'month', limits: LIMITS,
   });
   const paid = entitlement({ subscriptionStatus: 'active', periodEnd: future, freeReportUsed: true, reportsUsed: 7, cancelAtPeriodEnd: true });
   assert.equal(paid.active, true);
   assert.equal(paid.remaining, 23);
   assert.equal(paid.cancellationScheduled, true);
+  // An annual period must carry twelve months of report allowance, or the
+  // yearly plan would sell one twelfth of the monthly plan's work.
+  const yearly = entitlement({ subscriptionStatus: 'active', periodStart: new Date('2026-01-01'),
+    periodEnd: new Date('2027-01-01'), freeReportUsed: true, reportsUsed: 12 });
+  assert.equal(yearly.interval, 'year');
+  assert.equal(yearly.price, 199);
+  assert.equal(yearly.remaining, 348);
+  assert.equal(yearly.limits.reports, 360);
   assert.equal(hash('session').length, 64);
 });
 
@@ -70,6 +78,11 @@ test('Inspect billing accepts only the promised price and ignores stale subscrip
   assert.equal(validateInspectPrice(price), price);
   assert.throws(() => validateInspectPrice({ ...price, unit_amount: 2999 }), /USD 29/);
   assert.throws(() => validateInspectPrice({ ...price, recurring: { interval: 'year', interval_count: 1 } }), /USD 29/);
+  const yearPrice = { unit_amount: 19900, currency: 'usd', recurring: { interval: 'year', interval_count: 1 } };
+  assert.equal(validateInspectPrice(yearPrice, 'year'), yearPrice);
+  assert.throws(() => validateInspectPrice({ ...yearPrice, unit_amount: 19800 }, 'year'), /USD 199/);
+  assert.throws(() => validateInspectPrice(price, 'year'), /USD 199/);
+  assert.throws(() => validateInspectPrice(yearPrice, 'month'), /USD 29/);
   const active = { stripeSubscriptionId: 'sub_new', subscriptionStatus: 'active', periodStart: new Date('2026-09-01') };
   assert.equal(shouldIgnoreSubscription(active, { id: 'sub_old' }), true);
   assert.equal(shouldIgnoreSubscription({ ...active, subscriptionStatus: 'canceled' }, { id: 'sub_newer' }), false);
@@ -119,7 +132,11 @@ test('Inspect conversion events stay server-side, idempotent, and product-scoped
   const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.match(source, /queueInspectCapi\('Lead'[\s\S]{0,180}inspect-lead\.\$\{req\.inspect\.id\}/);
   assert.match(source, /queueInspectCapi\('CompleteRegistration'[\s\S]{0,180}inspect-registration\.\$\{req\.inspect\.id\}/);
-  assert.match(source, /queueInspectCapi\('InitiateCheckout'[\s\S]{0,220}value: 29/);
+  // Checkout value follows the chosen plan so Meta optimises toward the
+  // annual conversion rather than a flat $29.
+  assert.match(source, /queueInspectCapi\('InitiateCheckout'[\s\S]{0,220}value: plan\.amount \/ 100/);
+  assert.match(source, /year: Object\.freeze\(\{ interval: 'year', amount: 19900/);
+  assert.match(source, /const purchasablePlans = \(\) =>/);
   assert.match(source, /queueInspectCapi\('Purchase'[\s\S]{0,260}invoice\.amount_paid/);
   assert.match(source, /eventId: `inspect-purchase\.\$\{invoice\.id\}`/);
   assert.match(source, /product: 'marketel-inspect'/);
@@ -173,6 +190,7 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
     R2_SECRET_ACCESS_KEY: 'secret',
     STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
     STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
+    STRIPE_INSPECT_YEARLY_PRICE_ID: 'price_inspect_199',
     STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
     STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_inspect',
   });
@@ -189,6 +207,7 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
     INSPECT_R2_SECRET_ACCESS_KEY: 'inspect-secret',
     STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
     STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
+    STRIPE_INSPECT_YEARLY_PRICE_ID: 'price_inspect_199',
     STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
     STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_inspect',
   });

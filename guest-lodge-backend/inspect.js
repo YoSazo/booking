@@ -50,10 +50,21 @@ function validateSignatures(value) {
   });
 }
 
-function validateInspectPrice(price) {
-  if (price?.unit_amount !== 2900 || price.currency !== 'usd'
-      || price.recurring?.interval !== 'month' || price.recurring?.interval_count !== 1) {
-    throw fail(503, 'The Inspect price must be USD 29 per month.');
+// Two allowed shapes, both exact. The annual report allowance is the monthly one
+// multiplied by twelve, because the quota resets per *billing* period — leaving
+// it at 30 would sell a yearly plan one twelfth of the monthly plan's work.
+const INSPECT_PLANS = Object.freeze({
+  month: Object.freeze({ interval: 'month', amount: 2900, reports: LIMITS.reports, priceEnv: 'STRIPE_INSPECT_PRICE_ID', contentName: 'Marketel Inspect monthly plan' }),
+  year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
+});
+const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
+function validateInspectPrice(price, interval = 'month') {
+  const plan = inspectPlan(interval);
+  if (price?.unit_amount !== plan.amount || price.currency !== 'usd'
+      || price.recurring?.interval !== plan.interval || price.recurring?.interval_count !== 1) {
+    throw fail(503, plan.interval === 'year'
+      ? 'The Inspect annual price must be USD 199 per year.'
+      : 'The Inspect price must be USD 29 per month.');
   }
   return price;
 }
@@ -98,10 +109,24 @@ function validateDocument(input) {
   return document;
 }
 
+// Stripe billing periods run 28-31 days monthly and about 365 annually, so the
+// stored period identifies the plan without persisting it a second time and
+// risking the two copies disagreeing.
+function accountPlan(account) {
+  const start = Number(account.periodStart ? new Date(account.periodStart).getTime() : 0);
+  const end = Number(account.periodEnd ? new Date(account.periodEnd).getTime() : 0);
+  // Without both bounds there is no period to measure, and treating that as
+  // annual would hand out twelve months of allowance to an unknown plan.
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !start || !end) return INSPECT_PLANS.month;
+  return inspectPlan(end - start > 60 * 86400000 ? 'year' : 'month');
+}
+
 function entitlement(account, now = Date.now()) {
   const active = account.subscriptionStatus === 'active' && new Date(account.periodEnd).getTime() > now;
-  return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, LIMITS.reports - account.reportsUsed) : 0,
-    periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true, price: 29, limits: LIMITS };
+  const plan = accountPlan(account);
+  return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
+    periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true,
+    price: plan.amount / 100, interval: plan.interval, limits: { ...LIMITS, reports: plan.reports } };
 }
 
 const attributionText = (value, maximum = 180) => String(value || '')
@@ -172,6 +197,7 @@ function inspectEnvReadiness(env = process.env) {
   const stripeKey = clean('STRIPE_INSPECT_SECRET_KEY') || clean('STRIPE_MARKETEL_SECRET_KEY');
   const stripeKeyOk = stripeKey.startsWith('sk_');
   const priceIdOk = present('STRIPE_INSPECT_PRICE_ID') && clean('STRIPE_INSPECT_PRICE_ID').startsWith('price_');
+  const yearlyPriceIdOk = present('STRIPE_INSPECT_YEARLY_PRICE_ID') && clean('STRIPE_INSPECT_YEARLY_PRICE_ID').startsWith('price_');
   const webhookOk = present('STRIPE_INSPECT_WEBHOOK_SECRET') && clean('STRIPE_INSPECT_WEBHOOK_SECRET').startsWith('whsec_');
   const portalOk = present('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID') && clean('STRIPE_INSPECT_PORTAL_CONFIGURATION_ID').startsWith('bpc_');
   const priceValidationReady = stripeKeyOk && priceIdOk;
@@ -184,6 +210,9 @@ function inspectEnvReadiness(env = process.env) {
       item('inspect-auth-secret', 'Inspect auth secret', authOk, 'Set a distinct 32+ character INSPECT_AUTH_SECRET and keep it stable.', requireWhenEnabled),
       item('inspect-private-bucket', 'Inspect private R2 bucket', privateBucketOk && storageCredsOk, 'Create a private INSPECT_R2_BUCKET that differs from R2_BUCKET and give INSPECT_R2_* credentials read/write access to it.', requireWhenEnabled),
       item('inspect-stripe-price', 'Inspect $29/mo Stripe price id', priceIdOk, 'Create a USD 29 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
+      // Deliberately not critical: a missing annual price must never take the
+      // whole product dark, it just leaves monthly as the only plan on offer.
+      item('inspect-stripe-yearly-price', 'Inspect $199/yr Stripe price id', yearlyPriceIdOk, 'Create a USD 199 yearly Price and set STRIPE_INSPECT_YEARLY_PRICE_ID. Until then the paywall can only sell monthly.', false),
       item('inspect-stripe-webhook', 'Inspect Stripe webhook secret', webhookOk, 'Point a webhook at /api/inspect-stripe-webhook and set STRIPE_INSPECT_WEBHOOK_SECRET.', requireWhenEnabled),
       item('inspect-stripe-portal', 'Inspect billing portal configuration', portalOk, 'Create a Customer Portal config and set STRIPE_INSPECT_PORTAL_CONFIGURATION_ID.', requireWhenEnabled),
       item('inspect-price-validation', 'Inspect Stripe price can be retrieved', priceValidationReady, 'Set STRIPE_INSPECT_SECRET_KEY or reuse STRIPE_MARKETEL_SECRET_KEY with STRIPE_INSPECT_PRICE_ID so checkout can validate USD 29/mo.', requireWhenEnabled),
@@ -391,7 +420,7 @@ function registerInspect(app, {
     });
     if (!result) throw fail(401, 'Invalid or expired code. Request another code.');
     await recordBestEffort(result.id, 'AccountVerified');
-    res.json({ token: sessionToken, email, ...entitlement(result) });
+    res.json({ token: sessionToken, email, ...entitlement(result), plans: purchasablePlans() });
   }));
 
   // Used by the bundled iOS product picker. It intentionally exposes no
@@ -494,7 +523,7 @@ function registerInspect(app, {
       req.inspect = session.account; req.inspectSessionHash = session.tokenHash; next();
     }).catch(next);
   });
-  router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect) })));
+  router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect), plans: purchasablePlans() })));
   router.post('/attribution', guarded(async (req, res) => {
     const account = await saveAttribution(req.inspect, req.body.attribution, req);
     req.inspect = account;
@@ -793,6 +822,9 @@ function registerInspect(app, {
 
   const requireStripe = () => { if (!stripe) throw fail(503, 'Inspect billing is not configured yet.'); };
   const requireBilling = () => { requireStripe(); if (!env.STRIPE_INSPECT_PRICE_ID) throw fail(503, 'Inspect billing is not configured yet.'); };
+  // The paywall must only offer intervals that actually have a Stripe price,
+  // so a missing annual price degrades to monthly instead of a failing tap.
+  const purchasablePlans = () => ['year', 'month'].filter(interval => !!env[inspectPlan(interval).priceEnv]);
   async function syncSubscription(subscription) {
     if (subscription.metadata?.product !== 'marketel-inspect') return false;
     const accountId = subscription.metadata.inspectAccountId;
@@ -803,7 +835,8 @@ function registerInspect(app, {
       if (!a) return false;
       if (a.stripeCustomerId !== subscription.customer) throw fail(400, 'Subscription customer mismatch.');
       const item = subscription.items?.data?.[0];
-      if (item?.price?.id !== env.STRIPE_INSPECT_PRICE_ID) throw fail(400, 'Unexpected Inspect price.');
+      const allowedPrices = [env.STRIPE_INSPECT_PRICE_ID, env.STRIPE_INSPECT_YEARLY_PRICE_ID].filter(Boolean);
+      if (!item?.price?.id || !allowedPrices.includes(item.price.id)) throw fail(400, 'Unexpected Inspect price.');
       const start = new Date((item.current_period_start || subscription.current_period_start) * 1000);
       const end = new Date((item.current_period_end || subscription.current_period_end) * 1000);
       if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) throw fail(400, 'Missing billing period.');
@@ -820,6 +853,10 @@ function registerInspect(app, {
   router.post('/checkout', guarded(async (req, res) => {
     requireBilling();
     rate(`checkout:${req.inspect.id}`, 10, 3600000);
+    const interval = req.body.interval === 'year' ? 'year' : 'month';
+    const plan = inspectPlan(interval);
+    const priceId = env[plan.priceEnv];
+    if (!priceId) throw fail(503, 'That Inspect plan is not configured yet.');
     // Serialize creation and use Stripe idempotency to survive network retries.
     const checkout = await prisma.$transaction(async tx => {
       let a = await lockAccount(tx, req.inspect.id);
@@ -827,7 +864,7 @@ function registerInspect(app, {
         const subscription = await stripe.subscriptions.retrieve(a.stripeSubscriptionId);
         if (!['canceled', 'incomplete_expired'].includes(subscription.status)) throw fail(409, 'You already have a subscription. Use Manage subscription.');
       }
-      const price = validateInspectPrice(await stripe.prices.retrieve(env.STRIPE_INSPECT_PRICE_ID));
+      const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
       if (!a.stripeCustomerId) {
         const customer = await stripe.customers.create({ email: a.email, metadata: { product: 'marketel-inspect', inspectAccountId: a.id } }, { idempotencyKey: `inspect-customer:${a.id}` });
         a = await tx.inspectAccount.update({ where: { id: a.id }, data: { stripeCustomerId: customer.id } });
@@ -835,15 +872,17 @@ function registerInspect(app, {
       const subscriptions = await stripe.subscriptions.list({ customer: a.stripeCustomerId, status: 'all', limit: 100 });
       if (subscriptions.data.some(s => s.metadata?.product === 'marketel-inspect' && !['canceled', 'incomplete_expired'].includes(s.status))) throw fail(409, 'A subscription already exists. Refresh billing or use Manage subscription.');
       const open = await stripe.checkout.sessions.list({ customer: a.stripeCustomerId, status: 'open', limit: 10 });
-      const existing = open.data.find(s => s.metadata?.product === 'marketel-inspect');
+      // An open session for the other billing period must not be handed back,
+      // or choosing Annual would silently reopen a Monthly checkout.
+      const existing = open.data.find(s => s.metadata?.product === 'marketel-inspect' && (s.metadata?.interval || 'month') === interval);
       if (existing) return { url: existing.url, sessionId: existing.id };
       const nativeReturn = req.body.native === true;
       const session = await stripe.checkout.sessions.create({ mode: 'subscription', customer: a.stripeCustomerId,
-        line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id },
-        subscription_data: { metadata: { product: 'marketel-inspect', inspectAccountId: a.id } },
+        line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval },
+        subscription_data: { metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval } },
         success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : `${origin}/inspect/?checkout=success`,
         cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : `${origin}/inspect/?checkout=cancelled` },
-        { idempotencyKey: `inspect-checkout:${a.id}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
+        { idempotencyKey: `inspect-checkout:${a.id}:${interval}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
       return { url: session.url, sessionId: session.id };
     }, { timeout: 30000 });
     const eventId = `inspect-checkout.${checkout.sessionId}`;
@@ -852,9 +891,9 @@ function registerInspect(app, {
       account: req.inspect,
       req,
       eventId,
-      value: 29,
+      value: plan.amount / 100,
       currency: 'USD',
-      contentName: 'Marketel Inspect monthly plan',
+      contentName: plan.contentName,
     }).catch(error => console.error('Inspect checkout CAPI queue failed:', error.message));
     res.json({ url: checkout.url });
   }));
@@ -874,7 +913,7 @@ function registerInspect(app, {
       const s = matches.find(s => !['canceled', 'incomplete_expired'].includes(s.status)) || matches[0];
       if (s) await syncSubscription(s);
     }
-    res.json(entitlement(await prisma.inspectAccount.findUniqueOrThrow({ where: { id: req.inspect.id } })));
+    res.json({ ...entitlement(await prisma.inspectAccount.findUniqueOrThrow({ where: { id: req.inspect.id } })), plans: purchasablePlans() });
   }));
   router.delete('/account', guarded(async (req, res) => {
     if (req.body.confirm !== 'DELETE') throw fail(400, 'Type DELETE to confirm account deletion.');
