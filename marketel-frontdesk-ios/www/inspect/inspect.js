@@ -8,6 +8,46 @@ let account = null, draft = null, reports = [], nextReportCursor = null, preview
 let currentPage = 'current';
 let reportsCache = null, propertiesCache = null, listRequest = 0;
 const urls = new Map();
+const attributionKey = 'inspect.metaAttribution.v1';
+const cookieValue = name => {
+  try {
+    const match = String(document.cookie || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+    return match ? decodeURIComponent(match[1]) : '';
+  } catch { return ''; }
+};
+const validMetaId = value => /^fb\.1\.[A-Za-z0-9._-]+$/.test(String(value || '')) ? String(value).slice(0,220) : '';
+const validClickId = value => /^[A-Za-z0-9._-]{1,180}$/.test(String(value || '')) ? String(value) : '';
+function writeMetaCookie(name,value){
+  if(!/^https?:$/.test(location.protocol)||!value)return;
+  document.cookie=`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=7776000; SameSite=Lax${location.protocol==='https:'?'; Secure':''}`;
+}
+function generatedFbp(){
+  const words=new Uint32Array(2);crypto.getRandomValues(words);
+  return `fb.1.${Date.now()}.${words[0]}${words[1]}`;
+}
+function captureInspectAttribution(){
+  if(native||!/^https?:$/.test(location.protocol))return null;
+  const params=new URLSearchParams(location.search),fbclid=validClickId(params.get('fbclid'));
+  let fbp=validMetaId(cookieValue('_fbp'));
+  if(!fbp){fbp=generatedFbp();writeMetaCookie('_fbp',fbp);}
+  let fbc=fbclid?`fb.1.${Date.now()}.${fbclid}`:validMetaId(cookieValue('_fbc'));
+  if(fbclid)writeMetaCookie('_fbc',fbc);
+  let stored={};
+  try{stored=JSON.parse(localStorage.getItem(attributionKey)||'{}')||{};}catch{}
+  const source=new URL(location.origin+location.pathname);
+  const fields={utm_source:'utmSource',utm_medium:'utmMedium',utm_campaign:'utmCampaign',utm_content:'utmContent',utm_term:'utmTerm'};
+  const current={fbp,...(fbc?{fbc}:{}),sourceUrl:source.toString()};
+  for(const [parameter,key] of Object.entries(fields)){
+    const value=String(params.get(parameter)||'').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,180);
+    if(value){current[key]=value;source.searchParams.set(parameter,value);}
+  }
+  if(fbclid)source.searchParams.set('fbclid',fbclid);
+  current.sourceUrl=source.toString();
+  const result=!Object.keys(stored).length||fbclid?current:{...stored,fbp};
+  try{localStorage.setItem(attributionKey,JSON.stringify(result));}catch{}
+  return result;
+}
+const inspectAttribution=captureInspectAttribution();
 const localDate = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const uid = () => crypto.randomUUID?.() || `${Date.now().toString(36)}_${crypto.getRandomValues(new Uint32Array(2)).join('_')}`;
 const newDocument = propertyName => ({ propertyName: propertyName || '', author: '', type: 'routine', date: localDate(), rooms: [{ name: 'Living room', observation: '', issue: false, photos: [] }], signatures: [] });
@@ -146,11 +186,14 @@ function ensureAuth(after) {
   let email='';
   $('email-form').onsubmit=e=>{e.preventDefault();run(async()=>{email=$('email').value;await api('/auth/request',{method:'POST',body:{email}});$('code-form').hidden=false;notice('Check your email for the code.');});};
   $('code-form').onsubmit=e=>{e.preventDefault();run(async()=>{
-    const result=await api('/auth/verify',{method:'POST',body:{email,code:$('code').value}});
+    const result=await api('/auth/verify',{method:'POST',body:{email,code:$('code').value,attribution:inspectAttribution}});
     session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
   }).then(()=>{if(account) after();});};
 }
 async function refresh(){if(session){account=await api('/account');updateHeader();}}
+async function syncInspectAttribution(){
+  if(session&&account&&inspectAttribution)await api('/attribution',{method:'POST',body:{attribution:inspectAttribution}});
+}
 function remoteDocument(){
   return {...draft.document,rooms:draft.document.rooms.map(room=>({...room,photos:room.photos.map(id=>draft.files.find(file=>file.id===id)?.remoteId).filter(Boolean)}))};
 }
@@ -371,4 +414,4 @@ function showNativeKeyboardDoneButton(){
 window.addEventListener('pagehide',()=>remember());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session)run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh();});});
 if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
-try{draft=await stored('get');await refresh();if(account)prefetchLists();if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}
+try{draft=await stored('get');await refresh();if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}

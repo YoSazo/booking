@@ -848,6 +848,7 @@ async function queueMarketelCAPI(eventName, input = {}) {
     const now = new Date();
     const metadata = {
         provider: 'meta',
+        product: String(input.product || 'marketel-booking').trim().slice(0, 80),
         metaEventName: String(eventName || '').trim().slice(0, 80),
         sourceUrl: String(input.sourceUrl || '').trim().slice(0, 500),
         fbp: String(input.fbp || '').trim().slice(0, 220),
@@ -13136,6 +13137,7 @@ app.get('/api/admin/meta-capi/status', adminAuth, async (_req, res) => {
                         ? 'sent'
                         : row.eventName === MARKETEL_CAPI_FAILED ? 'failed' : 'pending',
                     metaEventName: metadata.metaEventName || '',
+                    product: metadata.product || 'marketel-booking',
                     providerEventId: row.eventId || '',
                     attempts: Number(metadata.attempts) || 0,
                     testMode: !!metadata.testMode,
@@ -18661,7 +18663,16 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
     : marketelStripe;
-require('./inspect').registerInspect(app, { prisma, mail: emailTransporter, stripe: inspectStripe });
+require('./inspect').registerInspect(app, {
+    prisma,
+    mail: emailTransporter,
+    stripe: inspectStripe,
+    queueCapi: queueMarketelCAPI,
+    capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
+    isCapiExcludedEmail: (email) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(
+        String(email || '').trim().toLowerCase()
+    ),
+});
 telemetry.setupRoutes(app);
 
 function startServer() {

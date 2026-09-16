@@ -21,6 +21,10 @@ model InspectAccount {
   periodEnd            DateTime?
   cancelAtPeriodEnd    Boolean          @default(false)
   reportsUsed          Int              @default(0)
+  // Server-sanitized Meta/UTM attribution for Inspect conversions. This is
+  // deliberately separate from booking-property funnel state and disappears
+  // with the Inspect account.
+  metaAttribution      Json?
   reports              InspectReport[]
   sessions             InspectSession[]
 }

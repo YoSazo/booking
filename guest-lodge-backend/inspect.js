@@ -6,6 +6,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const PDFDocument = require('pdfkit');
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { marketelMetaRequestContext } = require('./marketel-meta-capi');
 
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 const token = () => crypto.randomBytes(32).toString('base64url');
@@ -103,6 +104,50 @@ function entitlement(account, now = Date.now()) {
     periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true, price: 29, limits: LIMITS };
 }
 
+const attributionText = (value, maximum = 180) => String(value || '')
+  .replace(/[\u0000-\u001f\u007f]/g, '')
+  .trim()
+  .slice(0, maximum);
+
+function sanitizeInspectAttribution(value, req = {}) {
+  const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const meta = marketelMetaRequestContext({
+    body: { fbp: input.fbp, fbc: input.fbc, metaSourceUrl: input.sourceUrl },
+    headers: {},
+  });
+  const result = {
+    ...(meta.fbp ? { fbp: meta.fbp } : {}),
+    ...(meta.fbc ? { fbc: meta.fbc } : {}),
+    ...(meta.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
+  };
+  for (const key of ['utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm']) {
+    const text = attributionText(input[key]);
+    if (text) result[key] = text;
+  }
+  if (!Object.keys(result).length) return null;
+  result.ipAddress = attributionText(req.ip || req.socket?.remoteAddress, 100);
+  result.userAgent = attributionText(req.headers?.['user-agent'], 500);
+  result.capturedAt = new Date().toISOString();
+  return result;
+}
+
+function mergeInspectAttribution(existingValue, incoming) {
+  const existing = existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue)
+    ? existingValue
+    : {};
+  if (!incoming) return Object.keys(existing).length ? existing : null;
+  const newClick = incoming.fbc && incoming.fbc !== existing.fbc;
+  if (!Object.keys(existing).length || newClick) return { ...existing, ...incoming };
+  // A direct return may refresh match-quality fields but must never erase or
+  // relabel the ad click that originally brought this account to Inspect.
+  return {
+    ...existing,
+    ...(incoming.fbp ? { fbp: incoming.fbp } : {}),
+    ...(incoming.ipAddress ? { ipAddress: incoming.ipAddress } : {}),
+    ...(incoming.userAgent ? { userAgent: incoming.userAgent } : {}),
+  };
+}
+
 /** Sync env checks for /api/admin/launch-readiness. Critical only when Inspect is enabled. */
 function inspectEnvReadiness(env = process.env) {
   const clean = name => String(env[name] || '').trim();
@@ -147,7 +192,15 @@ function inspectEnvReadiness(env = process.env) {
   };
 }
 
-function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
+function registerInspect(app, {
+  prisma,
+  mail,
+  stripe,
+  queueCapi = null,
+  capiConfigured = false,
+  isCapiExcludedEmail = () => false,
+  env = process.env,
+}) {
   const enabled = env.INSPECT_ENABLED === 'true';
   const readiness = inspectEnvReadiness(env);
   const router = express.Router();
@@ -178,6 +231,44 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
   const recordBestEffort = (accountId, name, sourceId) => record(accountId, name, sourceId).catch(error => {
     console.error('Inspect event recording failed:', name, error.name);
   });
+  const saveAttribution = async (account, value, req, db = prisma) => {
+    const incoming = sanitizeInspectAttribution(value, req);
+    const merged = mergeInspectAttribution(account.metaAttribution, incoming);
+    if (!merged || JSON.stringify(merged) === JSON.stringify(account.metaAttribution || null)) return account;
+    return db.inspectAccount.update({ where: { id: account.id }, data: { metaAttribution: merged } });
+  };
+  const queueInspectCapi = async (eventName, {
+    account,
+    req,
+    eventId,
+    value,
+    currency = 'USD',
+    contentName,
+    eventTime,
+  }) => {
+    if (!capiConfigured || typeof queueCapi !== 'function' || !account || isCapiExcludedEmail(account.email)) {
+      return { queued: false, excluded: !!account && isCapiExcludedEmail(account.email) };
+    }
+    const attribution = account.metaAttribution && typeof account.metaAttribution === 'object'
+      ? account.metaAttribution
+      : {};
+    return queueCapi(eventName, {
+      product: 'marketel-inspect',
+      hotelId: `inspect:${account.id}`,
+      email: account.email,
+      externalId: `inspect:${account.id}`,
+      ip: attribution.ipAddress || req?.ip || req?.socket?.remoteAddress || '',
+      userAgent: attribution.userAgent || req?.headers?.['user-agent'] || '',
+      sourceUrl: attribution.sourceUrl || `${origin}/inspect/`,
+      fbp: attribution.fbp || '',
+      fbc: attribution.fbc || '',
+      value,
+      currency,
+      eventId,
+      contentName,
+      eventTime,
+    });
+  };
   const storageReady = () => {
     if (!storageConfigured) throw fail(503, 'Private report storage is not configured.');
   };
@@ -289,9 +380,10 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
       if (!crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(challenge.codeHash))) return null;
       await tx.inspectChallenge.delete({ where: { email } });
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
-      const account = await tx.inspectAccount.upsert({ where: { email },
+      let account = await tx.inspectAccount.upsert({ where: { email },
         create: { email, freeReportUsed: !!priorFreeClaim },
         update: priorFreeClaim ? { freeReportUsed: true } : {} });
+      account = await saveAttribution(account, req.body.attribution, req, tx);
       const oldSessions = await tx.inspectSession.findMany({ where: { accountId: account.id }, orderBy: { expiresAt: 'desc' }, skip: 9, select: { tokenHash: true } });
       if (oldSessions.length) await tx.inspectSession.deleteMany({ where: { tokenHash: { in: oldSessions.map(s => s.tokenHash) } } });
       await tx.inspectSession.create({ data: { tokenHash: hash(sessionToken), accountId: account.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
@@ -403,6 +495,11 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
     }).catch(next);
   });
   router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect) })));
+  router.post('/attribution', guarded(async (req, res) => {
+    const account = await saveAttribution(req.inspect, req.body.attribution, req);
+    req.inspect = account;
+    res.json({ success: true });
+  }));
   router.post('/events', guarded(async (req, res) => {
     if (req.body.name !== 'AdditionalReportOfferViewed') throw fail(400, 'Unknown Inspect event.');
     await record(req.inspect.id, req.body.name, `inspect-offer:${req.inspect.id}`);
@@ -452,6 +549,12 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
       await tx.inspectEvent.create({ data: { accountId: req.inspect.id, name: 'ReportStarted', sourceId: `inspect-start:${created.id}` } });
       return created;
     });
+    await queueInspectCapi('Lead', {
+      account: req.inspect,
+      req,
+      eventId: `inspect-lead.${req.inspect.id}`,
+      contentName: 'Marketel Inspect report started',
+    }).catch(error => console.error('Inspect Lead CAPI queue failed:', error.message));
     res.json(serialize(report));
   }));
   router.get('/reports/:id', guarded(async (req, res) => res.json(serialize(await owned(prisma, req.inspect.id, req.params.id)))));
@@ -649,6 +752,12 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
       await tx.inspectEvent.create({ data: { accountId: a.id, name: 'ReportFinalized', sourceId: `inspect-final:${r.id}` } });
       return finalized;
     });
+    await queueInspectCapi('CompleteRegistration', {
+      account: req.inspect,
+      req,
+      eventId: `inspect-registration.${req.inspect.id}`,
+      contentName: 'Marketel Inspect first report finalized',
+    }).catch(error => console.error('Inspect registration CAPI queue failed:', error.message));
     res.json(serialize(result));
   }));
   router.get('/reports/:id/pdf', guarded(async (req, res) => {
@@ -712,7 +821,7 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
     requireBilling();
     rate(`checkout:${req.inspect.id}`, 10, 3600000);
     // Serialize creation and use Stripe idempotency to survive network retries.
-    const url = await prisma.$transaction(async tx => {
+    const checkout = await prisma.$transaction(async tx => {
       let a = await lockAccount(tx, req.inspect.id);
       if (a.stripeSubscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(a.stripeSubscriptionId);
@@ -727,7 +836,7 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
       if (subscriptions.data.some(s => s.metadata?.product === 'marketel-inspect' && !['canceled', 'incomplete_expired'].includes(s.status))) throw fail(409, 'A subscription already exists. Refresh billing or use Manage subscription.');
       const open = await stripe.checkout.sessions.list({ customer: a.stripeCustomerId, status: 'open', limit: 10 });
       const existing = open.data.find(s => s.metadata?.product === 'marketel-inspect');
-      if (existing) return existing.url;
+      if (existing) return { url: existing.url, sessionId: existing.id };
       const nativeReturn = req.body.native === true;
       const session = await stripe.checkout.sessions.create({ mode: 'subscription', customer: a.stripeCustomerId,
         line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id },
@@ -735,9 +844,19 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
         success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : `${origin}/inspect/?checkout=success`,
         cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : `${origin}/inspect/?checkout=cancelled` },
         { idempotencyKey: `inspect-checkout:${a.id}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
-      return session.url;
+      return { url: session.url, sessionId: session.id };
     }, { timeout: 30000 });
-    await recordBestEffort(req.inspect.id, 'CheckoutStarted'); res.json({ url });
+    const eventId = `inspect-checkout.${checkout.sessionId}`;
+    await recordBestEffort(req.inspect.id, 'CheckoutStarted', eventId);
+    await queueInspectCapi('InitiateCheckout', {
+      account: req.inspect,
+      req,
+      eventId,
+      value: 29,
+      currency: 'USD',
+      contentName: 'Marketel Inspect monthly plan',
+    }).catch(error => console.error('Inspect checkout CAPI queue failed:', error.message));
+    res.json({ url: checkout.url });
   }));
   router.post('/billing', guarded(async (req, res) => {
     requireBilling();
@@ -795,7 +914,23 @@ function registerInspect(app, { prisma, mail, stripe, env = process.env }) {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       if (subscription.metadata?.product === 'marketel-inspect') {
         const synced = await syncSubscription(subscription);
-        if (synced && event.type === 'invoice.paid' && event.data.object.amount_paid > 0) await record(subscription.metadata.inspectAccountId, 'PaymentSucceeded', `inspect-invoice:${event.data.object.id}`);
+        const invoice = event.data.object;
+        if (synced && event.type === 'invoice.paid' && invoice.amount_paid > 0) {
+          const accountId = subscription.metadata.inspectAccountId;
+          await record(accountId, 'PaymentSucceeded', `inspect-invoice:${invoice.id}`);
+          const account = await prisma.inspectAccount.findUnique({ where: { id: accountId } });
+          if (account) {
+            await queueInspectCapi('Purchase', {
+              account,
+              req,
+              eventId: `inspect-purchase.${invoice.id}`,
+              value: Number(invoice.amount_paid) / 100,
+              currency: String(invoice.currency || 'usd').toUpperCase(),
+              contentName: 'Marketel Inspect subscription',
+              eventTime: Number(event.created) || undefined,
+            });
+          }
+        }
       }
     }
     res.json({ received: true });
@@ -822,6 +957,8 @@ module.exports = {
   shouldIgnoreSubscription,
   startsNewPaidPeriod,
   entitlement,
+  sanitizeInspectAttribution,
+  mergeInspectAttribution,
   inspectEnvReadiness,
   LIMITS,
   hash,

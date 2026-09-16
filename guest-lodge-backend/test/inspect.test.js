@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
-const { registerInspect, validateDocument, validateSignatures, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, inspectEnvReadiness, LIMITS, hash } = require('../inspect');
+const { registerInspect, validateDocument, validateSignatures, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, sanitizeInspectAttribution, mergeInspectAttribution, inspectEnvReadiness, LIMITS, hash } = require('../inspect');
 
 const validDocument = () => ({
   propertyName: 'Oak Street · Unit 2',
@@ -76,6 +76,59 @@ test('Inspect billing accepts only the promised price and ignores stale subscrip
   assert.equal(startsNewPaidPeriod(active, 'active', new Date('2026-10-01')), true);
   assert.equal(startsNewPaidPeriod(active, 'active', new Date('2026-09-01')), false);
   assert.equal(startsNewPaidPeriod({ ...active, subscriptionStatus: 'past_due' }, 'active', new Date('2026-09-01')), true);
+});
+
+test('Inspect Meta attribution is bounded, server-stamped, and preserves the latest real click', () => {
+  const first = sanitizeInspectAttribution({
+    fbp: 'fb.1.1720000000000.123456789',
+    fbc: 'fb.1.1720000000000.click_one',
+    sourceUrl: 'https://bookmarketel.com/inspect/?utm_source=meta&fbclid=click_one',
+    utmSource: 'meta', utmCampaign: 'inspect_launch', arbitrarySecret: 'discard me',
+  }, { ip: '203.0.113.10', headers: { 'user-agent': 'Inspect Browser' } });
+  assert.equal(first.fbp, 'fb.1.1720000000000.123456789');
+  assert.equal(first.fbc, 'fb.1.1720000000000.click_one');
+  assert.equal(first.utmCampaign, 'inspect_launch');
+  assert.equal(first.ipAddress, '203.0.113.10');
+  assert.equal(first.userAgent, 'Inspect Browser');
+  assert.equal(first.arbitrarySecret, undefined);
+
+  const directReturn = sanitizeInspectAttribution({ fbp: 'fb.1.1720000000001.987654321' }, {
+    ip: '203.0.113.11', headers: { 'user-agent': 'Returning Browser' },
+  });
+  const preserved = mergeInspectAttribution(first, directReturn);
+  assert.equal(preserved.fbc, first.fbc);
+  assert.equal(preserved.utmCampaign, 'inspect_launch');
+  assert.equal(preserved.fbp, directReturn.fbp);
+
+  const secondClick = sanitizeInspectAttribution({
+    fbp: directReturn.fbp,
+    fbc: 'fb.1.1720000000002.click_two',
+    sourceUrl: 'https://bookmarketel.com/inspect/?utm_campaign=inspect_refresh&fbclid=click_two',
+    utmCampaign: 'inspect_refresh',
+  }, { ip: '203.0.113.12', headers: { 'user-agent': 'Returning Browser' } });
+  assert.equal(mergeInspectAttribution(first, secondClick).utmCampaign, 'inspect_refresh');
+  assert.equal(sanitizeInspectAttribution({ fbp: 'not-meta', sourceUrl: 'javascript:alert(1)' }), null);
+});
+
+test('Inspect conversion events stay server-side, idempotent, and product-scoped', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const terms = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'terms.html'), 'utf8');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.match(source, /queueInspectCapi\('Lead'[\s\S]{0,180}inspect-lead\.\$\{req\.inspect\.id\}/);
+  assert.match(source, /queueInspectCapi\('CompleteRegistration'[\s\S]{0,180}inspect-registration\.\$\{req\.inspect\.id\}/);
+  assert.match(source, /queueInspectCapi\('InitiateCheckout'[\s\S]{0,220}value: 29/);
+  assert.match(source, /queueInspectCapi\('Purchase'[\s\S]{0,260}invoice\.amount_paid/);
+  assert.match(source, /eventId: `inspect-purchase\.\$\{invoice\.id\}`/);
+  assert.match(source, /product: 'marketel-inspect'/);
+  assert.match(server, /queueCapi: queueMarketelCAPI/);
+  assert.match(server, /isCapiExcludedEmail/);
+  assert.match(client, /fbclid[\s\S]{0,220}`fb\.1\.\$\{Date\.now\(\)\}\.\$\{fbclid\}`/);
+  assert.match(client, /inspect\.metaAttribution\.v1/);
+  assert.doesNotMatch(client, /connect\.facebook\.net|fbq\(/);
+  assert.match(terms, /Conversion events are sent server-to-server to Meta/);
 });
 
 async function request(app, path, options) {
