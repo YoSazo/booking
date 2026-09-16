@@ -147,6 +147,9 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 dialog::backdrop { background: #15261c24; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
+/* The sheet takes focus itself when it has no field, so opening one never lands
+   a focus ring on whichever control happened to be first in the markup. */
+dialog:focus, dialog:focus-visible { outline: none; }
 #dialog-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; border-radius: 999px; color: var(--muted); }
 .auth-back { margin-top: 2px; }
 .billing-toggle { display: flex; gap: 6px; padding: 5px; margin: 4px 0 18px; background: #e7efe9; border-radius: 15px; }

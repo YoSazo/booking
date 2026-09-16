@@ -84,7 +84,10 @@ function notice(message, type = '') {
   while (box.children.length > 3) box.firstChild.remove();
 }
 async function persist() { if (draft) await stored('put', draft); }
-function remember() { persist().catch(() => notice('Device storage is full or unavailable. Keep this page open and save your report online.')); }
+// True only when this device holds work the server has not seen. Without it the
+// "save your draft online first" warning fired even straight after saving.
+function draftUnsaved(){ return !!draft && !draft.finalizedAt && (!draft.serverId || draft.dirty === true); }
+function remember() { if (draft) draft.dirty = true; persist().catch(() => notice('Device storage is full or unavailable. Keep this page open and save your report online.')); }
 function dropSession() { session = ''; account = null; try { localStorage.removeItem('inspect.session'); } catch {} }
 // A 401 from any single call is not proof the session is gone. Background and
 // optional calls — /billing/refresh on every foreground, for one — used to sign
@@ -131,6 +134,8 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
 function modal(content) {
   $('dialog-body').innerHTML = content;
   if (!$('dialog').open) { document.documentElement.classList.add('sheet-open'); $('dialog').showModal(); }
+  const field = $('dialog-body').querySelector('input:not([readonly]), textarea');
+  (field || $('dialog')).focus();
   syncNativeInspectState(currentPage,true);
   settleSheet();
 }
@@ -179,11 +184,14 @@ function landing() {
   resetScroll();
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Your walkthrough.<br>A finished report.</h1><p class="muted">Keep photos, observations and issues organized by room.<br>Send a clear condition report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $29/month for 30 reports. One operator.</small></p><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Your walkthrough.<br>A finished report.</h1><p class="muted">Keep photos, observations and issues organized by room.<br>Send a clear condition report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
   $('start').onclick = () => start();
+  // The native shell hides the web header, so without this there was no way back
+  // in after signing out short of the overflow menu.
+  if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>list()));
 }
 async function start(propertyName = '') {
-  if (draft && !draft.finalizedAt && !confirm('Start a new report? Save your current draft online first if you want to keep it.')) return;
+  if (draftUnsaved() && !confirm('Start a new report? Your current draft is not saved online yet.')) return;
   clearURLs(); draft = { document: newDocument(propertyName), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
@@ -209,7 +217,7 @@ function editor() {
   };
   $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:'Room',observation:'',issue:false,photos:[]});remember();editor(); };
   $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
-  $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();notice('Report saved online.','success');editor();}, button)); };
+  $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor();}, button)); };
   bindPhotoDrag();
 }
 
@@ -265,7 +273,7 @@ function ensureAuth(after) {
   if(session && account) return after();
   let email='';
   const codeStep=()=>{
-    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p>We sent a six-digit code to ${esc(email)}.</p><form id="code-form"><label>Six-digit code<input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`;
+    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`;
     const input=$('code');
     // Synchronous focus inside the same user gesture: an await here would let
     // iOS dismiss the keyboard before the code field exists.
@@ -493,13 +501,13 @@ async function useComparisonPayload(payload){
   await persist();preview=!!report.finalizedAt;editor();
 }
 async function openReport(id){
-  if(draft&&!draft.finalizedAt&&draft.serverId!==id&&!confirm('Replace the draft on this device? Save it online first to keep it.'))return;
+  if(draftUnsaved()&&draft.serverId!==id&&!confirm('Replace the draft on this device? Your current draft is not saved online yet.'))return;
   haptic();
   $('app').innerHTML='<section class="loading">Opening your report…</section>';
   await useComparisonPayload(await api(`/reports/${id}/comparison`));
 }
 async function startComparison(baselineId){
-  if(draft&&!draft.finalizedAt&&!confirm('Start a comparison report? Save your current draft online first if you want to keep it.'))return;
+  if(draftUnsaved()&&!confirm('Start a comparison report? Your current draft is not saved online yet.'))return;
   const payload=await api(`/reports/${baselineId}/comparison-draft`,{method:'POST',body:{date:localDate()}});
   reportsCache=null;await useComparisonPayload(payload);
 }
@@ -527,7 +535,7 @@ $('account-button').onclick=async()=>{
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
   $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
-  $('logout').onclick=()=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();});
+  $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
   $('delete-account').onclick=()=>{if(prompt('This permanently deletes Inspect reports and photos and cancels its subscription. Booking properties are unaffected. Type DELETE to confirm.')==='DELETE')run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});};
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
