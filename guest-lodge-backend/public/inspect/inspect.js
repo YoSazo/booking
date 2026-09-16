@@ -115,10 +115,13 @@ async function api(path, options = {}) {
 }
 async function run(fn, trigger = document.activeElement?.closest?.('button')) {
   if (trigger?.disabled) return;
-  if (trigger) trigger.disabled = true;
+  if (trigger) { trigger.disabled = true; trigger.classList.add('is-busy'); }
   try { await fn(); } catch (error) { notice(error.message, 'error'); }
-  finally { if (trigger) trigger.disabled = false; }
+  finally { if (trigger) { trigger.disabled = false; trigger.classList.remove('is-busy'); } }
 }
+// Screens inherited the previous screen's scroll, so Preview opened halfway down
+// a long editor instead of at the top of the report.
+function resetScroll(){ try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { window.scrollTo(0, 0); } }
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectState',visible,selectedTab:page,hasDraft:!!draft});
@@ -173,6 +176,7 @@ function photoURL(id) {
 }
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
 function landing() {
+  resetScroll();
   updateHeader();
   setActiveNav('current');
   $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Your walkthrough.<br>A finished report.</h1><p class="muted">Keep photos, observations and issues organized by room.<br>Send a clear condition report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $29/month for 30 reports. One operator.</small></p><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
@@ -184,6 +188,7 @@ async function start(propertyName = '') {
   await persist(); editor();
 }
 function editor() {
+  resetScroll();
   if (!draft) return landing(); updateHeader();
   setActiveNav('current');
   const d = draft.document;
@@ -203,8 +208,8 @@ function editor() {
     if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
   };
   $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:'Room',observation:'',issue:false,photos:[]});remember();editor(); };
-  $('preview').onclick = () => { preview=true;reportPreview(); };
-  $('save').onclick = () => ensureAuth(() => run(async()=>{await save();notice('Report saved online.');editor();}));
+  $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
+  $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();notice('Report saved online.','success');editor();}, button)); };
   bindPhotoDrag();
 }
 
@@ -384,17 +389,20 @@ function reportRoom(r,label=''){
   return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
 }
 function reportPreview(){
+  resetScroll();
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}<div class="actions row">${draft.finalizedAt?'<button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button>':'<button id="finalize">Save & export my report →</button>'}</div><p class="muted">${draft.finalizedAt?'This version cannot change. Create a new report for corrections.':'Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.'}</p>`;
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}${draft.finalizedAt
+    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button></div>`
+    : `<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.</p>`}`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
-  if($('finalize'))$('finalize').onclick=()=>ensureAuth(()=>run(async()=>{
+  if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
     await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
-    await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice('Your report is ready. Download the PDF or create a private link.');
-  }));
+    await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice('Your report is ready. Download the PDF or create a private link.','success');
+  },button));};
   if($('pdf'))$('pdf').onclick=()=>run(async()=>{
     if(native){window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});return;}
     const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
@@ -444,13 +452,14 @@ async function offer(){
     const toggle=available.length>1?`<div class="billing-toggle" role="radiogroup" aria-label="Billing period">${available.map(value=>`<button type="button" role="radio" aria-checked="${planInterval===value}" data-plan="${value}">${value==='year'?'Annual':'Monthly'}</button>`).join('')}</div>`:'';
     const html=`<h2>Keep making reports.</h2>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${plan.save?`<p class="price-save">${plan.save}</p>`:''}<p>${plan.reports} reports per billing period · One operator<br>Up to 100 photos and 10 wording suggestions per report</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} Cancel renewal anytime. Existing finalized reports remain available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
     if(first)modal(html);else $('dialog-body').innerHTML=html;
-    document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{planInterval=button.dataset.plan==='year'?'year':'month';paint(false);};});
+    document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
     $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
   };
   paint(true);
 }
 function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openBrowser',url});else location.assign(url);}
 function renderProperties(data){
+  resetScroll();
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
   $('app').innerHTML=`<h1>Properties</h1><p class="muted">Start a fresh report, or compare a move-out with the last finalized condition report.</p>${details.length?'':'<section class="card">Properties appear here after you save a report.</section>'}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
   $('app').insertAdjacentHTML('beforeend','<button class="fab" id="new-property" aria-label="Start a new report" title="Start a new report">+</button>');
@@ -459,6 +468,7 @@ function renderProperties(data){
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
 }
 function renderReports(){
+  resetScroll();
   const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
   const status=account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.';
   $('app').innerHTML=`<h1>Your reports</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div>${reports.length?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}<button id="new-report">+ New report</button>`;
