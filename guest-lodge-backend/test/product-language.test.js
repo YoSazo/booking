@@ -96,7 +96,7 @@ test('the reveal makes the owner app and Guestel distinct without forcing a tour
 });
 
 test('activation discloses a card-required trial and its paid renewal before checkout', () => {
-    assert.match(revealCopy, /title: 'Start your 14-day free trial'/);
+    assert.match(revealCopy, /title: 'Start free for 14 days'/);
     // The landing page collects an email, not a card. Card-network disclosure is
     // owed before the card form — the reveal, asserted below — so the hero stays a
     // low-friction capture. May's no-price, no-card page ran at $3-5 CPL on this

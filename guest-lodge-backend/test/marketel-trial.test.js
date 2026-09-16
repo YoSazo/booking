@@ -116,7 +116,8 @@ test('trial terms are explicit before Stripe and existing trial users do not get
 test('subscribed activation replay previews the current trial without reopening checkout', () => {
   assert.match(reveal, /return activationPreviewMode \|\| \(!crm\.hotelSubscribed && crm\.marketelTrialEligible !== false\);/);
   assert.match(reveal, /if \(activationPreviewMode && crm\.hotelSubscribed\) \{[\s\S]*?is already active/);
-  assert.match(reveal, /const trialAvailable = trialOfferAvailable\(\);[\s\S]*?trialAvailable \? 'Get started'/);
+  assert.match(reveal, /const trialAvailable = trialOfferAvailable\(\);[\s\S]*?trialAvailable \? `Start free for \$\{trialDays\(\)\} days`/);
+  assert.match(reveal, /trialAvailable \? '\$0 today · Everything unlocked'/);
   assert.match(reveal, /const hasTrial = trialOfferAvailable\(\);[\s\S]*?\$0 <b>today<\/b>/);
 });
 
