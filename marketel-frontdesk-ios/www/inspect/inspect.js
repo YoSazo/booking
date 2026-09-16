@@ -57,7 +57,21 @@ function captureInspectAttribution(){
 const inspectAttribution=captureInspectAttribution();
 const localDate = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const uid = () => crypto.randomUUID?.() || `${Date.now().toString(36)}_${crypto.getRandomValues(new Uint32Array(2)).join('_')}`;
-const newDocument = propertyName => ({ propertyName: propertyName || '', author: '', type: 'routine', date: localDate(), rooms: [{ name: 'Living room', observation: '', issue: false, photos: [] }], signatures: [] });
+// Who prepares the report does not change between walkthroughs, so it is
+// remembered on the device. Report type deliberately is not: it prints on a
+// document used in deposit disputes, and inheriting last week's "move-out" is
+// worse than retyping one dropdown.
+const AUTHOR_KEY = 'inspect.author';
+const rememberedAuthor = () => { try { return localStorage.getItem(AUTHOR_KEY) || ''; } catch { return ''; } };
+const storeAuthor = value => { try { const name = String(value || '').trim(); if (name) localStorage.setItem(AUTHOR_KEY, name); } catch {} };
+// A whole unit is five to eight rooms, and every one of them used to arrive
+// called "Room". Names already used in this report are skipped.
+const COMMON_ROOMS = ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'];
+const nextRoomName = rooms => {
+  const used = new Set((rooms || []).map(room => String(room.name || '').trim().toLowerCase()));
+  return COMMON_ROOMS.find(name => !used.has(name.toLowerCase())) || 'Room';
+};
+const newDocument = propertyName => ({ propertyName: propertyName || '', author: rememberedAuthor(), type: 'routine', date: localDate(), rooms: [{ name: 'Living room', observation: '', issue: false, photos: [] }], signatures: [] });
 const db = new Promise((resolve, reject) => {
   const request = indexedDB.open('marketel-inspect', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('drafts');
@@ -204,7 +218,7 @@ function editor() {
   if (preview || draft.finalizedAt) return reportPreview();
   const photos=d.rooms.reduce((total,room)=>total+room.photos.length,0), photographed=d.rooms.filter(room=>room.photos.length).length, issues=d.rooms.filter(room=>room.issue).length;
   $('app').innerHTML = `<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>What did you observe?</h1></div><span class="status">${draft.serverId ? 'Draft · save changes online' : 'Draft stored on this device'}</span></div><p class="muted">${d.rooms.length} room${d.rooms.length===1?'':'s'} · ${photographed} photographed · ${photos} photo${photos===1?'':'s'} · ${issues} issue${issues===1?'':'s'}</p><section class="card grid"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
-  for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; remember(); };
+  for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
   $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
   $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
   $('rooms').onclick = event => {
@@ -215,7 +229,7 @@ function editor() {
     if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
     if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
   };
-  $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:'Room',observation:'',issue:false,photos:[]});remember();editor(); };
+  $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor(); };
   $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
   $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor();}, button)); };
   bindPhotoDrag();
@@ -422,7 +436,7 @@ function reportPreview(){
 }
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
-  modal(`<h2>${role==='resident'?'Resident / tenant':'Manager / inspector'} signature</h2><label>Signer name<input id="signer-name" maxlength="120" value="${esc(existing?.name||'')}"></label><p class="muted">Sign inside the box. This is optional and will be dated by Marketel when the report is finalized.</p><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><div class="row"><button id="save-signature">Use signature</button><button id="clear-signature" class="secondary">Clear</button>${existing?'<button id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
+  modal(`<h2>${role==='resident'?'Resident / tenant':'Manager / inspector'} signature</h2><label>Signer name<input id="signer-name" maxlength="120" value="${esc(existing?.name || (role === 'manager' ? (draft.document.author || rememberedAuthor()) : ''))}"></label><p class="muted">Sign inside the box. This is optional and will be dated by Marketel when the report is finalized.</p><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><div class="row"><button id="save-signature">Use signature</button><button id="clear-signature" class="secondary">Clear</button>${existing?'<button id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
   const canvas=$('signature-pad'),ctx=canvas.getContext('2d'),strokes=existing?structuredClone(existing.strokes):[];let current=null;
   const draw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2b22';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';for(const stroke of strokes){ctx.beginPath();stroke.forEach((point,index)=>{const x=point.x*canvas.width,y=point.y*canvas.height;index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}};
   const point=event=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};};
