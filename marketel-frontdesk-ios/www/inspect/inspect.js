@@ -123,11 +123,45 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectState',visible,selectedTab:page,hasDraft:!!draft});
 }
+// A sheet is a card on top of the app, so the shell stays put — `true` keeps the
+// native header and tab bar visible instead of suppressing them.
 function modal(content) {
   $('dialog-body').innerHTML = content;
   if (!$('dialog').open) { document.documentElement.classList.add('sheet-open'); $('dialog').showModal(); }
-  syncNativeInspectState(currentPage,false);
+  syncNativeInspectState(currentPage,true);
+  settleSheet();
 }
+// The sheet is nudged up by however much the keyboard actually covers and no
+// further, clamped so it can never ride up over the status bar.
+function settleSheet(){
+  const dialog=$('dialog');
+  if(!dialog?.open)return;
+  const style=getComputedStyle(document.documentElement);
+  const keyboard=parseFloat(style.getPropertyValue('--kb'))||0;
+  const safeTop=parseFloat(style.getPropertyValue('--safe-top'))||0;
+  // Derived from the sheet's height rather than its rect: the shift is animated,
+  // so a rect read mid-transition would measure a position it is still leaving.
+  const height=dialog.offsetHeight;
+  const centre=window.innerHeight/2;
+  const overlap=(centre+height/2)-(window.innerHeight-keyboard-12);
+  const headroom=(centre-height/2)-(safeTop+12);
+  const shift=Math.max(0,Math.min(overlap,headroom));
+  dialog.style.setProperty('--sheet-shift',`${-Math.round(shift)}px`);
+}
+// `.actions` floats over the page, so the page has to reserve its real height or
+// the closing line of a report hides underneath it.
+function watchActions(){
+  const bar=document.querySelector('.actions');
+  document.documentElement.style.setProperty('--actions-h',`${bar?Math.round(bar.offsetHeight):0}px`);
+  if(bar&&typeof ResizeObserver==='function'){
+    watchActions.observer?.disconnect();
+    watchActions.observer=new ResizeObserver(()=>{
+      document.documentElement.style.setProperty('--actions-h',`${Math.round(bar.offsetHeight)}px`);
+    });
+    watchActions.observer.observe(bar);
+  }
+}
+const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
 $('dialog-close').onclick = () => $('dialog').close();
 function setActiveNav(page) { currentPage=page;document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page));syncNativeInspectState(page); }
 function updateHeader() { $('account-button').textContent = account ? 'Account' : 'Sign in'; $('nav').hidden = !draft && !account;const current=$('current-report');if(current){const unfinished=draft&&!draft.finalizedAt;current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'Current report':'+ New report';} }
@@ -408,10 +442,10 @@ async function offer(){
   const paint=first=>{
     const plan=PLANS[planInterval];
     const toggle=available.length>1?`<div class="billing-toggle" role="radiogroup" aria-label="Billing period">${available.map(value=>`<button type="button" role="radio" aria-checked="${planInterval===value}" data-plan="${value}">${value==='year'?'Annual':'Monthly'}</button>`).join('')}</div>`:'';
-    const html=`<h2>Ready for the next property?</h2>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${plan.save?`<p class="price-save">${plan.save}</p>`:''}<p>${plan.reports} reports per billing period · One operator<br>Up to 100 photos and 10 wording suggestions per report</p><button id="buy" class="wide">Continue with Inspect</button><p><small>${plan.terms} Cancel renewal anytime. Existing finalized reports remain available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
+    const html=`<h2>Keep making reports.</h2>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${plan.save?`<p class="price-save">${plan.save}</p>`:''}<p>${plan.reports} reports per billing period · One operator<br>Up to 100 photos and 10 wording suggestions per report</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} Cancel renewal anytime. Existing finalized reports remain available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
     if(first)modal(html);else $('dialog-body').innerHTML=html;
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{planInterval=button.dataset.plan==='year'?'year':'month';paint(false);};});
-    $('buy').onclick=()=>run(async()=>{const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
+    $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
   };
   paint(true);
 }
@@ -419,11 +453,15 @@ function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShe
 function renderProperties(data){
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
   $('app').innerHTML=`<h1>Properties</h1><p class="muted">Start a fresh report, or compare a move-out with the last finalized condition report.</p>${details.length?'':'<section class="card">Properties appear here after you save a report.</section>'}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
+  $('app').insertAdjacentHTML('beforeend','<button class="fab" id="new-property" aria-label="Start a new report" title="Start a new report">+</button>');
+  $('new-property').onclick=()=>{haptic();run(()=>start());};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
 }
 function renderReports(){
-  $('app').innerHTML=`<h1>Your reports</h1><p class="muted">${account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.'}</p>${reports.length?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}<button id="new-report">+ New report</button>${!account.active&&!account.freeAvailable&&(!native||storefront==='USA')?'<button id="plans" class="quiet">Continue with Inspect</button>':''}`;
+  const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
+  const status=account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.';
+  $('app').innerHTML=`<h1>Your reports</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div>${reports.length?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}<button id="new-report">+ New report</button>`;
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   document.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.open),button));
@@ -446,6 +484,8 @@ async function useComparisonPayload(payload){
 }
 async function openReport(id){
   if(draft&&!draft.finalizedAt&&draft.serverId!==id&&!confirm('Replace the draft on this device? Save it online first to keep it.'))return;
+  haptic();
+  $('app').innerHTML='<section class="loading">Opening your report…</section>';
   await useComparisonPayload(await api(`/reports/${id}/comparison`));
 }
 async function startComparison(baselineId){
@@ -458,12 +498,12 @@ async function list(page='reports',append=false){
   updateHeader();setActiveNav(page);
   const request=++listRequest;
   if(page==='properties'){
-    if(propertiesCache)renderProperties(propertiesCache);else $('app').innerHTML='<h1>Properties</h1><section class="card skeleton">Loading saved properties…</section>';
+    if(propertiesCache)renderProperties(propertiesCache);else $('app').innerHTML='<h1>Properties</h1><section class="loading">Loading saved properties…</section>';
     const result=await api('/properties');propertiesCache=result;
     if(currentPage==='properties'&&request===listRequest)renderProperties(result);return;
   }
   if(reportsCache&&!append){reports=reportsCache.reports;nextReportCursor=reportsCache.nextCursor;renderReports();}
-  else if(!append)$('app').innerHTML='<h1>Your reports</h1><section class="card skeleton">Loading saved reports…</section>';
+  else if(!append)$('app').innerHTML='<h1>Your reports</h1><section class="loading">Loading saved reports…</section>';
   const pageResult=await api(`/reports?take=50${append&&nextReportCursor?`&cursor=${encodeURIComponent(nextReportCursor)}`:''}`);
   reports=append?reports.concat(pageResult.reports):pageResult.reports;nextReportCursor=pageResult.nextCursor;
   reportsCache={reports:[...reports],nextCursor:nextReportCursor};
@@ -482,12 +522,14 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open');syncNativeInspectState(currentPage,true);});
+$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
 window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
 window.marketelInspectNativeSelectTab=page=>{
+  // The tab bar stays visible over a sheet now, so a tap has to dismiss it first.
+  if($('dialog').open)$('dialog').close();
   if(page==='current'){if(draft)editor();else run(()=>start());return;}
   list(page).catch(error=>notice(error.message));
 };
@@ -524,6 +566,7 @@ function trackKeyboard(){
     const inset=Math.round(Math.max(nativeKeyboard,webInset));
     // Below this it is browser chrome settling, not a keyboard.
     root.style.setProperty('--kb',`${inset>60?inset:0}px`);
+    settleSheet();
   };
   const apply=()=>{if(!frame)frame=requestAnimationFrame(measure);};
   const heightOf=event=>Number(event?.keyboardHeight??event?.detail?.keyboardHeight??0)||0;
@@ -538,6 +581,8 @@ function trackKeyboard(){
   apply();
 }
 trackKeyboard();
+watchActions();
+new MutationObserver(watchActions).observe($('app'),{childList:true});
 window.addEventListener('pagehide',()=>remember());
 // Every foreground used to fire two calls; errors are swallowed here so a
 // background refresh can never overwrite the sign-out notice or disable a button.

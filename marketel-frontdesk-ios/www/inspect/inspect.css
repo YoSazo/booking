@@ -15,6 +15,8 @@
   --muted: #6b7d72;
   --border: #d8e4dc;
   --surface: #ffffff;
+  /* Published so inspect.js can read the inset when clamping the sheet. */
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 * { box-sizing: border-box; }
 /* A long press is how photos get reordered, so the chrome must not answer it
@@ -22,7 +24,7 @@
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable], .report-note, .transcript, .comparison-banner, blockquote { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html { min-height: 100%; background: #eff4f0; }
-body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(156px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
+body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(var(--actions-h, 0px) + 100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
 header { position: sticky; z-index: 8; top: 0; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
 .brand { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; font-weight: 750; font-size: 18px; }
 .brand-icon { display: block; width: 30px; height: 30px; border-radius: 8px; }
@@ -60,6 +62,8 @@ button:disabled { opacity: .5; cursor: wait; }
 .secondary:hover { background: #dceee4; }
 .danger { color: #aa382b; }
 .wide { width: 100%; }
+a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: #c2d5cb; }
+a:hover { color: var(--green-dark); text-decoration-color: var(--green); }
 button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offset: 3px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 14px 0; }
 .photo-grid img { width: 100%; height: 125px; object-fit: cover; border-radius: 10px; }
@@ -113,14 +117,18 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
    closed, so the sheet simply centres in whatever space is left. Nothing here
    reads visualViewport.offsetTop: iOS 26 leaves that stale and non-zero after
    the keyboard closes, which is what pinned the sheet to the top of the screen. */
-dialog { position: fixed; left: 50%; top: calc((100dvh - var(--kb, 0px)) / 2); transform: translate(-50%, -50%); margin: 0; border: 1px solid #ffffffd9; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - var(--kb, 0px) - 32px); overflow: hidden; color: inherit; background: #f9fcf9f2; box-shadow: 0 24px 70px #173b2340; -webkit-backdrop-filter: blur(24px) saturate(140%); backdrop-filter: blur(24px) saturate(140%); transition: top .18s ease, max-height .18s ease; }
+/* A card resting on the app, not a takeover: opaque, so nothing behind it is
+   frosted, and nudged up only by however much the keyboard actually covers
+   (--sheet-shift, computed in inspect.js). Re-centring in the leftover space
+   moved it far enough to collide with the status bar. */
+dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + var(--sheet-shift, 0px))); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - var(--kb, 0px) - env(safe-area-inset-top) - 32px); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: transform .2s ease, max-height .2s ease; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-dialog::backdrop { background: #15261c73; }
+dialog::backdrop { background: #15261c24; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
 #dialog-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; border-radius: 999px; color: var(--muted); }
 #dialog-close:hover { background: #edf5f0; color: var(--green); }
@@ -138,9 +146,20 @@ dialog h2 { margin-top: 0; padding-right: 38px; }
 .property-row, .report-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .skeleton { color: var(--muted); min-height: 86px; animation: skeleton-pulse 1.2s ease-in-out infinite alternate; }
 @keyframes skeleton-pulse { to { opacity: .55; } }
+/* Same identity as Front Desk's loading states, on an icon the native bundle
+   already ships, so nothing new is downloaded. */
+.loading { display: grid; place-items: center; gap: 13px; padding: 46px 0; color: var(--muted); font-size: 13px; }
+.loading::before { content: ""; width: 38px; height: 38px; border-radius: 11px; background: url('/marketel-frontdesk-icon.png') center / cover no-repeat; box-shadow: 0 6px 18px rgba(30, 106, 76, .2); animation: frontdeskLogoBreathe 1.15s ease-in-out infinite; }
+@keyframes frontdeskLogoBreathe { 0%, 100% { transform: translateY(0) scale(.96); opacity: .82; } 50% { transform: translateY(-2px) scale(1); opacity: 1; } }
+.status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 6px; }
+.status-line .quiet { flex: 0 0 auto; padding: 7px 11px; font-size: 13px; min-height: 38px; }
+/* Same glass recipe as the tab bar so the two read as one family. */
+.fab { position: fixed; z-index: 9; right: 18px; bottom: calc(88px + env(safe-area-inset-bottom)); width: 56px; height: 56px; min-height: 56px; padding: 0; display: grid; place-items: center; font-size: 27px; font-weight: 400; line-height: 1; color: var(--green-dark); background: linear-gradient(145deg, #ffffffc4, #e8f0e9b4); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border: 1px solid #ffffffcc; border-radius: 20px; box-shadow: 0 12px 32px #173b2324, inset 0 1px 0 #fff; }
+.fab:hover { background: linear-gradient(145deg, #ffffffd8, #e8f0e9c8); }
+.native-inspect-shell .fab { bottom: calc(86px + env(safe-area-inset-bottom)); }
 .price { font-size: 36px; font-weight: 750; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
-.native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(146px + env(safe-area-inset-bottom)); }
+.native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(var(--actions-h, 0px) + 98px + env(safe-area-inset-bottom)); }
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
