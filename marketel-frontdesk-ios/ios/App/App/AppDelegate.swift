@@ -328,8 +328,18 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         topBar.clipsToBounds = true
         topBar.isUserInteractionEnabled = true
 
-        let logo = MarketelMarkView()
+        let logoImage = Bundle.main.url(
+            forResource: "marketel-frontdesk-icon",
+            withExtension: "png",
+            subdirectory: "public"
+        ).flatMap { try? Data(contentsOf: $0) }.flatMap { UIImage(data: $0) }
+        let logo = UIImageView(image: logoImage)
         logo.translatesAutoresizingMaskIntoConstraints = false
+        logo.contentMode = .scaleAspectFit
+        logo.layer.cornerRadius = 6
+        logo.layer.cornerCurve = .continuous
+        logo.clipsToBounds = true
+        logo.accessibilityLabel = "Marketel"
 
         productNameLabel.text = "Front Desk"
         productNameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -421,8 +431,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyHeaderControl.accessibilityTraits = .button
 
         NSLayoutConstraint.activate([
-            logo.widthAnchor.constraint(equalToConstant: 23),
-            logo.heightAnchor.constraint(equalToConstant: 25),
+            logo.widthAnchor.constraint(equalToConstant: 28),
+            logo.heightAnchor.constraint(equalToConstant: 28),
             propertyChevron.widthAnchor.constraint(equalToConstant: 9),
             propertyChevron.heightAnchor.constraint(equalToConstant: 9),
             brandRow.leadingAnchor.constraint(equalTo: propertyHeaderControl.leadingAnchor),
@@ -723,8 +733,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 tabBar.selectedItem = yourPageTabItem
             }
         case .inspect:
-            productNameLabel.text = "Marketel Inspect"
-            propertyNameLabel.text = "Condition reports"
+            productNameLabel.text = "Marketel"
+            propertyNameLabel.text = "Inspect"
             propertyChevron.isHidden = true
             propertyHeaderControl.isUserInteractionEnabled = false
             qrButton.isHidden = true
@@ -1379,6 +1389,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 reportId: payload["reportId"] as? String ?? "",
                 token: payload["token"] as? String ?? ""
             )
+        case "inspectHaptic":
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case "inspectSignOut":
             // Inspect owns a separate bearer session in web storage. Do not
             // clear Front Desk credentials when only Inspect signs out.

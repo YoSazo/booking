@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const express = require('express');
-const { registerInspect, validateDocument, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, inspectEnvReadiness, LIMITS, hash } = require('../inspect');
+const { registerInspect, validateDocument, validateSignatures, validateInspectPrice, shouldIgnoreSubscription, startsNewPaidPeriod, entitlement, inspectEnvReadiness, LIMITS, hash } = require('../inspect');
 
 const validDocument = () => ({
   propertyName: 'Oak Street · Unit 2',
@@ -23,6 +23,33 @@ test('Inspect document validation preserves observations without inventing field
   ] }), /duplicate photo/);
   assert.equal(LIMITS.reports, 30);
   assert.equal(LIMITS.photos, 100);
+});
+
+test('Inspect signatures are bounded and cannot supply their own timestamp', () => {
+  const signatures = validateSignatures([{ role: 'manager', name: 'Alex Rivera', signedAt: '2001-01-01', strokes: [[{ x: 0.1, y: 0.2 }, { x: 0.9, y: 0.8 }]] }]);
+  assert.deepEqual(signatures, [{ role: 'manager', name: 'Alex Rivera', strokes: [[{ x: 0.1, y: 0.2 }, { x: 0.9, y: 0.8 }]] }]);
+  assert.throws(() => validateSignatures([
+    { role: 'resident', name: 'A', strokes: [[{ x: 0, y: 0 }, { x: 1, y: 1 }]] },
+    { role: 'resident', name: 'B', strokes: [[{ x: 0, y: 0 }, { x: 1, y: 1 }]] },
+  ]), /one manager and one resident/);
+  assert.throws(() => validateSignatures([{ role: 'manager', name: 'A', strokes: [[{ x: -1, y: 0 }, { x: 1, y: 1 }]] }]), /Invalid signature point/);
+});
+
+test('Inspect voice notes and comparisons fail closed around evidence', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+  assert.match(source, /router\.post\('\/reports\/:id\/voice-draft'/);
+  assert.match(source, /Do not infer from photos, diagnose causes, assign fault or liability/);
+  assert.match(source, /Audio and transcript exist only in memory/);
+  assert.match(source, /signedAt is deliberately omitted/);
+  assert.match(source, /baselineReportId/);
+  assert.match(schema, /onDelete: SetNull/);
+  assert.match(client, /AI only organized what it heard\. Check every detail/);
+  assert.match(client, /Press and hold a photo, then drag to reorder/);
+  assert.match(client, /Start move-out comparison/);
 });
 
 test('Inspect entitlement is separate, period-bound, and keeps the lifetime free report', () => {
