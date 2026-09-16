@@ -17,6 +17,10 @@
   --surface: #ffffff;
 }
 * { box-sizing: border-box; }
+/* A long press is how photos get reordered, so the chrome must not answer it
+   with a text selection. Real content stays selectable below. */
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, [contenteditable], .report-note, .transcript, .comparison-banner, blockquote { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html { min-height: 100%; background: #eff4f0; }
 body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(156px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
 header { position: sticky; z-index: 8; top: 0; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
@@ -96,7 +100,16 @@ nav::before { content: ""; position: absolute; z-index: -1; inset: 0; pointer-ev
 nav[hidden] { display: none; }
 nav button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 9px 6px; background: transparent; color: var(--green); border: 1px solid transparent; border-radius: 17px; font-size: 13px; }
 nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shadow: 0 5px 16px #173b2314, inset 0 1px 0 #fff; }
-#notice { position: fixed; bottom: calc(170px + env(safe-area-inset-bottom)); left: 20px; right: 20px; max-width: 620px; margin: auto; background: #213b2f; color: #fff; padding: 14px 20px; border-radius: 12px; display: none; z-index: 20; pointer-events: none; }
+/* Matches Front Desk: a thin pill that slides in from the right and leaves on
+   its own, rather than a full-width bar that the keyboard used to sit on top of. */
+#notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; }
+#notice:empty { display: none; }
+.toast { max-width: min(420px, 100%); background: #213b2f; color: #fff; border-radius: 11px; padding: 11px 16px; font-size: 12px; font-weight: 600; line-height: 1.45; box-shadow: 0 12px 32px #173b2333; animation: toast-in .2s ease, toast-out .3s ease 3.4s forwards; }
+.toast.success { background: var(--green); }
+.toast.error { background: #aa382b; }
+@keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
+html.kb-open #notice { bottom: calc(var(--kb, 0px) + 16px); }
 /* iOS WKWebView never resizes the layout viewport for the keyboard
    (interactive-widget is Chromium-only), so a natively centred dialog stays
    centred while the keyboard covers the lower half — taking the primary button
@@ -109,8 +122,8 @@ dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-html.kb-open dialog { top: calc(var(--vv-top, 0px) + 12px); transform: translate(-50%, 0); }
-dialog::backdrop { background: #15261c66; -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
+html.kb-open dialog { top: calc(var(--vv-top, 0px) + 12px); transform: translate(-50%, 0); max-height: calc(100dvh - var(--kb, 0px) - var(--vv-top, 0px) - 24px); }
+dialog::backdrop { background: #15261c73; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
 #dialog-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; border-radius: 999px; color: var(--muted); }
 #dialog-close:hover { background: #edf5f0; color: var(--green); }
@@ -134,7 +147,6 @@ blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
-.native-inspect-shell #notice { bottom: calc(128px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
   header { padding: 15px; }
   .card { padding: 18px; }

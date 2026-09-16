@@ -72,7 +72,17 @@ async function stored(action, value) {
     tx.oncomplete = () => resolve(request.result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
   });
 }
-function notice(message) { $('notice').textContent = message; $('notice').style.display = 'block'; clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').style.display = 'none', 9000); }
+function notice(message, type = '') {
+  const box = $('notice');
+  if (!box) return;
+  const el = document.createElement('div');
+  el.className = `toast ${type}`.trim();
+  el.textContent = message;
+  box.appendChild(el);
+  // Slightly outlives the CSS fade so the pill is never removed mid-animation.
+  setTimeout(() => el.remove(), 3800);
+  while (box.children.length > 3) box.firstChild.remove();
+}
 async function persist() { if (draft) await stored('put', draft); }
 function remember() { persist().catch(() => notice('Device storage is full or unavailable. Keep this page open and save your report online.')); }
 function dropSession() { session = ''; account = null; try { localStorage.removeItem('inspect.session'); } catch {} }
@@ -106,7 +116,7 @@ async function api(path, options = {}) {
 async function run(fn, trigger = document.activeElement?.closest?.('button')) {
   if (trigger?.disabled) return;
   if (trigger) trigger.disabled = true;
-  try { await fn(); } catch (error) { notice(error.message); }
+  try { await fn(); } catch (error) { notice(error.message, 'error'); }
   finally { if (trigger) trigger.disabled = false; }
 }
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
@@ -212,29 +222,37 @@ function ensureAuth(after) {
   if(session && account) return after();
   let email='';
   const codeStep=()=>{
-    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p>We sent a six-digit code to ${esc(email)}.</p><form id="code-form"><label>Six-digit code<input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label></form><button type="button" id="auth-back" class="quiet auth-back">← Use a different email</button>`;
+    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p>We sent a six-digit code to ${esc(email)}.</p><form id="code-form"><label>Six-digit code<input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`;
     const input=$('code');
     // Synchronous focus inside the same user gesture: an await here would let
     // iOS dismiss the keyboard before the code field exists.
     input.focus();
-    let verifying=false;
+    let verifying=false,lastTried='';
     const attempt=()=>{
       const code=input.value.replace(/\D/g,'').slice(0,6);
-      if(verifying||code.length!==6)return;
+      if(verifying||code.length!==6||code===lastTried)return;
       // Deliberately not disabled while verifying: disabling a focused input
       // drops the iOS keyboard, and re-focusing outside a user gesture will not
       // bring it back. The flag alone prevents a second submit.
-      verifying=true;
+      verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
         session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
       },null).then(()=>{
         verifying=false;
-        if(account)after();else{input.value='';input.focus();}
+        if(account)return after();
+        // Left in place and selected, so the next digit typed replaces it.
+        input.focus();input.select?.();
       });
     };
     input.oninput=attempt;
     $('code-form').onsubmit=event=>{event.preventDefault();attempt();};
+    // Codes expire after ten minutes, and without this the only way out of an
+    // expired one was to back out and retype the address.
+    $('auth-resend').onclick=()=>{
+      input.value='';lastTried='';input.focus();
+      run(async()=>{await api('/auth/request',{method:'POST',body:{email}});notice('New code sent. Check your email.','success');},null);
+    };
     $('auth-back').onclick=()=>emailStep(false);
   };
   const emailStep=open=>{
@@ -246,7 +264,7 @@ function ensureAuth(after) {
       email=$('email').value.trim();
       if(!email)return;
       codeStep();
-      run(async()=>{await api('/auth/request',{method:'POST',body:{email}});notice('Check your email for the code.');},null);
+      run(async()=>{await api('/auth/request',{method:'POST',body:{email}});notice('Check your email for the code.','success');},null);
     };
   };
   emailStep(true);
@@ -485,22 +503,33 @@ function showNativeKeyboardDoneButton(){
   };
   show();
 }
-// iOS keeps the layout viewport at full height when the keyboard opens, so the
-// sheet has to be told where the visible area actually is.
-function trackVisualViewport(){
-  const viewport=window.visualViewport;
-  if(!viewport)return;
+// The app runs Capacitor's Keyboard plugin with resize "none", so on iOS the
+// web viewport never shrinks and visualViewport reports nothing when the
+// keyboard opens — only the plugin knows its real height. Front Desk solves
+// this the same way in frontdesk/src/formKeyboard.js.
+function trackKeyboard(){
+  const root=document.documentElement;
+  let nativeKeyboard=0;
   const apply=()=>{
-    const root=document.documentElement;
-    root.style.setProperty('--vv-height',`${Math.round(viewport.height)}px`);
-    root.style.setProperty('--vv-top',`${Math.round(viewport.offsetTop)}px`);
-    root.classList.toggle('kb-open',window.innerHeight-viewport.height>120);
+    const viewport=window.visualViewport;
+    const webInset=viewport?Math.max(0,window.innerHeight-viewport.height-viewport.offsetTop):0;
+    const inset=Math.max(nativeKeyboard,webInset);
+    root.style.setProperty('--kb',`${Math.round(inset)}px`);
+    root.style.setProperty('--vv-top',`${Math.round(viewport?.offsetTop||0)}px`);
+    root.style.setProperty('--vv-height',`${Math.round(viewport?.height||window.innerHeight)}px`);
+    root.classList.toggle('kb-open',inset>120);
   };
-  viewport.addEventListener('resize',apply);
-  viewport.addEventListener('scroll',apply);
+  const heightOf=event=>Number(event?.keyboardHeight??event?.detail?.keyboardHeight??0)||0;
+  window.addEventListener('keyboardWillShow',event=>{nativeKeyboard=heightOf(event)||nativeKeyboard;apply();});
+  window.addEventListener('keyboardDidShow',event=>{nativeKeyboard=heightOf(event)||nativeKeyboard;apply();});
+  window.addEventListener('keyboardWillHide',()=>{nativeKeyboard=0;apply();});
+  window.addEventListener('keyboardDidHide',()=>{nativeKeyboard=0;apply();});
+  window.visualViewport?.addEventListener('resize',apply);
+  window.visualViewport?.addEventListener('scroll',apply);
+  window.addEventListener('orientationchange',apply);
   apply();
 }
-trackVisualViewport();
+trackKeyboard();
 window.addEventListener('pagehide',()=>remember());
 // Every foreground used to fire two calls; errors are swallowed here so a
 // background refresh can never overwrite the sign-out notice or disable a button.
@@ -512,4 +541,18 @@ document.addEventListener('visibilitychange',()=>{
   run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});},null);
 });
 if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
-try{draft=await stored('get');await refresh();if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}
+// A cold start often runs before the network is ready. That is not a failure
+// worth alarming anyone about: the session and the local draft are intact, so
+// boot quietly and let the next action surface any real problem. Only a genuine
+// 401 signs the operator out, and confirmSessionLost says so itself.
+try{
+  draft=await stored('get');
+  await refresh().catch(()=>{});
+  if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}
+  if(draft)editor();else if(account)await list();else landing();
+  if(new URLSearchParams(location.search).get('checkout')==='success'&&session){
+    await api('/billing/refresh',{method:'POST'});
+    await refresh();
+    notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.',account.active?'success':'');
+  }
+}catch(e){notice(e.message,'error');if(draft)editor();else landing();}
