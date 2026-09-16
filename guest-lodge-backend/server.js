@@ -1170,8 +1170,12 @@ app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'fron
 // App Store surface are configured. Guard the HTML/assets as well as the API,
 // so a guessed URL cannot expose a half-configured product.
 const INSPECT_PUBLIC_ROOT = path.join(__dirname, 'public', 'inspect');
-app.get('/inspect', (req, res) => {
+app.get('/inspect', (req, res, next) => {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
+    // Express is non-strict by default, so this handler also matches
+    // `/inspect/`. Let the canonical URL continue to the guarded app instead
+    // of redirecting it back to itself forever.
+    if (req.path.endsWith('/')) return next();
     // Inspect uses relative, product-scoped asset URLs. Keep one canonical URL
     // so /inspect never resolves them as root-level /inspect.css or /inspect.js.
     res.redirect(308, '/inspect/');

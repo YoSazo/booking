@@ -127,7 +127,9 @@ test('Inspect has one canonical trailing-slash route through Render and Vercel',
   const path = require('node:path');
   const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'hotel-booking-app', 'vercel.json'), 'utf8'));
-  assert.match(server, /app\.get\('\/inspect',[\s\S]{0,280}res\.redirect\(308, '\/inspect\/'\)/);
+  assert.match(server, /app\.get\('\/inspect'/);
+  assert.match(server, /if \(req\.path\.endsWith\('\/'\)\) return next\(\)/);
+  assert.match(server, /res\.redirect\(308, '\/inspect\/'\)/);
   assert.deepEqual(vercel.redirects?.find(route => route.source === '/inspect'), {
     source: '/inspect', destination: '/inspect/', permanent: true,
   });
