@@ -123,7 +123,11 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectState',visible,selectedTab:page,hasDraft:!!draft});
 }
-function modal(content) { $('dialog-body').innerHTML = content; if (!$('dialog').open) $('dialog').showModal(); syncNativeInspectState(currentPage,false); }
+function modal(content) {
+  $('dialog-body').innerHTML = content;
+  if (!$('dialog').open) { document.documentElement.classList.add('sheet-open'); $('dialog').showModal(); }
+  syncNativeInspectState(currentPage,false);
+}
 $('dialog-close').onclick = () => $('dialog').close();
 function setActiveNav(page) { currentPage=page;document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page));syncNativeInspectState(page); }
 function updateHeader() { $('account-button').textContent = account ? 'Account' : 'Sign in'; $('nav').hidden = !draft && !account;const current=$('current-report');if(current){const unfinished=draft&&!draft.finalizedAt;current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'Current report':'+ New report';} }
@@ -478,7 +482,7 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>syncNativeInspectState(currentPage,true));
+$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
@@ -503,22 +507,25 @@ function showNativeKeyboardDoneButton(){
   };
   show();
 }
-// The app runs Capacitor's Keyboard plugin with resize "none", so on iOS the
-// web viewport never shrinks and visualViewport reports nothing when the
-// keyboard opens — only the plugin knows its real height. Front Desk solves
-// this the same way in frontdesk/src/formKeyboard.js.
+// One published value: --kb, the height the keyboard is covering, 0 when closed.
+// CSS centres the sheet in what is left, so there is no open/closed branch and
+// nothing to get stuck. visualViewport.offsetTop is used only to measure the
+// inset and never to position anything, because iOS 26 leaves it non-zero after
+// the keyboard closes — which is what pinned the sheet to the top of the screen.
+// The app also runs Capacitor's Keyboard plugin with resize "none", so on iOS
+// the web viewport never shrinks and only the plugin knows the real height.
 function trackKeyboard(){
   const root=document.documentElement;
-  let nativeKeyboard=0;
-  const apply=()=>{
+  let nativeKeyboard=0,frame=0;
+  const measure=()=>{
+    frame=0;
     const viewport=window.visualViewport;
     const webInset=viewport?Math.max(0,window.innerHeight-viewport.height-viewport.offsetTop):0;
-    const inset=Math.max(nativeKeyboard,webInset);
-    root.style.setProperty('--kb',`${Math.round(inset)}px`);
-    root.style.setProperty('--vv-top',`${Math.round(viewport?.offsetTop||0)}px`);
-    root.style.setProperty('--vv-height',`${Math.round(viewport?.height||window.innerHeight)}px`);
-    root.classList.toggle('kb-open',inset>120);
+    const inset=Math.round(Math.max(nativeKeyboard,webInset));
+    // Below this it is browser chrome settling, not a keyboard.
+    root.style.setProperty('--kb',`${inset>60?inset:0}px`);
   };
+  const apply=()=>{if(!frame)frame=requestAnimationFrame(measure);};
   const heightOf=event=>Number(event?.keyboardHeight??event?.detail?.keyboardHeight??0)||0;
   window.addEventListener('keyboardWillShow',event=>{nativeKeyboard=heightOf(event)||nativeKeyboard;apply();});
   window.addEventListener('keyboardDidShow',event=>{nativeKeyboard=heightOf(event)||nativeKeyboard;apply();});
@@ -527,6 +534,7 @@ function trackKeyboard(){
   window.visualViewport?.addEventListener('resize',apply);
   window.visualViewport?.addEventListener('scroll',apply);
   window.addEventListener('orientationchange',apply);
+  window.addEventListener('focusout',apply);
   apply();
 }
 trackKeyboard();

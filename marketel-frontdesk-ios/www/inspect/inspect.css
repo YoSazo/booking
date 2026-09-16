@@ -102,27 +102,24 @@ nav button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 9px 6px; back
 nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shadow: 0 5px 16px #173b2314, inset 0 1px 0 #fff; }
 /* Matches Front Desk: a thin pill that slides in from the right and leaves on
    its own, rather than a full-width bar that the keyboard used to sit on top of. */
-#notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; }
+#notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; transition: bottom .18s ease; }
 #notice:empty { display: none; }
 .toast { max-width: min(420px, 100%); background: #213b2f; color: #fff; border-radius: 11px; padding: 11px 16px; font-size: 12px; font-weight: 600; line-height: 1.45; box-shadow: 0 12px 32px #173b2333; animation: toast-in .2s ease, toast-out .3s ease 3.4s forwards; }
 .toast.success { background: var(--green); }
 .toast.error { background: #aa382b; }
 @keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
-html.kb-open #notice { bottom: calc(var(--kb, 0px) + 16px); }
-/* iOS WKWebView never resizes the layout viewport for the keyboard
-   (interactive-widget is Chromium-only), so a natively centred dialog stays
-   centred while the keyboard covers the lower half — taking the primary button
-   and the close control with it. These custom properties are written from
-   visualViewport in inspect.js, and .kb-open top-anchors the sheet inside the
-   part of the screen that is actually visible. */
-dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; border: 1px solid #ffffffd9; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(var(--vv-height, 100dvh) - 24px); overflow: hidden; color: inherit; background: #f9fcf9f2; box-shadow: 0 24px 70px #173b2340; -webkit-backdrop-filter: blur(24px) saturate(140%); backdrop-filter: blur(24px) saturate(140%); }
+/* One formula for every case. --kb is the keyboard height and is 0 when it is
+   closed, so the sheet simply centres in whatever space is left. Nothing here
+   reads visualViewport.offsetTop: iOS 26 leaves that stale and non-zero after
+   the keyboard closes, which is what pinned the sheet to the top of the screen. */
+dialog { position: fixed; left: 50%; top: calc((100dvh - var(--kb, 0px)) / 2); transform: translate(-50%, -50%); margin: 0; border: 1px solid #ffffffd9; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - var(--kb, 0px) - 32px); overflow: hidden; color: inherit; background: #f9fcf9f2; box-shadow: 0 24px 70px #173b2340; -webkit-backdrop-filter: blur(24px) saturate(140%); backdrop-filter: blur(24px) saturate(140%); transition: top .18s ease, max-height .18s ease; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
+html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-html.kb-open dialog { top: calc(var(--vv-top, 0px) + 12px); transform: translate(-50%, 0); max-height: calc(100dvh - var(--kb, 0px) - var(--vv-top, 0px) - 24px); }
 dialog::backdrop { background: #15261c73; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
 #dialog-close { position: absolute; z-index: 2; top: 12px; right: 12px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; border-radius: 999px; color: var(--muted); }
