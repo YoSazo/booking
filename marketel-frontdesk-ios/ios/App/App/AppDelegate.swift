@@ -24,6 +24,11 @@ private extension Notification.Name {
 
 private var marketelPendingNotificationDestination: [String: String]?
 
+private enum MarketelShellProduct: Equatable {
+    case frontDesk
+    case inspect
+}
+
 private enum MarketelSharedCredentials {
     static let appGroup = "group.com.bookmarketel.frontdesk"
 
@@ -119,7 +124,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private let tabBar = UITabBar()
     private let menuButton = UIButton(type: .system)
     private let propertyHeaderControl = UIControl()
+    private let productNameLabel = UILabel()
     private let propertyNameLabel = UILabel()
+    private let propertyChevron = UIImageView(image: UIImage(systemName: "chevron.down"))
+    private let qrButton = UIButton(type: .system)
     private let trialStatusBadge = UIButton(type: .system)
     private let yourPageTabItem = UITabBarItem(
         title: "Your Page",
@@ -137,6 +145,24 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         tag: 3
     )
     private var bookingTabItem: UITabBarItem?
+    private let inspectReportsTabItem = UITabBarItem(
+        title: "Reports",
+        image: UIImage(systemName: "doc.text"),
+        tag: 10
+    )
+    private let inspectCurrentTabItem = UITabBarItem(
+        title: "Current",
+        image: UIImage(systemName: "square.and.pencil"),
+        tag: 11
+    )
+    private let inspectPropertiesTabItem = UITabBarItem(
+        title: "Properties",
+        image: UIImage(systemName: "building.2"),
+        tag: 12
+    )
+    private var shellProduct: MarketelShellProduct?
+    private var frontDeskMenu: UIMenu?
+    private var inspectMenu: UIMenu?
     private var shellVisible = false
     private var shellSuppressedByModal = false
     private var nativeTourActive = false
@@ -171,6 +197,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.tintColor = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
         configureTopBar()
         configureTabBar()
+        setShellProduct(.frontDesk)
         configureAssistantPill()
         setShellVisible(false, animated: false)
         NotificationCenter.default.addObserver(
@@ -304,10 +331,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         let logo = MarketelMarkView()
         logo.translatesAutoresizingMaskIntoConstraints = false
 
-        let frontDeskLabel = UILabel()
-        frontDeskLabel.text = "Front Desk"
-        frontDeskLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        frontDeskLabel.textColor = .label
+        productNameLabel.text = "Front Desk"
+        productNameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        productNameLabel.textColor = .label
 
         var trialConfiguration = UIButton.Configuration.filled()
         trialConfiguration.title = "TRIAL"
@@ -340,7 +366,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         trialStatusBadge.isHidden = true
         trialStatusBadge.accessibilityTraits = .staticText
 
-        let frontDeskRow = UIStackView(arrangedSubviews: [frontDeskLabel, trialStatusBadge])
+        let frontDeskRow = UIStackView(arrangedSubviews: [productNameLabel, trialStatusBadge])
         frontDeskRow.axis = .horizontal
         frontDeskRow.alignment = .center
         frontDeskRow.spacing = 6
@@ -351,12 +377,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyNameLabel.lineBreakMode = .byTruncatingTail
         propertyNameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let chevron = UIImageView(image: UIImage(systemName: "chevron.down"))
-        chevron.translatesAutoresizingMaskIntoConstraints = false
-        chevron.tintColor = .secondaryLabel
-        chevron.contentMode = .scaleAspectFit
+        propertyChevron.translatesAutoresizingMaskIntoConstraints = false
+        propertyChevron.tintColor = .secondaryLabel
+        propertyChevron.contentMode = .scaleAspectFit
 
-        let propertyRow = UIStackView(arrangedSubviews: [propertyNameLabel, chevron])
+        let propertyRow = UIStackView(arrangedSubviews: [propertyNameLabel, propertyChevron])
         propertyRow.axis = .horizontal
         propertyRow.alignment = .center
         propertyRow.spacing = 4
@@ -398,8 +423,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         NSLayoutConstraint.activate([
             logo.widthAnchor.constraint(equalToConstant: 23),
             logo.heightAnchor.constraint(equalToConstant: 25),
-            chevron.widthAnchor.constraint(equalToConstant: 9),
-            chevron.heightAnchor.constraint(equalToConstant: 9),
+            propertyChevron.widthAnchor.constraint(equalToConstant: 9),
+            propertyChevron.heightAnchor.constraint(equalToConstant: 9),
             brandRow.leadingAnchor.constraint(equalTo: propertyHeaderControl.leadingAnchor),
             brandRow.trailingAnchor.constraint(equalTo: propertyHeaderControl.trailingAnchor),
             brandRow.topAnchor.constraint(equalTo: propertyHeaderControl.topAnchor),
@@ -409,7 +434,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         propertyHeaderControl.setContentHuggingPriority(.defaultLow, for: .horizontal)
         propertyHeaderControl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let qrButton = UIButton(type: .system)
         var qrConfiguration = UIButton.Configuration.plain()
         qrConfiguration.image = UIImage(systemName: "qrcode.viewfinder")
         qrConfiguration.baseForegroundColor = .label
@@ -470,7 +494,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         menuConfiguration.baseForegroundColor = .label
         menuConfiguration.contentInsets = .zero
         menuButton.configuration = menuConfiguration
-        menuButton.menu = UIMenu(
+        frontDeskMenu = UIMenu(
             children: [
                 supportAction,
                 notificationSettingsAction,
@@ -481,6 +505,26 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 signOutAction,
             ]
         )
+        let inspectRefreshAction = UIAction(
+            title: "Refresh",
+            image: UIImage(systemName: "arrow.clockwise")
+        ) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "refresh")
+        }
+        let inspectAccountAction = UIAction(
+            title: "Inspect account",
+            image: UIImage(systemName: "person.crop.circle")
+        ) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "account")
+        }
+        let frontDeskAction = UIAction(
+            title: "Open booking Front Desk",
+            image: UIImage(systemName: "bed.double")
+        ) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "frontdesk")
+        }
+        inspectMenu = UIMenu(children: [inspectRefreshAction, inspectAccountAction, frontDeskAction])
+        menuButton.menu = frontDeskMenu
         menuButton.showsMenuAsPrimaryAction = true
         menuButton.changesSelectionAsPrimaryAction = false
         menuButton.automaticallyUpdatesConfiguration = false
@@ -636,6 +680,16 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
+        if shellProduct == .inspect {
+            let destination: String
+            switch item.tag {
+            case 10: destination = "reports"
+            case 12: destination = "properties"
+            default: destination = "current"
+            }
+            callWeb(function: "marketelInspectNativeSelectTab", argument: destination)
+            return
+        }
         let filter: String
         switch item.tag {
         case 1: filter = "bookings"
@@ -644,6 +698,55 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         default: filter = "settings"
         }
         callWeb(function: "marketelNativeSelectTab", argument: filter)
+    }
+
+    private func setShellProduct(_ product: MarketelShellProduct) {
+        guard shellProduct != product else { return }
+        shellProduct = product
+        switch product {
+        case .frontDesk:
+            productNameLabel.text = "Front Desk"
+            propertyChevron.isHidden = false
+            propertyHeaderControl.isUserInteractionEnabled = true
+            qrButton.isHidden = false
+            menuButton.menu = frontDeskMenu
+            menuButton.accessibilityLabel = "Front Desk menu"
+            if let bookingTabItem {
+                tabBar.items = [
+                    yourPageTabItem,
+                    bookingTabItem,
+                    availabilityTabItem,
+                    guestAppTabItem,
+                ]
+            }
+            if tabBar.selectedItem == nil || (tabBar.selectedItem?.tag ?? 10) >= 10 {
+                tabBar.selectedItem = yourPageTabItem
+            }
+        case .inspect:
+            productNameLabel.text = "Marketel Inspect"
+            propertyNameLabel.text = "Condition reports"
+            propertyChevron.isHidden = true
+            propertyHeaderControl.isUserInteractionEnabled = false
+            qrButton.isHidden = true
+            trialStatusBadge.isHidden = true
+            menuButton.menu = inspectMenu
+            menuButton.accessibilityLabel = "Inspect menu"
+            tabBar.items = [inspectReportsTabItem, inspectCurrentTabItem, inspectPropertiesTabItem]
+            tabBar.selectedItem = inspectCurrentTabItem
+        }
+        view.setNeedsLayout()
+    }
+
+    private func updateInspectSelectedTab(_ identifier: String, hasDraft: Bool) {
+        inspectCurrentTabItem.title = hasDraft ? "Current" : "New Report"
+        inspectCurrentTabItem.image = UIImage(systemName: hasDraft ? "square.and.pencil" : "plus.square")
+        let tag: Int
+        switch identifier {
+        case "reports": tag = 10
+        case "properties": tag = 12
+        default: tag = 11
+        }
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tag })
     }
 
     @objc private func openPropertyPicker() {
@@ -862,12 +965,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     }
 
     private func updatePropertyName(_ name: String) {
+        guard shellProduct == .frontDesk else { return }
         let propertyName = name.isEmpty ? "Your property" : name
         propertyNameLabel.text = propertyName
         propertyHeaderControl.accessibilityLabel = "Switch property, \(propertyName)"
     }
 
     private func updateTrialStatus(trialing: Bool, daysLeft: Int) {
+        guard shellProduct == .frontDesk else {
+            trialStatusBadge.isHidden = true
+            return
+        }
         trialStatusBadge.isHidden = !trialing
         guard trialing else { return }
         let days = max(0, daysLeft)
@@ -1028,11 +1136,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         statusBarBackdrop.isHidden = !visible
         topBar.isHidden = !visible
         menuButton.isHidden = !visible
+        qrButton.isHidden = !visible || shellProduct == .inspect
         tabBar.isHidden = !visible
-        assistantPill.isHidden = !visible || !assistantPillVisible
+        assistantPill.isHidden = !visible || !assistantPillVisible || shellProduct == .inspect
         assistantPillButton.isHidden = assistantPill.isHidden
         topBar.isUserInteractionEnabled = visible && !nativeTourActive
         menuButton.isUserInteractionEnabled = visible && !nativeTourActive
+        propertyHeaderControl.isUserInteractionEnabled = visible && !nativeTourActive && shellProduct == .frontDesk
         tabBar.isUserInteractionEnabled = visible && !nativeTourActive
         assistantPillButton.isUserInteractionEnabled = visible && !nativeTourActive
     }
@@ -1234,6 +1344,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             shellSuppressedByModal = !visible
             setShellVisible(visible, animated: shellVisible)
         case "state":
+            setShellProduct(.frontDesk)
             updatePropertyName(payload["hotelName"] as? String ?? "Front Desk")
             updateSelectedTab(payload["selectedTab"] as? String ?? "settings")
             updateBookingBadge(payload["bookingBadge"] as? Int ?? 0)
@@ -1249,6 +1360,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             )
             let requestedVisible = payload["visible"] as? Bool ?? true
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
+        case "inspectState":
+            setShellProduct(.inspect)
+            shellSuppressedByModal = !(payload["visible"] as? Bool ?? true)
+            updateInspectSelectedTab(
+                payload["selectedTab"] as? String ?? "current",
+                hasDraft: payload["hasDraft"] as? Bool ?? false
+            )
+            setShellVisible(!shellSuppressedByModal, animated: shellVisible)
         case "saveContact":
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":

@@ -64,6 +64,10 @@ expect(delegate, /case "inspectStorefront":[\s\S]{0,100}sendInspectStorefront/,
   'AppDelegate does not provide the App Store storefront to Inspect');
 expect(delegate, /case "inspectExportPDF":[\s\S]{0,220}exportInspectPDF/,
   'AppDelegate does not provide a native Inspect PDF export');
+expect(delegate, /case "inspectState":[\s\S]{0,180}setShellProduct\(\.inspect\)/,
+  'AppDelegate does not give Inspect the native navigation shell');
+expect(delegate, /inspectReportsTabItem[\s\S]{0,900}inspectPropertiesTabItem/,
+  'AppDelegate does not provide native Inspect tabs');
 expect(delegate, /case "tourMode":/,
   'AppDelegate does not lock native navigation during the native walkthrough');
 expect(delegate, /case "openAssistant":[\s\S]{0,120}presentNativeAssistant\(\)/,
@@ -91,6 +95,8 @@ if (/clarity\.ms|unpkg\.com/.test(bundledFrontDesk)) {
 if (/<script[^>]+src=["']https?:/i.test(bundledInspect)) {
   failures.push('Bundled Inspect must not load executable JavaScript from a remote origin');
 }
+expect(read('www/inspect/inspect.js'), /type:'inspectState'[\s\S]{0,180}selectedTab/,
+  'Bundled Inspect does not synchronize its native tab selection');
 expect(bundledRoot, /marketel\.product[\s\S]{0,800}data-product="inspect"/,
   'The native app entry does not preserve a focused Marketel product choice');
 const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');

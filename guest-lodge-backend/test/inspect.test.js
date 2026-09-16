@@ -122,6 +122,19 @@ test('Inspect photo uploads preserve the local-work recovery message when storag
   assert.match(source, /Your report and photo remain on this device; try again shortly\./);
 });
 
+test('Inspect has one canonical trailing-slash route through Render and Vercel', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const vercel = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'hotel-booking-app', 'vercel.json'), 'utf8'));
+  assert.match(server, /app\.get\('\/inspect',[\s\S]{0,280}res\.redirect\(308, '\/inspect\/'\)/);
+  assert.deepEqual(vercel.redirects?.find(route => route.source === '/inspect'), {
+    source: '/inspect', destination: '/inspect/', permanent: true,
+  });
+  assert.ok(vercel.rewrites.some(route => route.source === '/inspect/(.*)'
+    && route.destination.endsWith('/inspect/$1')));
+});
+
 test('Inspect API is dark behind its flag and requires a bearer session', async () => {
   const off = express();
   off.use(express.json());

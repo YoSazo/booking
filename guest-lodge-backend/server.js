@@ -1170,7 +1170,13 @@ app.use('/frontdesk/assets', express.static(path.join(__dirname, 'public', 'fron
 // App Store surface are configured. Guard the HTML/assets as well as the API,
 // so a guessed URL cannot expose a half-configured product.
 const INSPECT_PUBLIC_ROOT = path.join(__dirname, 'public', 'inspect');
-app.use(['/inspect', '/inspect/'], (req, res, next) => {
+app.get('/inspect', (req, res) => {
+    if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
+    // Inspect uses relative, product-scoped asset URLs. Keep one canonical URL
+    // so /inspect never resolves them as root-level /inspect.css or /inspect.js.
+    res.redirect(308, '/inspect/');
+});
+app.use('/inspect/', (req, res, next) => {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');

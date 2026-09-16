@@ -1,9 +1,11 @@
 const native = location.protocol === 'capacitor:' || location.protocol === 'ionic:';
+if(native)document.documentElement.classList.add('native-inspect-shell');
 const API = native ? 'https://bookmarketel.com/api/inspect' : '/api/inspect';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let session = localStorage.getItem('inspect.session') || '';
 let account = null, draft = null, reports = [], nextReportCursor = null, busy = false, preview = false, storefront = null, storefrontWaiters = [];
+let currentPage = 'current';
 const urls = new Map();
 const localDate = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const uid = () => crypto.randomUUID?.() || `${Date.now().toString(36)}_${crypto.getRandomValues(new Uint32Array(2)).join('_')}`;
@@ -42,9 +44,13 @@ async function run(fn) {
   try { await fn(); } catch (error) { notice(error.message); }
   finally { busy = false; document.querySelectorAll('button').forEach(b => b.disabled = false); }
 }
-function modal(content) { $('dialog-body').innerHTML = content; if (!$('dialog').open) $('dialog').showModal(); }
+function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
+  if(!native)return;
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectState',visible,selectedTab:page,hasDraft:!!draft});
+}
+function modal(content) { $('dialog-body').innerHTML = content; if (!$('dialog').open) $('dialog').showModal(); syncNativeInspectState(currentPage,false); }
 $('dialog-close').onclick = () => $('dialog').close();
-function setActiveNav(page) { document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page)); }
+function setActiveNav(page) { currentPage=page;document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page));syncNativeInspectState(page); }
 function updateHeader() { $('account-button').textContent = account ? 'Account' : 'Sign in'; $('nav').hidden = !draft && !account;const current=$('current-report');if(current){const unfinished=draft&&!draft.finalizedAt;current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'Current report':'+ New report';} }
 function photoURL(id) {
   if (urls.has(id)) return urls.get(id);
@@ -55,6 +61,7 @@ function photoURL(id) {
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
 function landing() {
   updateHeader();
+  setActiveNav('current');
   $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Your walkthrough.<br>A finished report.</h1><p class="muted">Keep photos, observations and issues organized by room.<br>Send a clear condition report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $29/month for 30 reports. One operator.</small></p><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
   $('start').onclick = () => start();
 }
@@ -200,10 +207,20 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else run(()=>list(page));};
+$('dialog').addEventListener('close',()=>syncNativeInspectState(currentPage,true));
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
 window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
+window.marketelInspectNativeSelectTab=page=>{
+  if(page==='current'){if(draft)editor();else run(()=>start());return;}
+  run(()=>list(page));
+};
+window.marketelInspectNativeAction=action=>{
+  if(action==='account'){$('account-button').click();return;}
+  if(action==='frontdesk'){syncNativeInspectState(currentPage,false);localStorage.setItem('marketel.product','bookings');location.assign('../frontdesk/index.html?native=ios');return;}
+  if(action==='refresh')run(async()=>{await refresh();if(draft)editor();else if(account)await list(currentPage==='properties'?'properties':'reports');else landing();notice('Inspect refreshed.');});
+};
 function showNativeKeyboardDoneButton(){
   if(!native)return;
   let attempts=0;
@@ -217,5 +234,5 @@ function showNativeKeyboardDoneButton(){
 }
 window.addEventListener('pagehide',()=>remember());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session)run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh();});});
-if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'visibility',visible:false});window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
+if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 try{draft=await stored('get');await refresh();if(draft)editor();else if(account)await list();else landing();if(new URLSearchParams(location.search).get('checkout')==='success'&&session){await api('/billing/refresh',{method:'POST'});await refresh();notice(account.active?'Inspect is ready. Your subscription is active.':'Payment confirmation is pending. Refresh billing status shortly.');}}catch(e){notice(e.message);if(draft)editor();else landing();}

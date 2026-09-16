@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/inspect", "destination": "/inspect/", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/frontdesk", "destination": "https://guest-lodge-backend.onrender.com/frontdesk" },
     { "source": "/frontdesk/", "destination": "https://guest-lodge-backend.onrender.com/frontdesk/" },
@@ -7,6 +10,8 @@
     { "source": "/marketel-journey.js", "destination": "https://guest-lodge-backend.onrender.com/marketel-journey.js" },
     { "source": "/marketel-telemetry.js", "destination": "https://guest-lodge-backend.onrender.com/marketel-telemetry.js" },
     { "source": "/frontdesk-sw.js", "destination": "https://guest-lodge-backend.onrender.com/frontdesk-sw.js" },
+    { "source": "/inspect/", "destination": "https://guest-lodge-backend.onrender.com/inspect/" },
+    { "source": "/inspect/(.*)", "destination": "https://guest-lodge-backend.onrender.com/inspect/$1" },
     { "source": "/api/(.*)", "destination": "https://guest-lodge-backend.onrender.com/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
