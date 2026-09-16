@@ -235,6 +235,14 @@ function registerInspect(app, {
   const router = express.Router();
   const bucket = env.INSPECT_R2_BUCKET;
   const origin = env.INSPECT_PUBLIC_ORIGIN || 'https://bookmarketel.com';
+  const configuredAppStoreUrl = String(env.MARKETEL_FRONTDESK_APP_STORE_URL
+    || 'https://apps.apple.com/us/app/marketel/id6801005750').trim();
+  const appStoreUrl = (() => {
+    try {
+      const value = new URL(configuredAppStoreUrl);
+      return value.protocol === 'https:' && value.hostname === 'apps.apple.com' ? value.toString() : '';
+    } catch { return ''; }
+  })();
   const secret = env.INSPECT_AUTH_SECRET;
   const r2Endpoint = env.INSPECT_R2_ENDPOINT || env.R2_ENDPOINT;
   const r2AccessKeyId = env.INSPECT_R2_ACCESS_KEY_ID || env.R2_ACCESS_KEY_ID;
@@ -423,9 +431,46 @@ function registerInspect(app, {
     res.json({ token: sessionToken, email, ...entitlement(result), plans: purchasablePlans() });
   }));
 
+  // A handoff is deliberately separate from the normal bearer session. The
+  // emailed value is short-lived, single-use and exchanged for a fresh session
+  // only inside the app; replaying the URL cannot reopen the account.
+  router.post('/auth/handoff', guarded(async (req, res) => {
+    rate(`handoff-redeem:${req.ip}`, 20, 600000);
+    const raw = String(req.body.token || '');
+    if (!/^[A-Za-z0-9_-]{43}$/.test(raw)) throw fail(401, 'This app link is invalid or expired.');
+    const sessionToken = token();
+    const result = await prisma.$transaction(async tx => {
+      const row = await tx.inspectHandoff.findUnique({
+        where: { tokenHash: hash(raw) },
+        include: { account: true },
+      });
+      if (!row || row.expiresAt <= new Date()) {
+        if (row) await tx.inspectHandoff.deleteMany({ where: { tokenHash: row.tokenHash } });
+        return null;
+      }
+      const claimed = await tx.inspectHandoff.deleteMany({
+        where: { tokenHash: row.tokenHash, expiresAt: { gt: new Date() } },
+      });
+      if (claimed.count !== 1) return null;
+      await tx.inspectSession.create({
+        data: { tokenHash: hash(sessionToken), accountId: row.accountId, expiresAt: new Date(Date.now() + 30 * 86400000) },
+      });
+      const oldSessions = await tx.inspectSession.findMany({
+        where: { accountId: row.accountId }, orderBy: { expiresAt: 'desc' }, skip: 9, select: { tokenHash: true },
+      });
+      if (oldSessions.length) await tx.inspectSession.deleteMany({ where: { tokenHash: { in: oldSessions.map(item => item.tokenHash) } } });
+      return { account: row.account, reportId: row.reportId };
+    });
+    if (!result) throw fail(401, 'This app link is invalid or expired.');
+    await recordBestEffort(result.account.id, 'AppHandoffRedeemed');
+    res.json({ token: sessionToken, email: result.account.email, reportId: result.reportId,
+      ...entitlement(result.account), plans: purchasablePlans() });
+  }));
+
   // Used by the bundled iOS product picker. It intentionally exposes no
   // environment details; a 200 response only means the product is launchable.
-  router.get('/config', (_req, res) => res.json({ enabled: true, limits: { reports: LIMITS.reports, photos: LIMITS.photos } }));
+  router.get('/config', (_req, res) => res.json({ enabled: true, appStoreUrl,
+    limits: { reports: LIMITS.reports, photos: LIMITS.photos } }));
 
   // Recipient capabilities are separate from operator sessions and never reveal originals.
   const shared = async value => {
@@ -536,6 +581,37 @@ function registerInspect(app, {
   }));
   router.post('/auth/logout', guarded(async (req, res) => {
     await prisma.inspectSession.deleteMany({ where: { tokenHash: req.inspectSessionHash } }); res.json({ success: true });
+  }));
+  router.post('/app-handoff', guarded(async (req, res) => {
+    rate(`handoff-mail:${req.inspect.id}`, 6, 3600000);
+    if (!mail) throw fail(503, 'Email is temporarily unavailable.');
+    const reportId = String(req.body.reportId || '').trim() || null;
+    if (reportId) {
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(reportId)) throw fail(400, 'Invalid report.');
+      const report = await prisma.inspectReport.findFirst({ where: { id: reportId, accountId: req.inspect.id }, select: { id: true } });
+      if (!report) throw fail(404, 'Report not found.');
+    }
+    const raw = token();
+    const expiresAt = new Date(Date.now() + 10 * 60000);
+    await prisma.$transaction(async tx => {
+      await tx.inspectHandoff.deleteMany({ where: { accountId: req.inspect.id } });
+      await tx.inspectHandoff.create({ data: { tokenHash: hash(raw), accountId: req.inspect.id, reportId, expiresAt } });
+    });
+    const openUrl = `${origin}/inspect/open?handoff=${encodeURIComponent(raw)}`;
+    try {
+      await mail.sendMail({
+        from: '"Marketel Inspect" <support@bookmarketel.com>',
+        to: req.inspect.email,
+        subject: 'Open your report in Marketel',
+        text: `Open your Inspect report in the Marketel app:\n\n${openUrl}\n\nThis secure link expires in 10 minutes and works once.`,
+        html: `<p>Continue your Inspect report in the Marketel app.</p><p><a href="${safe(openUrl)}" style="display:inline-block;padding:12px 18px;background:#2e7d5b;color:#fff;text-decoration:none;border-radius:10px;font-weight:700">Open your report in Marketel</a></p><p>This secure link expires in 10 minutes and works once.</p>`,
+      });
+    } catch (error) {
+      await prisma.inspectHandoff.deleteMany({ where: { tokenHash: hash(raw) } });
+      throw error;
+    }
+    await recordBestEffort(req.inspect.id, 'AppHandoffSent');
+    res.json({ openUrl, expiresAt: expiresAt.toISOString(), appStoreUrl });
   }));
   router.get('/reports', guarded(async (req, res) => {
     const take = Math.min(50, Math.max(1, Number(req.query.take) || 50));
@@ -980,6 +1056,7 @@ function registerInspect(app, {
     try {
       await prisma.inspectSession.deleteMany({ where: { expiresAt: { lt: new Date() } } });
       await prisma.inspectChallenge.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+      await prisma.inspectHandoff.deleteMany({ where: { expiresAt: { lt: new Date() } } });
       await removeObjects();
     } catch (error) { console.error('Inspect cleanup failed:', error.name); }
     finally { running = false; }

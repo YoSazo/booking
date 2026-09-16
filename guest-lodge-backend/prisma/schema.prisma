@@ -27,6 +27,7 @@ model InspectAccount {
   metaAttribution      Json?
   reports              InspectReport[]
   sessions             InspectSession[]
+  handoffs             InspectHandoff[]
 }
 
 model InspectChallenge {
@@ -51,6 +52,21 @@ model InspectSession {
   account   InspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId])
+}
+
+// Short-lived, single-use bridge from an authenticated Inspect web session to
+// the Marketel iOS app. Only a SHA-256 digest is stored; the emailed bearer
+// token cannot be recovered from the database.
+model InspectHandoff {
+  tokenHash String         @id
+  accountId String
+  reportId  String?
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+  account   InspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
 }
 
 model InspectReport {

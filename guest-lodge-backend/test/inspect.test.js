@@ -159,6 +159,46 @@ async function request(app, path, options) {
   }
 }
 
+test('Inspect app handoff is hashed, single-use, bound to its account and short-lived', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+  // Only a digest is ever persisted: the emailed bearer cannot be recovered from
+  // a database dump.
+  assert.match(source, /inspectHandoff\.create\(\{ data: \{ tokenHash: hash\(raw\)/);
+  assert.doesNotMatch(source, /inspectHandoff\.create\([\s\S]{0,200}token: raw/);
+  assert.match(schema, /model InspectHandoff[\s\S]{0,260}tokenHash String\s+@id/);
+  assert.match(schema, /onDelete: Cascade/);
+
+  // Redemption deletes the row inside the same transaction that mints the
+  // session, so a replayed link cannot open a second session.
+  assert.match(source, /inspectHandoff\.deleteMany\([\s\S]{0,160}expiresAt: \{ gt: new Date\(\) \}/);
+  assert.match(source, /if \(claimed\.count !== 1\) return null/);
+  assert.match(source, /10 \* 60000/);
+
+  // Both directions are rate limited, and the opaque value is shape-checked
+  // before it is ever used to look anything up.
+  assert.match(source, /rate\(`handoff-mail:\$\{req\.inspect\.id\}`/);
+  assert.match(source, /rate\(`handoff-redeem:\$\{req\.ip\}`/);
+  assert.match(source, /\^\[A-Za-z0-9_-\]\{43\}\$/);
+
+  // A requested report must belong to the requesting account.
+  assert.match(source, /inspectReport\.findFirst\(\{ where: \{ id: reportId, accountId: req\.inspect\.id \}/);
+
+  // Expired rows are swept with the other short-lived tables.
+  assert.match(source, /inspectHandoff\.deleteMany\(\{ where: \{ expiresAt: \{ lt: new Date\(\) \} \} \}\)/);
+
+  // The app claims the link itself, and the fallback page never echoes a token.
+  assert.match(server, /com\.bookmarketel\.frontdesk[\s\S]{0,160}\/inspect\/open/);
+  assert.match(server, /app\.get\('\/inspect\/open'/);
+  assert.doesNotMatch(server, /inspect\/open'[\s\S]{0,1400}req\.query\.handoff/);
+  assert.match(client, /window\.marketelInspectOpenHandoff\s*=/);
+});
+
 test('Inspect launch-readiness stays non-blocking while disabled and blocks when enabled without infra', () => {
   const dark = inspectEnvReadiness({ INSPECT_ENABLED: 'false' });
   assert.equal(dark.enabled, false);
@@ -260,7 +300,7 @@ test('Inspect API is dark behind its flag and requires a bearer session', async 
   });
   const config = await request(on, '/api/inspect/config');
   assert.equal(config.status, 200);
-  assert.deepEqual(await config.json(), { enabled: true, limits: { reports: 30, photos: 100 } });
+  assert.deepEqual(await config.json(), { enabled: true, appStoreUrl: 'https://apps.apple.com/us/app/marketel/id6801005750', limits: { reports: 30, photos: 100 } });
   assert.equal((await request(on, '/api/inspect/account')).status, 401);
   onRegistration.close();
 });

@@ -1055,10 +1055,16 @@ app.use(cors(corsOptions));
 const APPLE_APP_SITE_ASSOCIATION = {
     appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] },
     applinks: {
-        details: [{
-            appIDs: ['YAS2Z7ZY3M.com.bookmarketel.guestel'],
-            components: [{ '/': '/clip/*', comment: 'Open a hotel directly in Guestel' }],
-        }],
+        details: [
+            {
+                appIDs: ['YAS2Z7ZY3M.com.bookmarketel.guestel'],
+                components: [{ '/': '/clip/*', comment: 'Open a hotel directly in Guestel' }],
+            },
+            {
+                appIDs: ['YAS2Z7ZY3M.com.bookmarketel.frontdesk'],
+                components: [{ '/': '/inspect/open', comment: 'Continue an Inspect report in Marketel' }],
+            },
+        ],
     },
 };
 function serveAppSiteAssociation(_req, res) {
@@ -1180,6 +1186,21 @@ app.get('/inspect', (req, res, next) => {
     // Inspect uses relative, product-scoped asset URLs. Keep one canonical URL
     // so /inspect never resolves them as root-level /inspect.css or /inspect.js.
     res.redirect(308, '/inspect/');
+});
+app.get('/inspect/open', (req, res) => {
+    if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
+    const configured = String(process.env.MARKETEL_FRONTDESK_APP_STORE_URL
+        || 'https://apps.apple.com/us/app/marketel/id6801005750').trim();
+    let appStoreUrl = 'https://apps.apple.com/us/app/marketel/id6801005750';
+    try {
+        const parsed = new URL(configured);
+        if (parsed.protocol === 'https:' && parsed.hostname === 'apps.apple.com') appStoreUrl = parsed.toString();
+    } catch (_) { /* Use the published listing. */ }
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
+    res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open Marketel Inspect</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#eff4f0;color:#1a2b22;font:16px system-ui,-apple-system,sans-serif}.card{width:min(100%,440px);padding:28px;background:#fff;border:1px solid #d9e4dc;border-radius:20px;box-shadow:0 18px 50px #1a2b2214}h1{font-size:26px;margin:0 0 10px}p{color:#52665b;line-height:1.55}.button{display:block;margin-top:20px;padding:14px 18px;border-radius:12px;background:#2e7d5b;color:#fff;text-align:center;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Continue in Marketel</h1><p>Install Marketel, then return to the email titled <strong>Open your report in Marketel</strong> and tap its button again.</p><a class="button" href="${appStoreUrl}">Download Marketel on the App Store</a><p><small>The secure email link expires after 10 minutes and works once.</small></p></main></body></html>`);
 });
 app.use('/inspect/', (req, res, next) => {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);

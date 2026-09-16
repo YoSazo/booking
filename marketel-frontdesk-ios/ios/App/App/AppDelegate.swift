@@ -20,9 +20,12 @@ private extension Notification.Name {
         Notification.Name("MarketelOpenNotificationPath")
     static let marketelRefreshFrontDesk =
         Notification.Name("MarketelRefreshFrontDesk")
+    static let marketelOpenInspectHandoff =
+        Notification.Name("MarketelOpenInspectHandoff")
 }
 
 private var marketelPendingNotificationDestination: [String: String]?
+private var marketelPendingInspectHandoffToken: String?
 
 private enum MarketelShellProduct: Equatable {
     case frontDesk
@@ -165,6 +168,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var inspectMenu: UIMenu?
     private var shellVisible = false
     private var shellSuppressedByModal = false
+    private var inspectAuthenticated = false
+    private var pendingInspectHandoffToken: String?
+    private var inspectHandoffDeliveryAttempts = 0
     private var nativeTourActive = false
     private var nativeAuthToken = ""
     private var activeHotelId = ""
@@ -229,6 +235,22 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             name: .marketelRefreshFrontDesk,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(openInspectHandoff(_:)),
+            name: .marketelOpenInspectHandoff,
+            object: nil
+        )
+        // A cold launch delivers the link before this controller exists, so the
+        // token waits in a global until there is somewhere to hand it to.
+        if let pendingHandoff = marketelPendingInspectHandoffToken {
+            marketelPendingInspectHandoffToken = nil
+            pendingInspectHandoffToken = pendingHandoff
+            inspectHandoffDeliveryAttempts = 0
+            DispatchQueue.main.async { [weak self] in
+                self?.deliverInspectHandoff()
+            }
+        }
     }
 
     deinit {
@@ -747,8 +769,50 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.setNeedsLayout()
     }
 
+    @objc private func openInspectHandoff(_ notification: Notification) {
+        guard let token = notification.object as? String, !token.isEmpty else { return }
+        // Claimed here, so a later controller cannot replay an already-spent token.
+        marketelPendingInspectHandoffToken = nil
+        pendingInspectHandoffToken = token
+        inspectHandoffDeliveryAttempts = 0
+        setShellProduct(.inspect)
+        deliverInspectHandoff()
+    }
+
+    // The web layer owns redemption; this only carries the token across and
+    // forgets it immediately, so the value never lingers in native state.
+    private func deliverInspectHandoff() {
+        guard let token = pendingInspectHandoffToken else { return }
+        guard let webView, webView.url != nil else {
+            scheduleInspectHandoffRetry()
+            return
+        }
+        webView.evaluateJavaScript("typeof window.marketelInspectOpenHandoff === 'function'") { [weak self] ready, _ in
+            guard let self else { return }
+            if (ready as? Bool) == true {
+                self.pendingInspectHandoffToken = nil
+                self.inspectHandoffDeliveryAttempts = 0
+                self.callWeb(function: "marketelInspectOpenHandoff", argument: token)
+            } else {
+                self.scheduleInspectHandoffRetry()
+            }
+        }
+    }
+
+    private func scheduleInspectHandoffRetry() {
+        guard pendingInspectHandoffToken != nil else { return }
+        inspectHandoffDeliveryAttempts += 1
+        guard inspectHandoffDeliveryAttempts <= 25 else {
+            pendingInspectHandoffToken = nil
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.deliverInspectHandoff()
+        }
+    }
+
     private func updateInspectSelectedTab(_ identifier: String, hasDraft: Bool) {
-        inspectCurrentTabItem.title = hasDraft ? "Current" : "New Report"
+        inspectCurrentTabItem.title = hasDraft ? "In Progress" : "New Report"
         inspectCurrentTabItem.image = UIImage(systemName: hasDraft ? "square.and.pencil" : "plus.square")
         let tag: Int
         switch identifier {
@@ -1373,11 +1437,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         case "inspectState":
             setShellProduct(.inspect)
             shellSuppressedByModal = !(payload["visible"] as? Bool ?? true)
+            inspectAuthenticated = payload["authenticated"] as? Bool ?? false
             updateInspectSelectedTab(
                 payload["selectedTab"] as? String ?? "current",
-                hasDraft: payload["hasDraft"] as? Bool ?? false
+                hasDraft: payload["hasUnfinishedDraft"] as? Bool ?? false
             )
-            setShellVisible(!shellSuppressedByModal, animated: shellVisible)
+            // Reports and Properties mean nothing to a signed-out owner, so the
+            // whole bar stays hidden until there is an account behind it.
+            setShellVisible(inspectAuthenticated && !shellSuppressedByModal, animated: shellVisible)
         case "saveContact":
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":
@@ -1739,6 +1806,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        // An Inspect handoff is claimed here rather than being forwarded to the
+        // web layer as a URL, so the single-use token never lands in page history.
+        if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+           let url = userActivity.webpageURL,
+           url.path == "/inspect/open",
+           let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+               .queryItems?.first(where: { $0.name == "handoff" })?.value,
+           !token.isEmpty {
+            marketelPendingInspectHandoffToken = token
+            NotificationCenter.default.post(name: .marketelOpenInspectHandoff, object: token)
+            return true
+        }
         // Called when the app was launched with an activity, including Universal Links.
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call

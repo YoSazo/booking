@@ -7,6 +7,8 @@ let session = localStorage.getItem('inspect.session') || '';
 let account = null, draft = null, reports = [], nextReportCursor = null, preview = false, storefront = null, storefrontWaiters = [];
 let currentPage = 'current';
 let reportsCache = null, propertiesCache = null, listRequest = 0;
+const DEFAULT_APP_STORE_URL = 'https://apps.apple.com/us/app/marketel/id6801005750';
+let appStoreUrl = DEFAULT_APP_STORE_URL;
 // $29 x 12 = $348, so the annual plan saves $149 — and its report allowance is
 // the monthly one times twelve, because the quota resets per billing period.
 const PLANS = Object.freeze({
@@ -101,6 +103,7 @@ async function persist() { if (draft) await stored('put', draft); }
 // True only when this device holds work the server has not seen. Without it the
 // "save your draft online first" warning fired even straight after saving.
 function draftUnsaved(){ return !!draft && !draft.finalizedAt && (!draft.serverId || draft.dirty === true); }
+function hasUnfinishedDraft(){ return !!draft && !draft.finalizedAt; }
 function remember() { if (draft) draft.dirty = true; persist().catch(() => notice('Device storage is full or unavailable. Keep this page open and save your report online.')); }
 function dropSession() { session = ''; account = null; try { localStorage.removeItem('inspect.session'); } catch {} }
 // A 401 from any single call is not proof the session is gone. Background and
@@ -141,7 +144,9 @@ async function run(fn, trigger = document.activeElement?.closest?.('button')) {
 function resetScroll(){ try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { window.scrollTo(0, 0); } }
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
-  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectState',visible,selectedTab:page,hasDraft:!!draft});
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({
+    type:'inspectState',visible,selectedTab:page,authenticated:!!account,hasUnfinishedDraft:hasUnfinishedDraft(),
+  });
 }
 // A sheet is a card on top of the app, so the shell stays put — `true` keeps the
 // native header and tab bar visible instead of suppressing them.
@@ -186,7 +191,14 @@ function watchActions(){
 const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
 $('dialog-close').onclick = () => $('dialog').close();
 function setActiveNav(page) { currentPage=page;document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page));syncNativeInspectState(page); }
-function updateHeader() { $('account-button').textContent = account ? 'Account' : 'Sign in'; $('nav').hidden = !draft && !account;const current=$('current-report');if(current){const unfinished=draft&&!draft.finalizedAt;current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'Current report':'+ New report';} }
+function updateHeader() {
+  $('account-button').textContent = account ? 'Account' : 'Sign in';
+  $('nav').hidden = !account;
+  document.documentElement.classList.toggle('inspect-authenticated',!!account);
+  const current=$('current-report');
+  if(current){const unfinished=hasUnfinishedDraft();current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'In Progress':'+ New Report';}
+  syncNativeInspectState(currentPage,true);
+}
 function photoURL(id) {
   if (urls.has(id)) return urls.get(id);
   const file = draft.files.find(f => f.id === id);
@@ -202,7 +214,7 @@ function landing() {
   $('start').onclick = () => start();
   // The native shell hides the web header, so without this there was no way back
   // in after signing out short of the overflow menu.
-  if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>list()));
+  if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
 }
 async function start(propertyName = '') {
   if (draftUnsaved() && !confirm('Start a new report? Your current draft is not saved online yet.')) return;
@@ -217,7 +229,7 @@ function editor() {
   d.signatures ||= [];
   if (preview || draft.finalizedAt) return reportPreview();
   const photos=d.rooms.reduce((total,room)=>total+room.photos.length,0), photographed=d.rooms.filter(room=>room.photos.length).length, issues=d.rooms.filter(room=>room.issue).length;
-  $('app').innerHTML = `<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>What did you observe?</h1></div><span class="status">${draft.serverId ? 'Draft · save changes online' : 'Draft stored on this device'}</span></div><p class="muted">${d.rooms.length} room${d.rooms.length===1?'':'s'} · ${photographed} photographed · ${photos} photo${photos===1?'':'s'} · ${issues} issue${issues===1?'':'s'}</p><section class="card grid"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
+  $('app').innerHTML = `<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>What did you observe?</h1></div><span class="status">${draft.serverId ? 'Draft · save changes online' : 'Draft stored on this device'}</span></div><p class="muted">${d.rooms.length} room${d.rooms.length===1?'':'s'} · ${photographed} photographed · ${photos} photo${photos===1?'':'s'} · ${issues} issue${issues===1?'':'s'}</p><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
   for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
   $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
   $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -230,9 +242,22 @@ function editor() {
     if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
   };
   $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor(); };
+  if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
   $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
   $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor();}, button)); };
   bindPhotoDrag();
+}
+
+async function chooseExistingProperty(){
+  if(!account)return;
+  const data=propertiesCache||await api('/properties');propertiesCache=data;
+  const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
+  if(!details.length)return notice('Saved properties appear here after you save a report.');
+  modal(`<h2>Use an existing property</h2><p class="muted">Choose the exact property or unit for this report.</p><div class="stack property-choices">${details.map((property,index)=>`<button type="button" class="secondary" data-existing-property="${index}">${esc(property.name)}</button>`).join('')}</div><button type="button" id="keep-new-property" class="quiet">Enter a new property or unit</button>`);
+  document.querySelectorAll('[data-existing-property]').forEach(button=>button.onclick=()=>{
+    draft.document.propertyName=details[Number(button.dataset.existingProperty)].name;remember();$('dialog').close();editor();
+  });
+  $('keep-new-property').onclick=()=>{$('dialog').close();$('property')?.focus();};
 }
 
 function bindPhotoDrag(){
@@ -416,7 +441,7 @@ function reportPreview(){
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
   $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}${draft.finalizedAt
-    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button></div>`
+    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button></div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this report with you.</h2><p class="muted">We will email one secure link that signs you in and opens this report in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
     : `<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.</p>`}`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
@@ -433,6 +458,12 @@ function reportPreview(){
   // Revoke lives inside the share sheet rather than the floating action bar:
   // it is rare, destructive, and only means anything once a link exists.
   if($('share'))$('share').onclick=()=>run(async()=>{const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);$('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});$('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});});
+  if($('send-app-handoff'))$('send-app-handoff').onclick=event=>run(async()=>{
+    const result=await api('/app-handoff',{method:'POST',body:{reportId:draft.serverId}});
+    appStoreUrl=result.appStoreUrl||appStoreUrl;
+    modal(`<h2>Check your email.</h2><p>We sent <strong>${esc(account.email)}</strong> a secure <strong>Open your report in Marketel</strong> link.</p><p class="muted">If Marketel is already installed, tap that email button to open this report. Otherwise install the app first, then tap it. The link expires in 10 minutes and works once.</p><a class="button wide" href="${esc(appStoreUrl)}" target="_blank" rel="noopener">Download Marketel on the App Store</a><button id="handoff-done" class="quiet">Keep using the web</button>`);
+    $('handoff-done').onclick=()=>$('dialog').close();
+  },event.currentTarget);
 }
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
@@ -541,9 +572,18 @@ async function list(page='reports',append=false){
   reportsCache={reports:[...reports],nextCursor:nextReportCursor};
   if(currentPage==='reports'&&request===listRequest)renderReports();
 }
+async function openAccountHome(){
+  if(!account)return landing();
+  if(hasUnfinishedDraft())return editor();
+  updateHeader();setActiveNav('reports');
+  const result=reportsCache||await api('/reports?take=50');
+  reports=result.reports||[];nextReportCursor=result.nextCursor||null;reportsCache={reports:[...reports],nextCursor:nextReportCursor};
+  if(!reports.length)return start();
+  renderReports();
+}
 function prefetchLists(){if(!account)return;api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});api('/reports?take=50').then(result=>{reportsCache=result;}).catch(()=>{});}
 $('account-button').onclick=async()=>{
-  if(!account)return ensureAuth(()=>draft?editor():run(()=>list()));
+  if(!account)return ensureAuth(()=>run(()=>openAccountHome()));
   await requestStorefront();
   modal(`<h2>Inspect account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} reports left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:'One complete report free. Existing reports stay available.'}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete Inspect account</button></div></details><p><a href="https://bookmarketel.com/inspect/terms.html">Inspect terms & privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
@@ -564,6 +604,23 @@ window.marketelInspectNativeSelectTab=page=>{
   if($('dialog').open)$('dialog').close();
   if(page==='current'){if(draft)editor();else run(()=>start());return;}
   list(page).catch(error=>notice(error.message));
+};
+window.marketelInspectOpenHandoff=async rawToken=>{
+  try{
+    const raw=String(rawToken||'');
+    if(!/^[A-Za-z0-9_-]{43}$/.test(raw))throw new Error('This app link is invalid or expired.');
+    const response=await fetch(`${API}/auth/handoff`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:raw})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.error||'This app link is invalid or expired.');
+    session=result.token;localStorage.setItem('inspect.session',session);account=result;
+    clearURLs();draft=null;preview=false;await stored('delete');reportsCache=null;propertiesCache=null;
+    updateHeader();prefetchLists();localStorage.setItem('marketel.product','inspect');
+    if(result.reportId)await openReport(result.reportId);else await openAccountHome();
+    notice('Signed in. Your report is ready.','success');
+  }catch(error){
+    notice(error.message||'This app link is invalid or expired.','error');
+    ensureAuth(()=>run(()=>openAccountHome()));
+  }
 };
 window.marketelInspectNativeAction=action=>{
   if(action==='account'){$('account-button').click();return;}
@@ -634,7 +691,7 @@ try{
   draft=await stored('get');
   await refresh().catch(()=>{});
   if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}
-  if(draft)editor();else if(account)await list();else landing();
+  if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
   if(new URLSearchParams(location.search).get('checkout')==='success'&&session){
     await api('/billing/refresh',{method:'POST'});
     await refresh();
