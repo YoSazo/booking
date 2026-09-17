@@ -142,7 +142,12 @@ async function run(fn, trigger = document.activeElement?.closest?.('button')) {
 }
 // Screens inherited the previous screen's scroll, so Preview opened halfway down
 // a long editor instead of at the top of the report.
-function resetScroll(){ try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { window.scrollTo(0, 0); } }
+let currentScreen='';
+function enterScreen(key){
+  const keep = currentScreen===key ? window.scrollY : 0;
+  currentScreen=key;
+  requestAnimationFrame(()=>{ try { window.scrollTo({ top: keep, behavior: 'auto' }); } catch { window.scrollTo(0, keep); } });
+}
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({
@@ -208,7 +213,7 @@ function photoURL(id) {
 }
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
 function landing() {
-  resetScroll();
+  enterScreen('landing');
   updateHeader();
   setActiveNav('current');
   $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Your walkthrough.<br>A finished report.</h1><p class="muted">Keep photos, observations and issues organized by room.<br>Send a clear condition report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
@@ -223,7 +228,6 @@ async function start(propertyName = '') {
   await persist(); editor();
 }
 function editor(step) {
-  resetScroll();
   if (!draft) return landing(); updateHeader();
   setActiveNav('current');
   const d = draft.document;
@@ -232,6 +236,7 @@ function editor(step) {
   // The draft decides which step opens: an unnamed report needs its details, a
   // named one is ready for the work. Returning lands on the work, not the form.
   editorStep = step || (d.propertyName.trim() ? 'rooms' : 'details');
+  enterScreen(`editor:${editorStep}`);
   const bar = `<div class="screen-bar">${account
     ? '<button type="button" id="editor-back" class="quiet">← All reports</button>'
     : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
@@ -479,7 +484,7 @@ function reportRoom(r,label=''){
   return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
 }
 function reportPreview(){
-  resetScroll();
+  enterScreen('preview');
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
@@ -510,20 +515,52 @@ function reportPreview(){
     $('handoff-done').onclick=()=>$('dialog').close();
   },event.currentTarget);
 }
+// Two steps rather than one tall sheet: the name, then the pad. A sheet with a
+// text field and a signature canvas together is tall enough that opening the
+// keyboard shoved it around the screen on every focus.
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
-  modal(`<h2>${role==='resident'?'Resident / tenant':'Manager / inspector'} signature</h2><label>Signer name<input id="signer-name" maxlength="120" value="${esc(existing?.name || (role === 'manager' ? (draft.document.author || rememberedAuthor()) : ''))}"></label><p class="muted">Sign inside the box. This is optional and will be dated by Marketel when the report is finalized.</p><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><div class="row"><button id="save-signature">Use signature</button><button id="clear-signature" class="secondary">Clear</button>${existing?'<button id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
-  const canvas=$('signature-pad'),ctx=canvas.getContext('2d'),strokes=existing?structuredClone(existing.strokes):[];let current=null;
-  const draw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2b22';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';for(const stroke of strokes){ctx.beginPath();stroke.forEach((point,index)=>{const x=point.x*canvas.width,y=point.y*canvas.height;index?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}};
-  const point=event=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};};
-  canvas.onpointerdown=event=>{current=[point(event)];strokes.push(current);canvas.setPointerCapture(event.pointerId);draw();};
-  canvas.onpointermove=event=>{if(!current)return;const next=point(event),last=current[current.length-1];if(Math.hypot(next.x-last.x,next.y-last.y)>.003&&current.length<300){current.push(next);draw();}};
-  canvas.onpointerup=canvas.onpointercancel=()=>{if(current?.length===1)current.push({...current[0],x:Math.min(1,current[0].x+.002)});current=null;};
-  $('clear-signature').onclick=()=>{strokes.splice(0);draw();};
-  $('save-signature').onclick=()=>{const name=$('signer-name').value.trim();if(!name)return notice('Enter the signer name.');if(!strokes.length)return notice('Add a signature first.');const signatures=(draft.document.signatures||[]).filter(signature=>signature.role!==role);signatures.push({role,name,strokes});draft.document.signatures=signatures;remember();$('dialog').close();reportPreview();};
-  if($('remove-signature'))$('remove-signature').onclick=()=>{draft.document.signatures=draft.document.signatures.filter(signature=>signature.role!==role);remember();$('dialog').close();reportPreview();};
-  draw();
+  const title=role==='resident'?'Resident / tenant':'Manager / inspector';
+  let name=existing?.name || (role==='manager' ? (draft.document.author||rememberedAuthor()) : '');
+  const strokes=existing?structuredClone(existing.strokes):[];
+
+  const nameStep=()=>{
+    modal(`<h2>${title}</h2><label>Signer name<input id="signer-name" maxlength="120" value="${esc(name)}"></label><div class="row"><button type="button" id="signer-next">Next →</button>${existing?'<button type="button" id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
+    $('signer-name').oninput=event=>{name=event.target.value;};
+    $('signer-next').onclick=()=>{
+      if(!name.trim())return notice('Enter the signer name.','error');
+      padStep();
+    };
+    if($('remove-signature'))$('remove-signature').onclick=()=>{
+      draft.document.signatures=draft.document.signatures.filter(signature=>signature.role!==role);
+      remember();$('dialog').close();reportPreview();
+    };
+  };
+
+  const padStep=()=>{
+    $('dialog-body').innerHTML=`<h2>${title}</h2><p class="muted">${esc(name)}</p><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><div class="row"><button type="button" id="save-signature">Use signature</button><button type="button" id="clear-signature" class="secondary">Clear</button><button type="button" id="signer-back" class="quiet">← Name</button></div>`;
+    // Nothing is focused here, so the keyboard stays down and the sheet stays put.
+    settleSheet();
+    const canvas=$('signature-pad'),ctx=canvas.getContext('2d');let current=null;
+    const draw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2b22';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';for(const stroke of strokes){ctx.beginPath();stroke.forEach((p,i)=>{const x=p.x*canvas.width,y=p.y*canvas.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}};
+    const point=event=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};};
+    canvas.onpointerdown=event=>{current=[point(event)];strokes.push(current);canvas.setPointerCapture(event.pointerId);draw();};
+    canvas.onpointermove=event=>{if(!current)return;const next=point(event),last=current[current.length-1];if(Math.hypot(next.x-last.x,next.y-last.y)>.003&&current.length<300){current.push(next);draw();}};
+    canvas.onpointerup=canvas.onpointercancel=()=>{if(current?.length===1)current.push({...current[0],x:Math.min(1,current[0].x+.002)});current=null;};
+    $('clear-signature').onclick=()=>{strokes.splice(0);draw();};
+    $('signer-back').onclick=()=>nameStep();
+    $('save-signature').onclick=()=>{
+      if(!strokes.length)return notice('Add a signature first.','error');
+      const signatures=(draft.document.signatures||[]).filter(signature=>signature.role!==role);
+      signatures.push({role,name:name.trim(),strokes});
+      draft.document.signatures=signatures;remember();$('dialog').close();reportPreview();
+    };
+    draw();
+  };
+
+  nameStep();
 }
+
 function rewrite(index){ensureAuth(()=>run(async()=>{
   await ensureServerDraft();const original=draft.document.rooms[index].observation;
   if(!original.trim())throw new Error('Type an observation first, or use Talk through this room.');
@@ -557,7 +594,7 @@ async function offer(){
 }
 function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openBrowser',url});else location.assign(url);}
 function renderProperties(data){
-  resetScroll();
+  enterScreen('properties');
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
   $('app').innerHTML=`<h1>Properties</h1><p class="muted">Start a fresh report, or compare a move-out with the last finalized condition report.</p><button id="new-property">+ New property</button>${details.length?'':'<section class="card">Properties appear here after you save a report.</section>'}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
   $('new-property').onclick=()=>{haptic();run(()=>start());};
@@ -565,7 +602,7 @@ function renderProperties(data){
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
 }
 function renderReports(){
-  resetScroll();
+  enterScreen('reports');
   const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
   const status=account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.';
   const localDraft=hasUnfinishedDraft()&&!draft.serverId

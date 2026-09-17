@@ -54,15 +54,14 @@ final class MarketelInspectCameraViewController: UIViewController {
         previewContainer.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(previewContainer)
 
-        let topScrim = UIView()
-        let bottomScrim = UIView()
-        topScrim.backgroundColor = UIColor.black.withAlphaComponent(0.28)
-        bottomScrim.backgroundColor = UIColor.black.withAlphaComponent(0.34)
-
         let done = UIButton(type: .system)
         done.setTitle("Done", for: .normal)
         done.setTitleColor(.white, for: .normal)
         done.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+        done.titleLabel?.layer.shadowColor = UIColor.black.cgColor
+        done.titleLabel?.layer.shadowOpacity = 0.6
+        done.titleLabel?.layer.shadowRadius = 3
+        done.titleLabel?.layer.shadowOffset = .zero
         done.addTarget(self, action: #selector(finish), for: .touchUpInside)
 
         message.textColor = .white
@@ -88,7 +87,7 @@ final class MarketelInspectCameraViewController: UIViewController {
         shutter.addTarget(self, action: #selector(capture), for: .touchUpInside)
         shutter.isEnabled = false
 
-        for subview in [topScrim, bottomScrim, done, stripScroll, shutter, message] {
+        for subview in [done, stripScroll, shutter, message] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -100,18 +99,8 @@ final class MarketelInspectCameraViewController: UIViewController {
             previewContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             previewContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            topScrim.topAnchor.constraint(equalTo: view.topAnchor),
-            topScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            topScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topScrim.bottomAnchor.constraint(equalTo: done.bottomAnchor, constant: 8),
-
             done.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             done.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
-
-            bottomScrim.topAnchor.constraint(equalTo: stripScroll.topAnchor, constant: -10),
-            bottomScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomScrim.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             stripScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
             stripScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
