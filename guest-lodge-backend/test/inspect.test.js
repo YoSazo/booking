@@ -48,7 +48,7 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(source, /baselineReportId/);
   assert.match(schema, /onDelete: SetNull/);
   assert.match(client, /AI only organized what it heard\. Check every detail/);
-  assert.match(client, /Press and hold a photo, then drag to reorder/);
+  assert.match(client, /Press and hold a photo to lift it, then drag it where you want it/);
   assert.match(client, /Start move-out comparison/);
 });
 

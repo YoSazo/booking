@@ -251,13 +251,13 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
     $('rooms').onclick = event => {
       const figure = event.target.closest('figure[data-photo-id]');
-      if (figure && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
+      if (figure && Date.now()-photoDropAt > 400 && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
       const b = event.target.closest('button'); if (!b) return;
       if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (confirm('Remove this room and its photos from the report?')) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
@@ -308,31 +308,103 @@ function viewPhoto(id){
     $('dialog').close();editor('rooms');
   };
 }
+// Reordering is a lift, not a hover. The tile leaves the grid and follows the
+// finger; the empty slot it left behind is what travels, so the photos under it
+// close that gap and open a new one wherever the finger currently is — the way
+// iOS moves an app icon.
+//
+// Pointer events cannot stop a page scroll: preventDefault on pointermove does
+// nothing, and touch-action is settled before the gesture begins. That is why
+// the old version was unusable — the page scrolled out from under the drag and
+// iOS then cancelled it. So each grid carries a non-passive touchmove listener
+// and cancels the scroll itself, but only once a tile is actually lifted; until
+// then a finger on a photo scrolls the report like anywhere else.
+let photoDrag=null,photoDropAt=0;
+function photoDragBlock(event){ if(photoDrag?.lifted) event.preventDefault(); }
+function photoDragLift(){
+  const s=photoDrag; if(!s) return;
+  const rect=s.figure.getBoundingClientRect();
+  const ghost=s.figure.cloneNode(true);
+  ghost.className='photo-ghost';
+  ghost.removeAttribute('data-photo-id');
+  ghost.style.cssText=`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`;
+  document.body.appendChild(ghost);
+  Object.assign(s,{lifted:true,ghost,rect});
+  s.figure.classList.add('is-drag-source');
+  s.figure.setPointerCapture?.(s.pointerId);
+  photoDragFollow();
+  haptic();
+  s.frame=requestAnimationFrame(photoDragEdge);
+}
+function photoDragFollow(){
+  const s=photoDrag; if(!s?.ghost) return;
+  s.ghost.style.transform=`translate(${s.x-s.startX}px,${s.y-s.startY}px) scale(1.06)`;
+}
+// Held near an edge the report scrolls itself, because the slot someone is
+// aiming for is usually off screen and their finger is no longer free to scroll.
+function photoDragEdge(){
+  const s=photoDrag; if(!s?.lifted) return;
+  const zone=96;
+  const by=s.y<zone ? -Math.ceil((zone-s.y)/6)
+    : s.y>window.innerHeight-zone ? Math.ceil((s.y-(window.innerHeight-zone))/6) : 0;
+  if(by){ const was=window.scrollY; window.scrollBy(0,by); if(window.scrollY!==was) photoDragShuffle(); }
+  s.frame=requestAnimationFrame(photoDragEdge);
+}
+function photoDragShuffle(){
+  const s=photoDrag; if(!s?.lifted) return;
+  const over=document.elementFromPoint(s.x,s.y)?.closest('.photo-grid figure');
+  if(!over||over===s.figure||over.dataset.photoRoom!==s.figure.dataset.photoRoom) return;
+  const photos=draft.document.rooms[Number(s.figure.dataset.photoRoom)]?.photos;
+  if(!photos) return;
+  const from=photos.indexOf(s.figure.dataset.photoId),to=photos.indexOf(over.dataset.photoId);
+  if(from<0||to<0||from===to) return;
+  const grid=over.parentElement;
+  const before=new Map([...grid.children].map(item=>[item,item.getBoundingClientRect()]));
+  photos.splice(to,0,photos.splice(from,1)[0]);
+  grid.insertBefore(s.figure,to>from?over.nextSibling:over);
+  for(const item of grid.children){
+    const was=before.get(item); if(!was||item===s.figure) continue;
+    const now=item.getBoundingClientRect(),x=was.left-now.left,y=was.top-now.top;
+    if(x||y) item.animate?.([{transform:`translate(${x}px,${y}px)`},{transform:'none'}],{duration:180,easing:'ease-out'});
+  }
+}
+function photoDragDrop(){
+  const s=photoDrag; if(!s) return;
+  clearTimeout(s.timer); if(s.frame) cancelAnimationFrame(s.frame);
+  photoDrag=null;
+  if(!s.lifted) return;
+  // A drop ends in a tap, so the lightbox has to know this one was not for it.
+  photoDropAt=Date.now();
+  const land=s.figure.getBoundingClientRect();
+  const settle=()=>{ s.ghost?.remove(); s.figure.classList.remove('is-drag-source'); };
+  const fall=s.ghost?.animate?.(
+    [{transform:s.ghost.style.transform},
+     {transform:`translate(${land.left-s.rect.left}px,${land.top-s.rect.top}px) scale(1)`}],
+    {duration:170,easing:'ease-out'});
+  if(fall){ fall.onfinish=fall.oncancel=settle; setTimeout(settle,400); } else settle();
+  remember();
+  haptic();
+}
 function bindPhotoDrag(){
+  document.querySelectorAll('.photo-grid').forEach(grid=>grid.addEventListener('touchmove',photoDragBlock,{passive:false}));
   document.querySelectorAll('.photo-grid figure').forEach(figure=>{
-    let timer=null,dragging=false,startX=0,startY=0,pointerId=null;
-    const finish=()=>{clearTimeout(timer);timer=null;if(dragging){dragging=false;figure.classList.remove('is-dragging');remember();editor();}};
     figure.onpointerdown=event=>{
-      if(event.target.closest('button,summary,details'))return;
-      pointerId=event.pointerId;startX=event.clientX;startY=event.clientY;
-      timer=setTimeout(()=>{dragging=true;figure.classList.add('is-dragging');figure.setPointerCapture?.(pointerId);if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});},350);
+      if(event.target.closest('button,summary,details')) return;
+      if(figure.parentElement.children.length<2) return;
+      photoDragDrop();
+      photoDrag={figure,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,lifted:false};
+      photoDrag.timer=setTimeout(photoDragLift,320);
     };
     figure.onpointermove=event=>{
-      if(!timer&&!dragging)return;
-      if(!dragging&&Math.hypot(event.clientX-startX,event.clientY-startY)>10){clearTimeout(timer);timer=null;return;}
-      if(!dragging)return;
-      event.preventDefault();
-      const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('.photo-grid figure');
-      if(!target||target===figure||target.dataset.photoRoom!==figure.dataset.photoRoom)return;
-      const room=draft.document.rooms[Number(figure.dataset.photoRoom)].photos;
-      const from=room.indexOf(figure.dataset.photoId),to=room.indexOf(target.dataset.photoId);
-      if(from<0||to<0)return;
-      const grid=target.parentElement,positions=new Map([...grid.children].map(item=>[item,item.getBoundingClientRect()]));
-      room.splice(to,0,room.splice(from,1)[0]);
-      grid.insertBefore(figure,to>from?target.nextSibling:target);
-      for(const item of grid.children){const before=positions.get(item),after=item.getBoundingClientRect();if(!before)continue;const x=before.left-after.left,y=before.top-after.top;if(x||y)item.animate([{transform:`translate(${x}px,${y}px)`},{transform:'translate(0,0)'}],{duration:180,easing:'ease-out'});}
+      const s=photoDrag; if(!s||s.figure!==figure) return;
+      s.x=event.clientX; s.y=event.clientY;
+      // A finger that travels before the hold completes wanted to scroll.
+      if(!s.lifted){ if(Math.hypot(s.x-s.startX,s.y-s.startY)>10){ clearTimeout(s.timer); photoDrag=null; } return; }
+      photoDragFollow();
+      photoDragShuffle();
     };
-    figure.onpointerup=finish;figure.onpointercancel=finish;figure.onlostpointercapture=()=>{if(dragging)finish();};
+    figure.onpointerup=figure.onpointercancel=photoDragDrop;
+    figure.onlostpointercapture=()=>{ if(photoDrag?.figure===figure) photoDragDrop(); };
   });
 }
 async function addPhotos(input) {
