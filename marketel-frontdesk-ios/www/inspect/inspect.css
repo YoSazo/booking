@@ -91,6 +91,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 .photo-grid figure:active { transform: scale(.985); }
 .photo-grid figure.is-dragging { z-index: 3; opacity: .88; transform: scale(1.04); box-shadow: 0 14px 32px #173b2333; touch-action: none; }
 .photo-grid figcaption { font-size: 11px; color: var(--muted); }
+/* Removing a photo is the frequent action, so it sits on the tile rather than
+   behind the overflow menu. */
+.photo-x { position: absolute; z-index: 2; top: 6px; right: 6px; width: 28px; height: 28px; min-height: 28px; padding: 0; display: grid; place-items: center; font-size: 12px; line-height: 1; color: #fff; background: #17231ba8; border-radius: 999px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.photo-x:active { transform: scale(.92); }
+.photo-grid img { cursor: zoom-in; }
+.photo-full { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 12px; background: #0d150f; margin: 4px 0 14px; }
 .photo-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; }
 .photo-menu { position: relative; }
 .photo-menu summary { list-style: none; cursor: pointer; color: var(--green); font-weight: 800; padding: 4px 8px; }
@@ -197,7 +203,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 6px; }
 .status-line .quiet { flex: 0 0 auto; padding: 7px 11px; font-size: 13px; min-height: 38px; }
 /* Same glass recipe as the tab bar so the two read as one family. */
-.fab { position: fixed; z-index: 9; right: 18px; bottom: calc(88px + env(safe-area-inset-bottom)); width: 56px; height: 56px; min-height: 56px; padding: 0; display: grid; place-items: center; font-size: 27px; font-weight: 400; line-height: 1; color: var(--green-dark); background: linear-gradient(145deg, #ffffffc4, #e8f0e9b4); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border: 1px solid #ffffffcc; border-radius: 20px; box-shadow: 0 12px 32px #173b2324, inset 0 1px 0 #fff; }
+.fab { position: fixed; z-index: 9; right: 18px; bottom: calc(88px + env(safe-area-inset-bottom)); width: 56px; height: 56px; min-height: 56px; padding: 0; display: grid; place-items: center; font-size: 27px; font-weight: 400; line-height: 1; color: var(--green-dark); background: linear-gradient(145deg, #ffffffc4, #e8f0e9b4); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border: 1px solid #ffffffcc; border-radius: 999px; box-shadow: 0 12px 32px #173b2324, inset 0 1px 0 #fff; }
 .native-inspect-shell .fab { bottom: calc(86px + env(safe-area-inset-bottom)); }
 .price { font-size: 36px; font-weight: 750; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }

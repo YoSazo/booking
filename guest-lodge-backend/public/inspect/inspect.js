@@ -16,6 +16,7 @@ const PLANS = Object.freeze({
   month: Object.freeze({ price: 29, per: '/month', save: '', reports: 30, terms: '$29 charged today, then monthly until cancelled.' }),
 });
 let planInterval = 'year';
+let editorStep = 'details';
 const urls = new Map();
 const attributionKey = 'inspect.metaAttribution.v1';
 const cookieValue = name => {
@@ -221,28 +222,47 @@ async function start(propertyName = '') {
   clearURLs(); draft = { document: newDocument(propertyName), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
-function editor() {
+function editor(step) {
   resetScroll();
   if (!draft) return landing(); updateHeader();
   setActiveNav('current');
   const d = draft.document;
   d.signatures ||= [];
   if (preview || draft.finalizedAt) return reportPreview();
-  const photos=d.rooms.reduce((total,room)=>total+room.photos.length,0), photographed=d.rooms.filter(room=>room.photos.length).length, issues=d.rooms.filter(room=>room.issue).length;
-  $('app').innerHTML = `<div class="screen-bar">${account
+  // The draft decides which step opens: an unnamed report needs its details, a
+  // named one is ready for the work. Returning lands on the work, not the form.
+  editorStep = step || (d.propertyName.trim() ? 'rooms' : 'details');
+  const bar = `<div class="screen-bar">${account
     ? '<button type="button" id="editor-back" class="quiet">← All reports</button>'
-    : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div><div class="row spread"><div><small class="eyebrow">New condition report</small><h1>What did you observe?</h1></div><span class="status">${draft.serverId ? 'Draft · save changes online' : 'Draft stored on this device'}</span></div><p class="muted">${d.rooms.length} room${d.rooms.length===1?'':'s'} · ${photographed} photographed · ${photos} photo${photos===1?'':'s'} · ${issues} issue${issues===1?'':'s'}${account?(account.freeAvailable?' · this one is free':account.active?` · ${account.remaining} left this period`:' · $199/year or $29/month to export'):' · first report free'}</p><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
-  for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
-  $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
-  $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
-  $('rooms').onclick = event => {
-    const b = event.target.closest('button'); if (!b) return;
-    if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (confirm('Remove this room and its photos from the report?')) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor(); } }
-    if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),p=d.rooms[i].photos.indexOf(id); if(p>=0){d.rooms[i].photos.splice(p,1);const url=urls.get(id);if(url)URL.revokeObjectURL(url);urls.delete(id);remember();editor();} }
-    if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,p=a.indexOf(id),offset=Number(offsetValue); if (p>=0&&p+offset>=0&&p+offset<a.length) { [a[p],a[p+offset]]=[a[p+offset],a[p]]; remember(); editor(); } }
-    if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
-    if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
-  };
+    : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
+  if (editorStep === 'details') {
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>Which property?</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
+    for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
+    if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
+    $('to-rooms').onclick = () => {
+      if(!d.propertyName.trim())return notice('Enter a property or unit name first.','error');
+      haptic();editor('rooms');
+    };
+  } else {
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label></div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo, then drag to reorder.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label><button class="secondary" data-voice="${i}">Talk through this room</button><button class="quiet" data-ai="${i}">Polish typed note</button></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
+    $('to-details').onclick = () => { haptic();editor('details'); };
+    $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
+    $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
+    $('rooms').onclick = event => {
+      const figure = event.target.closest('figure[data-photo-id]');
+      if (figure && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
+      const b = event.target.closest('button'); if (!b) return;
+      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (confirm('Remove this room and its photos from the report?')) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
+      if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
+      if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
+      if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
+      if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
+    };
+    $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
+    $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
+    $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor('rooms');}, button)); };
+    bindPhotoDrag();
+  }
   // Signed out in the app neither chrome is on screen, so these are the only exits.
   if($('editor-back'))$('editor-back').onclick=()=>run(()=>list());
   if($('editor-signin'))$('editor-signin').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
@@ -250,12 +270,8 @@ function editor() {
     if(!confirm('Discard this report? Anything not saved online is removed from this device.'))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();if(account)await openAccountHome();else landing();});
   };
-  $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor(); };
-  if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
-  $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
-  $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor();}, button)); };
-  bindPhotoDrag();
 }
+
 
 async function chooseExistingProperty(){
   if(!account)return;
@@ -269,6 +285,21 @@ async function chooseExistingProperty(){
   $('keep-new-property').onclick=()=>{$('dialog').close();$('property')?.focus();};
 }
 
+// Tapping a photo opens it full size, because a thumbnail cannot show whether a
+// scuff actually read on camera.
+function viewPhoto(id){
+  const url=photoURL(id);
+  if(!url)return;
+  const room=draft.document.rooms.findIndex(r=>r.photos.includes(id));
+  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo"><div class="row"><button type="button" id="photo-close" class="secondary">Done</button><button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
+  $('photo-close').onclick=()=>$('dialog').close();
+  $('photo-remove').onclick=()=>{
+    const photos=draft.document.rooms[room]?.photos||[];
+    const pos=photos.indexOf(id);
+    if(pos>=0){photos.splice(pos,1);const objectUrl=urls.get(id);if(objectUrl){URL.revokeObjectURL(objectUrl);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();}
+    $('dialog').close();editor('rooms');
+  };
+}
 function bindPhotoDrag(){
   document.querySelectorAll('.photo-grid figure').forEach(figure=>{
     let timer=null,dragging=false,startX=0,startY=0,pointerId=null;
@@ -526,7 +557,7 @@ function renderProperties(data){
   resetScroll();
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
   $('app').innerHTML=`<h1>Properties</h1><p class="muted">Start a fresh report, or compare a move-out with the last finalized condition report.</p>${details.length?'':'<section class="card">Properties appear here after you save a report.</section>'}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
-  $('app').insertAdjacentHTML('beforeend','<button class="fab" id="new-property" aria-label="Start a new report" title="Start a new report">+</button>');
+  $('app').insertAdjacentHTML('beforeend','<button id="new-property">+ New property</button>');
   $('new-property').onclick=()=>{haptic();run(()=>start());};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
@@ -535,11 +566,19 @@ function renderReports(){
   resetScroll();
   const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
   const status=account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.';
-  $('app').innerHTML=`<h1>Your reports</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div>${reports.length?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}<button id="new-report">+ New report</button>`;
+  const localDraft=hasUnfinishedDraft()&&!draft.serverId
+    ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(draft.document.date)} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
+    : '';
+  $('app').innerHTML=`<h1>Your reports</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div>${localDraft}${reports.length||localDraft?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}<button id="new-report">+ New report</button>`;
   $('app').insertAdjacentHTML('beforeend','<button class="fab" id="new-report-fab" aria-label="Start a new report" title="Start a new report">+</button>');
   $('new-report-fab').onclick=()=>{haptic();run(()=>start());};
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
+  if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
+  if($('delete-local-draft'))$('delete-local-draft').onclick=()=>{
+    if(!confirm('Delete this unsaved report from this device?'))return;
+    run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();await list();});
+  };
   document.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.open),button));
   document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=()=>{if(confirm('Permanently delete this report, its photos and shared link? This does not restore report allowance.'))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
 }
