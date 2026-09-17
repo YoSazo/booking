@@ -17,6 +17,10 @@
   --surface: #ffffff;
   /* Published so inspect.js can read the inset when clamping the sheet. */
   --safe-top: env(safe-area-inset-top, 0px);
+  /* The native shell draws its header and tab bar over the webview, so the
+     viewport still counts those bands but nothing may be placed in them. */
+  --shell-top: 0px;
+  --shell-bottom: 0px;
 }
 * { box-sizing: border-box; }
 /* A long press is how photos get reordered, so the chrome must not answer it
@@ -154,7 +158,7 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
    frosted, and nudged up only by however much the keyboard actually covers
    (--sheet-shift, computed in inspect.js). Re-centring in the leftover space
    moved it far enough to collide with the status bar. */
-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + var(--sheet-shift, 0px))); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - var(--kb, 0px) - env(safe-area-inset-top) - 32px); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: transform .2s ease, max-height .2s ease; }
+dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + var(--sheet-shift, 0px))); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - max(var(--kb, 0px), var(--shell-bottom)) - var(--shell-top) - env(safe-area-inset-top) - 32px); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: transform .2s ease, max-height .2s ease; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
@@ -216,6 +220,9 @@ dialog:focus, dialog:focus-visible { outline: none; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
 .native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(var(--actions-h, 0px) + 98px + env(safe-area-inset-bottom)); }
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
+.native-inspect-shell.inspect-authenticated { --shell-top: 82px; --shell-bottom: 98px; }
+/* A sheet tall enough to need the whole screen takes the shell with it. */
+html.sheet-full { --shell-top: 0px; --shell-bottom: 0px; }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--actions-h, 0px) + 22px + env(safe-area-inset-bottom)); }

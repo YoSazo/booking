@@ -156,12 +156,16 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
 }
 // A sheet is a card on top of the app, so the shell stays put — `true` keeps the
 // native header and tab bar visible instead of suppressing them.
-function modal(content) {
+function modal(content, { fullscreen = false } = {}) {
   $('dialog-body').innerHTML = content;
+  document.documentElement.classList.toggle('sheet-full', fullscreen);
   if (!$('dialog').open) { document.documentElement.classList.add('sheet-open'); $('dialog').showModal(); }
   const field = $('dialog-body').querySelector('input:not([readonly]), textarea');
   (field || $('dialog')).focus();
-  syncNativeInspectState(currentPage,true);
+  // A sheet that needs the whole screen has to take the native header and tab
+  // bar with it: UIKit draws those over the webview, so no z-index reaches past
+  // them and a tall sheet is simply cut off underneath.
+  syncNativeInspectState(currentPage, !fullscreen);
   settleSheet();
 }
 // The sheet is nudged up by however much the keyboard actually covers and no
@@ -170,15 +174,22 @@ function settleSheet(){
   const dialog=$('dialog');
   if(!dialog?.open)return;
   const style=getComputedStyle(document.documentElement);
-  const keyboard=parseFloat(style.getPropertyValue('--kb'))||0;
-  const safeTop=parseFloat(style.getPropertyValue('--safe-top'))||0;
+  const number=name=>parseFloat(style.getPropertyValue(name))||0;
+  const keyboard=number('--kb');
+  // The sheet is centred in the viewport, but the usable band is not: the native
+  // header and tab bar sit inside the viewport and are drawn over it. Centring
+  // inside the whole thing put a tall sheet's first line under the header.
+  const top=number('--safe-top')+number('--shell-top')+12;
+  const bottom=window.innerHeight-Math.max(keyboard,number('--shell-bottom'))-12;
   // Derived from the sheet's height rather than its rect: the shift is animated,
   // so a rect read mid-transition would measure a position it is still leaving.
   const height=dialog.offsetHeight;
   const centre=window.innerHeight/2;
-  const overlap=(centre+height/2)-(window.innerHeight-keyboard-12);
-  const headroom=(centre-height/2)-(safeTop+12);
-  const shift=Math.max(0,Math.min(overlap,headroom));
+  const overlap=(centre+height/2)-bottom;
+  const headroom=(centre-height/2)-top;
+  // A negative shift moves the sheet down, which is the case that was missing:
+  // nothing could rescue a sheet whose top had already gone under the header.
+  const shift=headroom<0?headroom:Math.max(0,Math.min(overlap,headroom));
   dialog.style.setProperty('--sheet-shift',`${-Math.round(shift)}px`);
 }
 // `.actions` floats over the page, so the page has to reserve its real height or
@@ -664,7 +675,7 @@ async function offer(){
     const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
     const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually${plan.save?` · ${plan.save}`:''}`:plan.save;
     const html=`<h2>Keep every walkthrough on the record.</h2><p class="offer-anchor">One argument about damage costs more than a year of Inspect.</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points"><li>${plan.reports} reports — about ${unit} each</li><li>PDF export and a private share link on every report</li><li>Before and after move-out comparisons</li><li>Up to 100 photos per report, with wording help on every note</li></ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The report you just finished is saved and waiting, and existing finalized reports stay available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
-    if(first)modal(html);else $('dialog-body').innerHTML=html;
+    if(first)modal(html,{fullscreen:true});else{$('dialog-body').innerHTML=html;settleSheet();}
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
     $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
   };
@@ -761,7 +772,7 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
+$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open','sheet-full');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
