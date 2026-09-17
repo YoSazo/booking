@@ -173,6 +173,12 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* The finalized report's actions sit in flow at the end of the document rather
    than floating over its last line. */
 .report-actions { margin: 22px 0 10px; }
+/* The editor carries its own exits: signed out in the app neither the web header
+   nor the native shell is on screen, so this row is the only way back. */
+.screen-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 4px; }
+.screen-bar .quiet { padding: 8px 10px; font-size: 13px; min-height: 40px; }
+.next-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 6px; }
+.next-actions button { flex: 1 1 auto; }
 .app-handoff-card { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-top: 24px; }
 .app-handoff-card h2 { margin: 5px 0 4px; }
 .app-handoff-card p { margin: 0; }
@@ -199,7 +205,7 @@ blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
-.native-inspect-shell:not(.inspect-authenticated) body { padding-bottom: calc(var(--actions-h, 0px) + 22px + env(safe-area-inset-bottom)); }
+.native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--actions-h, 0px) + 22px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) .actions { bottom: calc(10px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + var(--actions-h, 0px) + 24px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
