@@ -657,7 +657,13 @@ async function offer(){
   const paint=first=>{
     const plan=PLANS[planInterval];
     const toggle=available.length>1?`<div class="billing-toggle" role="radiogroup" aria-label="Billing period">${available.map(value=>`<button type="button" role="radio" aria-checked="${planInterval===value}" data-plan="${value}">${value==='year'?'Annual':'Monthly'}</button>`).join('')}</div>`:'';
-    const html=`<h2>Keep making reports.</h2>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${plan.save?`<p class="price-save">${plan.save}</p>`:''}<p>${plan.reports} reports per billing period · One operator<br>Up to 100 photos and 10 wording suggestions per report</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} Cancel renewal anytime. The report you just finished is saved and waiting, and existing finalized reports stay available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
+    // Priced against nothing, $199 is only a big number. The anchor line and the
+    // per-report figure are what make it small, and both are derived from PLANS
+    // so a price change cannot leave the arithmetic behind.
+    const each=plan.price/plan.reports;
+    const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
+    const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually${plan.save?` · ${plan.save}`:''}`:plan.save;
+    const html=`<h2>Keep every walkthrough on the record.</h2><p class="offer-anchor">One argument about damage costs more than a year of Inspect.</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points"><li>${plan.reports} reports — about ${unit} each</li><li>PDF export and a private share link on every report</li><li>Before and after move-out comparisons</li><li>Up to 100 photos per report, with wording help on every note</li></ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The report you just finished is saved and waiting, and existing finalized reports stay available. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`;
     if(first)modal(html);else $('dialog-body').innerHTML=html;
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
     $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});

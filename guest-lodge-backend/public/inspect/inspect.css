@@ -177,6 +177,9 @@ dialog:focus, dialog:focus-visible { outline: none; }
 @keyframes price-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .price small { font-size: 15px; font-weight: 600; color: var(--muted); }
 .price-save { color: var(--green); font-weight: 650; font-size: 14px; margin: 2px 0 14px; }
+.offer-anchor { margin: -2px 0 16px; color: var(--muted); font-size: 14px; }
+.offer-points { margin: 10px 0 14px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+.offer-reversal { margin: 0 0 10px; font-size: 13px; font-weight: 650; color: var(--muted); }
 .more-actions summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 650; padding: 10px 2px; }
 .more-actions summary::-webkit-details-marker { display: none; }
 .more-actions[open] summary { color: var(--green); }
