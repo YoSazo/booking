@@ -70,7 +70,7 @@ button:disabled { opacity: .5; cursor: wait; }
    cannot land while the first is still working. */
 button.is-busy { color: transparent !important; pointer-events: none; position: relative; }
 button.is-busy::after { content: ""; position: absolute; inset: 0; margin: auto; width: 17px; height: 17px; border: 2px solid #ffffff5c; border-top-color: #fff; border-radius: 50%; animation: inspect-spin .7s linear infinite; }
-.quiet.is-busy::after, .secondary.is-busy::after, .fab.is-busy::after { border-color: #2e7d5b33; border-top-color: var(--green); }
+.quiet.is-busy::after, .secondary.is-busy::after { border-color: #2e7d5b33; border-top-color: var(--green); }
 @keyframes inspect-spin { to { transform: rotate(360deg); } }
 a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: #c2d5cb; }
 /* Every hover state lives here so a touch device never sees one: iOS holds
@@ -82,7 +82,6 @@ a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text
   .secondary:hover { background: #dceee4; }
   a:hover { color: var(--green-dark); text-decoration-color: var(--green); }
   #dialog-close:hover { background: #edf5f0; color: var(--green); }
-  .fab:hover { background: linear-gradient(145deg, #ffffffd8, #e8f0e9c8); }
 }
 button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offset: 3px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 14px 0; }
@@ -203,8 +202,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 6px; }
 .status-line .quiet { flex: 0 0 auto; padding: 7px 11px; font-size: 13px; min-height: 38px; }
 /* Same glass recipe as the tab bar so the two read as one family. */
-.fab { position: fixed; z-index: 9; right: 18px; bottom: calc(88px + env(safe-area-inset-bottom)); width: 56px; height: 56px; min-height: 56px; padding: 0; display: grid; place-items: center; font-size: 27px; font-weight: 400; line-height: 1; color: var(--green-dark); background: linear-gradient(145deg, #ffffffc4, #e8f0e9b4); -webkit-backdrop-filter: blur(26px) saturate(180%); backdrop-filter: blur(26px) saturate(180%); border: 1px solid #ffffffcc; border-radius: 999px; box-shadow: 0 12px 32px #173b2324, inset 0 1px 0 #fff; }
-.native-inspect-shell .fab { bottom: calc(86px + env(safe-area-inset-bottom)); }
 .price { font-size: 36px; font-weight: 750; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
 .native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(var(--actions-h, 0px) + 98px + env(safe-area-inset-bottom)); }
