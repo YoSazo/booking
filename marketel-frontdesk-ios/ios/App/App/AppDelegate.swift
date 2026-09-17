@@ -769,6 +769,28 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.setNeedsLayout()
     }
 
+    // Presented at the medium detent so the room card stays in view behind it,
+    // and left open after each shot so a walkthrough is one continuous motion.
+    private func presentInspectCamera(room: Int) {
+        guard presentedViewController == nil else { return }
+        let camera = MarketelInspectCameraViewController { [weak self] dataUrl in
+            guard let self else { return }
+            let payload: [String: Any] = ["room": room, "dataUrl": dataUrl]
+            guard
+                let json = try? JSONSerialization.data(withJSONObject: payload),
+                let text = String(data: json, encoding: .utf8)
+            else { return }
+            self.callWeb(function: "marketelInspectPhotoCaptured", argument: text)
+        }
+        camera.modalPresentationStyle = .pageSheet
+        if let sheet = camera.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 28
+        }
+        present(camera, animated: true)
+    }
+
     @objc private func openInspectHandoff(_ notification: Notification) {
         guard let token = notification.object as? String, !token.isEmpty else { return }
         // Claimed here, so a later controller cannot replay an already-spent token.
@@ -1456,6 +1478,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 reportId: payload["reportId"] as? String ?? "",
                 token: payload["token"] as? String ?? ""
             )
+        case "inspectCamera":
+            presentInspectCamera(room: payload["room"] as? Int ?? 0)
         case "inspectHaptic":
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case "inspectSignOut":
