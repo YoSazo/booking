@@ -47,21 +47,33 @@ final class MarketelInspectCameraViewController: UIViewController {
     }
 
     private func buildInterface() {
+        // The viewfinder is the sheet. Controls float over it, the way every
+        // camera does — giving the preview a leftover slice left it postage
+        // stamp sized at the medium detent.
+        previewContainer.backgroundColor = .black
+        previewContainer.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(previewContainer)
+
+        let topScrim = UIView()
+        let bottomScrim = UIView()
+        topScrim.backgroundColor = UIColor.black.withAlphaComponent(0.28)
+        bottomScrim.backgroundColor = UIColor.black.withAlphaComponent(0.34)
+
         let done = UIButton(type: .system)
         done.setTitle("Done", for: .normal)
         done.setTitleColor(.white, for: .normal)
         done.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
         done.addTarget(self, action: #selector(finish), for: .touchUpInside)
 
-        previewContainer.backgroundColor = .black
-        previewContainer.layer.cornerRadius = 16
-        previewContainer.clipsToBounds = true
-
-        message.textColor = UIColor.white.withAlphaComponent(0.72)
-        message.font = .systemFont(ofSize: 13)
+        message.textColor = .white
+        message.font = .systemFont(ofSize: 13, weight: .medium)
         message.textAlignment = .center
         message.numberOfLines = 2
         message.text = "Photos are added to this room as you take them."
+        message.layer.shadowColor = UIColor.black.cgColor
+        message.layer.shadowOpacity = 0.5
+        message.layer.shadowRadius = 3
+        message.layer.shadowOffset = .zero
 
         strip.axis = .horizontal
         strip.spacing = 8
@@ -72,29 +84,39 @@ final class MarketelInspectCameraViewController: UIViewController {
         shutter.backgroundColor = .white
         shutter.layer.cornerRadius = 33
         shutter.layer.borderWidth = 4
-        shutter.layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+        shutter.layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
         shutter.addTarget(self, action: #selector(capture), for: .touchUpInside)
         shutter.isEnabled = false
 
-        for subview in [done, previewContainer, stripScroll, shutter, message] {
+        for subview in [topScrim, bottomScrim, done, stripScroll, shutter, message] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
         strip.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
-            done.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 6),
+            previewContainer.topAnchor.constraint(equalTo: view.topAnchor),
+            previewContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            previewContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            previewContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            topScrim.topAnchor.constraint(equalTo: view.topAnchor),
+            topScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topScrim.bottomAnchor.constraint(equalTo: done.bottomAnchor, constant: 8),
+
+            done.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             done.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
 
-            previewContainer.topAnchor.constraint(equalTo: done.bottomAnchor, constant: 8),
-            previewContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
-            previewContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
-            previewContainer.bottomAnchor.constraint(equalTo: stripScroll.topAnchor, constant: -10),
+            bottomScrim.topAnchor.constraint(equalTo: stripScroll.topAnchor, constant: -10),
+            bottomScrim.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomScrim.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomScrim.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             stripScroll.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
             stripScroll.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -14),
-            stripScroll.heightAnchor.constraint(equalToConstant: 56),
-            stripScroll.bottomAnchor.constraint(equalTo: shutter.topAnchor, constant: -12),
+            stripScroll.heightAnchor.constraint(equalToConstant: 48),
+            stripScroll.bottomAnchor.constraint(equalTo: shutter.topAnchor, constant: -10),
 
             strip.topAnchor.constraint(equalTo: stripScroll.topAnchor),
             strip.bottomAnchor.constraint(equalTo: stripScroll.bottomAnchor),
@@ -105,11 +127,11 @@ final class MarketelInspectCameraViewController: UIViewController {
             shutter.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             shutter.widthAnchor.constraint(equalToConstant: 66),
             shutter.heightAnchor.constraint(equalToConstant: 66),
-            shutter.bottomAnchor.constraint(equalTo: message.topAnchor, constant: -10),
+            shutter.bottomAnchor.constraint(equalTo: message.topAnchor, constant: -8),
 
             message.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             message.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            message.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            message.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
         ])
     }
 
