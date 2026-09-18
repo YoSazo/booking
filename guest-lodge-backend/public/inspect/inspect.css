@@ -28,7 +28,7 @@
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable], .report-note, .transcript, .comparison-banner, blockquote { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html { min-height: 100%; background: #eff4f0; }
-body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(var(--actions-h, 0px) + 100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
+body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
 header { position: sticky; z-index: 8; top: 0; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
 .brand { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; font-weight: 750; font-size: 18px; }
 .brand-icon { display: block; width: 30px; height: 30px; border-radius: 8px; }
@@ -171,7 +171,7 @@ nav button { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 9px 6px; back
 nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shadow: 0 5px 16px #173b2314, inset 0 1px 0 #fff; }
 /* Matches Front Desk: a thin pill that slides in from the right and leaves on
    its own, rather than a full-width bar that the keyboard used to sit on top of. */
-#notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(var(--kb, 0px) + var(--actions-h, 0px) + 100px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; transition: bottom .18s ease; }
+#notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(var(--kb, 0px) + 100px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; transition: bottom .18s ease; }
 #notice:empty { display: none; }
 .toast { max-width: min(420px, 100%); background: #213b2f; color: #fff; border-radius: 11px; padding: 11px 16px; font-size: 12px; font-weight: 600; line-height: 1.45; box-shadow: 0 12px 32px #173b2333; animation: toast-in .2s ease, toast-out .3s ease 3.4s forwards; }
 .toast.success { background: var(--green); }
@@ -192,6 +192,7 @@ dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
+html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 dialog::backdrop { background: #15261c24; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
@@ -216,7 +217,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .more-actions summary::-webkit-details-marker { display: none; }
 .more-actions[open] summary { color: var(--green); }
 .more-actions > .stack { margin-top: 6px; }
-.actions { position: fixed; z-index: 6; left: 22px; right: 22px; bottom: calc(80px + env(safe-area-inset-bottom)); width: fit-content; max-width: 806px; margin: auto; padding: 8px; background: #ffffffd9; border: 1px solid #ffffff; border-radius: 18px; box-shadow: 0 10px 32px #173b2324; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+.actions { justify-content: center; margin: 26px 0 8px; }
 /* The finalized report's actions sit in flow at the end of the document rather
    than floating over its last line. */
 .report-actions { margin: 22px 0 10px; }
@@ -246,7 +247,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 /* Same glass recipe as the tab bar so the two read as one family. */
 .price { font-size: 36px; font-weight: 750; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
-.native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(var(--actions-h, 0px) + 98px + env(safe-area-inset-bottom)); }
+.native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(98px + env(safe-area-inset-bottom)); }
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
 .native-inspect-shell.inspect-authenticated { --shell-top: 82px; --shell-bottom: 98px; }
 /* A sheet tall enough to need the whole screen takes the shell with it. */
@@ -274,10 +275,8 @@ html.sheet-full dialog::backdrop { animation: plan-scrim 280ms ease both; }
 @keyframes plan-scrim { from { opacity: 0; } to { opacity: 1; } }
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
-.native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
-.native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--actions-h, 0px) + 22px + env(safe-area-inset-bottom)); }
-.native-inspect-shell:not(.inspect-authenticated) .actions { bottom: calc(10px + env(safe-area-inset-bottom)); }
-.native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + var(--actions-h, 0px) + 24px + env(safe-area-inset-bottom)); }
+.native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+.native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
   header { padding: 15px; }
   .card { padding: 18px; }

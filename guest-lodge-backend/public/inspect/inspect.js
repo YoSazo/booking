@@ -156,10 +156,28 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
 }
 // A sheet is a card on top of the app, so the shell stays put — `true` keeps the
 // native header and tab bar visible instead of suppressing them.
+// `overflow: hidden` does not stop iOS scrolling the document behind a fixed
+// sheet — which is how a sheet ended up stranded at the top of a white page
+// with the keyboard up. Pinning the body does stop it, and the offset has to
+// be restored on close, because pinning jumps the page to the top.
+let lockedScrollY=0;
+function lockPage(){
+  if(document.documentElement.classList.contains('sheet-open'))return;
+  lockedScrollY=window.scrollY||window.pageYOffset||0;
+  document.documentElement.classList.add('sheet-open');
+  document.body.style.top=`-${lockedScrollY}px`;
+}
+function unlockPage(){
+  if(!document.documentElement.classList.contains('sheet-open'))return;
+  document.documentElement.classList.remove('sheet-open');
+  document.body.style.top='';
+  window.scrollTo(0,lockedScrollY);
+  lockedScrollY=0;
+}
 function modal(content, { fullscreen = false } = {}) {
   $('dialog-body').innerHTML = content;
   document.documentElement.classList.toggle('sheet-full', fullscreen);
-  if (!$('dialog').open) { document.documentElement.classList.add('sheet-open'); $('dialog').showModal(); }
+  if (!$('dialog').open) { lockPage(); $('dialog').showModal(); }
   const field = $('dialog-body').querySelector('input:not([readonly]), textarea');
   (field || $('dialog')).focus();
   // A sheet that needs the whole screen has to take the native header and tab
@@ -188,25 +206,15 @@ function settleSheet(){
   // so a rect read mid-transition would measure a position it is still leaving.
   const height=dialog.offsetHeight;
   const centre=window.innerHeight/2;
-  const overlap=(centre+height/2)-bottom;
-  const headroom=(centre-height/2)-top;
-  // A negative shift moves the sheet down, which is the case that was missing:
-  // nothing could rescue a sheet whose top had already gone under the header.
-  const shift=headroom<0?headroom:Math.max(0,Math.min(overlap,headroom));
+  // Centre inside the band that is usable, not inside the viewport. Shifting
+  // only far enough to fit pinned the sheet against whichever edge crowded it
+  // first, which with the keyboard up read as sitting too high.
+  const maxUp=(centre-height/2)-top;
+  const maxDown=bottom-(centre+height/2);
+  const shift=height>=(bottom-top)
+    ? maxUp                                                  // taller than the band: keep the top on screen
+    : Math.max(-maxDown,Math.min(centre-(top+bottom)/2,maxUp));
   dialog.style.setProperty('--sheet-shift',`${-Math.round(shift)}px`);
-}
-// `.actions` floats over the page, so the page has to reserve its real height or
-// the closing line of a report hides underneath it.
-function watchActions(){
-  const bar=document.querySelector('.actions');
-  document.documentElement.style.setProperty('--actions-h',`${bar?Math.round(bar.offsetHeight):0}px`);
-  if(bar&&typeof ResizeObserver==='function'){
-    watchActions.observer?.disconnect();
-    watchActions.observer=new ResizeObserver(()=>{
-      document.documentElement.style.setProperty('--actions-h',`${Math.round(bar.offsetHeight)}px`);
-    });
-    watchActions.observer.observe(bar);
-  }
 }
 const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
 // Best effort by design: a dropped count is better than a blocked walkthrough.
@@ -895,7 +903,7 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>{document.documentElement.classList.remove('sheet-open','sheet-full');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
+$('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
@@ -985,8 +993,6 @@ function trackKeyboard(){
   apply();
 }
 trackKeyboard();
-watchActions();
-new MutationObserver(watchActions).observe($('app'),{childList:true});
 window.addEventListener('pagehide',()=>remember());
 // Every foreground used to fire two calls; errors are swallowed here so a
 // background refresh can never overwrite the sign-out notice or disable a button.
