@@ -197,11 +197,24 @@ function settleSheet(){
   const style=getComputedStyle(document.documentElement);
   const number=name=>parseFloat(style.getPropertyValue(name))||0;
   const keyboard=number('--kb');
-  // The sheet is centred in the viewport, but the usable band is not: the native
-  // header and tab bar sit inside the viewport and are drawn over it. Centring
-  // inside the whole thing put a tall sheet's first line under the header.
-  const top=number('--safe-top')+number('--shell-top')+12;
-  const bottom=window.innerHeight-Math.max(keyboard,number('--shell-bottom'))-12;
+  // Two separate reasons the usable band is not the viewport.
+  //
+  // The native header and tab bar sit inside the viewport and are drawn over
+  // it, so centring in the whole thing put a tall sheet's first line under the
+  // header.
+  //
+  // And on iOS Safari a keyboard does not shrink the layout viewport — it
+  // shrinks the visual one and lets the user pan it around inside the layout
+  // viewport. A position:fixed sheet is fixed to the layout viewport, so it
+  // slides off the top as though it were page content, which no amount of
+  // locking document scroll can prevent. Follow the visual viewport instead.
+  // offsetTop is trusted only while a keyboard is up: iOS 26 leaves it stale
+  // afterwards, and reading it then used to pin the sheet to the top.
+  const viewport=window.visualViewport;
+  const viewTop=keyboard>0&&viewport?viewport.offsetTop:0;
+  const viewHeight=viewport?viewport.height:window.innerHeight;
+  const top=viewTop+number('--safe-top')+number('--shell-top')+12;
+  const bottom=viewTop+viewHeight-Math.max(number('--kb-native'),number('--shell-bottom'))-12;
   // Derived from the sheet's height rather than its rect: the shift is animated,
   // so a rect read mid-transition would measure a position it is still leaving.
   const height=dialog.offsetHeight;
