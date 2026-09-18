@@ -81,8 +81,18 @@ test('a refusal is recorded, and does not pretend to be reveal depth', () => {
         reveal.indexOf('function maybeAskAfterProof('),
         reveal.indexOf('function presentSheet(')
     );
-    assert.match(gate, /crm\.hotelSubscribed \|\| activationPreviewMode/);
-    assert.match(gate, /askAlreadyShown\(\)/);
+    // A paying property is never nagged, but a subscribed owner replaying the
+    // reveal (activationPreviewMode) must still see it — and must record none
+    // of it, or the replay files a decline against a customer.
+    assert.match(gate, /crm\.hotelSubscribed && !activationPreviewMode/);
+    assert.match(gate, /!activationPreviewMode && askAlreadyShown\(\)/);
+    const ask = reveal.slice(
+        reveal.indexOf('function closeAsk('),
+        reveal.indexOf('function maybeAskAfterProof(')
+    );
+    for (const guarded of [/if \(activationPreviewMode\) return;/, /!activationPreviewMode && !activationOfferTracked/]) {
+        assert.match(ask, guarded, 'a replay would write to the funnel');
+    }
     // Gated on ASK_PROMPTS, which covers only proof cards — asking again right
     // after they closed the offer sheet would be nagging, not measuring.
     const prompts = reveal.slice(

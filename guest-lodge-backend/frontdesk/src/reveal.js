@@ -1125,6 +1125,7 @@ function closeAsk(reason) {
   const ask = document.getElementById('mvrAsk');
   if (!ask) return;
   ask.remove();
+  if (activationPreviewMode) return;
   trackReveal('ActivationDeclined', reason);
 }
 
@@ -1155,7 +1156,7 @@ function presentActivationAsk(cardId) {
       <div class="mvr-sheet-body" id="mvrAskBody">${askOfferHtml(cardId)}</div>
     </div>`;
   root.appendChild(ask);
-  markAskShown();
+  if (!activationPreviewMode) markAskShown();
   ask.querySelectorAll('[data-ask-dismiss]').forEach((control) => {
     control.addEventListener('click', () => closeAsk('dismissed'));
   });
@@ -1163,16 +1164,21 @@ function presentActivationAsk(cardId) {
   // The price is on screen, which is all "offer viewed" has ever meant. This is
   // what moves that metric's denominator from "opened the money card" to
   // "looked at any proof at all".
-  if (!activationOfferTracked) {
+  if (!activationPreviewMode && !activationOfferTracked) {
     activationOfferTracked = true;
     trackReveal('ActivationOfferViewed');
   }
 }
 
+// activationPreviewMode is this file's word for "a subscribed owner replaying
+// what a prospect sees" — every other surface here already renders as-if-
+// unsubscribed in it, so the ask belongs there too. Nothing it would record
+// does: a replay must not file a decline against a paying property, and the
+// once-per-property flag stays unset so the replay can be repeated.
 function maybeAskAfterProof(cardId) {
   if (!ASK_PROMPTS[cardId]) return;
-  if (crm.hotelSubscribed || activationPreviewMode) return;
-  if (askAlreadyShown()) return;
+  if (crm.hotelSubscribed && !activationPreviewMode) return;
+  if (!activationPreviewMode && askAlreadyShown()) return;
   presentActivationAsk(cardId);
 }
 
