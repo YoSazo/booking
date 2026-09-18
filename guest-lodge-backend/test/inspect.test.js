@@ -111,6 +111,23 @@ test('live feedback never costs the recording it is decorating', () => {
     assert.match(record, /finally\{clearInterval\(tick\);stopMeter\(\);stopCaptions\(\);/);
 });
 
+test('a sheet opens without summoning the keyboard', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const modal = client.slice(client.indexOf('function modal(content'), client.indexOf('function settleSheet'));
+
+    // Autofocus dragged the whole iOS mess in at once: keyboard up, visual
+    // viewport shrunk, iOS panning it to reveal the field, and computing that
+    // pan against a body pinned at -scrollY — so the sheet landed differently
+    // depending on where the page happened to be scrolled.
+    assert.match(modal, /\$\('dialog'\)\.focus\(\);/);
+    assert.doesNotMatch(modal, /querySelector\('input/);
+
+    // The code step keeps its focus on purpose: it has to happen inside the
+    // same user gesture or iOS drops the keyboard before the field exists.
+    assert.match(client, /Synchronous focus inside the same user gesture/);
+});
+
 test('the landing demo still reads when nothing is allowed to move', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

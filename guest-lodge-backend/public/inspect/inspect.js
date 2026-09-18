@@ -178,8 +178,14 @@ function modal(content, { fullscreen = false } = {}) {
   $('dialog-body').innerHTML = content;
   document.documentElement.classList.toggle('sheet-full', fullscreen);
   if (!$('dialog').open) { lockPage(); $('dialog').showModal(); }
-  const field = $('dialog-body').querySelector('input:not([readonly]), textarea');
-  (field || $('dialog')).focus();
+  // Deliberately not focusing the first field. Autofocus opened the keyboard
+  // the instant a sheet appeared, and on iOS that drags in everything at once:
+  // the keyboard shrinks the visual viewport, iOS pans it to reveal the focused
+  // field, and it computes where to pan against a body we have pinned at
+  // -scrollY — so the sheet landed somewhere different depending on where the
+  // page happened to be scrolled. Opening with no keyboard makes the sheet
+  // stable, and the field is one tap away when they are ready for it.
+  $('dialog').focus();
   // A sheet that needs the whole screen has to take the native header and tab
   // bar with it: UIKit draws those over the webview, so no z-index reaches past
   // them and a tall sheet is simply cut off underneath.
