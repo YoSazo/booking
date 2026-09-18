@@ -1150,7 +1150,11 @@ function presentActivationAsk(cardId) {
   ask.className = 'mvr-sheet is-ask';
   ask.setAttribute('role', 'dialog');
   ask.setAttribute('aria-modal', 'true');
-  ask.innerHTML = `<div class="mvr-sheet-scrim" data-ask-dismiss></div>
+  // The scrim deliberately does not dismiss. There is one decline row per
+  // property, ever, so a stray tap outside the card would spend that property's
+  // only answer on 'dismissed' — the least informative value there is. Leaving
+  // has to be deliberate: the ✕, or Escape.
+  ask.innerHTML = `<div class="mvr-sheet-scrim"></div>
     <div class="mvr-sheet-card">
       <button type="button" class="mvr-sheet-x" data-ask-dismiss aria-label="Close">&times;</button>
       <div class="mvr-sheet-body" id="mvrAskBody">${askOfferHtml(cardId)}</div>

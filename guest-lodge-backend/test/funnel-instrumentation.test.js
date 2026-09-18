@@ -72,6 +72,11 @@ test('a refusal is recorded, and does not pretend to be reveal depth', () => {
         assert.match(reveal, new RegExp(`id: '${reason}'`), `${reason} is no longer offered`);
     }
     assert.match(reveal, /closeAsk\('dismissed'\)/);
+    // One decline row exists per property, ever. A stray tap on the scrim would
+    // spend it on the least informative value, so leaving has to be deliberate.
+    const markup = reveal.slice(reveal.indexOf('ask.innerHTML'), reveal.indexOf('root.appendChild(ask)'));
+    assert.match(markup, /<div class="mvr-sheet-scrim"><\/div>/);
+    assert.match(markup, /class="mvr-sheet-x" data-ask-dismiss/);
     assert.match(reveal, /trackReveal\('ActivationDeclined', reason\)/);
 
     // It is asked after a proof card closes, not after the offer sheet, and
