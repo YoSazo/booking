@@ -32,7 +32,17 @@ body { min-height: 100vh; margin: 0; padding: calc(64px + env(safe-area-inset-to
 /* This is also the top edge of every web sheet. Sticky stopped participating
    once the body was scroll-locked at -scrollY, so opening Sign in near the end
    of a page could make the banner disappear. */
-header { position: fixed; z-index: 8; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+header { position: fixed; z-index: 12; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 0 20px; min-height: 64px; overflow: hidden; background: #ffffffeb; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+.header-bar { min-height: 63px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.header-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 320ms cubic-bezier(.32,.72,0,1), opacity 180ms ease; }
+.header-drawer-clip { min-height: 0; overflow: hidden; }
+.header-drawer-content { position: relative; width: min(620px, 100%); margin: 0 auto; padding: 6px 0 22px; transform: translateY(-12px); opacity: 0; transition: transform 280ms cubic-bezier(.32,.72,0,1), opacity 180ms ease; }
+.header-drawer-content h2 { margin: 0; padding-right: 42px; }
+.header-drawer-content p { margin: 8px 0 12px; }
+.header-drawer-close { position: absolute; top: 0; right: 0; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: var(--muted); }
+html.auth-open .header-drawer { grid-template-rows: 1fr; opacity: 1; }
+html.auth-open .header-drawer-content { transform: none; opacity: 1; }
+html.auth-open .header-bar, html.auth-open main, html.auth-open nav { pointer-events: none; }
 .brand { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; font-weight: 750; font-size: 18px; }
 .brand-icon { display: block; width: 30px; height: 30px; border-radius: 8px; }
 .brand-wordmark { display: block; width: 120px; height: auto; }
@@ -244,11 +254,6 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .flow-card { position: relative; width: min(480px, 100%); margin: 0; background: #fbfdfb; }
 .flow-card h2 { margin-top: 0; padding-right: 38px; }
 .flow-close { position: absolute; top: 10px; right: 10px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; color: var(--muted); border-radius: 999px; }
-/* Sign-in visually extends the persistent banner instead of floating at a
-   keyboard-sensitive centre point. The field begins high enough that Safari
-   has no reason to pan the page just to reveal it. */
-.auth-screen .flow-frame { place-items: start center; padding-top: 0; }
-.auth-screen .flow-card { width: min(620px, 100%); border-top: 0; border-radius: 0 0 24px 24px; }
 .danger-button { background: #aa382b; color: #fff; }
 .property-row, .report-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; -webkit-tap-highlight-color: transparent; transition: transform .16s ease; }
 .property-row:active, .report-row:active { transform: scale(.995); }
@@ -295,7 +300,8 @@ html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px);
 .native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
-  header { padding: 15px; }
+  header { padding: 0 15px; }
+  .header-drawer-content { padding-bottom: 18px; }
   .card { padding: 18px; }
   .grid { grid-template-columns: 1fr; }
   .hero { margin: 32px 0; }

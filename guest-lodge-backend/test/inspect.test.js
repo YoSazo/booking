@@ -161,21 +161,30 @@ test('Inspect sheets use one keyboard coordinate system and no visual scrim', ()
     assert.doesNotMatch(client, /--sheet-shift/);
 });
 
-test('the required email flow never enters the iOS fixed-dialog keyboard trap', () => {
+test('the required email flow expands the persistent header without replacing the report', () => {
     const fs = require('node:fs');
     const path = require('node:path');
     const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
     const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.css'), 'utf8');
-    const flow = client.slice(client.indexOf('function flowScreen('), client.indexOf('async function refresh('));
+    const header = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'index.html'), 'utf8');
+    const drawer = client.slice(client.indexOf('function headerDrawer('), client.indexOf('function confirmAction('));
     const auth = client.slice(client.indexOf('function ensureAuth('), client.indexOf('async function refresh('));
 
-    assert.match(auth, /'auth-screen'/);
-    assert.match(flow, /document\.createDocumentFragment\(\)/);
+    assert.match(header, /<header>.*id="header-drawer".*id="header-drawer-body".*<\/header>/s);
+    assert.match(header, /id="header-drawer"[^>]*aria-hidden="true" inert/);
+    assert.match(auth, /headerDrawer\(html\)/);
+    assert.doesNotMatch(drawer, /document\.createDocumentFragment\(\)/);
+    assert.doesNotMatch(drawer, /replaceChildren\(origin\)/);
+    assert.doesNotMatch(drawer, /scrollTo\(/);
     assert.doesNotMatch(auth, /\bmodal\(/);
     assert.doesNotMatch(auth, /showModal\(/);
     assert.doesNotMatch(auth, /lockPage\(/);
-    assert.match(css, /\.flow-frame\s*\{\s*position:\s*sticky/);
-    assert.match(css, /\.auth-screen \.flow-frame\s*\{[^}]*place-items:\s*start center/);
+    assert.match(drawer, /drawer\.inert=true/);
+    assert.match(drawer, /app\.inert=true/);
+    assert.match(drawer, /bar\.inert=true/);
+    assert.match(css, /\.header-drawer\s*\{[^}]*grid-template-rows:\s*0fr/);
+    assert.match(css, /html\.auth-open \.header-drawer\s*\{[^}]*grid-template-rows:\s*1fr/);
+    assert.match(css, /html\.auth-open \.header-bar, html\.auth-open main, html\.auth-open nav\s*\{[^}]*pointer-events:\s*none/);
 });
 
 test('the landing defers pricing by one transparent tap without opening checkout', () => {

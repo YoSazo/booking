@@ -514,10 +514,10 @@ async function addPhotos(input) {
 // One step visible at a time. Both forms used to sit in the sheet together, so
 // the six-digit field appeared directly under "Send sign-in code" and the sheet
 // carried two inputs and two buttons at once.
-// Inputs and confirmations use an ordinary in-page screen rather than a browser
-// alert or fixed dialog. Detaching preserves the exact DOM and event handlers,
-// and keeping the old document height prevents Safari from collapsing its
-// toolbar just because a card replaced a long report.
+// Plan previews and confirmations use an ordinary in-page screen rather than a
+// browser alert or fixed dialog. Detaching preserves the exact DOM and event
+// handlers, and keeping the old document height prevents Safari from collapsing
+// its toolbar just because a card replaced a long report.
 function flowScreen(content,kind=''){
   const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
   const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
@@ -539,6 +539,39 @@ function flowScreen(content,kind=''){
   syncNativeInspectState(currentPage,true);
   return {restore,paint:html=>{$('flow-body').innerHTML=html;},closeButton:$('flow-cancel')};
 }
+// Authentication belongs to the Marketel banner, not on a replacement page.
+// The report stays mounted at the same scroll offset while the banner's bottom
+// edge grows to reveal the email and code steps.
+function headerDrawer(content){
+  const drawer=$('header-drawer'),body=$('header-drawer-body'),close=$('header-drawer-close');
+  const app=$('app'),nav=$('nav'),bar=document.querySelector('.header-bar');
+  let restored=false;
+  const restore=()=>{
+    if(restored)return;
+    restored=true;
+    document.documentElement.classList.remove('auth-open');
+    drawer.setAttribute('aria-hidden','true');
+    drawer.inert=true;
+    app.inert=false;
+    nav.inert=false;
+    bar.inert=false;
+    $('account-button').disabled=false;
+    setTimeout(()=>{if(restored&&!document.documentElement.classList.contains('auth-open'))body.replaceChildren();},330);
+    syncNativeInspectState(currentPage,true);
+  };
+  body.innerHTML=content;
+  drawer.setAttribute('aria-hidden','false');
+  drawer.inert=false;
+  app.inert=true;
+  nav.inert=true;
+  bar.inert=true;
+  $('account-button').disabled=true;
+  document.activeElement?.blur?.();
+  document.documentElement.classList.add('auth-open');
+  close.onclick=restore;
+  syncNativeInspectState(currentPage,true);
+  return {restore,paint:html=>{body.innerHTML=html;},closeButton:close};
+}
 function confirmAction({title,message,confirmLabel='Continue',danger=false}){
   return new Promise(resolve=>{
     const flow=flowScreen(`<h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="flow-confirm" class="${danger?'danger-button':''}">${esc(confirmLabel)}</button><button type="button" id="flow-keep" class="secondary">Keep it</button></div>`,'confirm-screen');
@@ -549,17 +582,15 @@ function confirmAction({title,message,confirmLabel='Continue',danger=false}){
     $('flow-confirm').onclick=()=>finish(true);
   });
 }
-// Authentication is deliberately a normal in-page screen. iOS 26 has an open
-// WebKit regression where the keyboard pans the visual viewport even when the
-// document reports scrollTop=0; combining that with showModal(), a fixed body
-// and a fixed descendant creates the disappearing toolbar and blank scrollable
-// strip seen in Safari.
+// Authentication expands the already-fixed header. It never opens a top-layer
+// dialog, freezes the body or replaces the report, so Safari has only one page
+// and one scroll position to reconcile with its keyboard and browser toolbar.
 function ensureAuth(after) {
   if(session && account) return after();
-  let flow=null;
+  let drawer=null;
   let email='';
   const codeStep=()=>{
-    flow.paint(`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`);
+    drawer.paint(`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`);
     const input=$('code');
     // Synchronous focus inside the same user gesture: an await here would let
     // iOS dismiss the keyboard before the code field exists.
@@ -574,7 +605,7 @@ function ensureAuth(after) {
       verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
-        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();flow.restore();
+        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();drawer.restore();
       },null).then(()=>{
         verifying=false;
         if(account)return after();
@@ -594,7 +625,7 @@ function ensureAuth(after) {
   };
   const emailStep=open=>{
     const html=`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
-    if(open)flow=flowScreen(html,'auth-screen');else flow.paint(html);
+    if(open)drawer=headerDrawer(html);else drawer.paint(html);
     if(!open)$('email').focus();
     $('email-form').onsubmit=event=>{
       event.preventDefault();
