@@ -28,8 +28,11 @@
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable], .report-note, .transcript, .comparison-banner, blockquote { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html { min-height: 100%; background: #eff4f0; }
-body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
-header { position: sticky; z-index: 8; top: 0; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+body { min-height: 100vh; margin: 0; padding: calc(64px + env(safe-area-inset-top)) 0 calc(100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
+/* This is also the top edge of every web sheet. Sticky stopped participating
+   once the body was scroll-locked at -scrollY, so opening Sign in near the end
+   of a page could make the banner disappear. */
+header { position: fixed; z-index: 8; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
 .brand { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; font-weight: 750; font-size: 18px; }
 .brand-icon { display: block; width: 30px; height: 30px; border-radius: 8px; }
 .brand-wordmark { display: block; width: 120px; height: auto; }
@@ -181,16 +184,17 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
 /* The layout viewport never resizes for the keyboard. JS publishes one top and
    one usable height from visualViewport, so Safari cannot resize the layout and
    then have us independently translate the sheet a second time. */
-dialog { position: fixed; left: 50%; top: var(--sheet-top, 50%); transform: translate(-50%, -50%); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: var(--sheet-max-height, calc(100svh - var(--shell-bottom) - var(--shell-top) - env(safe-area-inset-top) - 32px)); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: top .16s ease, max-height .16s ease; }
+dialog { position: fixed; left: 50%; top: var(--sheet-top, 50%); transform: translate(-50%, -50%); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: var(--sheet-max-height, calc(100svh - var(--shell-bottom) - var(--shell-top) - env(safe-area-inset-top) - 32px)); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
 /* iOS can pan the visual viewport even while a fixed body is scroll-locked.
-   Counter that pan on the frozen page; the top-layer dialog is positioned
-   separately inside the usable visual band. */
-html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; transform: translateY(var(--viewport-pan, 0px)); }
+   Counter that pan on the visible page pieces without turning body into a
+   containing block for its fixed header. */
+html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; }
+html.sheet-open header, html.sheet-open main, html.sheet-open nav { transform: translateY(var(--viewport-pan, 0px)); }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 /* No blur, tint or dimming behind sheets. It remains a real modal backdrop, so
    taps cannot leak into the page underneath. */

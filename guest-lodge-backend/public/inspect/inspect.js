@@ -210,7 +210,11 @@ function settleSheet(){
   const viewTop=keyboard>0&&viewport?Math.max(0,viewport.offsetTop):0;
   const viewHeight=keyboard>0&&viewport?viewport.height:window.innerHeight;
   const nativeKeyboard=number('--kb-native');
-  const shellTop=keyboard>0?0:number('--shell-top');
+  // The native shell and the web header are hard top boundaries even while the
+  // keyboard is open. Dropping this boundary was what let the auth card shoot
+  // up over the banner.
+  const webHeader=native?0:($('account-button')?.closest('header')?.offsetHeight||64);
+  const shellTop=Math.max(number('--shell-top'),webHeader);
   const shellBottom=keyboard>0?0:number('--shell-bottom');
   const top=viewTop+number('--safe-top')+shellTop+12;
   // visualViewport.height already excludes the web keyboard. Capacitor uses

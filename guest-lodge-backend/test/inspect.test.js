@@ -144,6 +144,13 @@ test('Inspect sheets use one keyboard coordinate system and no visual scrim', ()
     assert.match(css, /dialog::backdrop\s*\{[^}]*background:\s*transparent/);
     assert.match(css, /dialog::backdrop\s*\{[^}]*backdrop-filter:\s*none/);
 
+    // The header cannot disappear when the fixed-body scroll lock is applied,
+    // and the sheet treats it as a boundary while the keyboard is present.
+    assert.match(css, /header\s*\{\s*position:\s*fixed/);
+    assert.match(client, /const webHeader=native\?0:/);
+    assert.match(client, /const shellTop=Math\.max\(number\('--shell-top'\),webHeader\)/);
+    assert.doesNotMatch(css, /transition:\s*top/);
+
     // The visible band owns the sheet position. Safari's pan is cancelled only
     // on the frozen page, and native keyboard height is not confused with the
     // already-resized web visual viewport.
