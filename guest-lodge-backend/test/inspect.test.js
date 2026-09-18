@@ -161,6 +161,33 @@ test('Inspect sheets use one keyboard coordinate system and no visual scrim', ()
     assert.doesNotMatch(client, /--sheet-shift/);
 });
 
+test('the required email flow never enters the iOS fixed-dialog keyboard trap', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.css'), 'utf8');
+    const flow = client.slice(client.indexOf('function flowScreen('), client.indexOf('async function refresh('));
+    const auth = client.slice(client.indexOf('function ensureAuth('), client.indexOf('async function refresh('));
+
+    assert.match(auth, /'auth-screen'/);
+    assert.match(flow, /document\.createDocumentFragment\(\)/);
+    assert.doesNotMatch(auth, /\bmodal\(/);
+    assert.doesNotMatch(auth, /showModal\(/);
+    assert.doesNotMatch(auth, /lockPage\(/);
+    assert.match(css, /\.flow-frame\s*\{\s*position:\s*sticky/);
+    assert.match(css, /\.auth-screen \.flow-frame\s*\{[^}]*place-items:\s*start center/);
+});
+
+test('Inspect destructive choices use product UI instead of browser alerts', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    assert.match(client, /function confirmAction\(/);
+    assert.doesNotMatch(client, /\bconfirm\s*\(/);
+    assert.doesNotMatch(client, /\bprompt\s*\(/);
+    assert.doesNotMatch(client, /\balert\s*\(/);
+});
+
 test('the landing demo still reads when nothing is allowed to move', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

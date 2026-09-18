@@ -293,7 +293,7 @@ function landing() {
   if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
 }
 async function start(propertyName = '') {
-  if (draftUnsaved() && !confirm('Start a new report? Your current draft is not saved online yet.')) return;
+  if (draftUnsaved() && !await confirmAction({title:'Start a new report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start new report',danger:true})) return;
   clearURLs(); draft = { document: newDocument(propertyName), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
@@ -325,11 +325,11 @@ function editor(step) {
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
-    $('rooms').onclick = event => {
+    $('rooms').onclick = async event => {
       const figure = event.target.closest('figure[data-photo-id]');
       if (figure && Date.now()-photoDropAt > 400 && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
       const b = event.target.closest('button'); if (!b) return;
-      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (confirm('Remove this room and its photos from the report?')) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
+      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (await confirmAction({title:'Remove this room?',message:'Its photos and notes will be removed from this report.',confirmLabel:'Remove room',danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
       if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
       if (b.dataset.nativeCamera !== undefined) { haptic(); window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:Number(b.dataset.nativeCamera)}); }
@@ -344,8 +344,8 @@ function editor(step) {
   // Signed out in the app neither chrome is on screen, so these are the only exits.
   if($('editor-back'))$('editor-back').onclick=()=>run(()=>list());
   if($('editor-signin'))$('editor-signin').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
-  $('editor-discard').onclick=()=>{
-    if(!confirm('Discard this report? Anything not saved online is removed from this device.'))return;
+  $('editor-discard').onclick=async()=>{
+    if(!await confirmAction({title:'Discard this report?',message:'Anything not saved online will be removed from this device.',confirmLabel:'Discard report',danger:true}))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();if(account)await openAccountHome();else landing();});
   };
 }
@@ -498,11 +498,52 @@ async function addPhotos(input) {
 // One step visible at a time. Both forms used to sit in the sheet together, so
 // the six-digit field appeared directly under "Send sign-in code" and the sheet
 // carried two inputs and two buttons at once.
+// Inputs and confirmations use an ordinary in-page screen rather than a browser
+// alert or fixed dialog. Detaching preserves the exact DOM and event handlers,
+// and keeping the old document height prevents Safari from collapsing its
+// toolbar just because a card replaced a long report.
+function flowScreen(content,kind=''){
+  const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
+  const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
+  while(app.firstChild)origin.appendChild(app.firstChild);
+  let restored=false;
+  const restore=()=>{
+    if(restored)return;
+    restored=true;
+    app.replaceChildren(origin);
+    document.documentElement.classList.remove('flow-open');
+    $('account-button').disabled=false;
+    requestAnimationFrame(()=>{window.scrollTo(0,originScroll);if($('demo'))playDemo();});
+    syncNativeInspectState(currentPage,true);
+  };
+  app.innerHTML=`<section class="flow-screen ${kind}" style="--flow-page-height:${Math.round(originHeight)}px"><div class="flow-frame"><article class="card flow-card"><div id="flow-body">${content}</div><button type="button" id="flow-cancel" class="quiet flow-close" aria-label="Close">&#10005;</button></article></div></section>`;
+  document.documentElement.classList.add('flow-open');
+  $('account-button').disabled=true;
+  $('flow-cancel').onclick=restore;
+  syncNativeInspectState(currentPage,true);
+  return {restore,paint:html=>{$('flow-body').innerHTML=html;},closeButton:$('flow-cancel')};
+}
+function confirmAction({title,message,confirmLabel='Continue',danger=false}){
+  return new Promise(resolve=>{
+    const flow=flowScreen(`<h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="flow-confirm" class="${danger?'danger-button':''}">${esc(confirmLabel)}</button><button type="button" id="flow-keep" class="secondary">Keep it</button></div>`,'confirm-screen');
+    let answered=false;
+    const finish=value=>{if(answered)return;answered=true;flow.restore();resolve(value);};
+    flow.closeButton.onclick=()=>finish(false);
+    $('flow-keep').onclick=()=>finish(false);
+    $('flow-confirm').onclick=()=>finish(true);
+  });
+}
+// Authentication is deliberately a normal in-page screen. iOS 26 has an open
+// WebKit regression where the keyboard pans the visual viewport even when the
+// document reports scrollTop=0; combining that with showModal(), a fixed body
+// and a fixed descendant creates the disappearing toolbar and blank scrollable
+// strip seen in Safari.
 function ensureAuth(after) {
   if(session && account) return after();
+  let flow=null;
   let email='';
   const codeStep=()=>{
-    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`;
+    flow.paint(`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`);
     const input=$('code');
     // Synchronous focus inside the same user gesture: an await here would let
     // iOS dismiss the keyboard before the code field exists.
@@ -517,7 +558,7 @@ function ensureAuth(after) {
       verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
-        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
+        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();flow.restore();
       },null).then(()=>{
         verifying=false;
         if(account)return after();
@@ -537,7 +578,7 @@ function ensureAuth(after) {
   };
   const emailStep=open=>{
     const html=`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
-    if(open)modal(html);else $('dialog-body').innerHTML=html;
+    if(open)flow=flowScreen(html,'auth-screen');else flow.paint(html);
     if(!open)$('email').focus();
     $('email-form').onsubmit=event=>{
       event.preventDefault();
@@ -843,12 +884,12 @@ function renderReports(){
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
-  if($('delete-local-draft'))$('delete-local-draft').onclick=()=>{
-    if(!confirm('Delete this unsaved report from this device?'))return;
+  if($('delete-local-draft'))$('delete-local-draft').onclick=async()=>{
+    if(!await confirmAction({title:'Delete this unsaved report?',message:'This removes the report from this device.',confirmLabel:'Delete report',danger:true}))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();await list();});
   };
   document.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.open),button));
-  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=()=>{if(confirm('Permanently delete this report, its photos and shared link? This does not restore report allowance.'))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
+  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=async()=>{if(await confirmAction({title:'Permanently delete this report?',message:'Its photos and shared link will also be deleted. Your report allowance will not be restored.',confirmLabel:'Delete permanently',danger:true}))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
 }
 async function loadReportFiles(report){
   const files=[];
@@ -866,13 +907,13 @@ async function useComparisonPayload(payload){
   await persist();preview=!!report.finalizedAt;editor();
 }
 async function openReport(id){
-  if(draftUnsaved()&&draft.serverId!==id&&!confirm('Replace the draft on this device? Your current draft is not saved online yet.'))return;
+  if(draftUnsaved()&&draft.serverId!==id&&!await confirmAction({title:'Replace this draft?',message:'Your current draft is not saved online yet.',confirmLabel:'Replace draft',danger:true}))return;
   haptic();
   $('app').innerHTML='<section class="loading">Opening your report…</section>';
   await useComparisonPayload(await api(`/reports/${id}/comparison`));
 }
 async function startComparison(baselineId){
-  if(draftUnsaved()&&!confirm('Start a comparison report? Your current draft is not saved online yet.'))return;
+  if(draftUnsaved()&&!await confirmAction({title:'Start a comparison report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start comparison',danger:true}))return;
   const payload=await api(`/reports/${baselineId}/comparison-draft`,{method:'POST',body:{date:localDate()}});
   reportsCache=null;await useComparisonPayload(payload);
 }
@@ -910,9 +951,14 @@ $('account-button').onclick=async()=>{
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
   $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
-  $('delete-account').onclick=()=>{if(prompt('This permanently deletes Inspect reports and photos and cancels its subscription. Booking properties are unaffected. Type DELETE to confirm.')==='DELETE')run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});};
+  $('delete-account').onclick=async()=>{
+    $('dialog').close();
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    if(!await confirmAction({title:'Delete your Inspect account?',message:'This permanently deletes Inspect reports and photos and cancels its subscription. Booking properties are unaffected.',confirmLabel:'Delete account permanently',danger:true}))return;
+    run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});
+  };
 };
-async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
+async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});if($('dialog').open)$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
 $('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.removeProperty('--sheet-top');$('dialog').style.removeProperty('--sheet-max-height');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
