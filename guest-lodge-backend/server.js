@@ -6981,6 +6981,9 @@ app.post('/api/hotel/:hotelId/booking-intent', async (req, res) => {
 // Growth funnel capture (public). Lightweight guest-side events so the owner can
 // see "page views → tried to book → booked." Best-effort; never errors the guest.
 // Reuses FunnelEvent; the guest app throttles to ~1 per session per event.
+// Guest-side only. The owner's own activation checkout is ActivationCheckoutStarted:
+// both used to write 'CheckoutStarted' into one table, so an owner funnel silently
+// counted guests trying to book as owners reaching Stripe.
 const GROWTH_EVENT_NAMES = { page_view: 'PageView', checkout_started: 'CheckoutStarted' };
 app.post('/api/hotel/:hotelId/track', async (req, res) => {
     try {
@@ -10786,7 +10789,7 @@ const MARKETEL_ONBOARDING_EVENT_NAMES = [
     'SetupCompleted',
     'FrontDeskOpened',
     'GoLiveClicked',
-    'CheckoutStarted',
+    'ActivationCheckoutStarted',
     'PaymentSucceeded',
     'SetupResumeEmailSent',
     'PreviewReadyEmailSending',
@@ -11046,7 +11049,7 @@ const MARKETEL_ATTRIBUTION_MILESTONES = new Set([
     'SetupCompleted',
     'ValueRevealStarted',
     'ActivationOfferViewed',
-    'CheckoutStarted',
+    'ActivationCheckoutStarted',
     'TrialStarted',
     'TrialNativeAppActivated',
     'TrialLinkPlacementConfirmed',
@@ -11065,7 +11068,7 @@ const MARKETEL_FUNNEL_DASHBOARD_EVENT_NAMES = [
     'SetupCompleted',
     'ValueRevealStarted',
     'ActivationOfferViewed',
-    'CheckoutStarted',
+    'ActivationCheckoutStarted',
     'TrialStarted',
     'TrialWillEnd',
     'TrialNativeAppActivated',
@@ -11242,7 +11245,7 @@ function addMarketelAttributionProperty(group, property) {
     if (property.milestones.has('SetupCompleted')) group.setupCompleted += 1;
     if (property.milestones.has('ValueRevealStarted')) group.revealStarted += 1;
     if (property.milestones.has('ActivationOfferViewed')) group.offerViewed += 1;
-    if (property.milestones.has('CheckoutStarted')) group.checkoutStarted += 1;
+    if (property.milestones.has('ActivationCheckoutStarted')) group.checkoutStarted += 1;
     if (property.milestones.has('TrialStarted')) group.trialsStarted += 1;
     if (property.milestones.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
     if (property.milestones.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;
@@ -11533,7 +11536,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             property.lastSeenAt = timestamp;
             property.eventCount += 1;
             if (row.sessionId) property.sessions.add(row.sessionId);
-            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'].includes(row.eventName)) {
+            if (['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'ActivationCheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'].includes(row.eventName)) {
                 property.milestones[row.eventName] = timestamp;
             }
             propertyMap.set(row.hotelId, property);
@@ -11593,7 +11596,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
             if (event.event === 'SetupCompleted') nextOutcome = 'setup-completed';
             if (event.event === 'ActivationOfferViewed') nextOutcome = 'offer-viewed';
             if (event.event === 'GoLiveClicked') nextOutcome = 'checkout-requested';
-            if (event.event === 'CheckoutStarted') nextOutcome = 'checkout-started';
+            if (event.event === 'ActivationCheckoutStarted') nextOutcome = 'checkout-started';
             if (event.event === 'TrialStarted') nextOutcome = 'trial-started';
             if (event.event === 'PaymentSucceeded') nextOutcome = 'paid';
             if ((outcomeRank[nextOutcome] || 0) > (outcomeRank[session.outcome] || 0)) session.outcome = nextOutcome;
@@ -11639,7 +11642,7 @@ app.get('/api/funnel/journey-export', adminAuth, async (req, res) => {
                 identity: 'Anonymous visitor and per-tab session IDs are used to join events.',
             },
             interpretation: {
-                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'CheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'],
+                conversionEvents: ['Lead', 'QualifiedLead', 'SetupCompleted', 'ActivationOfferViewed', 'GoLiveClicked', 'ActivationCheckoutStarted', 'TrialStarted', 'TrialNativeAppActivated', 'TrialLinkPlacementConfirmed', 'TrialFirstBookingReceived', 'TrialConverted', 'TrialCanceled', 'PaymentSucceeded'],
                 journeyEvents: 'Clarity and Smartlook own interaction playback. Journey* rows are reserved for rare client and checkout failures.',
                 duration: 'Use timestamps between compact milestones for directional timing; session replay is authoritative for detailed behavior.',
                 ordering: 'Within a session, sort by sequence first and timestamp second.',
@@ -15734,11 +15737,11 @@ async function marketelActivationContext({ hotelId, metadata = {}, checkoutSessi
         select: { ownerEmail: true, ownerPhone: true },
     }).catch(() => null);
     // The invoice path has no checkout session id, so fall back to the property's most
-    // recent CheckoutStarted rather than losing match quality on conversion.
+    // recent ActivationCheckoutStarted rather than losing match quality on conversion.
     const checkoutTracking = await prisma.funnelEvent.findFirst({
         where: checkoutSessionId
-            ? { eventName: 'CheckoutStarted', eventId: `marketel-checkout.${checkoutSessionId}` }
-            : { eventName: 'CheckoutStarted', hotelId },
+            ? { eventName: 'ActivationCheckoutStarted', eventId: `marketel-checkout.${checkoutSessionId}` }
+            : { eventName: 'ActivationCheckoutStarted', hotelId },
         orderBy: { createdAt: 'desc' },
         select: { metadata: true, userAgent: true, ipAddress: true },
     }).catch(() => null);
@@ -16456,7 +16459,7 @@ app.post('/api/crm/go-live', crmAuth, async (req, res) => {
         await prisma.funnelEvent.create({
             data: {
                 hotelId,
-                eventName: 'CheckoutStarted',
+                eventName: 'ActivationCheckoutStarted',
                 eventId: checkoutEventId,
                 guestEmail: hotel.ownerEmail || null,
                 guestPhone: hotel.ownerPhone || null,

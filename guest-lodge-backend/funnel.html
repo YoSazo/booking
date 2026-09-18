@@ -944,7 +944,7 @@
   <button class="filter-btn" data-filter="SetupCompleted" onclick="setFilter('SetupCompleted')">Completed</button>
   <button class="filter-btn" data-filter="ValueRevealStarted" onclick="setFilter('ValueRevealStarted')">Reveal</button>
   <button class="filter-btn" data-filter="ActivationOfferViewed" onclick="setFilter('ActivationOfferViewed')">Offer</button>
-  <button class="filter-btn" data-filter="CheckoutStarted" onclick="setFilter('CheckoutStarted')">Checkout</button>
+  <button class="filter-btn" data-filter="ActivationCheckoutStarted" onclick="setFilter('ActivationCheckoutStarted')">Checkout</button>
   <button class="filter-btn" data-filter="TrialStarted" onclick="setFilter('TrialStarted')">Trial</button>
   <button class="filter-btn" data-filter="PaymentSucceeded" onclick="setFilter('PaymentSucceeded')">Paid</button>
 </div>
@@ -1550,7 +1550,7 @@ const TYPE_LABELS = {
   ActivationEmailSent: 'Activation Email Sent',
   PaymentCTAClicked: 'Hit Gate',
   GoLiveClicked: 'Activation Clicked',
-  CheckoutStarted: 'Stripe Checkout',
+  ActivationCheckoutStarted: 'Stripe Checkout',
   TrialStarted: 'Trial Started',
   TrialWillEnd: 'Trial Ending Soon',
   TrialNativeAppActivated: 'Front Desk App Opened',
@@ -1608,7 +1608,7 @@ function renderEvents() {
   document.getElementById('stat-step4').textContent = allCounts.SetupCompleted || 0;
   document.getElementById('stat-reveal').textContent = allCounts.ValueRevealStarted || 0;
   document.getElementById('stat-offer-reveal').textContent = allCounts.ActivationOfferViewed || 0;
-  document.getElementById('stat-checkout').textContent = allCounts.CheckoutStarted || 0;
+  document.getElementById('stat-checkout').textContent = allCounts.ActivationCheckoutStarted || 0;
   document.getElementById('stat-trials').textContent = allCounts.TrialStarted || 0;
   document.getElementById('stat-trial-app').textContent = allCounts.TrialNativeAppActivated || 0;
   document.getElementById('stat-trial-link').textContent = allCounts.TrialLinkPlacementConfirmed || 0;

@@ -222,7 +222,7 @@ function addProperty(group, property) {
   if (property.events.has('SetupCompleted')) group.completed += 1;
   if (property.events.has('ValueRevealStarted')) group.revealEntered += 1;
   if (property.events.has('ActivationOfferViewed')) group.offerViewed += 1;
-  if (property.events.has('CheckoutStarted')) group.checkoutStarted += 1;
+  if (property.events.has('ActivationCheckoutStarted')) group.checkoutStarted += 1;
   if (property.events.has('TrialStarted')) group.trialsStarted += 1;
   if (property.events.has('TrialNativeAppActivated')) group.trialAppsOpened += 1;
   if (property.events.has('TrialLinkPlacementConfirmed')) group.trialLinksPlaced += 1;

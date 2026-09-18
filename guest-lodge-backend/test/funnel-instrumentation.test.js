@@ -83,6 +83,36 @@ test('guest Meta events no longer duplicate themselves into FunnelEvent', () => 
     assert.match(route, /prisma\.hitPayment\.create/);
 });
 
+test('the owner activation checkout is not confused with a guest checkout', () => {
+    // Both used to write 'CheckoutStarted' into FunnelEvent: the guest growth
+    // tracker and the owner's own Stripe activation. The owner funnel therefore
+    // counted guests trying to book as owners reaching Stripe, which is only
+    // harmless while guest traffic is near zero.
+    const goLive = server.slice(
+        server.indexOf("app.post('/api/crm/go-live'"),
+        server.indexOf("app.get('/api/crm/go-live-success'")
+    );
+    assert.match(goLive, /eventName: 'ActivationCheckoutStarted'/);
+    assert.doesNotMatch(goLive, /eventName: 'CheckoutStarted'/);
+
+    // The guest side keeps the old name, and keeps it to itself.
+    assert.match(server, /checkout_started: 'CheckoutStarted'/);
+
+    // Conversion attribution is recovered by looking the row back up, so the
+    // read has to follow the rename or every activation loses its fbp/fbc.
+    const context = server.slice(
+        server.indexOf('async function marketelActivationContext('),
+        server.indexOf('async function recordMarketelTrialStarted(')
+    );
+    assert.match(context, /eventName: 'ActivationCheckoutStarted'/);
+    assert.doesNotMatch(context, /eventName: 'CheckoutStarted'/);
+
+    // Owner-side reporting surfaces must agree with what is written.
+    for (const [name, source] of [['funnel.html', dashboard], ['marketel-report.js', marketelReport]]) {
+        assert.match(source, /ActivationCheckoutStarted/, `${name} still reads the guest event`);
+    }
+});
+
 test('every push trigger is actually fired by the code path it names', () => {
     // A trigger defined but never called is a notification that silently never
     // arrives, which is indistinguishable from "nothing happened yet".
