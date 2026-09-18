@@ -52,6 +52,40 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(client, /Start move-out comparison/);
 });
 
+test('the AI path is observable, and cannot be advertised while it is off', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    // Visible, so the product cannot pass every check while its advertised
+    // workflow 503s — but never critical, because launchConfigured requires
+    // every critical check and would take sign-in and export dark with it.
+    const aiItem = server.slice(server.indexOf("item('inspect-ai-key'"), server.indexOf("item('inspect-stripe-price'"));
+    assert.match(aiItem, /present\('OPENAI_API_KEY'\)/);
+    assert.match(aiItem, /, false\),\s*$/);
+    assert.doesNotMatch(aiItem, /requireWhenEnabled/);
+
+    // Both ends of the pipeline report, so a silent failure is visible.
+    assert.match(server, /recordBestEffort\(req\.inspect\.id, 'VoiceNoteDrafted'\)/);
+    assert.match(server, /recordBestEffort\(req\.inspect\.id, 'VoiceNoteFailed'\)/);
+    for (const name of ['VoiceNoteKept', 'VoiceNoteDiscarded']) {
+        assert.match(server, new RegExp(`'${name}', null`), `${name} is not accepted from the client`);
+        assert.match(client, new RegExp(name), `${name} is never sent`);
+    }
+
+    // Kept-vs-discarded is a rate, so it must not be deduped per account the
+    // way the one-per-account offer view is.
+    assert.match(server, /\['AdditionalReportOfferViewed', accountId => `inspect-offer:\$\{accountId\}`\]/);
+    assert.match(server, /if \(!sourceId\) rate\(`inspect-events:/);
+
+    // Closing the review sheet is an answer, not an absence.
+    assert.match(client, /kept\?'VoiceNoteKept':'VoiceNoteDiscarded'/);
+
+    // The recording and transcript still never reach an event payload.
+    assert.match(server, /Neither is\n      \/\/ added to the report, logs, object storage, or an event payload/);
+});
+
 test('Inspect entitlement is separate, period-bound, and keeps the lifetime free report', () => {
   const future = new Date(Date.now() + 86400000);
   assert.deepEqual(entitlement({ subscriptionStatus: null, periodEnd: null, freeReportUsed: false, reportsUsed: 0 }), {
@@ -223,6 +257,7 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
   const ready = inspectEnvReadiness({
     INSPECT_ENABLED: 'true',
     INSPECT_AUTH_SECRET: 'a'.repeat(32),
+    OPENAI_API_KEY: 'sk-test-inspect',
     INSPECT_R2_BUCKET: 'marketel-inspect-private',
     R2_BUCKET: 'marketel-uploads',
     R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',

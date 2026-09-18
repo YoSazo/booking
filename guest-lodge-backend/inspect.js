@@ -209,6 +209,12 @@ function inspectEnvReadiness(env = process.env) {
         : 'INSPECT_ENABLED is false; leave it off until R2, Stripe, and migration are ready.', false),
       item('inspect-auth-secret', 'Inspect auth secret', authOk, 'Set a distinct 32+ character INSPECT_AUTH_SECRET and keep it stable.', requireWhenEnabled),
       item('inspect-private-bucket', 'Inspect private R2 bucket', privateBucketOk && storageCredsOk, 'Create a private INSPECT_R2_BUCKET that differs from R2_BUCKET and give INSPECT_R2_* credentials read/write access to it.', requireWhenEnabled),
+      // Advisory, not critical: voice notes degrade to "you can type instead",
+      // and taking sign-in, reports and export dark over that would be far
+      // worse than the outage it reports. But it must be visible, because the
+      // product can otherwise pass every check while the workflow it is
+      // advertised on answers 503 to every owner who tries it.
+      item('inspect-ai-key', 'Inspect voice notes and wording help', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY. Without it "Talk through this room" and "Polish typed note" return 503 — the rest of Inspect still works, but do not advertise the AI write-up until this is set.', false),
       item('inspect-stripe-price', 'Inspect $29/mo Stripe price id', priceIdOk, 'Create a USD 29 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
       // Deliberately not critical: a missing annual price must never take the
       // whole product dark, it just leaves monthly as the only plan on offer.
@@ -574,9 +580,19 @@ function registerInspect(app, {
     req.inspect = account;
     res.json({ success: true });
   }));
+  // The offer view is one per account, because the question is whether they ever
+  // reached it. The voice outcomes are counted every time, because the question
+  // there is a rate: does the AI path work, and do people keep what it wrote.
+  const CLIENT_EVENTS = new Map([
+    ['AdditionalReportOfferViewed', accountId => `inspect-offer:${accountId}`],
+    ['VoiceNoteKept', null],
+    ['VoiceNoteDiscarded', null],
+  ]);
   router.post('/events', guarded(async (req, res) => {
-    if (req.body.name !== 'AdditionalReportOfferViewed') throw fail(400, 'Unknown Inspect event.');
-    await record(req.inspect.id, req.body.name, `inspect-offer:${req.inspect.id}`);
+    if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown Inspect event.');
+    const sourceId = CLIENT_EVENTS.get(req.body.name);
+    if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
+    await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined);
     res.json({ success: true });
   }));
   router.post('/auth/logout', guarded(async (req, res) => {
@@ -805,9 +821,11 @@ function registerInspect(app, {
       if (typeof parsed.observation !== 'string' || !parsed.observation.trim() || typeof parsed.issueMentioned !== 'boolean') throw new Error('Invalid structured response');
       // Audio and transcript exist only in memory for this request. Neither is
       // added to the report, logs, object storage, or an event payload.
+      recordBestEffort(req.inspect.id, 'VoiceNoteDrafted');
       res.json({ transcript, suggestion: parsed.observation.trim().slice(0, 4000), issueMentioned: parsed.issueMentioned });
     } catch (error) {
       await releaseAiUse(req.inspect.id, report.id).catch(() => {});
+      recordBestEffort(req.inspect.id, 'VoiceNoteFailed');
       console.error('Inspect voice note failed:', error.name);
       throw fail(503, 'Voice note processing failed. Your recording was not saved; you can retry or type the note.');
     }

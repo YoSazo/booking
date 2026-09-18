@@ -206,6 +206,8 @@ function watchActions(){
   }
 }
 const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
+// Best effort by design: a dropped count is better than a blocked walkthrough.
+const logInspect=name=>{if(session)api('/events',{method:'POST',body:{name}}).catch(()=>{});};
 $('dialog-close').onclick = () => $('dialog').close();
 function setActiveNav(page) { currentPage=page;document.querySelectorAll('#nav button').forEach(button => button.classList.toggle('is-active', page === 'current' ? button.id === 'current-report' : button.dataset.page === page));syncNativeInspectState(page); }
 function updateHeader() {
@@ -556,7 +558,11 @@ async function recordRoom(index){
 }
 function reviewVoiceNote(index,result){
   modal(`<h2>Review this room note</h2><p class="muted">AI only organized what it heard. Check every detail before adding it.</p><blockquote>${esc(result.suggestion)}</blockquote><details><summary>What Inspect heard</summary><p class="transcript">${esc(result.transcript)}</p></details><div class="stack"><button id="replace-note">Use as room note</button><button id="append-note" class="secondary">Add after my note</button><button id="discard-note" class="quiet">Discard</button></div>`);
-  const accept=mode=>{const room=draft.document.rooms[index];room.observation=mode==='append'&&room.observation.trim()?`${room.observation.trim()}\n${result.suggestion}`:result.suggestion;if(result.issueMentioned)room.issue=true;remember();$('dialog').close();editor();};
+  // Whether the draft was kept is the only read on whether the AI actually
+  // helped. Closing the sheet is an answer too, so every exit records one.
+  let kept=false;
+  $('dialog').addEventListener('close',()=>logInspect(kept?'VoiceNoteKept':'VoiceNoteDiscarded'),{once:true});
+  const accept=mode=>{const room=draft.document.rooms[index];room.observation=mode==='append'&&room.observation.trim()?`${room.observation.trim()}\n${result.suggestion}`:result.suggestion;if(result.issueMentioned)room.issue=true;remember();kept=true;$('dialog').close();editor();};
   $('replace-note').onclick=()=>accept('replace');$('append-note').onclick=()=>accept('append');$('discard-note').onclick=()=>$('dialog').close();
 }
 function signaturePreview(signature){
@@ -658,7 +664,7 @@ async function requestStorefront(){
 }
 async function offer(){
   await requestStorefront();
-  if(session)api('/events',{method:'POST',body:{name:'AdditionalReportOfferViewed'}}).catch(()=>{});
+  logInspect('AdditionalReportOfferViewed');
   if(native&&storefront!=='USA')return modal('<h2>Your free report is yours.</h2><p>This account has no additional report allowance available. Existing subscribers can refresh their account access.</p><button id="refresh-access">Refresh access</button>'),$('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();});
   // Annual is preselected — $29/month takes over three months to repay what one
   // customer costs to acquire — but only intervals the server has a price for
