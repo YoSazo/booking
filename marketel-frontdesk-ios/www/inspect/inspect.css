@@ -154,6 +154,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 #signature-pad { display: block; width: 100%; height: 130px; margin: 12px 0; border: 1.5px solid var(--border); border-radius: 12px; background: #fff; touch-action: none; }
 .recording-state { display: flex; align-items: center; gap: 8px; }
 .recording-dot { width: 10px; height: 10px; border-radius: 999px; background: #c63c32; animation: recording-pulse 1s infinite; }
+/* Driven from the stream already being recorded, so it always moves — this is
+   what a screen recording of someone talking actually has to show. */
+.live-bars { display: flex; align-items: center; justify-content: center; gap: 4px; height: 46px; margin: 14px 0 10px; }
+.live-bars span { width: 4px; height: 100%; border-radius: 999px; background: var(--green); opacity: .8; transform: scaleY(.12); transform-origin: center; transition: transform .07s linear; }
+/* Captions are a bonus: absent in most webviews, so the box holds its height
+   rather than making the sheet jump if they never arrive. */
+.live-caption { margin: 0 0 12px; min-height: 60px; max-height: 96px; overflow-y: auto; padding: 10px 12px; background: #edf3ee; border-radius: 12px; font-size: 14.5px; line-height: 1.45; text-align: left; }
 .transcript { white-space: pre-wrap; max-height: 180px; overflow: auto; }
 @keyframes recording-pulse { 50% { opacity: .35; } }
 .status { font-size: 12px; font-weight: 600; color: var(--green-dark); background: var(--green-pale); border: 1px solid #d5ecdf; border-radius: 999px; padding: 7px 11px; }
@@ -258,7 +265,13 @@ html.sheet-full dialog {
   border-radius: 0;
   box-shadow: none;
   padding: calc(env(safe-area-inset-top, 0px) + 22px) 22px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  /* It takes the whole screen, so it has to arrive rather than appear. The
+     global reduced-motion rule collapses this to nothing on its own. */
+  animation: plan-in 280ms cubic-bezier(.32, .72, 0, 1) both;
 }
+html.sheet-full dialog::backdrop { animation: plan-scrim 280ms ease both; }
+@keyframes plan-in { from { opacity: 0; transform: translateY(22px) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes plan-scrim { from { opacity: 0; } to { opacity: 1; } }
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }

@@ -89,6 +89,28 @@ test('coverage can say what is missing and nothing about condition', () => {
     assert.match(client, /reports\/\$\{draft\.serverId\}\/coverage/);
 });
 
+test('live feedback never costs the recording it is decorating', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const live = client.slice(client.indexOf('function liveMeter('), client.indexOf('async function recordRoom'));
+
+    // The meter reads the stream already being recorded — no second microphone.
+    assert.match(live, /createMediaStreamSource\(stream\)/);
+    // Captions open their own, so on iOS they compete with the MediaRecorder.
+    // Every failure has to be silent: the note comes from the server transcript
+    // either way, and losing the audio to win a caption is a bad trade.
+    assert.match(live, /window\.SpeechRecognition\|\|window\.webkitSpeechRecognition/);
+    assert.equal((live.match(/catch\s*\{\s*return\(\)=>\{\};\s*\}/g) || []).length, 2);
+    assert.match(live, /if\(!Recognition\|\|!target\)return\(\)=>\{\};/);
+    // Safari ends the session on a pause; it has to come back by itself.
+    assert.match(live, /recognition\.onend=\(\)=>\{if\(!stopped\)/);
+
+    // Both stop with the recorder, including when the sheet is cancelled.
+    const record = client.slice(client.indexOf('async function recordRoom'), client.indexOf('function reviewVoiceNote'));
+    assert.match(record, /const stopMeter=liveMeter\(stream\),stopCaptions=liveCaptions\(\);/);
+    assert.match(record, /finally\{clearInterval\(tick\);stopMeter\(\);stopCaptions\(\);/);
+});
+
 test('the landing demo still reads when nothing is allowed to move', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

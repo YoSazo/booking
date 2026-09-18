@@ -562,6 +562,69 @@ async function save() {
   const doc=remoteDocument();
   await api(`/reports/${draft.serverId}`,{method:'PUT',body:doc});reportsCache=null;propertiesCache=null;await persist();
 }
+// Two kinds of feedback while recording, because one of them may not exist.
+//
+// The meter is driven from the stream already being recorded, so it costs no
+// second microphone and always works — it is what makes a screen recording of
+// someone talking show anything at all.
+//
+// Captions are a bonus. SpeechRecognition opens its OWN microphone rather than
+// accepting our stream, so on iOS it competes with the MediaRecorder and in a
+// WKWebView it frequently does not exist. Every failure here is silent and the
+// recording carries on: the note comes from the server transcript regardless,
+// and losing the audio to win a caption would be a bad trade.
+function liveMeter(stream){
+  const bars=$('live-bars');
+  let ctx,frame=0;
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx||!bars)return()=>{};
+    ctx=new Ctx();
+    const analyser=ctx.createAnalyser();
+    analyser.fftSize=256;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const data=new Uint8Array(analyser.frequencyBinCount);
+    const spans=[...bars.children];
+    const draw=()=>{
+      analyser.getByteFrequencyData(data);
+      const step=Math.floor(data.length/spans.length)||1;
+      spans.forEach((span,i)=>{
+        let sum=0;
+        for(let n=i*step;n<(i+1)*step;n++)sum+=data[n]||0;
+        span.style.transform=`scaleY(${Math.max(0.12,Math.min(1,(sum/step)/120))})`;
+      });
+      frame=requestAnimationFrame(draw);
+    };
+    draw();
+  }catch{return()=>{};}
+  return()=>{if(frame)cancelAnimationFrame(frame);ctx?.close?.().catch(()=>{});};
+}
+function liveCaptions(){
+  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const target=$('live-caption');
+  if(!Recognition||!target)return()=>{};
+  let recognition,stopped=false,settled='';
+  try{
+    recognition=new Recognition();
+    recognition.continuous=true;
+    recognition.interimResults=true;
+    recognition.lang=navigator.language||'en-US';
+    recognition.onresult=event=>{
+      let interim='';
+      for(let i=event.resultIndex;i<event.results.length;i++){
+        const text=event.results[i][0]?.transcript||'';
+        if(event.results[i].isFinal)settled=`${settled} ${text}`.trim();else interim+=text;
+      }
+      target.textContent=`${settled} ${interim}`.trim();
+      target.scrollTop=target.scrollHeight;
+    };
+    // Safari ends the session on a pause; keep it alive until we say otherwise.
+    recognition.onend=()=>{if(!stopped){try{recognition.start();}catch{}}};
+    recognition.onerror=()=>{};
+    recognition.start();
+  }catch{return()=>{};}
+  return()=>{stopped=true;try{recognition.stop();}catch{}};
+}
 async function recordRoom(index){
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Voice notes are not supported on this device. You can type the observation instead.');
   let stream;
@@ -574,14 +637,15 @@ async function recordRoom(index){
     recorder.onerror=()=>reject(new Error('Recording failed. Please retry.'));
     recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||supported||'audio/mp4'}));
   });
-  modal(`<h2>Talk through ${esc(draft.document.rooms[index].name)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`);
+  modal(`<h2>Talk through ${esc(draft.document.rooms[index].name)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p><div class="live-bars" id="live-bars" aria-hidden="true">${'<span></span>'.repeat(13)}</div><p class="live-caption" id="live-caption" aria-live="polite">Listening…</p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`);
+  const stopMeter=liveMeter(stream),stopCaptions=liveCaptions();
   const tick=setInterval(()=>{seconds+=1;const label=$('recording-time');if(label)label.textContent=`0:${String(seconds).padStart(2,'0')}`;if(seconds>=60&&recorder.state==='recording')recorder.stop();},1000);
   const started=Date.now();
   $('stop-recording').onclick=()=>{if(recorder.state==='recording')recorder.stop();};
   $('dialog').addEventListener('close',()=>{if(recorder.state==='recording'){cancelled=true;recorder.stop();}},{once:true});
   recorder.start(250);
   let blob;
-  try{blob=await recording;}catch(error){if($('dialog').open)$('dialog').close();throw error;}finally{clearInterval(tick);stream.getTracks().forEach(track=>track.stop());finished=true;}
+  try{blob=await recording;}catch(error){if($('dialog').open)$('dialog').close();throw error;}finally{clearInterval(tick);stopMeter();stopCaptions();stream.getTracks().forEach(track=>track.stop());finished=true;}
   if(cancelled||!finished||!blob.size)return;
   const durationMs=Math.min(60000,Math.max(250,Date.now()-started));
   $('dialog').close();
