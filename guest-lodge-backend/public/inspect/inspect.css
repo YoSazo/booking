@@ -115,6 +115,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 .photo-menu button { text-align: left; white-space: nowrap; min-height: 36px; padding: 8px 10px; }
 .drag-hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
 .room-footer { margin: 20px -4px -8px; padding-top: 14px; border-top: 1px solid var(--border); text-align: right; }
+/* Voice leads the room card; typing is the escape hatch behind a disclosure.
+   The disclosure renders open whenever the room already has an observation, so
+   an accepted note is never hidden behind a collapsed summary. */
+.note-lead { margin: 14px 0 10px; display: grid; gap: 7px; }
+.note-lead p { margin: 0; font-size: 13px; text-align: center; }
+.write-own { margin: 0 0 4px; }
+.write-own summary { cursor: pointer; padding: 8px 2px; min-height: 40px; display: flex; align-items: center; color: var(--green); font-weight: 650; font-size: 14px; }
+.write-own label { display: block; margin-top: 6px; }
 .capture-actions, .note-tools { margin-top: 8px; }
 .date-field { min-width: 0; overflow: hidden; }
 .issue { display: flex; align-items: center; gap: 9px; }

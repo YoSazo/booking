@@ -566,6 +566,20 @@ function registerInspect(app, {
     return pdf(await shared(req.params.token), res);
   }));
 
+  // Above the auth boundary on purpose. The signal worth having here is the
+  // owner who records a note and then refuses to hand over an email — they have
+  // no session by definition, so an authenticated route could never see them.
+  // accountId is nullable, so the row is valid unattributed. Name only: no
+  // transcript, audio, room or property detail reaches this, and it must stay
+  // that way — the voice route promises the recording never leaves memory.
+  const ANON_EVENTS = new Set(['VoiceNoteRecorded']);
+  router.post('/events/anon', guarded(async (req, res) => {
+    if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown Inspect event.');
+    rate(`inspect-anon-events:${req.ip}`, 40, 3600000);
+    await record(null, req.body.name);
+    res.json({ success: true });
+  }));
+
   router.use((req, res, next) => {
     const raw = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization || '')?.[1];
     if (!raw) return next(fail(401, 'Please sign in to Inspect.'));
@@ -587,6 +601,9 @@ function registerInspect(app, {
     ['AdditionalReportOfferViewed', accountId => `inspect-offer:${accountId}`],
     ['VoiceNoteKept', null],
     ['VoiceNoteDiscarded', null],
+    // Also accepted here so a signed-in owner's recording is attributed rather
+    // than landing in the anonymous bucket.
+    ['VoiceNoteRecorded', null],
   ]);
   router.post('/events', guarded(async (req, res) => {
     if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown Inspect event.');

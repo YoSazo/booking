@@ -52,6 +52,41 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(client, /Start move-out comparison/);
 });
 
+test('the AI is the path, and the note is never hidden once written', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    // Voice leads; typing is the escape hatch. If the disclosure ever renders
+    // closed over an existing observation the owner's note looks deleted.
+    assert.match(client, /class="wide" data-voice/);
+    assert.match(client, /r\.observation\.trim\(\) \? 'open' : ''/);
+    assert.match(client, /<summary>Write it myself<\/summary>/);
+
+    // The recording event has to clear the auth boundary, because the owners it
+    // exists to count are exactly the ones who have not signed in yet.
+    const anon = server.slice(server.indexOf('const ANON_EVENTS'), server.indexOf('router.use((req, res, next) => {\n    const raw'));
+    assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded'\]\)/);
+    assert.match(anon, /record\(null, req\.body\.name\)/);
+    assert.match(anon, /rate\(`inspect-anon-events:/);
+    assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in to Inspect.'),
+        'the anonymous event route is below the auth boundary and can never fire');
+
+    // It is sent once a usable recording exists and before the email wall.
+    const record = client.slice(client.indexOf('async function recordRoom'), client.indexOf('function reviewVoiceNote'));
+    assert.ok(record.indexOf("logInspect('VoiceNoteRecorded',true)") < record.indexOf('ensureAuth(process)'),
+        'the recording event fires after the auth wall, so a bail there stays invisible');
+
+    // Name only. The voice route promises the recording never leaves memory.
+    assert.match(client, /const logInspect=\(name,anonymous=false\)=>/);
+    assert.match(client, /body:\{name\}/);
+
+    // The promise must not overclaim on a document used in disputes.
+    assert.doesNotMatch(client, /report writes itself/i);
+    assert.match(client, /Inspect writes the notes/);
+});
+
 test('the AI path is observable, and cannot be advertised while it is off', () => {
     const fs = require('node:fs');
     const path = require('node:path');
