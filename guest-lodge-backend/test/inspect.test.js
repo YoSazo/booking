@@ -178,6 +178,22 @@ test('the required email flow never enters the iOS fixed-dialog keyboard trap', 
     assert.match(css, /\.auth-screen \.flow-frame\s*\{[^}]*place-items:\s*start center/);
 });
 
+test('the landing defers pricing by one transparent tap without opening checkout', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const landing = client.slice(client.indexOf('function landing()'), client.indexOf('async function start('));
+    const preview = landing.slice(landing.indexOf('function previewPlans()'));
+
+    assert.match(landing, /One complete report free\. No card\./);
+    assert.match(landing, /id="see-plans"/);
+    assert.doesNotMatch(landing.slice(0,landing.indexOf('function previewPlans()')), /\$199|\$29\/month/);
+    assert.match(preview, /Plans after your free report/);
+    assert.match(preview, /PLANS\[planInterval\]/);
+    assert.match(preview, /Create my first report free/);
+    assert.doesNotMatch(preview, /logInspect\(/);
+    assert.doesNotMatch(preview, /\/checkout/);
+});
+
 test('Inspect destructive choices use product UI instead of browser alerts', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

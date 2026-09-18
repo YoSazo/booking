@@ -285,12 +285,28 @@ function landing() {
   enterScreen('landing');
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
   playDemo();
   $('start').onclick = () => start();
+  $('see-plans').onclick=previewPlans;
   // The native shell hides the web header, so without this there was no way back
   // in after signing out short of the overflow menu.
   if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
+}
+// Pricing stays one tap away without turning a no-card free report into a
+// purchase decision. This is informational: it neither fires the post-report
+// offer event nor opens checkout.
+function previewPlans(){
+  let flow=null;
+  const paint=()=>{
+    const plan=PLANS[planInterval],each=plan.price/plan.reports;
+    const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
+    const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually · ${plan.save}`:'Cancel renewal anytime.';
+    flow.paint(`<h2>Plans after your free report</h2><p class="muted">Finish and export your first complete report before choosing anything.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} reports — about ${unit} each</li><li>AI-written room notes from your walkthrough</li><li>PDF export and a private share link</li></ul><button type="button" id="plan-start" class="wide">Create my first report free</button><p><small>No card for your first complete report. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`);
+    document.querySelectorAll('[data-preview-plan]').forEach(button=>button.onclick=()=>{planInterval=button.dataset.previewPlan==='month'?'month':'year';paint();});
+    $('plan-start').onclick=()=>{flow.restore();start();};
+  };
+  flow=flowScreen('','plans-screen');paint();
 }
 async function start(propertyName = '') {
   if (draftUnsaved() && !await confirmAction({title:'Start a new report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start new report',danger:true})) return;
