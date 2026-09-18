@@ -231,6 +231,22 @@ blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 
 .native-inspect-shell.inspect-authenticated { --shell-top: 82px; --shell-bottom: 98px; }
 /* A sheet tall enough to need the whole screen takes the shell with it. */
 html.sheet-full { --shell-top: 0px; --shell-bottom: 0px; }
+/* The plan sheet already hides the native header and tab bar. Give it the room
+   that freed: a centred card still capped itself well below the screen, so the
+   offer scrolled inside a mostly empty viewport. */
+html.sheet-full dialog {
+  left: 0; top: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  height: calc(100dvh - var(--kb, 0px));
+  max-height: calc(100dvh - var(--kb, 0px));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: calc(env(safe-area-inset-top, 0px) + 22px) 22px calc(env(safe-area-inset-bottom, 0px) + 20px);
+}
+html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell .actions { bottom: calc(78px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(var(--actions-h, 0px) + 22px + env(safe-area-inset-bottom)); }

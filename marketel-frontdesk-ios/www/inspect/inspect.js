@@ -173,6 +173,9 @@ function modal(content, { fullscreen = false } = {}) {
 function settleSheet(){
   const dialog=$('dialog');
   if(!dialog?.open)return;
+  // A full-screen sheet is already exactly where it belongs; shifting it would
+  // only push it off one edge or the other.
+  if(document.documentElement.classList.contains('sheet-full')){dialog.style.setProperty('--sheet-shift','0px');return;}
   const style=getComputedStyle(document.documentElement);
   const number=name=>parseFloat(style.getPropertyValue(name))||0;
   const keyboard=number('--kb');
