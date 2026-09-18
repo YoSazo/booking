@@ -54,6 +54,49 @@ test('every reveal event the client fires is accepted by the server', () => {
     assert.deepEqual(rejected, [], `reveal events rejected at ingest: ${rejected.join(', ')}`);
 });
 
+test('a refusal is recorded, and does not pretend to be reveal depth', () => {
+    // Ten of fourteen owners left without pressing the activation button, and a
+    // non-tap is unanalysable. The ask exists to turn that silence into a reason.
+    assert.ok(allowlist('const MARKETEL_VALUE_REVEAL_EVENTS = new Set([').has('ActivationDeclined'));
+
+    // revealProgressStep drives the emailed resume links. A decline is not
+    // progress, and adding it to this map would rewrite where someone resumes.
+    const stepMap = server.slice(
+        server.indexOf('const revealStepByEvent = {'),
+        server.indexOf('};', server.indexOf('const revealStepByEvent = {'))
+    );
+    assert.doesNotMatch(stepMap, /ActivationDeclined/);
+
+    // Every exit from the ask writes something: a reason, or 'dismissed'.
+    for (const reason of ['price', 'bookings', 'timing', 'other']) {
+        assert.match(reveal, new RegExp(`id: '${reason}'`), `${reason} is no longer offered`);
+    }
+    assert.match(reveal, /closeAsk\('dismissed'\)/);
+    assert.match(reveal, /trackReveal\('ActivationDeclined', reason\)/);
+
+    // It is asked after a proof card closes, not after the offer sheet, and
+    // never to someone who has already paid.
+    assert.match(reveal, /maybeAskAfterProof\(closed\)/);
+    const gate = reveal.slice(
+        reveal.indexOf('function maybeAskAfterProof('),
+        reveal.indexOf('function presentSheet(')
+    );
+    assert.match(gate, /crm\.hotelSubscribed \|\| activationPreviewMode/);
+    assert.match(gate, /askAlreadyShown\(\)/);
+    // Gated on ASK_PROMPTS, which covers only proof cards — asking again right
+    // after they closed the offer sheet would be nagging, not measuring.
+    const prompts = reveal.slice(
+        reveal.indexOf('const ASK_PROMPTS = {'),
+        reveal.indexOf('};', reveal.indexOf('const ASK_PROMPTS = {'))
+    );
+    for (const card of ['booking', 'frontdesk', 'guestel']) assert.match(prompts, new RegExp(`${card}:`));
+    assert.doesNotMatch(prompts, /activation:/);
+
+    // And the answer has to be visible where it is read.
+    assert.match(dashboard, /ActivationDeclined: 'Said Not Yet'/);
+    assert.match(dashboard, /allCounts\.ActivationDeclined/);
+});
+
 test('interaction telemetry is blocked before it can write to Neon', () => {
     const journeyEvents = allowlist('const MARKETEL_JOURNEY_EVENT_NAMES');
     assert.deepEqual([...journeyEvents].sort(), ['JourneyCheckoutFailed', 'JourneyClientError']);

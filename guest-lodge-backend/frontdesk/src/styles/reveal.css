@@ -2962,6 +2962,16 @@
 }
 .mvr-sheet-lede p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--mvr-muted); }
 
+/* The ask: a short sheet, no grabber and no footer. Its two buttons are the
+   whole point, so they sit in the body rather than below a scroll. */
+.mvr-sheet.is-ask .mvr-sheet-body {
+  display: grid;
+  gap: 10px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+}
+.mvr-sheet.is-ask .mvr-sheet-lede { margin: 0; }
+.mvr-ask-price { margin: 0; font-size: 14px; line-height: 1.5; color: var(--mvr-text); }
+
 .mvr-sheet-shot { margin: 0; display: flex; justify-content: center; }
 .mvr-sheet-shot img {
   width: min(280px, 78%);

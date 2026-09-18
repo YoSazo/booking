@@ -7363,6 +7363,10 @@ const MARKETEL_VALUE_REVEAL_EVENTS = new Set([
     'AssistantRevealViewed',
     'ActivationOfferViewed',
     'BookingPreviewCheckoutReached',
+    // Why an owner said no, carried in contentName. Deliberately absent from
+    // revealStepByEvent below: a decline is not reveal depth, and adding it
+    // there would rewrite revealProgressStep and the resume links keyed to it.
+    'ActivationDeclined',
 ]);
 app.post('/api/crm/value-reveal-event', crmAuth, async (req, res) => {
     if (!funnelTrackingEnabled) return res.json({ success: true, local: true });

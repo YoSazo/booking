@@ -52,6 +52,7 @@ const PENDING_KEY = 'marketelValueRevealPendingV1';
 const STEP_KEY = 'marketelValueRevealStepV1';
 const BILLING_KEY = 'marketelBillingIntervalV1';
 const VISITED_KEY = 'marketelValueRevealVisitedV1';
+const ASK_KEY = 'marketelActivationAskShownV1';
 
 // `currentStep` is no longer a screen index — the reveal is a hub, not a tour.
 // It survives only as "furthest depth reached", because the server's
@@ -924,6 +925,7 @@ function closeSheet(reason = 'closed') {
   document.getElementById('mvrSheet')?.remove();
   document.getElementById('mvrLivePreview')?.remove();
   refreshHubState();
+  maybeAskAfterProof(closed);
 }
 
 function frontdeskSheetBodyHtml() {
@@ -1038,9 +1040,140 @@ function bindSheetDragToDismiss(card, handle) {
 
 function onRevealKeydown(event) {
   if (event.key !== 'Escape' && event.key !== 'Esc') return;
+  if (document.getElementById('mvrAsk')) {
+    event.preventDefault();
+    closeAsk('dismissed');
+    return;
+  }
   if (!openSheetId) return;
   event.preventDefault();
   closeSheet('escape-key');
+}
+
+// ---------------------------------------------------------------- the ask
+//
+// The hub waits to be chosen, and ten of fourteen owners never chose it: they
+// opened a proof card, left the one that asks for money unopened, and went. A
+// non-tap says nothing — it could be price, trust, timing or disbelief, and no
+// amount of traffic separates those. So the offer moves to the moment attention
+// is already proven, and every outcome gets written down, refusals included. A
+// recorded "no, because…" is worth more than silence.
+const ASK_PROMPTS = {
+  booking: 'Like your new booking page?',
+  frontdesk: 'Want Front Desk on your phone?',
+  guestel: 'Want guests coming back direct?',
+};
+
+const ASK_REASONS = [
+  { id: 'price', label: 'I need to think about the price' },
+  { id: 'bookings', label: 'Not sure it’ll bring me bookings' },
+  { id: 'timing', label: 'I’m not ready yet' },
+  { id: 'other', label: 'Something else' },
+];
+
+function askStorageKey() {
+  return `${ASK_KEY}.${crm.activeHotelId || 'property'}`;
+}
+
+function askAlreadyShown() {
+  try {
+    return localStorage.getItem(askStorageKey()) === '1';
+  } catch (_) {
+    return false;
+  }
+}
+
+function markAskShown() {
+  try {
+    localStorage.setItem(askStorageKey(), '1');
+  } catch (_) {}
+}
+
+function askPriceLineHtml() {
+  const price = billingInterval === 'year' ? '$1,490/year' : '$149/month';
+  return trialOfferAvailable()
+    ? `<strong>Start free for ${trialDays()} days</strong> — $0 today, then ${price}.`
+    : `<strong>${price}</strong> · Cancel anytime.`;
+}
+
+function askOfferHtml(cardId) {
+  return `<div class="mvr-sheet-lede">
+      <h2>${esc(ASK_PROMPTS[cardId] || ASK_PROMPTS.booking)}</h2>
+      <p>Keep it live, and unlock Front Desk + Guestel.</p>
+    </div>
+    <p class="mvr-ask-price">${askPriceLineHtml()}</p>
+    <button type="button" class="mvr-primary mvr-final-cta" id="mvrAskYes">${
+      trialOfferAvailable() ? 'Start my free trial' : 'Activate Marketel'
+    }</button>
+    <button type="button" class="mvr-sheet-close" id="mvrAskNo">Not yet</button>`;
+}
+
+function askReasonHtml() {
+  return `<div class="mvr-sheet-lede">
+      <h2>Why not yet?</h2>
+      <p>One tap. It only changes what gets built next.</p>
+    </div>
+    ${ASK_REASONS.map((reason) => `<button type="button" class="mvr-row" data-ask-reason="${esc(reason.id)}">
+      <span class="mvr-row-text"><strong>${esc(reason.label)}</strong></span>
+      <span class="mvr-row-chevron" aria-hidden="true">›</span>
+    </button>`).join('')}`;
+}
+
+// Idempotent. The scrim and the ✕ stay bound across both screens, so a double
+// tap must not write a second row — and the server keeps only the first anyway.
+function closeAsk(reason) {
+  const ask = document.getElementById('mvrAsk');
+  if (!ask) return;
+  ask.remove();
+  trackReveal('ActivationDeclined', reason);
+}
+
+function bindAskBody() {
+  document.getElementById('mvrAskYes')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
+  document.getElementById('mvrAskNo')?.addEventListener('click', () => {
+    const body = document.getElementById('mvrAskBody');
+    if (!body) return;
+    body.innerHTML = askReasonHtml();
+    bindAskBody();
+  });
+  document.querySelectorAll('#mvrAsk [data-ask-reason]').forEach((control) => {
+    control.addEventListener('click', () => closeAsk(control.dataset.askReason));
+  });
+}
+
+function presentActivationAsk(cardId) {
+  const root = document.getElementById('marketelValueReveal');
+  if (!root || document.getElementById('mvrAsk')) return;
+  const ask = document.createElement('div');
+  ask.id = 'mvrAsk';
+  ask.className = 'mvr-sheet is-ask';
+  ask.setAttribute('role', 'dialog');
+  ask.setAttribute('aria-modal', 'true');
+  ask.innerHTML = `<div class="mvr-sheet-scrim" data-ask-dismiss></div>
+    <div class="mvr-sheet-card">
+      <button type="button" class="mvr-sheet-x" data-ask-dismiss aria-label="Close">&times;</button>
+      <div class="mvr-sheet-body" id="mvrAskBody">${askOfferHtml(cardId)}</div>
+    </div>`;
+  root.appendChild(ask);
+  markAskShown();
+  ask.querySelectorAll('[data-ask-dismiss]').forEach((control) => {
+    control.addEventListener('click', () => closeAsk('dismissed'));
+  });
+  bindAskBody();
+  // The price is on screen, which is all "offer viewed" has ever meant. This is
+  // what moves that metric's denominator from "opened the money card" to
+  // "looked at any proof at all".
+  if (!activationOfferTracked) {
+    activationOfferTracked = true;
+    trackReveal('ActivationOfferViewed');
+  }
+}
+
+function maybeAskAfterProof(cardId) {
+  if (!ASK_PROMPTS[cardId]) return;
+  if (crm.hotelSubscribed || activationPreviewMode) return;
+  if (askAlreadyShown()) return;
+  presentActivationAsk(cardId);
 }
 
 function presentSheet(id) {
@@ -1100,6 +1233,7 @@ function finishReveal() {
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(STEP_KEY);
     localStorage.removeItem(visitedStorageKey());
+    localStorage.removeItem(askStorageKey());
     localStorage.setItem('settingsTourDone', '1');
     localStorage.setItem('onboardingDone', '1');
   } catch (_) {}
@@ -1440,6 +1574,7 @@ export function clearPendingMarketelValueReveal() {
     localStorage.removeItem(PENDING_KEY);
     localStorage.removeItem(STEP_KEY);
     localStorage.removeItem(visitedStorageKey());
+    localStorage.removeItem(askStorageKey());
   } catch (_) {}
 }
 
