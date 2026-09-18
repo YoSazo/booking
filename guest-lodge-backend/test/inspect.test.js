@@ -52,6 +52,56 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(client, /Start move-out comparison/);
 });
 
+test('coverage can say what is missing and nothing about condition', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const route = server.slice(server.indexOf('const COVERAGE_SURFACES'), server.indexOf("router.post('/reports/:id/pdf'"));
+
+    // Structured Outputs guarantees shape, never facts — so the shape carries
+    // the guarantee. There must be no free-text field the model could put a
+    // claim about the property into: rooms come back as integers, surfaces
+    // from a closed enum, and the name is re-emitted from our own document.
+    assert.match(route, /room: \{ type: 'integer' \}/);
+    assert.match(route, /enum: COVERAGE_SURFACES/);
+    assert.doesNotMatch(route.slice(route.indexOf('json_schema'), route.indexOf('const parsed')), /type: 'string' \}(?!,\s*enum)/);
+    assert.match(route, /name: byIndex\.get\(row\.room\)/);
+    assert.match(route, /COVERAGE_SURFACES\.includes\(surface\)/);
+
+    // It is not a note suggestion, so it must not spend the owner's ten.
+    assert.doesNotMatch(route, /claimAiUse|releaseAiUse/);
+    assert.match(route, /rate\(`coverage:\$\{req\.inspect\.id\}`/);
+
+    // Advisory: every failure path returns an empty result, never an error.
+    assert.match(route, /if \(!env\.OPENAI_API_KEY\) return res\.json\(\{ rooms: \[\] \}\)/);
+    assert.match(route, /catch \(error\) \{[\s\S]*?res\.json\(\{ rooms: \[\] \}\)/);
+
+    // One call, a bounded payload, and not the 1600px rendition the PDF uses.
+    assert.equal((route.match(/responses\.create/g) || []).length, 1);
+    assert.match(route, /COVERAGE_PER_ROOM = 4/);
+    assert.match(route, /COVERAGE_TOTAL = 24/);
+    assert.match(route, /\.resize\(\{ width: 512, height: 512/);
+
+    // The client asks for it; it never runs itself, because the check needs the
+    // photos uploaded and a surprise upload on reaching preview is worse.
+    assert.match(client, /id="coverage-run"/);
+    assert.match(client, /reports\/\$\{draft\.serverId\}\/coverage/);
+});
+
+test('the landing demo still reads when nothing is allowed to move', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const demo = client.slice(client.indexOf('function playDemo()'), client.indexOf('function landing()'));
+
+    // inspect.css only collapses CSS animations; a JS typing loop runs straight
+    // through that, so reduced motion has to be asked about here.
+    assert.match(demo, /prefers-reduced-motion: reduce/);
+    assert.match(demo, /said\.textContent=DEMO_SAID;demo\.classList\.add\('is-in'\);return;/);
+    // And the loop must stop when the screen is replaced under it.
+    assert.match(demo, /document\.body\.contains\(said\)/);
+});
+
 test('the AI is the path, and the note is never hidden once written', () => {
     const fs = require('node:fs');
     const path = require('node:path');

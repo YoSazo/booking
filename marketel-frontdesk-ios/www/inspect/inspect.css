@@ -43,9 +43,21 @@ small, .muted { color: var(--muted); line-height: 1.5; }
 .hero h1 { font-size: clamp(42px, 7vw, 58px); letter-spacing: -2.2px; }
 .eyebrow { text-transform: uppercase; letter-spacing: 2px; font-size: 11px; font-weight: 750; }
 .card { background: #ffffffeb; border: 1px solid #ffffff; border-radius: 20px; padding: 22px; margin: 16px 0; box-shadow: 0 2px 6px #2e7d5b0f, 0 12px 30px #2e7d5b12; }
-.example { max-width: 530px; margin: 35px auto; text-align: left; transform: rotate(-1deg); }
-.example-head { border-bottom: 1px solid #dce5dd; padding-bottom: 14px; }
-.example-photo { background: linear-gradient(130deg, #dfe7dc, #bbcdbb); height: 90px; border-radius: 12px; display: grid; place-items: center; color: #506653; margin: 18px 0; }
+.demo { max-width: 530px; margin: 35px auto; text-align: left; }
+.demo .eyebrow { color: var(--muted); }
+.demo-step { margin: 14px 0 0; }
+.demo-label { display: block; font-size: 11px; font-weight: 750; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.demo blockquote { margin: 6px 0 0; min-height: 76px; font-size: 15px; line-height: 1.5; }
+/* The caret only belongs to the half that is still being spoken. */
+.demo blockquote::after { content: ''; display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--green); animation: demo-caret 1s step-end infinite; }
+@keyframes demo-caret { 50% { opacity: 0; } }
+.demo-arrow { margin: 12px 0 0; text-align: center; font-size: 19px; color: #9fb4a5; opacity: 0; transition: opacity .3s ease; }
+#demo-result { margin-top: 6px; opacity: 0; transform: translateY(6px); transition: opacity .35s ease, transform .35s ease; }
+.demo-note { margin: 6px 0 0; font-size: 15px; line-height: 1.5; }
+.demo-badge { display: inline-block; margin-top: 9px; padding: 4px 10px; border-radius: 999px; background: #e7efe9; color: var(--green-dark, #1f5c41); font-size: 12px; font-weight: 700; font-style: normal; }
+.demo.is-in blockquote::after { opacity: 0; animation: none; }
+.demo.is-in .demo-arrow { opacity: 1; }
+.demo.is-in #demo-result { opacity: 1; transform: none; }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .spread { justify-content: space-between; }
 .stack { display: grid; gap: 16px; }
@@ -123,6 +135,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 .write-own { margin: 0 0 4px; }
 .write-own summary { cursor: pointer; padding: 8px 2px; min-height: 40px; display: flex; align-items: center; color: var(--green); font-weight: 650; font-size: 14px; }
 .write-own label { display: block; margin-top: 6px; }
+.coverage-list { margin: 12px 0 10px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; }
 .capture-actions, .note-tools { margin-top: 8px; }
 .date-field { min-width: 0; overflow: hidden; }
 .issue { display: flex; align-items: center; gap: 9px; }

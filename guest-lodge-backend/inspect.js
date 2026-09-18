@@ -867,6 +867,90 @@ function registerInspect(app, {
       throw fail(503, 'Wording assistance failed. Your original note is unchanged.');
     }
   }));
+  // What is pictured, never what condition it is in. The response carries no
+  // free text at all: rooms come back as indices into the document the server
+  // already holds, and surfaces come from a closed enum. Structured Outputs
+  // only ever guarantees shape — so the shape is made to carry the guarantee.
+  // There is nowhere in this schema to put "water damage on the ceiling".
+  const COVERAGE_SURFACES = ['floor', 'ceiling', 'walls', 'windows', 'door', 'fixtures', 'appliances'];
+  const COVERAGE_PER_ROOM = 4;
+  const COVERAGE_TOTAL = 24;
+  router.post('/reports/:id/coverage', guarded(async (req, res) => {
+    // Advisory throughout: every failure returns an empty result, never an
+    // error, because nothing here may stand between an owner and finalizing.
+    if (!env.OPENAI_API_KEY) return res.json({ rooms: [] });
+    rate(`coverage:${req.inspect.id}`, 10, 3600000);
+    const report = await owned(prisma, req.inspect.id, req.params.id);
+    const attachments = new Map(report.attachments.map(a => [a.id, a]));
+    const picked = [];
+    let total = 0;
+    (report.document.rooms || []).forEach((room, index) => {
+      if (total >= COVERAGE_TOTAL) return;
+      const ids = (room.photos || []).filter(id => attachments.has(id))
+        .slice(0, Math.min(COVERAGE_PER_ROOM, COVERAGE_TOTAL - total));
+      if (!ids.length) return;
+      total += ids.length;
+      picked.push({ index, name: room.name, ids });
+    });
+    if (!picked.length) return res.json({ rooms: [] });
+    try {
+      // The stored rendition is 1600px because a PDF needs that. Deciding
+      // whether a floor is in shot does not, and the difference is most of the
+      // cost of this call.
+      const content = [];
+      for (const room of picked) {
+        content.push({ type: 'input_text', text: `Room ${room.index}: ${room.name}` });
+        for (const id of room.ids) {
+          const small = await sharp(await object(attachments.get(id).objectKey))
+            .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 60 })
+            .toBuffer();
+          content.push({ type: 'input_image', detail: 'low', image_url: `data:image/jpeg;base64,${small.toString('base64')}` });
+        }
+      }
+      const OpenAI = require('openai');
+      const ai = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: 30000, maxRetries: 0 });
+      const result = await ai.responses.create({
+        model: env.INSPECT_AI_MODEL || env.OPENAI_ASSISTANT_MODEL || 'gpt-5.6-luna',
+        store: false,
+        reasoning: { effort: 'low' },
+        safety_identifier: hash(`inspect:${req.inspect.id}`),
+        max_output_tokens: 700,
+        instructions: 'You check photo coverage for a property condition report. For each room, report only which of the listed surfaces are not visible in any of that room\'s photos. Judge visibility alone. Never comment on condition, damage, cleanliness, wear, cause, fault or repair, and never describe what you see. Return the required JSON only.',
+        input: [{ role: 'user', content }],
+        text: { format: { type: 'json_schema', name: 'inspect_coverage', strict: true, schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { rooms: { type: 'array', items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              room: { type: 'integer' },
+              missing: { type: 'array', items: { type: 'string', enum: COVERAGE_SURFACES } },
+            },
+            required: ['room', 'missing'],
+          } } },
+          required: ['rooms'],
+        } } },
+      });
+      const parsed = JSON.parse(result.output_text || '{}');
+      const byIndex = new Map(picked.map(room => [room.index, room.name]));
+      // Names are re-emitted from the server's own document, never echoed back
+      // from the model, so the only thing it can influence is the surface list.
+      const rooms = (Array.isArray(parsed.rooms) ? parsed.rooms : [])
+        .filter(row => byIndex.has(row.room) && Array.isArray(row.missing) && row.missing.length)
+        .map(row => ({
+          name: byIndex.get(row.room),
+          missing: [...new Set(row.missing.filter(surface => COVERAGE_SURFACES.includes(surface)))].slice(0, COVERAGE_SURFACES.length),
+        }))
+        .filter(row => row.missing.length)
+        .slice(0, 30);
+      res.json({ rooms });
+    } catch (error) {
+      console.error('Inspect coverage check failed:', error.name);
+      res.json({ rooms: [] });
+    }
+  }));
   router.post('/reports/:id/finalize', guarded(async (req, res) => {
     const result = await prisma.$transaction(async tx => {
       const a = await lockAccount(tx, req.inspect.id);

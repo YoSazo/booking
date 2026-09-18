@@ -233,11 +233,41 @@ function photoURL(id) {
   const url = URL.createObjectURL(file.blob); urls.set(id, url); return url;
 }
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
+// The hero promises a transformation, so the proof beneath it has to show one
+// rather than the finished artifact. Canned, not a recording: it must be
+// legible on first paint and still read correctly when frozen.
+const DEMO_SAID = 'Living room, small scuff on the wall beside the doorway, nothing else, everything looks fine.';
+let demoTimer = 0;
+function playDemo(){
+  const demo=$('demo'),said=$('demo-said');
+  if(!demo||!said)return;
+  clearTimeout(demoTimer);
+  // inspect.css only collapses CSS animation and transition durations under
+  // reduced motion; a JS typing loop runs straight through that, so ask here.
+  if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
+    said.textContent=DEMO_SAID;demo.classList.add('is-in');return;
+  }
+  const cycle=()=>{
+    // The landing screen can be replaced mid-loop; stop rather than resurrect it.
+    if(!document.body.contains(said))return;
+    said.textContent='';demo.classList.remove('is-in');
+    let at=0;
+    const type=()=>{
+      if(!document.body.contains(said))return;
+      said.textContent=DEMO_SAID.slice(0,++at);
+      if(at<DEMO_SAID.length){demoTimer=setTimeout(type,32);return;}
+      demoTimer=setTimeout(()=>{demo.classList.add('is-in');demoTimer=setTimeout(cycle,4600);},420);
+    };
+    type();
+  };
+  cycle();
+}
 function landing() {
   enterScreen('landing');
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card example"><div class="example-head"><small>SAMPLE REPORT · NOT A REAL INSPECTION</small><h2>Oak Street · Unit 2</h2><span class="status">Routine condition report</span></div><div class="example-photo">Your room photos, together</div><strong>Living room · Issue noted</strong><p>Small scuff on the wall beside the doorway. No other observations recorded.</p><small>Photos + your observations → PDF and private sharing link</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  playDemo();
   $('start').onclick = () => start();
   // The native shell hides the web header, so without this there was no way back
   // in after signing out short of the overflow menu.
@@ -581,6 +611,15 @@ function signaturePreview(signature){
 function reportRoom(r,label=''){
   return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
 }
+const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
+// A reminder, never a requirement — the finalize button is untouched either way.
+function renderCoverage(rooms){
+  const card=$('coverage-card');
+  if(!card)return;
+  card.innerHTML=`<div><h2>Photo coverage</h2></div>${rooms.length
+    ? `<ul class="coverage-list">${rooms.map(room=>`<li><strong>${esc(room.name)}</strong> — no photo of the ${esc(surfaceList(room.missing))}</li>`).join('')}</ul><p class="muted">Add what is missing, or finalize as it is.</p>`
+    : '<p class="muted">Every room shows the usual surfaces. Nothing obvious is missing.</p>'}`;
+}
 function reportPreview(){
   enterScreen('preview');
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
@@ -588,8 +627,13 @@ function reportPreview(){
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
   $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button></div><div class="next-actions"><button type="button" id="another-report" class="secondary">+ New report</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All reports</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this report with you.</h2><p class="muted">We will email one secure link that signs you in and opens this report in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
-    : `<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
+    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
+  if($('coverage-run'))$('coverage-run').onclick=event=>{
+    const button=event.currentTarget;
+    haptic();
+    ensureAuth(()=>run(async()=>{await save();const result=await api(`/reports/${draft.serverId}/coverage`,{method:'POST'});renderCoverage(result.rooms||[]);},button));
+  };
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
     await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
