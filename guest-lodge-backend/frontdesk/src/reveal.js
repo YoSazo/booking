@@ -1092,14 +1092,19 @@ function markAskShown() {
 function askPriceLineHtml() {
   const price = billingInterval === 'year' ? '$1,490/year' : '$149/month';
   return trialOfferAvailable()
-    ? `<strong>Start free for ${trialDays()} days</strong> — $0 today, then ${price}.`
+    ? `<strong>Start free for ${trialDays()} days</strong> — $0 today. First charge ${firstTrialBillingDate()}: ${price}. <a href="/terms" target="_blank" rel="noopener">Trial terms</a>`
     : `<strong>${price}</strong> · Cancel anytime.`;
 }
 
 function askOfferHtml(cardId) {
+  const isYearly = billingInterval === 'year';
   return `<div class="mvr-sheet-lede">
       <h2>${esc(ASK_PROMPTS[cardId] || ASK_PROMPTS.booking)}</h2>
       <p>Keep it live, and unlock Front Desk + Guestel.</p>
+    </div>
+    <div class="mvr-billing-toggle mvr-ask-billing" role="radiogroup" aria-label="Billing frequency">
+      <button type="button" role="radio" aria-checked="${!isYearly}" class="${!isYearly ? 'is-active' : ''}" data-mvr-ask-billing="month">Monthly</button>
+      <button type="button" role="radio" aria-checked="${isYearly}" class="${isYearly ? 'is-active' : ''}" data-mvr-ask-billing="year">Yearly <span>Save $298</span></button>
     </div>
     <p class="mvr-ask-price">${askPriceLineHtml()}</p>
     <button type="button" class="mvr-primary mvr-final-cta" id="mvrAskYes">${
@@ -1131,6 +1136,16 @@ function closeAsk(reason) {
 
 function bindAskBody() {
   document.getElementById('mvrAskYes')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
+  document.querySelectorAll('#mvrAsk [data-mvr-ask-billing]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!selectBillingInterval(button.dataset.mvrAskBilling)) return;
+      const body = document.getElementById('mvrAskBody');
+      const ask = document.getElementById('mvrAsk');
+      if (!body || !ask) return;
+      body.innerHTML = askOfferHtml(ask.dataset.proofCard || 'booking');
+      bindAskBody();
+    });
+  });
   document.getElementById('mvrAskNo')?.addEventListener('click', () => {
     const body = document.getElementById('mvrAskBody');
     if (!body) return;
@@ -1148,6 +1163,7 @@ function presentActivationAsk(cardId) {
   const ask = document.createElement('div');
   ask.id = 'mvrAsk';
   ask.className = 'mvr-sheet is-ask';
+  ask.dataset.proofCard = cardId;
   ask.setAttribute('role', 'dialog');
   ask.setAttribute('aria-modal', 'true');
   // The scrim deliberately does not dismiss. There is one decline row per
@@ -1254,8 +1270,8 @@ function finishReveal() {
 }
 
 async function activateMarketel(button) {
+  const originalLabel = button.textContent;
   if (activationPreviewMode && crm.hotelSubscribed) {
-    const originalLabel = button.textContent;
     button.disabled = true;
     button.textContent = `${propertyName()} is already active`;
     window.setTimeout(() => {
@@ -1277,9 +1293,22 @@ async function activateMarketel(button) {
   } finally {
     if (document.body.contains(button)) {
       button.disabled = false;
-      button.textContent = activationCtaLabel();
+      button.textContent = originalLabel;
     }
   }
+}
+
+function selectBillingInterval(value) {
+  const nextInterval = value === 'year' ? 'year' : 'month';
+  if (nextInterval === billingInterval) return false;
+  billingInterval = nextInterval;
+  try { localStorage.setItem(BILLING_KEY, billingInterval); } catch (_) {}
+  trackJourney('JourneyBillingIntervalSelected', {
+    billingInterval,
+    price: billingInterval === 'year' ? 1490 : 149,
+    currency: 'USD',
+  });
+  return true;
 }
 
 function bindRevealEvents() {
@@ -1313,15 +1342,7 @@ function bindSheetEvents() {
   document.getElementById('mvrFinalCta')?.addEventListener('click', (event) => activateMarketel(event.currentTarget));
   document.querySelectorAll('[data-mvr-billing]').forEach((button) => {
     button.addEventListener('click', () => {
-      const nextInterval = button.dataset.mvrBilling === 'year' ? 'year' : 'month';
-      if (nextInterval === billingInterval) return;
-      billingInterval = nextInterval;
-      try { localStorage.setItem(BILLING_KEY, billingInterval); } catch (_) {}
-      trackJourney('JourneyBillingIntervalSelected', {
-        billingInterval,
-        price: billingInterval === 'year' ? 1490 : 149,
-        currency: 'USD',
-      });
+      if (!selectBillingInterval(button.dataset.mvrBilling)) return;
       const body = document.querySelector('#mvrSheet .mvr-sheet-body');
       if (body) {
         body.innerHTML = finaleHtml();

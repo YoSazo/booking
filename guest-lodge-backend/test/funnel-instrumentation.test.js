@@ -79,6 +79,18 @@ test('a refusal is recorded, and does not pretend to be reveal depth', () => {
     assert.match(markup, /class="mvr-sheet-x" data-ask-dismiss/);
     assert.match(reveal, /trackReveal\('ActivationDeclined', reason\)/);
 
+    // The short ask goes straight to Stripe, so it must expose both billing
+    // choices itself. Otherwise every first-time owner silently defaults to
+    // monthly and the annual cash option disappears from the path.
+    assert.match(reveal, /data-mvr-ask-billing="month"/);
+    assert.match(reveal, /data-mvr-ask-billing="year"/);
+    assert.match(reveal, /Yearly <span>Save \$298<\/span>/);
+    assert.match(reveal, /First charge \$\{firstTrialBillingDate\(\)\}: \$\{price\}/);
+    assert.match(reveal, /window\.goLive\(\{ billingInterval \}\)/);
+    assert.match(reveal, /function selectBillingInterval\(value\)/);
+    assert.equal((reveal.match(/JourneyBillingIntervalSelected/g) || []).length, 1,
+        'billing selection should have one shared implementation');
+
     // It is asked after a proof card closes, not after the offer sheet, and
     // never to someone who has already paid.
     assert.match(reveal, /maybeAskAfterProof\(closed\)/);

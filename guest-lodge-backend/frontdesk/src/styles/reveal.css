@@ -2989,7 +2989,9 @@
   padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
 }
 .mvr-sheet.is-ask .mvr-sheet-lede { margin: 0; }
-.mvr-ask-price { margin: 0; font-size: 14px; line-height: 1.5; color: var(--mvr-text); }
+.mvr-sheet.is-ask .mvr-billing-toggle { width: 100%; margin: 2px 0 0; }
+.mvr-ask-price { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--mvr-text); }
+.mvr-ask-price a { color: var(--mvr-green); font-weight: 650; text-underline-offset: 2px; }
 
 .mvr-sheet-shot { margin: 0; display: flex; justify-content: center; }
 .mvr-sheet-shot img {
