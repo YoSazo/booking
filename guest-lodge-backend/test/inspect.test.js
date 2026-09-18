@@ -128,6 +128,32 @@ test('a sheet opens without summoning the keyboard', () => {
     assert.match(client, /Synchronous focus inside the same user gesture/);
 });
 
+test('Inspect sheets use one keyboard coordinate system and no visual scrim', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.css'), 'utf8');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'index.html'), 'utf8');
+
+    // The browser must not resize the layout viewport while our own visual-
+    // viewport handler independently positions the sheet.
+    assert.match(html, /interactive-widget=overlays-content/);
+    assert.doesNotMatch(html, /interactive-widget=resizes-content/);
+
+    // A modal remains blocking, but nothing behind it is blurred, tinted or dimmed.
+    assert.match(css, /dialog::backdrop\s*\{[^}]*background:\s*transparent/);
+    assert.match(css, /dialog::backdrop\s*\{[^}]*backdrop-filter:\s*none/);
+
+    // The visible band owns the sheet position. Safari's pan is cancelled only
+    // on the frozen page, and native keyboard height is not confused with the
+    // already-resized web visual viewport.
+    assert.match(client, /--sheet-top/);
+    assert.match(client, /--sheet-max-height/);
+    assert.match(client, /--viewport-pan/);
+    assert.match(client, /--kb-native/);
+    assert.doesNotMatch(client, /--sheet-shift/);
+});
+
 test('the landing demo still reads when nothing is allowed to move', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

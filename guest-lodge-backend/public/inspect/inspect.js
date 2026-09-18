@@ -170,6 +170,7 @@ function lockPage(){
 function unlockPage(){
   if(!document.documentElement.classList.contains('sheet-open'))return;
   document.documentElement.classList.remove('sheet-open');
+  document.documentElement.style.setProperty('--viewport-pan','0px');
   document.body.style.top='';
   window.scrollTo(0,lockedScrollY);
   lockedScrollY=0;
@@ -192,48 +193,35 @@ function modal(content, { fullscreen = false } = {}) {
   syncNativeInspectState(currentPage, !fullscreen);
   settleSheet();
 }
-// The sheet is nudged up by however much the keyboard actually covers and no
-// further, clamped so it can never ride up over the status bar.
+// One coordinate system owns sheet placement. The layout viewport remains
+// stable; visualViewport tells us the band that is actually visible above the
+// keyboard. Safari may pan that band, so its offset belongs in the sheet's
+// layout coordinate and is separately cancelled on the frozen page behind it.
 function settleSheet(){
   const dialog=$('dialog');
   if(!dialog?.open)return;
   // A full-screen sheet is already exactly where it belongs; shifting it would
   // only push it off one edge or the other.
-  if(document.documentElement.classList.contains('sheet-full')){dialog.style.setProperty('--sheet-shift','0px');return;}
+  if(document.documentElement.classList.contains('sheet-full'))return;
   const style=getComputedStyle(document.documentElement);
   const number=name=>parseFloat(style.getPropertyValue(name))||0;
   const keyboard=number('--kb');
-  // Two separate reasons the usable band is not the viewport.
-  //
-  // The native header and tab bar sit inside the viewport and are drawn over
-  // it, so centring in the whole thing put a tall sheet's first line under the
-  // header.
-  //
-  // And on iOS Safari a keyboard does not shrink the layout viewport — it
-  // shrinks the visual one and lets the user pan it around inside the layout
-  // viewport. A position:fixed sheet is fixed to the layout viewport, so it
-  // slides off the top as though it were page content, which no amount of
-  // locking document scroll can prevent. Follow the visual viewport instead.
-  // offsetTop is trusted only while a keyboard is up: iOS 26 leaves it stale
-  // afterwards, and reading it then used to pin the sheet to the top.
   const viewport=window.visualViewport;
-  const viewTop=keyboard>0&&viewport?viewport.offsetTop:0;
-  const viewHeight=viewport?viewport.height:window.innerHeight;
-  const top=viewTop+number('--safe-top')+number('--shell-top')+12;
-  const bottom=viewTop+viewHeight-Math.max(number('--kb-native'),number('--shell-bottom'))-12;
-  // Derived from the sheet's height rather than its rect: the shift is animated,
-  // so a rect read mid-transition would measure a position it is still leaving.
-  const height=dialog.offsetHeight;
-  const centre=window.innerHeight/2;
-  // Centre inside the band that is usable, not inside the viewport. Shifting
-  // only far enough to fit pinned the sheet against whichever edge crowded it
-  // first, which with the keyboard up read as sitting too high.
-  const maxUp=(centre-height/2)-top;
-  const maxDown=bottom-(centre+height/2);
-  const shift=height>=(bottom-top)
-    ? maxUp                                                  // taller than the band: keep the top on screen
-    : Math.max(-maxDown,Math.min(centre-(top+bottom)/2,maxUp));
-  dialog.style.setProperty('--sheet-shift',`${-Math.round(shift)}px`);
+  const viewTop=keyboard>0&&viewport?Math.max(0,viewport.offsetTop):0;
+  const viewHeight=keyboard>0&&viewport?viewport.height:window.innerHeight;
+  const nativeKeyboard=number('--kb-native');
+  const shellTop=keyboard>0?0:number('--shell-top');
+  const shellBottom=keyboard>0?0:number('--shell-bottom');
+  const top=viewTop+number('--safe-top')+shellTop+12;
+  // visualViewport.height already excludes the web keyboard. Capacitor uses
+  // resize:none, so only its native keyboard event supplies the covered height.
+  const visualBottom=viewTop+viewHeight;
+  const nativeBottom=window.innerHeight-nativeKeyboard;
+  const bottom=Math.min(visualBottom,nativeBottom)-shellBottom-12;
+  const available=Math.max(120,bottom-top);
+  dialog.style.setProperty('--sheet-top',`${Math.round(top+available/2)}px`);
+  dialog.style.setProperty('--sheet-max-height',`${Math.round(available)}px`);
+  document.documentElement.style.setProperty('--viewport-pan',`${Math.round(viewTop)}px`);
 }
 const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
 // Best effort by design: a dropped count is better than a blocked walkthrough.
@@ -922,7 +910,7 @@ $('account-button').onclick=async()=>{
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
+$('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.removeProperty('--sheet-top');$('dialog').style.removeProperty('--sheet-max-height');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
@@ -980,11 +968,10 @@ function showNativeKeyboardDoneButton(){
   };
   show();
 }
-// One published value: --kb, the height the keyboard is covering, 0 when closed.
-// CSS centres the sheet in what is left, so there is no open/closed branch and
-// nothing to get stuck. visualViewport.offsetTop is used only to measure the
-// inset and never to position anything, because iOS 26 leaves it non-zero after
-// the keyboard closes — which is what pinned the sheet to the top of the screen.
+// Publish the total covered height and the native-only height separately. The
+// web visual viewport already excludes its keyboard; Capacitor resize:none does
+// not, so subtracting one undifferentiated value either double-counted the web
+// keyboard or ignored the native one.
 // The app also runs Capacitor's Keyboard plugin with resize "none", so on iOS
 // the web viewport never shrinks and only the plugin knows the real height.
 function trackKeyboard(){
@@ -997,6 +984,7 @@ function trackKeyboard(){
     const inset=Math.round(Math.max(nativeKeyboard,webInset));
     // Below this it is browser chrome settling, not a keyboard.
     root.style.setProperty('--kb',`${inset>60?inset:0}px`);
+    root.style.setProperty('--kb-native',`${nativeKeyboard>60?Math.round(nativeKeyboard):0}px`);
     settleSheet();
   };
   const apply=()=>{if(!frame)frame=requestAnimationFrame(measure);};

@@ -178,23 +178,23 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
 .toast.error { background: #aa382b; }
 @keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
-/* One formula for every case. --kb is the keyboard height and is 0 when it is
-   closed, so the sheet simply centres in whatever space is left. Nothing here
-   reads visualViewport.offsetTop: iOS 26 leaves that stale and non-zero after
-   the keyboard closes, which is what pinned the sheet to the top of the screen. */
-/* A card resting on the app, not a takeover: opaque, so nothing behind it is
-   frosted, and nudged up only by however much the keyboard actually covers
-   (--sheet-shift, computed in inspect.js). Re-centring in the leftover space
-   moved it far enough to collide with the status bar. */
-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + var(--sheet-shift, 0px))); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - max(var(--kb, 0px), var(--shell-bottom)) - var(--shell-top) - env(safe-area-inset-top) - 32px); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: transform .2s ease, max-height .2s ease; }
+/* The layout viewport never resizes for the keyboard. JS publishes one top and
+   one usable height from visualViewport, so Safari cannot resize the layout and
+   then have us independently translate the sheet a second time. */
+dialog { position: fixed; left: 50%; top: var(--sheet-top, 50%); transform: translate(-50%, -50%); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: var(--sheet-max-height, calc(100svh - var(--shell-bottom) - var(--shell-top) - env(safe-area-inset-top) - 32px)); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: top .16s ease, max-height .16s ease; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
-html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; }
+/* iOS can pan the visual viewport even while a fixed body is scroll-locked.
+   Counter that pan on the frozen page; the top-layer dialog is positioned
+   separately inside the usable visual band. */
+html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; transform: translateY(var(--viewport-pan, 0px)); }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-dialog::backdrop { background: #15261c24; }
+/* No blur, tint or dimming behind sheets. It remains a real modal backdrop, so
+   taps cannot leak into the page underneath. */
+dialog::backdrop { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
 /* The sheet takes focus itself when it has no field, so opening one never lands
    a focus ring on whichever control happened to be first in the markup. */
@@ -270,9 +270,7 @@ html.sheet-full dialog {
      global reduced-motion rule collapses this to nothing on its own. */
   animation: plan-in 280ms cubic-bezier(.32, .72, 0, 1) both;
 }
-html.sheet-full dialog::backdrop { animation: plan-scrim 280ms ease both; }
 @keyframes plan-in { from { opacity: 0; transform: translateY(22px) scale(.99); } to { opacity: 1; transform: none; } }
-@keyframes plan-scrim { from { opacity: 0; } to { opacity: 1; } }
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
