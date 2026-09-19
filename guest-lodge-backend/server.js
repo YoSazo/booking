@@ -648,6 +648,11 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@bookmarketel.
 
 // Meta Ads / Facebook Marketing API config
 const META_AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID;
+// The CAPI system user is the one granted on the ad account; META_ACCESS_TOKEN
+// belongs to an app outside that business and Graph refuses it for insights.
+const META_INSIGHTS_TOKEN = process.env.META_INSIGHTS_ACCESS_TOKEN
+    || process.env.MARKETEL_META_ACCESS_TOKEN
+    || process.env.META_ACCESS_TOKEN;
 const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 const META_API_VERSION = resolveMetaGraphApiVersion(process.env.META_API_VERSION);
 
@@ -11782,7 +11787,7 @@ app.post('/api/funnel/tracking', adminAuth, (req, res) => {
 // Meta Ads insights for funnel dashboard (admin only)
 app.get('/api/meta-insights', adminAuth, async (req, res) => {
     try {
-        if (!META_AD_ACCOUNT_ID || !META_ACCESS_TOKEN) {
+        if (!META_AD_ACCOUNT_ID || !META_INSIGHTS_TOKEN) {
             return res.json({
                 success: false,
                 enabled: false,
@@ -11833,7 +11838,7 @@ app.get('/api/meta-insights', adminAuth, async (req, res) => {
         const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}/insights`;
 
         const params = {
-            access_token: META_ACCESS_TOKEN,
+            access_token: META_INSIGHTS_TOKEN,
             level: 'campaign',
             time_range: JSON.stringify({ since, until }),
             time_increment: 'all_days',
