@@ -36,6 +36,8 @@
 	<string>Front Desk lets you save the Marketel messaging number as a contact.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Marketel Inspect uses the microphone only while you choose to dictate a room observation.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Marketel Inspect turns what you say into on-screen text while you dictate a room observation.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Marketel uses your photo library only when you choose a report, property, or room photo.</string>
 	<key>UILaunchStoryboardName</key>

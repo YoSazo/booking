@@ -170,6 +170,7 @@ function lockPage(){
 function unlockPage(){
   if(!document.documentElement.classList.contains('sheet-open'))return;
   document.documentElement.classList.remove('sheet-open');
+  document.documentElement.style.setProperty('--viewport-pan','0px');
   document.body.style.top='';
   window.scrollTo(0,lockedScrollY);
   lockedScrollY=0;
@@ -192,48 +193,39 @@ function modal(content, { fullscreen = false } = {}) {
   syncNativeInspectState(currentPage, !fullscreen);
   settleSheet();
 }
-// The sheet is nudged up by however much the keyboard actually covers and no
-// further, clamped so it can never ride up over the status bar.
+// One coordinate system owns sheet placement. The layout viewport remains
+// stable; visualViewport tells us the band that is actually visible above the
+// keyboard. Safari may pan that band, so its offset belongs in the sheet's
+// layout coordinate and is separately cancelled on the frozen page behind it.
 function settleSheet(){
   const dialog=$('dialog');
   if(!dialog?.open)return;
   // A full-screen sheet is already exactly where it belongs; shifting it would
   // only push it off one edge or the other.
-  if(document.documentElement.classList.contains('sheet-full')){dialog.style.setProperty('--sheet-shift','0px');return;}
+  if(document.documentElement.classList.contains('sheet-full'))return;
   const style=getComputedStyle(document.documentElement);
   const number=name=>parseFloat(style.getPropertyValue(name))||0;
   const keyboard=number('--kb');
-  // Two separate reasons the usable band is not the viewport.
-  //
-  // The native header and tab bar sit inside the viewport and are drawn over
-  // it, so centring in the whole thing put a tall sheet's first line under the
-  // header.
-  //
-  // And on iOS Safari a keyboard does not shrink the layout viewport — it
-  // shrinks the visual one and lets the user pan it around inside the layout
-  // viewport. A position:fixed sheet is fixed to the layout viewport, so it
-  // slides off the top as though it were page content, which no amount of
-  // locking document scroll can prevent. Follow the visual viewport instead.
-  // offsetTop is trusted only while a keyboard is up: iOS 26 leaves it stale
-  // afterwards, and reading it then used to pin the sheet to the top.
   const viewport=window.visualViewport;
-  const viewTop=keyboard>0&&viewport?viewport.offsetTop:0;
-  const viewHeight=viewport?viewport.height:window.innerHeight;
-  const top=viewTop+number('--safe-top')+number('--shell-top')+12;
-  const bottom=viewTop+viewHeight-Math.max(number('--kb-native'),number('--shell-bottom'))-12;
-  // Derived from the sheet's height rather than its rect: the shift is animated,
-  // so a rect read mid-transition would measure a position it is still leaving.
-  const height=dialog.offsetHeight;
-  const centre=window.innerHeight/2;
-  // Centre inside the band that is usable, not inside the viewport. Shifting
-  // only far enough to fit pinned the sheet against whichever edge crowded it
-  // first, which with the keyboard up read as sitting too high.
-  const maxUp=(centre-height/2)-top;
-  const maxDown=bottom-(centre+height/2);
-  const shift=height>=(bottom-top)
-    ? maxUp                                                  // taller than the band: keep the top on screen
-    : Math.max(-maxDown,Math.min(centre-(top+bottom)/2,maxUp));
-  dialog.style.setProperty('--sheet-shift',`${-Math.round(shift)}px`);
+  const viewTop=keyboard>0&&viewport?Math.max(0,viewport.offsetTop):0;
+  const viewHeight=keyboard>0&&viewport?viewport.height:window.innerHeight;
+  const nativeKeyboard=number('--kb-native');
+  // The native shell and the web header are hard top boundaries even while the
+  // keyboard is open. Dropping this boundary was what let the auth card shoot
+  // up over the banner.
+  const webHeader=native?0:($('account-button')?.closest('header')?.offsetHeight||64);
+  const shellTop=Math.max(number('--shell-top'),webHeader);
+  const shellBottom=keyboard>0?0:number('--shell-bottom');
+  const top=viewTop+number('--safe-top')+shellTop+12;
+  // visualViewport.height already excludes the web keyboard. Capacitor uses
+  // resize:none, so only its native keyboard event supplies the covered height.
+  const visualBottom=viewTop+viewHeight;
+  const nativeBottom=window.innerHeight-nativeKeyboard;
+  const bottom=Math.min(visualBottom,nativeBottom)-shellBottom-12;
+  const available=Math.max(120,bottom-top);
+  dialog.style.setProperty('--sheet-top',`${Math.round(top+available/2)}px`);
+  dialog.style.setProperty('--sheet-max-height',`${Math.round(available)}px`);
+  document.documentElement.style.setProperty('--viewport-pan',`${Math.round(viewTop)}px`);
 }
 const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
 // Best effort by design: a dropped count is better than a blocked walkthrough.
@@ -293,15 +285,31 @@ function landing() {
   enterScreen('landing');
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.<br>Then $199/year or $29/month. One operator.</small></p><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
   playDemo();
   $('start').onclick = () => start();
+  $('see-plans').onclick=previewPlans;
   // The native shell hides the web header, so without this there was no way back
   // in after signing out short of the overflow menu.
   if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
 }
+// Pricing stays one tap away without turning a no-card free report into a
+// purchase decision. This is informational: it neither fires the post-report
+// offer event nor opens checkout.
+function previewPlans(){
+  let flow=null;
+  const paint=()=>{
+    const plan=PLANS[planInterval],each=plan.price/plan.reports;
+    const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
+    const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually · ${plan.save}`:'Cancel renewal anytime.';
+    flow.paint(`<h2>Plans after your free report</h2><p class="muted">Finish and export your first complete report before choosing anything.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} reports — about ${unit} each</li><li>AI-written room notes from your walkthrough</li><li>PDF export and a private share link</li></ul><button type="button" id="plan-start" class="wide">Create my first report free</button><p><small>No card for your first complete report. <a href="https://bookmarketel.com/inspect/terms.html">Inspect terms</a></small></p>`);
+    document.querySelectorAll('[data-preview-plan]').forEach(button=>button.onclick=()=>{planInterval=button.dataset.previewPlan==='month'?'month':'year';paint();});
+    $('plan-start').onclick=()=>{flow.restore();start();};
+  };
+  flow=flowScreen('','plans-screen');paint();
+}
 async function start(propertyName = '') {
-  if (draftUnsaved() && !confirm('Start a new report? Your current draft is not saved online yet.')) return;
+  if (draftUnsaved() && !await confirmAction({title:'Start a new report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start new report',danger:true})) return;
   clearURLs(); draft = { document: newDocument(propertyName), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
@@ -333,11 +341,11 @@ function editor(step) {
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
-    $('rooms').onclick = event => {
+    $('rooms').onclick = async event => {
       const figure = event.target.closest('figure[data-photo-id]');
       if (figure && Date.now()-photoDropAt > 400 && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
       const b = event.target.closest('button'); if (!b) return;
-      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (confirm('Remove this room and its photos from the report?')) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
+      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (await confirmAction({title:'Remove this room?',message:'Its photos and notes will be removed from this report.',confirmLabel:'Remove room',danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
       if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
       if (b.dataset.nativeCamera !== undefined) { haptic(); window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:Number(b.dataset.nativeCamera)}); }
@@ -352,8 +360,8 @@ function editor(step) {
   // Signed out in the app neither chrome is on screen, so these are the only exits.
   if($('editor-back'))$('editor-back').onclick=()=>run(()=>list());
   if($('editor-signin'))$('editor-signin').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
-  $('editor-discard').onclick=()=>{
-    if(!confirm('Discard this report? Anything not saved online is removed from this device.'))return;
+  $('editor-discard').onclick=async()=>{
+    if(!await confirmAction({title:'Discard this report?',message:'Anything not saved online will be removed from this device.',confirmLabel:'Discard report',danger:true}))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();if(account)await openAccountHome();else landing();});
   };
 }
@@ -506,11 +514,83 @@ async function addPhotos(input) {
 // One step visible at a time. Both forms used to sit in the sheet together, so
 // the six-digit field appeared directly under "Send sign-in code" and the sheet
 // carried two inputs and two buttons at once.
+// Plan previews and confirmations use an ordinary in-page screen rather than a
+// browser alert or fixed dialog. Detaching preserves the exact DOM and event
+// handlers, and keeping the old document height prevents Safari from collapsing
+// its toolbar just because a card replaced a long report.
+function flowScreen(content,kind=''){
+  const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
+  const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
+  while(app.firstChild)origin.appendChild(app.firstChild);
+  let restored=false;
+  const restore=()=>{
+    if(restored)return;
+    restored=true;
+    app.replaceChildren(origin);
+    document.documentElement.classList.remove('flow-open');
+    $('account-button').disabled=false;
+    requestAnimationFrame(()=>{window.scrollTo(0,originScroll);if($('demo'))playDemo();});
+    syncNativeInspectState(currentPage,true);
+  };
+  app.innerHTML=`<section class="flow-screen ${kind}" style="--flow-page-height:${Math.round(originHeight)}px"><div class="flow-frame"><article class="card flow-card"><div id="flow-body">${content}</div><button type="button" id="flow-cancel" class="quiet flow-close" aria-label="Close">&#10005;</button></article></div></section>`;
+  document.documentElement.classList.add('flow-open');
+  $('account-button').disabled=true;
+  $('flow-cancel').onclick=restore;
+  syncNativeInspectState(currentPage,true);
+  return {restore,paint:html=>{$('flow-body').innerHTML=html;},closeButton:$('flow-cancel')};
+}
+// Authentication belongs to the Marketel banner, not on a replacement page.
+// The report stays mounted at the same scroll offset while the banner's bottom
+// edge grows to reveal the email and code steps.
+function headerDrawer(content){
+  const drawer=$('header-drawer'),body=$('header-drawer-body'),close=$('header-drawer-close');
+  const app=$('app'),nav=$('nav'),bar=document.querySelector('.header-bar');
+  let restored=false;
+  const restore=()=>{
+    if(restored)return;
+    restored=true;
+    document.documentElement.classList.remove('auth-open');
+    drawer.setAttribute('aria-hidden','true');
+    drawer.inert=true;
+    app.inert=false;
+    nav.inert=false;
+    bar.inert=false;
+    $('account-button').disabled=false;
+    setTimeout(()=>{if(restored&&!document.documentElement.classList.contains('auth-open'))body.replaceChildren();},330);
+    syncNativeInspectState(currentPage,true);
+  };
+  body.innerHTML=content;
+  drawer.setAttribute('aria-hidden','false');
+  drawer.inert=false;
+  app.inert=true;
+  nav.inert=true;
+  bar.inert=true;
+  $('account-button').disabled=true;
+  document.activeElement?.blur?.();
+  document.documentElement.classList.add('auth-open');
+  close.onclick=restore;
+  syncNativeInspectState(currentPage,true);
+  return {restore,paint:html=>{body.innerHTML=html;},closeButton:close};
+}
+function confirmAction({title,message,confirmLabel='Continue',danger=false}){
+  return new Promise(resolve=>{
+    const flow=flowScreen(`<h2>${esc(title)}</h2><p>${esc(message)}</p><div class="row"><button type="button" id="flow-confirm" class="${danger?'danger-button':''}">${esc(confirmLabel)}</button><button type="button" id="flow-keep" class="secondary">Keep it</button></div>`,'confirm-screen');
+    let answered=false;
+    const finish=value=>{if(answered)return;answered=true;flow.restore();resolve(value);};
+    flow.closeButton.onclick=()=>finish(false);
+    $('flow-keep').onclick=()=>finish(false);
+    $('flow-confirm').onclick=()=>finish(true);
+  });
+}
+// Authentication expands the already-fixed header. It never opens a top-layer
+// dialog, freezes the body or replaces the report, so Safari has only one page
+// and one scroll position to reconcile with its keyboard and browser toolbar.
 function ensureAuth(after) {
   if(session && account) return after();
+  let drawer=null;
   let email='';
   const codeStep=()=>{
-    $('dialog-body').innerHTML=`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`;
+    drawer.paint(`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`);
     const input=$('code');
     // Synchronous focus inside the same user gesture: an await here would let
     // iOS dismiss the keyboard before the code field exists.
@@ -525,7 +605,7 @@ function ensureAuth(after) {
       verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
-        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();$('dialog').close();
+        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();drawer.restore();
       },null).then(()=>{
         verifying=false;
         if(account)return after();
@@ -545,7 +625,7 @@ function ensureAuth(after) {
   };
   const emailStep=open=>{
     const html=`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
-    if(open)modal(html);else $('dialog-body').innerHTML=html;
+    if(open)drawer=headerDrawer(html);else drawer.paint(html);
     if(!open)$('email').focus();
     $('email-form').onsubmit=event=>{
       event.preventDefault();
@@ -652,7 +732,73 @@ function liveCaptions(){
   }catch{return()=>{};}
   return()=>{stopped=true;try{recognition.stop();}catch{}};
 }
+// One sheet for both surfaces so the copy and layout cannot drift. The meter
+// is web-only: it reads the MediaStream the page owns, and in the app the page
+// owns nothing — there, real captions are the feedback instead.
+function recordingSheetHtml(roomName,withMeter){
+  return `<h2>Talk through ${esc(roomName)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p>${withMeter?`<div class="live-bars" id="live-bars" aria-hidden="true">${'<span></span>'.repeat(13)}</div>`:''}<p class="live-caption" id="live-caption" aria-live="polite">Listening…</p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`;
+}
+// Shared tail: whatever captured the audio, this is what turns it into a note.
+function sendVoiceNote(index,blob,durationMs){
+  logInspect('VoiceNoteRecorded',true);
+  ensureAuth(()=>run(async()=>{
+    // The write-up is the thing worth paying for, and it used to happen behind
+    // a closed sheet with a toast as the only sign anything was running.
+    // modal() rather than setting the body, because the auth path closes the
+    // dialog on success — on a first report this would paint into a shut sheet.
+    modal('<section class="loading">Writing your note…</section>');
+    try{
+      await ensureServerDraft();
+      const form=new FormData();form.append('audio',blob,blob.type.includes('webm')?'note.webm':blob.type.includes('ogg')?'note.ogg':'note.m4a');form.append('roomIndex',String(index));form.append('durationMs',String(durationMs));
+      const result=await api(`/reports/${draft.serverId}/voice-draft`,{method:'POST',body:form});
+      reviewVoiceNote(index,result);
+    }catch(error){
+      // Never strand them on a spinner; run() surfaces the message.
+      $('dialog').close();
+      throw error;
+    }
+  }));
+}
+// WKWebView has no SpeechRecognition, so in the app the shell does the whole
+// recording — one microphone, no competition with getUserMedia — and streams
+// the live text back into the same sheet.
+let nativeDictation=null;
+function nativeRecordRoom(index){
+  const shell=window.webkit?.messageHandlers?.marketelShell;
+  if(!shell||nativeDictation)return;
+  let seconds=0,stopped=false;
+  modal(recordingSheetHtml(draft.document.rooms[index].name,false));
+  const tick=setInterval(()=>{seconds+=1;const label=$('recording-time');if(label)label.textContent=`0:${String(seconds).padStart(2,'0')}`;if(seconds>=60)stop();},1000);
+  const stop=()=>{if(stopped)return;stopped=true;clearInterval(tick);shell.postMessage({type:'inspectDictateStop'});};
+  nativeDictation={index,started:Date.now(),cancelled:false};
+  $('stop-recording').onclick=stop;
+  // Dismissing the sheet still has to stop the engine, or the shell keeps the
+  // microphone open behind a screen that is no longer there.
+  $('dialog').addEventListener('close',()=>{if(nativeDictation)nativeDictation.cancelled=true;stop();},{once:true});
+  shell.postMessage({type:'inspectDictate',room:index});
+}
+window.marketelInspectDictationText=raw=>{
+  let data;try{data=JSON.parse(raw);}catch{return;}
+  const box=$('live-caption');
+  if(box&&typeof data.text==='string'&&data.text.trim())box.textContent=data.text;
+};
+window.marketelInspectAudioCaptured=raw=>{
+  const pending=nativeDictation;
+  nativeDictation=null;
+  if(!pending)return;
+  let data;try{data=JSON.parse(raw);}catch{return;}
+  if(pending.cancelled)return;
+  if(typeof data.dataUrl!=='string'||!data.dataUrl){
+    if($('dialog').open)$('dialog').close();
+    return notice('That recording did not save. Try again, or type the note instead.','error');
+  }
+  run(async()=>{
+    const blob=await (await fetch(data.dataUrl)).blob();
+    sendVoiceNote(pending.index,blob,Math.min(60000,Math.max(250,Date.now()-pending.started)));
+  },null);
+};
 async function recordRoom(index){
+  if(native)return nativeRecordRoom(index);
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Voice notes are not supported on this device. You can type the observation instead.');
   let stream;
   try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});}
@@ -664,7 +810,7 @@ async function recordRoom(index){
     recorder.onerror=()=>reject(new Error('Recording failed. Please retry.'));
     recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||supported||'audio/mp4'}));
   });
-  modal(`<h2>Talk through ${esc(draft.document.rooms[index].name)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p><div class="live-bars" id="live-bars" aria-hidden="true">${'<span></span>'.repeat(13)}</div><p class="live-caption" id="live-caption" aria-live="polite">Listening…</p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`);
+  modal(recordingSheetHtml(draft.document.rooms[index].name,true));
   const stopMeter=liveMeter(stream),stopCaptions=liveCaptions();
   const tick=setInterval(()=>{seconds+=1;const label=$('recording-time');if(label)label.textContent=`0:${String(seconds).padStart(2,'0')}`;if(seconds>=60&&recorder.state==='recording')recorder.stop();},1000);
   const started=Date.now();
@@ -674,17 +820,7 @@ async function recordRoom(index){
   let blob;
   try{blob=await recording;}catch(error){if($('dialog').open)$('dialog').close();throw error;}finally{clearInterval(tick);stopMeter();stopCaptions();stream.getTracks().forEach(track=>track.stop());finished=true;}
   if(cancelled||!finished||!blob.size)return;
-  const durationMs=Math.min(60000,Math.max(250,Date.now()-started));
-  $('dialog').close();
-  logInspect('VoiceNoteRecorded',true);
-  const process=()=>run(async()=>{
-    await ensureServerDraft();
-    const form=new FormData();form.append('audio',blob,blob.type.includes('webm')?'note.webm':blob.type.includes('ogg')?'note.ogg':'note.m4a');form.append('roomIndex',String(index));form.append('durationMs',String(durationMs));
-    notice('Turning your walkthrough into a room note…');
-    const result=await api(`/reports/${draft.serverId}/voice-draft`,{method:'POST',body:form});
-    reviewVoiceNote(index,result);
-  });
-  ensureAuth(process);
+  sendVoiceNote(index,blob,Math.min(60000,Math.max(250,Date.now()-started)));
 }
 function reviewVoiceNote(index,result){
   modal(`<h2>Review this room note</h2><p class="muted">AI only organized what it heard. Check every detail before adding it.</p><blockquote>${esc(result.suggestion)}</blockquote><details><summary>What Inspect heard</summary><p class="transcript">${esc(result.transcript)}</p></details><div class="stack"><button id="replace-note">Use as room note</button><button id="append-note" class="secondary">Add after my note</button><button id="discard-note" class="quiet">Discard</button></div>`);
@@ -851,12 +987,12 @@ function renderReports(){
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
-  if($('delete-local-draft'))$('delete-local-draft').onclick=()=>{
-    if(!confirm('Delete this unsaved report from this device?'))return;
+  if($('delete-local-draft'))$('delete-local-draft').onclick=async()=>{
+    if(!await confirmAction({title:'Delete this unsaved report?',message:'This removes the report from this device.',confirmLabel:'Delete report',danger:true}))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();await list();});
   };
   document.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.open),button));
-  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=()=>{if(confirm('Permanently delete this report, its photos and shared link? This does not restore report allowance.'))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
+  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=async()=>{if(await confirmAction({title:'Permanently delete this report?',message:'Its photos and shared link will also be deleted. Your report allowance will not be restored.',confirmLabel:'Delete permanently',danger:true}))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
 }
 async function loadReportFiles(report){
   const files=[];
@@ -874,13 +1010,13 @@ async function useComparisonPayload(payload){
   await persist();preview=!!report.finalizedAt;editor();
 }
 async function openReport(id){
-  if(draftUnsaved()&&draft.serverId!==id&&!confirm('Replace the draft on this device? Your current draft is not saved online yet.'))return;
+  if(draftUnsaved()&&draft.serverId!==id&&!await confirmAction({title:'Replace this draft?',message:'Your current draft is not saved online yet.',confirmLabel:'Replace draft',danger:true}))return;
   haptic();
   $('app').innerHTML='<section class="loading">Opening your report…</section>';
   await useComparisonPayload(await api(`/reports/${id}/comparison`));
 }
 async function startComparison(baselineId){
-  if(draftUnsaved()&&!confirm('Start a comparison report? Your current draft is not saved online yet.'))return;
+  if(draftUnsaved()&&!await confirmAction({title:'Start a comparison report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start comparison',danger:true}))return;
   const payload=await api(`/reports/${baselineId}/comparison-draft`,{method:'POST',body:{date:localDate()}});
   reportsCache=null;await useComparisonPayload(payload);
 }
@@ -918,11 +1054,16 @@ $('account-button').onclick=async()=>{
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
   $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
-  $('delete-account').onclick=()=>{if(prompt('This permanently deletes Inspect reports and photos and cancels its subscription. Booking properties are unaffected. Type DELETE to confirm.')==='DELETE')run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});};
+  $('delete-account').onclick=async()=>{
+    $('dialog').close();
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    if(!await confirmAction({title:'Delete your Inspect account?',message:'This permanently deletes Inspect reports and photos and cancels its subscription. Booking properties are unaffected.',confirmLabel:'Delete account permanently',danger:true}))return;
+    run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});
+  };
 };
-async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});$('dialog').close();landing();}
+async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});if($('dialog').open)$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
-$('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.setProperty('--sheet-shift','0px');syncNativeInspectState(currentPage,true);});
+$('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.removeProperty('--sheet-top');$('dialog').style.removeProperty('--sheet-max-height');syncNativeInspectState(currentPage,true);});
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
@@ -980,11 +1121,10 @@ function showNativeKeyboardDoneButton(){
   };
   show();
 }
-// One published value: --kb, the height the keyboard is covering, 0 when closed.
-// CSS centres the sheet in what is left, so there is no open/closed branch and
-// nothing to get stuck. visualViewport.offsetTop is used only to measure the
-// inset and never to position anything, because iOS 26 leaves it non-zero after
-// the keyboard closes — which is what pinned the sheet to the top of the screen.
+// Publish the total covered height and the native-only height separately. The
+// web visual viewport already excludes its keyboard; Capacitor resize:none does
+// not, so subtracting one undifferentiated value either double-counted the web
+// keyboard or ignored the native one.
 // The app also runs Capacitor's Keyboard plugin with resize "none", so on iOS
 // the web viewport never shrinks and only the plugin knows the real height.
 function trackKeyboard(){
@@ -997,6 +1137,7 @@ function trackKeyboard(){
     const inset=Math.round(Math.max(nativeKeyboard,webInset));
     // Below this it is browser chrome settling, not a keyboard.
     root.style.setProperty('--kb',`${inset>60?inset:0}px`);
+    root.style.setProperty('--kb-native',`${nativeKeyboard>60?Math.round(nativeKeyboard):0}px`);
     settleSheet();
   };
   const apply=()=>{if(!frame)frame=requestAnimationFrame(measure);};

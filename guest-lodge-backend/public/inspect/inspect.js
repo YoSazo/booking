@@ -732,7 +732,73 @@ function liveCaptions(){
   }catch{return()=>{};}
   return()=>{stopped=true;try{recognition.stop();}catch{}};
 }
+// One sheet for both surfaces so the copy and layout cannot drift. The meter
+// is web-only: it reads the MediaStream the page owns, and in the app the page
+// owns nothing — there, real captions are the feedback instead.
+function recordingSheetHtml(roomName,withMeter){
+  return `<h2>Talk through ${esc(roomName)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p>${withMeter?`<div class="live-bars" id="live-bars" aria-hidden="true">${'<span></span>'.repeat(13)}</div>`:''}<p class="live-caption" id="live-caption" aria-live="polite">Listening…</p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`;
+}
+// Shared tail: whatever captured the audio, this is what turns it into a note.
+function sendVoiceNote(index,blob,durationMs){
+  logInspect('VoiceNoteRecorded',true);
+  ensureAuth(()=>run(async()=>{
+    // The write-up is the thing worth paying for, and it used to happen behind
+    // a closed sheet with a toast as the only sign anything was running.
+    // modal() rather than setting the body, because the auth path closes the
+    // dialog on success — on a first report this would paint into a shut sheet.
+    modal('<section class="loading">Writing your note…</section>');
+    try{
+      await ensureServerDraft();
+      const form=new FormData();form.append('audio',blob,blob.type.includes('webm')?'note.webm':blob.type.includes('ogg')?'note.ogg':'note.m4a');form.append('roomIndex',String(index));form.append('durationMs',String(durationMs));
+      const result=await api(`/reports/${draft.serverId}/voice-draft`,{method:'POST',body:form});
+      reviewVoiceNote(index,result);
+    }catch(error){
+      // Never strand them on a spinner; run() surfaces the message.
+      $('dialog').close();
+      throw error;
+    }
+  }));
+}
+// WKWebView has no SpeechRecognition, so in the app the shell does the whole
+// recording — one microphone, no competition with getUserMedia — and streams
+// the live text back into the same sheet.
+let nativeDictation=null;
+function nativeRecordRoom(index){
+  const shell=window.webkit?.messageHandlers?.marketelShell;
+  if(!shell||nativeDictation)return;
+  let seconds=0,stopped=false;
+  modal(recordingSheetHtml(draft.document.rooms[index].name,false));
+  const tick=setInterval(()=>{seconds+=1;const label=$('recording-time');if(label)label.textContent=`0:${String(seconds).padStart(2,'0')}`;if(seconds>=60)stop();},1000);
+  const stop=()=>{if(stopped)return;stopped=true;clearInterval(tick);shell.postMessage({type:'inspectDictateStop'});};
+  nativeDictation={index,started:Date.now(),cancelled:false};
+  $('stop-recording').onclick=stop;
+  // Dismissing the sheet still has to stop the engine, or the shell keeps the
+  // microphone open behind a screen that is no longer there.
+  $('dialog').addEventListener('close',()=>{if(nativeDictation)nativeDictation.cancelled=true;stop();},{once:true});
+  shell.postMessage({type:'inspectDictate',room:index});
+}
+window.marketelInspectDictationText=raw=>{
+  let data;try{data=JSON.parse(raw);}catch{return;}
+  const box=$('live-caption');
+  if(box&&typeof data.text==='string'&&data.text.trim())box.textContent=data.text;
+};
+window.marketelInspectAudioCaptured=raw=>{
+  const pending=nativeDictation;
+  nativeDictation=null;
+  if(!pending)return;
+  let data;try{data=JSON.parse(raw);}catch{return;}
+  if(pending.cancelled)return;
+  if(typeof data.dataUrl!=='string'||!data.dataUrl){
+    if($('dialog').open)$('dialog').close();
+    return notice('That recording did not save. Try again, or type the note instead.','error');
+  }
+  run(async()=>{
+    const blob=await (await fetch(data.dataUrl)).blob();
+    sendVoiceNote(pending.index,blob,Math.min(60000,Math.max(250,Date.now()-pending.started)));
+  },null);
+};
 async function recordRoom(index){
+  if(native)return nativeRecordRoom(index);
   if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Voice notes are not supported on this device. You can type the observation instead.');
   let stream;
   try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});}
@@ -744,7 +810,7 @@ async function recordRoom(index){
     recorder.onerror=()=>reject(new Error('Recording failed. Please retry.'));
     recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||supported||'audio/mp4'}));
   });
-  modal(`<h2>Talk through ${esc(draft.document.rooms[index].name)}</h2><p class="recording-state"><span class="recording-dot"></span> Recording · <strong id="recording-time">0:00</strong></p><div class="live-bars" id="live-bars" aria-hidden="true">${'<span></span>'.repeat(13)}</div><p class="live-caption" id="live-caption" aria-live="polite">Listening…</p><p class="muted">Say only what you can observe. Mention the location and whether it should be marked as an issue. The recording and transcript are not attached to your report.</p><button id="stop-recording">Stop and review</button>`);
+  modal(recordingSheetHtml(draft.document.rooms[index].name,true));
   const stopMeter=liveMeter(stream),stopCaptions=liveCaptions();
   const tick=setInterval(()=>{seconds+=1;const label=$('recording-time');if(label)label.textContent=`0:${String(seconds).padStart(2,'0')}`;if(seconds>=60&&recorder.state==='recording')recorder.stop();},1000);
   const started=Date.now();
@@ -754,17 +820,7 @@ async function recordRoom(index){
   let blob;
   try{blob=await recording;}catch(error){if($('dialog').open)$('dialog').close();throw error;}finally{clearInterval(tick);stopMeter();stopCaptions();stream.getTracks().forEach(track=>track.stop());finished=true;}
   if(cancelled||!finished||!blob.size)return;
-  const durationMs=Math.min(60000,Math.max(250,Date.now()-started));
-  $('dialog').close();
-  logInspect('VoiceNoteRecorded',true);
-  const process=()=>run(async()=>{
-    await ensureServerDraft();
-    const form=new FormData();form.append('audio',blob,blob.type.includes('webm')?'note.webm':blob.type.includes('ogg')?'note.ogg':'note.m4a');form.append('roomIndex',String(index));form.append('durationMs',String(durationMs));
-    notice('Turning your walkthrough into a room note…');
-    const result=await api(`/reports/${draft.serverId}/voice-draft`,{method:'POST',body:form});
-    reviewVoiceNote(index,result);
-  });
-  ensureAuth(process);
+  sendVoiceNote(index,blob,Math.min(60000,Math.max(250,Date.now()-started)));
 }
 function reviewVoiceNote(index,result){
   modal(`<h2>Review this room note</h2><p class="muted">AI only organized what it heard. Check every detail before adding it.</p><blockquote>${esc(result.suggestion)}</blockquote><details><summary>What Inspect heard</summary><p class="transcript">${esc(result.transcript)}</p></details><div class="stack"><button id="replace-note">Use as room note</button><button id="append-note" class="secondary">Add after my note</button><button id="discard-note" class="quiet">Discard</button></div>`);

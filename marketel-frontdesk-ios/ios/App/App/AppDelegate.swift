@@ -168,6 +168,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var inspectMenu: UIMenu?
     private var shellVisible = false
     private var shellSuppressedByModal = false
+    private let dictation = MarketelDictation()
     private var inspectAuthenticated = false
     private var pendingInspectHandoffToken: String?
     private var inspectHandoffDeliveryAttempts = 0
@@ -771,6 +772,25 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     // Presented at the medium detent so the room card stays in view behind it,
     // and left open after each shot so a walkthrough is one continuous motion.
+    // No view controller: the web sheet stays on screen and the shell only
+    // supplies the audio and the live text, so one UI serves both surfaces.
+    private func presentInspectDictation() {
+        guard !dictation.isRunning else { return }
+        dictation.start(onText: { [weak self] text in
+            self?.sendDictation(function: "marketelInspectDictationText", payload: ["text": text])
+        }, onFinish: { [weak self] dataUrl in
+            self?.sendDictation(function: "marketelInspectAudioCaptured", payload: ["dataUrl": dataUrl ?? ""])
+        })
+    }
+
+    private func sendDictation(function: String, payload: [String: Any]) {
+        guard
+            let json = try? JSONSerialization.data(withJSONObject: payload),
+            let text = String(data: json, encoding: .utf8)
+        else { return }
+        callWeb(function: function, argument: text)
+    }
+
     private func presentInspectCamera(room: Int) {
         guard presentedViewController == nil else { return }
         let camera = MarketelInspectCameraViewController { [weak self] dataUrl in
@@ -1478,6 +1498,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 reportId: payload["reportId"] as? String ?? "",
                 token: payload["token"] as? String ?? ""
             )
+        case "inspectDictate":
+            presentInspectDictation()
+        case "inspectDictateStop":
+            dictation.stop()
         case "inspectCamera":
             presentInspectCamera(room: payload["room"] as? Int ?? 0)
         case "inspectHaptic":

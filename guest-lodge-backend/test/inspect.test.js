@@ -111,6 +111,41 @@ test('live feedback never costs the recording it is decorating', () => {
     assert.match(record, /finally\{clearInterval\(tick\);stopMeter\(\);stopCaptions\(\);/);
 });
 
+test('dictation works in the app without the shell owning the note', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const root = path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App');
+    const swift = fs.readFileSync(path.join(root, 'App', 'NativeDictation.swift'), 'utf8');
+    const project = fs.readFileSync(path.join(root, 'App.xcodeproj', 'project.pbxproj'), 'utf8');
+    const plist = fs.readFileSync(path.join(root, 'App', 'Info.plist'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    // One engine, one tap, two sinks. If the recogniser ever opened its own
+    // input we would be back to two things fighting for one microphone.
+    assert.match(swift, /installTap\(onBus: 0/);
+    assert.match(swift, /request\?\.append\(buffer\)/);
+    assert.match(swift, /file\?\.write\(from: buffer\)/);
+    assert.equal((swift.match(/installTap/g) || []).length, 1);
+
+    // Missing this key hard-crashes on the first authorization request.
+    assert.match(plist, /NSSpeechRecognitionUsageDescription/);
+
+    // A Sources entry is what actually compiles it — the group alone ships a
+    // build with the feature silently absent.
+    const sources = project.slice(project.indexOf('isa = PBXSourcesBuildPhase'));
+    assert.match(sources.slice(0, sources.indexOf('};')), /NativeDictation\.swift in Sources/);
+
+    // Captions are decoration: the note still comes from the server's own
+    // transcript of the uploaded audio, so the shell returns audio, not text.
+    assert.match(client, /window\.marketelInspectAudioCaptured/);
+    assert.match(client, /sendVoiceNote\(pending\.index/);
+    assert.match(client, /if\(native\)return nativeRecordRoom\(index\)/);
+
+    // Dismissing the sheet must stop the engine or the microphone stays open.
+    const nativePath = client.slice(client.indexOf('function nativeRecordRoom'), client.indexOf('window.marketelInspectDictationText'));
+    assert.match(nativePath, /addEventListener\('close'[\s\S]*?stop\(\)/);
+});
+
 test('a sheet opens without summoning the keyboard', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
@@ -248,8 +283,11 @@ test('the AI is the path, and the note is never hidden once written', () => {
         'the anonymous event route is below the auth boundary and can never fire');
 
     // It is sent once a usable recording exists and before the email wall.
-    const record = client.slice(client.indexOf('async function recordRoom'), client.indexOf('function reviewVoiceNote'));
-    assert.ok(record.indexOf("logInspect('VoiceNoteRecorded',true)") < record.indexOf('ensureAuth(process)'),
+    // Both surfaces now share sendVoiceNote, so the ordering lives there: the
+    // event has to be written before the email wall, or the owners it exists
+    // to count — the ones who refuse to verify — stay invisible.
+    const send = client.slice(client.indexOf('function sendVoiceNote'), client.indexOf('let nativeDictation'));
+    assert.ok(send.indexOf("logInspect('VoiceNoteRecorded',true)") < send.indexOf('ensureAuth('),
         'the recording event fires after the auth wall, so a bail there stays invisible');
 
     // Name only. The voice route promises the recording never leaves memory.
