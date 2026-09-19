@@ -32,7 +32,9 @@ final class MarketelDictation {
         settled = false
         // The microphone is required; speech recognition is not. Denying speech
         // costs the captions and nothing else.
-        AVAudioApplication.requestRecordPermission { [weak self] microphone in
+        // AVAudioApplication is iOS 17; the app target is 15.0 (17.2 belongs to
+        // the widget). This spelling is deprecated but present everywhere.
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] microphone in
             guard microphone else {
                 DispatchQueue.main.async { self?.settle(nil) }
                 return
