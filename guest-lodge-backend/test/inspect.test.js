@@ -44,7 +44,14 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(source, /router\.post\('\/reports\/:id\/voice-draft'/);
   assert.match(source, /Do not infer from photos, diagnose causes, assign fault or liability/);
   assert.match(source, /Audio and transcript exist only in memory/);
-  assert.match(source, /signedAt is deliberately omitted/);
+  // The property, not the prose: signedAt is never taken from the request, so a
+  // client cannot backdate a signature. It is stamped server-side when the
+  // signature first appears — not rewritten at finalize, which would claim
+  // everyone signed the moment the report was frozen.
+  assert.match(source, /signedAt is never taken from the client/);
+  assert.doesNotMatch(source, /signedAt: signature\?\.signedAt|signedAt: input/);
+  assert.match(source, /function stampSignatures\(next, previous, at = new Date\(\)\)/);
+  assert.match(source, /seen\.get\(`\$\{signature\.role\}:\$\{signature\.name\}`\) \|\| at\.toISOString\(\)/);
   assert.match(source, /baselineReportId/);
   assert.match(schema, /onDelete: SetNull/);
   assert.match(client, /AI only organized what it heard\. Check every detail/);
@@ -176,6 +183,45 @@ test('the original camera file can be handed over, and only to its owner', () =>
     // Offered only when there is something on the server to fetch.
     assert.match(client, /const canDownload=!native&&draft\.serverId&&remoteId/);
     assert.match(client, /photos\/\$\{remoteId\}\/original/);
+});
+
+test('an incident record does not misstate anything to an insurer', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    // type is the wedge discriminator and needs no migration, but the three
+    // existing types must keep working.
+    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident'\]/);
+
+    // date is when it was written down; neither it nor finalizedAt says when
+    // the thing happened. Optional, and unknown is a real answer.
+    assert.match(server, /document\.eventTime = eventTime/);
+    assert.match(server, /eventTime !== 'unknown' && !\/\^\(\[01\]/);
+
+    // A witness is not a "resident", and nobody signed at the moment the
+    // report was frozen.
+    assert.match(server, /incident: \['manager', 'witness'\]/);
+    assert.match(server, /default: \['manager', 'resident'\]/);
+    const finalize = server.slice(server.indexOf('const finalizedAt = new Date();'), server.indexOf('const finalized = await tx.inspectReport.update'));
+    assert.match(finalize, /stampSignatures\(document\.signatures, r\.document\?\.signatures, finalizedAt\)/);
+    assert.doesNotMatch(finalize, /signedAt: finalizedAt\.toISOString\(\)/);
+
+    // A share link is a bearer token to the whole document, and an incident
+    // narrative can name a person and their injury.
+    assert.match(server, /Incident records are not shareable by link/);
+    assert.match(client, /d\.type==='incident'\?'':'<button id="share"/);
+
+    // The model must never turn "her wrist looked bad" into an injury.
+    assert.match(server, /Never diagnose, characterise or speculate about injury/);
+    assert.match(server, /VOICE_INSTRUCTIONS\[report\.document\.type\] \|\| VOICE_INSTRUCTIONS\.default/);
+
+    // And both artifacts that leave the app carry the right disclaimer.
+    assert.match(server, /Not a legal, medical or insurance determination/);
+    assert.match(server, /disclaimerFor\(report\.document\.type\)/);
+    assert.match(server, /disclaimerFor\(d\.type\)/);
+    assert.match(client, /esc\(pw\.disclaimer\)/);
 });
 
 test('the claims arm is attributed without new plumbing', () => {

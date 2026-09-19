@@ -69,12 +69,30 @@ const rememberedAuthor = () => { try { return localStorage.getItem(AUTHOR_KEY) |
 const storeAuthor = value => { try { const name = String(value || '').trim(); if (name) localStorage.setItem(AUTHOR_KEY, name); } catch {} };
 // A whole unit is five to eight rooms, and every one of them used to arrive
 // called "Room". Names already used in this report are skipped.
-const COMMON_ROOMS = ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'];
+const WEDGES = {
+  incident: {
+    noun: 'detail', nounPlural: 'details',
+    seeds: ['What happened', 'Where it happened', 'Who was involved', 'What we did'],
+    eyebrow: 'New incident record', dateLabel: 'Date of the incident',
+    signers: { manager: 'staff', other: 'witness' },
+    disclaimer: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
+  },
+  default: {
+    noun: 'room', nounPlural: 'rooms',
+    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
+    eyebrow: 'New condition report', dateLabel: 'Inspection date',
+    signers: { manager: 'manager', other: 'resident' },
+    disclaimer: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
+  },
+};
+const wedge = type => WEDGES[type] || WEDGES.default;
+const COMMON_ROOMS = WEDGES.default.seeds;
 const nextRoomName = rooms => {
   const used = new Set((rooms || []).map(room => String(room.name || '').trim().toLowerCase()));
-  return COMMON_ROOMS.find(name => !used.has(name.toLowerCase())) || 'Room';
+  const w = wedge(draft?.document?.type);
+  return w.seeds.find(name => !used.has(name.toLowerCase())) || (w.noun[0].toUpperCase() + w.noun.slice(1));
 };
-const newDocument = propertyName => ({ propertyName: propertyName || '', author: rememberedAuthor(), type: 'routine', date: localDate(), rooms: [{ name: 'Living room', observation: '', issue: false, photos: [] }], signatures: [] });
+const newDocument = (propertyName, type = 'routine') => ({ propertyName: propertyName || '', author: rememberedAuthor(), type, date: localDate(), rooms: [{ name: wedge(type).seeds[0], observation: '', issue: false, photos: [] }], signatures: [] });
 const db = new Promise((resolve, reject) => {
   const request = indexedDB.open('marketel-inspect', 1);
   request.onupgradeneeded = () => request.result.createObjectStore('drafts');
@@ -292,6 +310,12 @@ function playDemo(){
 // two ideas do not belong next to each other on this page. The demo further
 // down still shows it — mentioned, not headlined.
 const LANDING_ARMS = {
+  incident: {
+    type: 'incident',
+    eyebrow: 'For hotels, short-lets and venues',
+    title: 'Write the incident report<br>before anyone goes home.',
+    lede: 'What happened, where, who was involved and what you did — photographed, timed, signed by a witness, and exported as a PDF.',
+  },
   claims: {
     eyebrow: 'For short-let and rental hosts',
     title: 'Document the damage<br>while it is in front of you.',
@@ -327,9 +351,9 @@ function previewPlans(){
   };
   flow=flowScreen('','plans-screen');paint();
 }
-async function start(propertyName = '') {
+async function start(propertyName = '', type) {
   if (draftUnsaved() && !await confirmAction({title:'Start a new report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start new report',danger:true})) return;
-  clearURLs(); draft = { document: newDocument(propertyName), files: [], serverId: null, finalizedAt: null }; preview = false;
+  clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
 function editor(step) {
@@ -341,13 +365,21 @@ function editor(step) {
   // The draft decides which step opens: an unnamed report needs its details, a
   // named one is ready for the work. Returning lands on the work, not the form.
   editorStep = step || (d.propertyName.trim() ? 'rooms' : 'details');
+  const w = wedge(d.type);
   enterScreen(`editor:${editorStep}`);
   const bar = `<div class="screen-bar">${account
     ? '<button type="button" id="editor-back" class="quiet">← All reports</button>'
     : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
   if (editorStep === 'details') {
-    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">New condition report</small><h1>Which property?</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">Inspection date<input type="date" id="date" value="${esc(d.date)}"></label><label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label></section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
-    for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>Which property?</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${d.type === 'incident'
+      // The report's date and the finalized timestamp both say when it was
+      // written down. Neither says when it happened, which is the field an
+      // insurer looks for first. Unknown is a real answer.
+      ? `<label class="date-field">Time it happened<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label><label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
+      : `<label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
+    for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) if($(id)) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
+    if($('event-time'))$('event-time').oninput = event => { d.eventTime = event.target.value; if($('event-time-unknown'))$('event-time-unknown').checked = false; remember(); };
+    if($('event-time-unknown'))$('event-time-unknown').onchange = event => { d.eventTime = event.target.checked ? 'unknown' : ($('event-time')?.value || ''); remember(); };
     if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
     $('to-rooms').onclick = () => {
       if(!d.propertyName.trim())return notice('Enter a property or unit name first.','error');
@@ -356,7 +388,7 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. Inspect writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details><div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this room</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add room</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. Inspect writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -364,14 +396,14 @@ function editor(step) {
       const figure = event.target.closest('figure[data-photo-id]');
       if (figure && Date.now()-photoDropAt > 400 && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
       const b = event.target.closest('button'); if (!b) return;
-      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice('Keep at least one room.'); if (await confirmAction({title:'Remove this room?',message:'Its photos and notes will be removed from this report.',confirmLabel:'Remove room',danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
+      if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice(`Keep at least one ${w.noun}.`); if (await confirmAction({title:`Remove this ${w.noun}?`,message:'Its photos and notes will be removed from this report.',confirmLabel:`Remove ${w.noun}`,danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
       if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
       if (b.dataset.nativeCamera !== undefined) { haptic(); window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:Number(b.dataset.nativeCamera)}); }
       if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
       if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
     };
-    $('add-room').onclick = () => { if (d.rooms.length >=30) return notice('Maximum 30 rooms.'); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
+    $('add-room').onclick = () => { if (d.rooms.length >=30) return notice(`Maximum 30 ${w.nounPlural}.`); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
     $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
     $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor('rooms');}, button)); };
     bindPhotoDrag();
@@ -868,7 +900,7 @@ function reviewVoiceNote(index,result){
 }
 function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
-  return `<section class="signature-preview"><strong>${signature.role==='resident'?'Resident / tenant':'Manager / inspector'} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
+  return `<section class="signature-preview"><strong>${signature.role==='witness'?'Witness':signature.role==='resident'?'Resident / tenant':'Manager / inspector'} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label=''){
   return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
@@ -884,11 +916,12 @@ function renderCoverage(rooms){
 }
 function reportPreview(){
   enterScreen('preview');
+  const pw = wedge(draft?.document?.type);
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?'Replace manager signature':'Add manager signature'}</button><button class="secondary" data-sign="resident">${d.signatures.some(s=>s.role==='resident')?'Replace resident signature':'Add resident signature'}</button></div></section>`:''}${draft.finalizedAt
-    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button><button id="share" class="secondary">Create private share link</button></div><div class="next-actions"><button type="button" id="another-report" class="secondary">+ New report</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All reports</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this report with you.</h2><p class="muted">We will email one secure link that signs you in and opens this report in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>MARKETEL INSPECT</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?`Replace ${pw.signers.manager} signature`:`Add ${pw.signers.manager} signature`}</button><button class="secondary" data-sign="${d.type==='incident'?'witness':'resident'}">${d.signatures.some(s=>s.role===(d.type==='incident'?'witness':'resident'))?`Replace ${pw.signers.other} signature`:`Add ${pw.signers.other} signature`}</button></div></section>`:''}${draft.finalizedAt
+    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div><div class="next-actions"><button type="button" id="another-report" class="secondary">+ New report</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All reports</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this report with you.</h2><p class="muted">We will email one secure link that signs you in and opens this report in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   if($('coverage-run'))$('coverage-run').onclick=event=>{
@@ -924,7 +957,7 @@ function reportPreview(){
 // keyboard shoved it around the screen on every focus.
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
-  const title=role==='resident'?'Resident / tenant':'Manager / inspector';
+  const title=role==='witness'?'Witness':role==='resident'?'Resident / tenant':'Manager / inspector';
   let name=existing?.name || (role==='manager' ? (draft.document.author||rememberedAuthor()) : '');
   const strokes=existing?structuredClone(existing.strokes):[];
 
