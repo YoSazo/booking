@@ -230,8 +230,19 @@ test('the claims arm is attributed without new plumbing', () => {
 
     // utm_campaign is already captured and persisted by captureInspectAttribution,
     // so which arm someone arrived from needs no new event.
-    assert.match(client, /LANDING_ARMS\[\(new URLSearchParams\(location\.search\)\.get\('utm_campaign'\)/);
+    // The path is canonical so a shared link keeps the arm, and utm_campaign is
+    // freed to name the campaign instead of doubling as the arm. pathname is
+    // already in sourceUrl, so attribution still needs no new plumbing.
+    assert.match(client, /location\.pathname\.match\(\/\\\/inspect\\\/\(\[a-z-\]\+\)/);
+    assert.match(client, /LANDING_ARMS\[fromPath\] \|\| LANDING_ARMS\[fromParam\.toLowerCase\(\)\]/);
     assert.match(client, /utm_campaign:/);
+    const server = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+    assert.match(server, /INSPECT_ARMS = new Set\(\['', '\/', '\/incident', '\/claims'\]\)/);
+    // An empty allowlist disables the microphone for every origin including
+    // this one, which killed dictation in Chrome while Safari let it through.
+    const policy = (server.match(/setHeader\('Permissions-Policy', '[^']+'\)/g) || []).join(' ');
+    assert.match(policy, /microphone=\(self\)/);
+    assert.doesNotMatch(policy, /microphone=\(\)/);
 
     // The claims arm leads with the original files, never with the AI: Airbnb
     // bans AI-generated evidence from claims in the same April 2026 update.

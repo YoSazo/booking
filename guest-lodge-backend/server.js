@@ -1202,13 +1202,22 @@ app.get('/inspect/open', (req, res) => {
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
     res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open Marketel Inspect</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#eff4f0;color:#1a2b22;font:16px system-ui,-apple-system,sans-serif}.card{width:min(100%,440px);padding:28px;background:#fff;border:1px solid #d9e4dc;border-radius:20px;box-shadow:0 18px 50px #1a2b2214}h1{font-size:26px;margin:0 0 10px}p{color:#52665b;line-height:1.55}.button{display:block;margin-top:20px;padding:14px 18px;border-radius:12px;background:#2e7d5b;color:#fff;text-align:center;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Continue in Marketel</h1><p>Install Marketel, then return to the email titled <strong>Open your report in Marketel</strong> and tap its button again.</p><a class="button" href="${appStoreUrl}">Download Marketel on the App Store</a><p><small>The secure email link expires after 10 minutes and works once.</small></p></main></body></html>`);
 });
+const INSPECT_ARMS = new Set(['', '/', '/incident', '/claims']);
 app.use('/inspect/', (req, res, next) => {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), payment=()');
-    if (req.path === '/' || req.path === '') return res.sendFile(path.join(INSPECT_PUBLIC_ROOT, 'index.html'));
+    // microphone=() is an empty allowlist: it disables the microphone for every
+    // origin including this one. Safari does not appear to enforce it, which is
+    // why dictation works there, but Chrome does — so the headline feature was
+    // dead on Android. (self) permits this origin and nobody else.
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self), payment=()');
+    // Each wedge gets a real path rather than a query parameter, so the arm is
+    // shareable, survives a copied link, and is already captured in sourceUrl
+    // via location.pathname — which leaves utm_campaign free to mean the
+    // campaign again instead of doubling as the arm.
+    if (INSPECT_ARMS.has(req.path)) return res.sendFile(path.join(INSPECT_PUBLIC_ROOT, 'index.html'));
     next();
 });
 app.use('/inspect', express.static(INSPECT_PUBLIC_ROOT, { index: false, maxAge: 0 }));

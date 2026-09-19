@@ -322,7 +322,15 @@ const LANDING_ARMS = {
     lede: 'Room-by-room photos kept as the original camera files, with a dated report you can send before the claim window closes.',
   },
 };
-const landingArm = () => LANDING_ARMS[(new URLSearchParams(location.search).get('utm_campaign') || '').toLowerCase()] || null;
+// The path is canonical: it survives a shared link, reads as a product, and is
+// already in sourceUrl via location.pathname — so utm_campaign goes back to
+// naming the campaign rather than doubling as the arm. The parameter stays as a
+// fallback so links already in flight keep working.
+const landingArm = () => {
+  const fromPath = (location.pathname.match(/\/inspect\/([a-z-]+)\/?$/) || [])[1];
+  const fromParam = new URLSearchParams(location.search).get('utm_campaign') || '';
+  return LANDING_ARMS[fromPath] || LANDING_ARMS[fromParam.toLowerCase()] || null;
+};
 function landing() {
   enterScreen('landing');
   const arm = landingArm();
