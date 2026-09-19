@@ -2016,6 +2016,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             showInspectProduct(payload["product"] as? String ?? "")
             setShellVisible(!shellSuppressedByModal, animated: shellVisible)
         case "inspectAuth":
+            // The email typed on the landing carries into the code step.
+            if let email = payload["email"] as? String, !email.isEmpty, authEmail.isEmpty {
+                authEmail = email
+            }
             openAuthDrawer(
                 title: payload["title"] as? String ?? "",
                 message: payload["message"] as? String ?? ""

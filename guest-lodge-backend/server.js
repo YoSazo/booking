@@ -1231,7 +1231,7 @@ function inspectSkinned(file, slug) {
     const source = fs.readFileSync(path.join(INSPECT_PUBLIC_ROOT, file), 'utf8');
     let html = source;
     if (arm) {
-        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover all three. ${slug === 'claims' ? 'Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.' : ''}</div>`;
+        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover all three. ${slug === 'claims' ? 'Claims reports are free to build and $12 each to send, or included in a plan. Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.' : ''}</div>`;
         const swaps = file === 'index.html' ? [
             ['<title>Marketel Inspect \u2014 Your walkthrough, a finished report</title>', `<title>${arm.title}</title>`],
             ['<span>Inspect</span>', `<span>${arm.product}</span>`],

@@ -21,6 +21,11 @@ model InspectAccount {
   periodEnd            DateTime?
   cancelAtPeriodEnd    Boolean          @default(false)
   reportsUsed          Int              @default(0)
+  // Single-report purchases not yet spent on a finalized report.
+  reportCredits        Int              @default(0)
+  // What a report is sent under. Snapshotted into each finalized document.
+  businessName         String?
+  logoKey              String?
   // Server-sanitized Meta/UTM attribution for Inspect conversions. This is
   // deliberately separate from booking-property funnel state and disappears
   // with the Inspect account.
@@ -106,9 +111,15 @@ model InspectEvent {
   accountId String?
   name      String
   sourceId  String?  @unique
+  // Which tool the step happened in, an anonymous visitor id so a funnel can
+  // be read before sign-in, and a short detail such as a decline reason.
+  tool      String?
+  visitorId String?
+  detail    String?
   createdAt DateTime @default(now())
 
   @@index([createdAt, name])
+  @@index([tool, name, createdAt])
 }
 
 // Durable private-object deletion queue; never fall back to public uploads.

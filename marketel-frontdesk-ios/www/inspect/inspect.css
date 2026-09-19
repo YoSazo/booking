@@ -333,6 +333,35 @@ html.wedge-enter .hero > :nth-child(5) { animation-delay: 170ms; }
 html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 @keyframes wedge-in { from { opacity: 0; transform: translateY(12px); } }
 .native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); }
+/* The booking funnel's landing: one pain, one field, one button, one proof. */
+.hero.golden h1 { font-size: clamp(36px, 6.4vw, 54px); }
+.hero.golden h1 .green { color: var(--green); }
+.lead-box { display: flex; gap: 8px; max-width: 520px; margin: 26px auto 8px; }
+.lead-box input { flex: 1 1 auto; min-width: 0; min-height: 52px; font-size: 16px; }
+.lead-box input.invalid { border-color: #aa382b; animation: lead-shake .32s ease; }
+.lead-box button { flex: 0 0 auto; min-height: 52px; }
+@keyframes lead-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.lead-note { margin: 4px 0 0; }
+.proof { max-width: 460px; margin: 18px auto 6px; font-size: 14px; color: var(--muted); }
+/* Setup: the flow card from the plan preview, one small step at a time. */
+.setup-step { margin: 0 0 6px; font-size: 12px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
+.setup-screen .flow-card label { display: grid; gap: 6px; margin: 14px 0; }
+.setup-screen .flow-card .button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.logo-preview { display: flex; justify-content: center; margin: 10px 0; }
+.logo-preview img { max-height: 72px; max-width: 200px; border-radius: 12px; }
+.building { display: grid; place-items: center; text-align: center; padding: 18px 0; }
+/* The business a report is sent under, above the product mark. */
+.biz-header { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+.biz-header img { max-height: 48px; max-width: 140px; border-radius: 10px; }
+.biz-header strong { font-size: 20px; letter-spacing: -.3px; }
+.reveal-actions { margin-top: 18px; }
+/* Three ways to send, the best value preselected. */
+.offer-options { display: grid; gap: 10px; margin: 16px 0 14px; }
+.offer-option { display: grid; gap: 3px; text-align: left; width: 100%; background: #fff; color: inherit; border: 1.5px solid var(--border); border-radius: 16px; padding: 14px 16px; box-shadow: none; }
+.offer-option strong { font-size: 19px; }
+.offer-option small { color: var(--muted); font-weight: 500; }
+.offer-option.is-selected { border-color: var(--green); background: var(--green-pale); }
+.offer-option:active { transform: scale(.99); }
 @media (max-width: 540px) {
   header { padding: 0 15px; }
   .header-drawer-content { padding-bottom: 18px; }
@@ -345,6 +374,8 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
   .brand { font-size: 16px; }
   .brand-icon { width: 28px; height: 28px; }
   .brand-wordmark { width: 104px; }
+  .lead-box { flex-direction: column; }
+  .lead-box button { width: 100%; }
   .actions { left: 15px; right: 15px; width: auto; }
   .actions button { flex: 1 1 auto; }
   .app-handoff-card { display: grid; }

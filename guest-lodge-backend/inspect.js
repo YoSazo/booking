@@ -41,6 +41,19 @@ const VOICE_INSTRUCTIONS = {
 const SIGNATURE_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
 const signatureRoles = type => SIGNATURE_ROLES[type] || SIGNATURE_ROLES.default;
 const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident', 'damage']);
+// Per-tool commercial settings. A 'first-free' tool includes one lifetime free
+// finalized report. A 'pay-at-export' tool is free to build and asks at the
+// moment a finished report is sent or downloaded, which is when cold traffic
+// has just seen its own report and is most willing to pay for it.
+const TOOLS = Object.freeze({
+  inspect: Object.freeze({ types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', label: 'Marketel Inspect', home: '/inspect/' }),
+  claims: Object.freeze({ types: ['damage'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
+  incident: Object.freeze({ types: ['incident'], offerMode: 'first-free', label: 'Marketel Incident', home: '/incident' }),
+});
+const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
+const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
+const DECLINE_REASONS = Object.freeze(['too_expensive', 'only_needed_one', 'missing_something', 'just_looking']);
+const visitorOf = value => (/^v_[A-Za-z0-9]{8,40}$/.test(String(value || '')) ? String(value) : null);
 // Printed on the document, so it says what the person actually was. Both
 // damage roles stay optional: a host documenting a wrecked room after checkout
 // has nobody left to sign, and an empty "Resident / tenant" slot on an evidence
@@ -172,6 +185,7 @@ function entitlement(account, now = Date.now()) {
   const active = account.subscriptionStatus === 'active' && new Date(account.periodEnd).getTime() > now;
   const plan = accountPlan(account);
   return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
+    credits: Math.max(0, Number(account.reportCredits) || 0), businessName: account.businessName || '', hasLogo: !!account.logoKey,
     periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true,
     price: plan.amount / 100, interval: plan.interval, limits: { ...LIMITS, reports: plan.reports } };
 }
@@ -314,11 +328,12 @@ function registerInspect(app, {
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(400, 'Enter a valid email.');
     return email;
   };
-  const record = async (accountId, name, sourceId) => {
-    if (sourceId) await prisma.inspectEvent.upsert({ where: { sourceId }, create: { accountId, name, sourceId }, update: {} });
-    else await prisma.inspectEvent.create({ data: { accountId, name } });
+  const record = async (accountId, name, sourceId, extra = {}) => {
+    const fields = { tool: extra.tool || null, visitorId: extra.visitorId || null, detail: extra.detail || null };
+    if (sourceId) await prisma.inspectEvent.upsert({ where: { sourceId }, create: { accountId, name, sourceId, ...fields }, update: {} });
+    else await prisma.inspectEvent.create({ data: { accountId, name, ...fields } });
   };
-  const recordBestEffort = (accountId, name, sourceId) => record(accountId, name, sourceId).catch(error => {
+  const recordBestEffort = (accountId, name, sourceId, extra) => record(accountId, name, sourceId, extra).catch(error => {
     console.error('Inspect event recording failed:', name, error.name);
   });
   const saveAttribution = async (account, value, req, db = prisma) => {
@@ -550,8 +565,17 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const before = baselineRooms.get(room.name.toLowerCase()) || baseline?.document?.rooms?.[index];
       return `${before ? roomHtml(before, baseline, `${req.params.token}/photos`, '<p class="compare-label">Previous finalized report</p>') : ''}${roomHtml(room, report, `${req.params.token}/photos`, before ? '<p class="compare-label">Current report</p>' : '')}`;
     }).join('');
+    const business = d.business && (d.business.name || d.business.logoKey)
+      ? `<header style="display:flex;align-items:center;gap:14px;margin:0 0 18px">${d.business.logoKey ? `<img src="${req.params.token}/logo" alt="" style="max-height:56px;max-width:160px">` : ''}<strong style="font-size:22px">${safe(d.business.name)}</strong></header>`
+      : '';
     res.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}</style></head><body><small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(d.date)}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}</p>` : ''}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
+    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(d.date)}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}</p>` : ''}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
+  }));
+  router.get('/shared/:token/logo', guarded(async (req, res) => {
+    const r = await shared(req.params.token);
+    const key = r.document?.business?.logoKey;
+    if (!key) throw fail(404, 'Logo unavailable.');
+    res.type('png').send(await object(key));
   }));
   router.get('/shared/:token/photos/:id', guarded(async (req, res) => {
     const r = await shared(req.params.token);
@@ -593,8 +617,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const doc = new PDFDocument({ size: 'A4', margin: 44, autoFirstPage: true });
     doc.on('error', () => res.destroy());
     const identity = documentIdentity(report.document.type);
+    const business = report.document.business;
+    const logo = business?.logoKey ? await object(business.logoKey).catch(() => null) : null;
     res.type('pdf').set('Content-Disposition', `attachment; filename="${identity.file}"`);
     doc.pipe(res);
+    if (logo) { try { doc.image(logo, { fit: [140, 56] }); doc.moveDown(0.5); } catch { /* A bad logo never blocks the report. */ } }
+    if (business?.name) doc.fontSize(16).text(business.name).moveDown(0.3);
     doc.fontSize(10).text(identity.brand);
     doc.moveDown().fontSize(24).text(report.document.propertyName);
     const legacy = report.document.type !== 'incident' && report.document.type !== 'damage';
@@ -629,11 +657,43 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // accountId is nullable, so the row is valid unattributed. Name only: no
   // transcript, audio, room or property detail reaches this, and it must stay
   // that way — the voice route promises the recording never leaves memory.
-  const ANON_EVENTS = new Set(['VoiceNoteRecorded']);
+  // The funnel ladder a cold visitor climbs before they ever sign in. Each step
+  // carries the tool and an anonymous visitor id, never content.
+  const LADDER_EVENTS = ['LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined'];
+  const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS]);
+  const eventExtra = body => ({
+    tool: toolOf(body?.tool),
+    visitorId: visitorOf(body?.visitorId),
+    detail: body?.name === 'OfferDeclined' && DECLINE_REASONS.includes(body?.detail) ? body.detail : null,
+  });
   router.post('/events/anon', guarded(async (req, res) => {
     if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown Inspect event.');
-    rate(`inspect-anon-events:${req.ip}`, 40, 3600000);
-    await record(null, req.body.name);
+    rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
+    await record(null, req.body.name, undefined, eventExtra(req.body));
+    res.json({ success: true });
+  }));
+  // The email on the landing is the lead, exactly as in the booking funnel: no
+  // code yet, so nothing stands between the ad and the build. The account row
+  // exists from here, but nothing is readable until the code is verified.
+  router.post('/leads', guarded(async (req, res) => {
+    rate(`inspect-leads:${req.ip}`, 20, 3600000);
+    const email = emailOf(req.body?.email);
+    rate(`inspect-lead-email:${email}`, 6, 3600000);
+    const extra = eventExtra(req.body);
+    const account = await prisma.$transaction(async tx => {
+      const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
+      const row = await tx.inspectAccount.upsert({ where: { email },
+        create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
+      return saveAttribution(row, req.body?.attribution, req, tx);
+    });
+    const firstLead = !(await prisma.inspectEvent.findUnique({ where: { sourceId: `inspect-lead:${account.id}` } }));
+    await recordBestEffort(account.id, 'LeadCaptured', `inspect-lead:${account.id}:${extra.tool}`, extra);
+    if (firstLead) {
+      await recordBestEffort(account.id, 'LeadFirst', `inspect-lead:${account.id}`, extra);
+      // Same event id as the report-start Lead, so Meta counts one lead.
+      await queueInspectCapi('Lead', { account, req, eventId: `inspect-lead.${account.id}`, contentName: `${TOOLS[extra.tool].label} lead` })
+        .catch(error => console.error('Inspect Lead CAPI queue failed:', error.message));
+    }
     res.json({ success: true });
   }));
 
@@ -646,6 +706,31 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }).catch(next);
   });
   router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect), plans: purchasablePlans() })));
+  // What a report is sent under. Snapshotted into each report at finalize, so
+  // changing the logo later never rewrites a document someone already has.
+  router.put('/branding', guarded(async (req, res) => {
+    const raw = typeof req.body?.businessName === 'string' ? req.body.businessName.replace(/[\u0000-\u001f\u007f]/g, '').trim() : '';
+    if (raw.length > 120) throw fail(400, 'Keep the business name under 120 characters.');
+    const account = await prisma.inspectAccount.update({ where: { id: req.inspect.id }, data: { businessName: raw || null } });
+    res.json({ businessName: account.businessName || '', hasLogo: !!account.logoKey });
+  }));
+  const logoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LIMITS.fileBytes, files: 1 } }).single('logo');
+  router.post('/branding/logo', logoUpload, guarded(async (req, res) => {
+    storageReady();
+    if (!req.file) throw fail(400, 'Choose a logo image.');
+    rate(`logo:${req.inspect.id}`, 20, 3600000);
+    let bytes;
+    try { bytes = await sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).png().toBuffer(); }
+    catch { throw fail(400, 'Use a JPEG, PNG, WebP or HEIC image for the logo.'); }
+    const key = `inspect/logos/${req.inspect.id}/${crypto.randomUUID()}.png`;
+    await s3.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: 'image/png' }));
+    await prisma.inspectAccount.update({ where: { id: req.inspect.id }, data: { logoKey: key } });
+    res.json({ hasLogo: true });
+  }));
+  router.get('/branding/logo', guarded(async (req, res) => {
+    if (!req.inspect.logoKey) throw fail(404, 'No logo yet.');
+    res.type('png').send(await object(req.inspect.logoKey));
+  }));
   router.post('/attribution', guarded(async (req, res) => {
     const account = await saveAttribution(req.inspect, req.body.attribution, req);
     req.inspect = account;
@@ -661,12 +746,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // Also accepted here so a signed-in owner's recording is attributed rather
     // than landing in the anonymous bucket.
     ['VoiceNoteRecorded', null],
+    ['LandingViewed', null], ['SetupStarted', null], ['SetupCompleted', null], ['FirstPhotoAdded', null],
+    ['ReportRevealed', null], ['ExportOfferViewed', null], ['OfferDeclined', null],
   ]);
   router.post('/events', guarded(async (req, res) => {
     if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown Inspect event.');
     const sourceId = CLIENT_EVENTS.get(req.body.name);
     if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
-    await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined);
+    await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body));
     res.json({ success: true });
   }));
   router.post('/auth/logout', guarded(async (req, res) => {
@@ -1054,9 +1141,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       if (document.rooms.some(room => room.photos.some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(a.email) } });
       const access = entitlement({ ...a, freeReportUsed: a.freeReportUsed || !!priorFreeClaim });
-      if (!access.freeAvailable && (!access.active || !access.remaining)) throw fail(402, 'Subscribe for additional reports, or wait for your next billing period.');
-      if (access.freeAvailable) await tx.inspectFreeClaim.create({ data: { emailHash: freeClaimHash(a.email) } });
-      await tx.inspectAccount.update({ where: { id: a.id }, data: access.freeAvailable ? { freeReportUsed: true } : { reportsUsed: { increment: 1 } } });
+      const tool = TOOLS[toolForType(document.type)];
+      // The lifetime free report first where the tool offers one, then the
+      // plan's allowance, then a single-report purchase.
+      const spend = tool.offerMode === 'first-free' && access.freeAvailable ? { freeReportUsed: true }
+        : access.active && access.remaining ? { reportsUsed: { increment: 1 } }
+        : access.credits > 0 ? { reportCredits: { decrement: 1 } }
+        : null;
+      if (!spend) throw fail(402, tool.offerMode === 'pay-at-export' ? 'Choose a plan or buy this report to send it.' : 'Subscribe for additional reports, or wait for your next billing period.');
+      if (spend.freeReportUsed) await tx.inspectFreeClaim.create({ data: { emailHash: freeClaimHash(a.email) } });
+      await tx.inspectAccount.update({ where: { id: a.id }, data: spend });
       const finalizedAt = new Date();
       // Signatures keep the time they were actually signed. Anything already
       // stored keeps its stamp; anything reaching finalize unstamped is being
@@ -1064,12 +1158,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const finalizedDocument = {
         ...document,
         ...(document.signatures ? { signatures: stampSignatures(document.signatures, r.document?.signatures, finalizedAt) } : {}),
+        ...(a.businessName || a.logoKey ? { business: { name: a.businessName || '', logoKey: a.logoKey || '' } } : {}),
       };
       const finalized = await tx.inspectReport.update({ where: { id: r.id }, data: { document: finalizedDocument, finalizedAt }, include: {
         attachments: true,
         baselineReport: { include: { attachments: true } },
       } });
-      await tx.inspectEvent.create({ data: { accountId: a.id, name: 'ReportFinalized', sourceId: `inspect-final:${r.id}` } });
+      await tx.inspectEvent.create({ data: { accountId: a.id, name: 'ReportFinalized', sourceId: `inspect-final:${r.id}`, tool: toolForType(document.type) } });
       return finalized;
     });
     await queueInspectCapi('CompleteRegistration', {
@@ -1142,9 +1237,47 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       return true;
     });
   }
+  const ensureCustomer = async (tx, a) => {
+    if (a.stripeCustomerId) return a;
+    const customer = await stripe.customers.create({ email: a.email, metadata: { product: 'marketel-inspect', inspectAccountId: a.id } }, { idempotencyKey: `inspect-customer:${a.id}` });
+    return tx.inspectAccount.update({ where: { id: a.id }, data: { stripeCustomerId: customer.id } });
+  };
+  const toolReturn = (tool, query) => `${origin}${TOOLS[tool].home}?${query}`;
+  // One report, paid once, at the moment it is sent. The price lives here, not
+  // in a dashboard Price, so the amount charged is exactly what the page shows.
+  async function reportCheckout(req, res) {
+    const reportId = String(req.body.reportId || '');
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(reportId)) throw fail(400, 'Choose the report to send.');
+    const report = await owned(prisma, req.inspect.id, reportId);
+    if (report.finalizedAt) throw fail(409, 'This report is already finalized.');
+    const tool = toolForType(report.document?.type);
+    const amount = TOOLS[tool].reportPrice;
+    if (!amount) throw fail(400, 'Single reports are not sold for this tool.');
+    const nativeReturn = req.body.native === true;
+    const checkout = await prisma.$transaction(async tx => {
+      const a = await ensureCustomer(tx, await lockAccount(tx, req.inspect.id));
+      const metadata = { product: 'marketel-inspect-report', inspectAccountId: a.id, reportId, tool };
+      const session = await stripe.checkout.sessions.create({ mode: 'payment', customer: a.stripeCustomerId,
+        line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount, product_data: { name: `${TOOLS[tool].label} report` } } }],
+        metadata, payment_intent_data: { metadata },
+        // Stripe fills in the session id, so the page can confirm the payment
+        // itself instead of waiting on the webhook.
+        success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : toolReturn(tool, `checkout=success&report=${reportId}&session={CHECKOUT_SESSION_ID}`),
+        cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : toolReturn(tool, 'checkout=cancelled') },
+        { idempotencyKey: `inspect-report-checkout:${a.id}:${reportId}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
+      return { url: session.url, sessionId: session.id };
+    }, { timeout: 30000 });
+    const eventId = `inspect-checkout.${checkout.sessionId}`;
+    await recordBestEffort(req.inspect.id, 'CheckoutStarted', eventId, { tool, detail: 'report' });
+    await queueInspectCapi('InitiateCheckout', { account: req.inspect, req, eventId, value: amount / 100, currency: 'USD', contentName: `${TOOLS[tool].label} report` })
+      .catch(error => console.error('Inspect checkout CAPI queue failed:', error.message));
+    res.json({ url: checkout.url });
+  }
   router.post('/checkout', guarded(async (req, res) => {
     requireBilling();
     rate(`checkout:${req.inspect.id}`, 10, 3600000);
+    if (req.body.interval === 'report') return reportCheckout(req, res);
+    const tool = toolOf(req.body.tool);
     const interval = req.body.interval === 'year' ? 'year' : 'month';
     const plan = inspectPlan(interval);
     const priceId = env[plan.priceEnv];
@@ -1157,10 +1290,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         if (!['canceled', 'incomplete_expired'].includes(subscription.status)) throw fail(409, 'You already have a subscription. Use Manage subscription.');
       }
       const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
-      if (!a.stripeCustomerId) {
-        const customer = await stripe.customers.create({ email: a.email, metadata: { product: 'marketel-inspect', inspectAccountId: a.id } }, { idempotencyKey: `inspect-customer:${a.id}` });
-        a = await tx.inspectAccount.update({ where: { id: a.id }, data: { stripeCustomerId: customer.id } });
-      }
+      a = await ensureCustomer(tx, a);
       const subscriptions = await stripe.subscriptions.list({ customer: a.stripeCustomerId, status: 'all', limit: 100 });
       if (subscriptions.data.some(s => s.metadata?.product === 'marketel-inspect' && !['canceled', 'incomplete_expired'].includes(s.status))) throw fail(409, 'A subscription already exists. Refresh billing or use Manage subscription.');
       const open = await stripe.checkout.sessions.list({ customer: a.stripeCustomerId, status: 'open', limit: 10 });
@@ -1170,15 +1300,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       if (existing) return { url: existing.url, sessionId: existing.id };
       const nativeReturn = req.body.native === true;
       const session = await stripe.checkout.sessions.create({ mode: 'subscription', customer: a.stripeCustomerId,
-        line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval },
-        subscription_data: { metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval } },
-        success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : `${origin}/inspect/?checkout=success`,
-        cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : `${origin}/inspect/?checkout=cancelled` },
+        line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval, tool },
+        subscription_data: { metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval, tool } },
+        success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : toolReturn(tool, `checkout=success${/^[A-Za-z0-9_-]{1,64}$/.test(String(req.body.reportId || '')) ? `&report=${req.body.reportId}` : ''}`),
+        cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : toolReturn(tool, 'checkout=cancelled') },
         { idempotencyKey: `inspect-checkout:${a.id}:${interval}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
       return { url: session.url, sessionId: session.id };
     }, { timeout: 30000 });
     const eventId = `inspect-checkout.${checkout.sessionId}`;
-    await recordBestEffort(req.inspect.id, 'CheckoutStarted', eventId);
+    await recordBestEffort(req.inspect.id, 'CheckoutStarted', eventId, { tool, detail: interval });
     await queueInspectCapi('InitiateCheckout', {
       account: req.inspect,
       req,
@@ -1188,6 +1318,19 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       contentName: plan.contentName,
     }).catch(error => console.error('Inspect checkout CAPI queue failed:', error.message));
     res.json({ url: checkout.url });
+  }));
+  // The return from Stripe confirms its own payment. The grant is the webhook's
+  // idempotent grant, so whichever arrives first wins and the other is a no-op.
+  router.post('/checkout/confirm', guarded(async (req, res) => {
+    requireBilling();
+    rate(`checkout-confirm:${req.inspect.id}`, 30, 3600000);
+    const sessionId = String(req.body.sessionId || '');
+    if (!/^cs_[A-Za-z0-9_]{8,200}$/.test(sessionId)) throw fail(400, 'Invalid checkout session.');
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.metadata?.product === 'marketel-inspect-report' && session.metadata?.inspectAccountId === req.inspect.id) {
+      await grantReportPurchase({ data: { object: session }, created: Math.floor(Date.now() / 1000) }, req);
+    }
+    res.json(entitlement(await prisma.inspectAccount.findUniqueOrThrow({ where: { id: req.inspect.id } })));
   }));
   router.post('/billing', guarded(async (req, res) => {
     requireBilling();
@@ -1217,7 +1360,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     await prisma.$transaction(async tx => {
       await lockAccount(tx, req.inspect.id);
       const assets = await tx.inspectAttachment.findMany({ where: { report: { accountId: req.inspect.id } } });
-      await tx.inspectGarbage.createMany({ data: assets.flatMap(a => [{ objectKey: a.objectKey }, { objectKey: a.originalKey }]), skipDuplicates: true });
+      const documents = await tx.inspectReport.findMany({ where: { accountId: req.inspect.id }, select: { document: true } });
+      const logos = new Set([req.inspect.logoKey, ...documents.map(row => row.document?.business?.logoKey)].filter(Boolean));
+      await tx.inspectGarbage.createMany({ data: [...assets.flatMap(a => [{ objectKey: a.objectKey }, { objectKey: a.originalKey }]), ...[...logos].map(objectKey => ({ objectKey }))], skipDuplicates: true });
       await tx.inspectEvent.deleteMany({ where: { accountId: req.inspect.id } });
       await tx.inspectAccount.delete({ where: { id: req.inspect.id } });
     });
@@ -1231,11 +1376,37 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   });
   app.use('/api/inspect', router);
 
+  // The event row is created in the same transaction as the credit and its
+  // sourceId is unique, so a replayed or concurrent delivery can never grant a
+  // second report for one payment.
+  async function grantReportPurchase(event, req) {
+    const session = event.data.object;
+    if (session.mode !== 'payment' || session.payment_status !== 'paid') return;
+    const accountId = String(session.metadata?.inspectAccountId || '');
+    const tool = toolOf(session.metadata?.tool);
+    const sourceId = `inspect-report-purchase:${session.id}`;
+    const granted = await prisma.$transaction(async tx => {
+      const account = await tx.inspectAccount.findUnique({ where: { id: accountId } });
+      if (!account || await tx.inspectEvent.findUnique({ where: { sourceId } })) return null;
+      await tx.inspectEvent.create({ data: { accountId, name: 'PaymentSucceeded', sourceId, tool, detail: 'report' } });
+      return tx.inspectAccount.update({ where: { id: accountId }, data: { reportCredits: { increment: 1 } } });
+    });
+    if (!granted) return;
+    await queueInspectCapi('Purchase', {
+      account: granted, req, eventId: `inspect-purchase.${session.id}`,
+      value: Number(session.amount_total) / 100, currency: String(session.currency || 'usd').toUpperCase(),
+      contentName: `${TOOLS[tool].label} report`, eventTime: Number(event.created) || undefined,
+    }).catch(error => console.error('Inspect report Purchase CAPI queue failed:', error.message));
+  }
   app.post('/api/inspect-stripe-webhook', guarded(async (req, res) => {
     if (!enabled || !stripe || !env.STRIPE_INSPECT_WEBHOOK_SECRET) return res.sendStatus(503);
     let event;
     try { event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], env.STRIPE_INSPECT_WEBHOOK_SECRET); }
     catch { return res.sendStatus(400); }
+    if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.product === 'marketel-inspect-report') {
+      await grantReportPurchase(event, req);
+      return res.json({ received: true });
+    }
     let subscriptionId;
     if (event.type.startsWith('customer.subscription.')) subscriptionId = event.data.object.id;
     if (event.type === 'checkout.session.completed') subscriptionId = event.data.object.subscription;
@@ -1248,7 +1419,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         const invoice = event.data.object;
         if (synced && event.type === 'invoice.paid' && invoice.amount_paid > 0) {
           const accountId = subscription.metadata.inspectAccountId;
-          await record(accountId, 'PaymentSucceeded', `inspect-invoice:${invoice.id}`);
+          await record(accountId, 'PaymentSucceeded', `inspect-invoice:${invoice.id}`, { tool: toolOf(subscription.metadata?.tool), detail: subscription.metadata?.interval === 'year' ? 'year' : 'month' });
           const account = await prisma.inspectAccount.findUnique({ where: { id: accountId } });
           if (account) {
             await queueInspectCapi('Purchase', {

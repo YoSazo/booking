@@ -467,6 +467,22 @@ const LANDING_ARMS = {
     title: 'Document the damage<br>while it is in front of you.',
     lede: 'Room-by-room photos kept as uploaded, with a dated report you can send before the claim window closes.',
     type: 'damage',
+    // Free to build; paid when the finished report is sent. The ask lands at
+    // the moment someone has just seen their own report, in the same session.
+    offer: { mode: 'pay-at-export', reportPrice: 12 },
+    golden: {
+      headline: 'Document guest damage <span class="green">before the claim window closes.</span>',
+      sub: 'Build a dated, photo-by-photo damage report in under 3 minutes.',
+      cta: 'Build my free damage report →',
+      note: 'Free to build. Takes 3 minutes. Pay only when you send it.',
+      proof: 'Airbnb asks hosts to request reimbursement within 14 days of checkout.',
+      jobTitle: 'Which rental had the damage?',
+      jobLabel: 'Rental property / unit',
+      jobPlaceholder: 'Pine Ave · Unit 2',
+      photoLabel: 'Add a photo of the damage',
+      building: 'Building your damage report',
+      reveal: 'Here is what your guest or the platform receives.',
+    },
     skin: {
       product: 'Claims',
       writesLabel: 'it writes',
@@ -523,6 +539,22 @@ const TOOL_TYPES = Object.freeze({ inspect: ['routine', 'move-in', 'move-out'], 
 const toolId = () => { const arm = landingArm(); return Object.keys(LANDING_ARMS).find(key => LANDING_ARMS[key] === arm) || 'inspect'; };
 const toolForType = type => Object.keys(TOOL_TYPES).find(tool => TOOL_TYPES[tool].includes(type)) || 'inspect';
 const toolTypesQuery = () => `types=${TOOL_TYPES[toolId()].join(',')}`;
+// A tool is either 'first-free' (one lifetime free finalized report) or
+// 'pay-at-export' (free to build, paid when a finished report is sent).
+const payAtExport = () => landingArm()?.offer?.mode === 'pay-at-export';
+const reportPrice = () => landingArm()?.offer?.reportPrice || 0;
+const canSend = () => !!account && ((account.active && account.remaining > 0) || account.credits > 0 || (!payAtExport() && account.freeAvailable));
+const storedEmail = () => { try { return localStorage.getItem('inspect.email') || ''; } catch { return ''; } };
+// Each step a visitor takes, per tool, before and after sign-in. Never content:
+// a name, the tool, an anonymous visitor id and at most a decline reason.
+const visitorId = (() => { try { let value = localStorage.getItem('inspect.visitor') || ''; if (!/^v_[A-Za-z0-9]{8,40}$/.test(value)) { value = `v_${uid().replace(/[^A-Za-z0-9]/g, '').slice(0, 24)}`; localStorage.setItem('inspect.visitor', value); } return value; } catch { return ''; } })();
+const trackedSteps = new Set();
+function track(name, detail, once = true) {
+  if (once && trackedSteps.has(name)) return;
+  trackedSteps.add(name);
+  api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail } }).catch(() => {});
+}
+const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
 // A document carries its own brand, whichever tool it was opened through.
 const documentLabelFor = type => type === 'damage' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
 function landing() {
@@ -530,7 +562,9 @@ function landing() {
   const arm = landingArm();
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first ${esc(skin().doc)} free</button><p><small>Your first complete report across Marketel Inspect is free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().writesLabel)}</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF${arm?.type==='incident'?'':' or a private link'}.</small></article><p><small>${esc(wedge(arm?.type).disclaimer)}</small></p></section>`;
+  track('LandingViewed');
+  if (!native && payAtExport()) return goldenLanding(arm);
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first ${esc(skin().doc)} free</button><p><small>Your first complete report across Marketel Inspect is free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button>${demoMarkup(arm)}</section>`;
   if(arm){
     $('demo-result').querySelector('.demo-note').textContent=arm.demoNote;
     if(arm.type==='incident')$('demo-result').querySelector('.demo-badge').remove();
@@ -546,6 +580,76 @@ function landing() {
   $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   settleWedgeEntrance();
 }
+function demoMarkup(arm){
+  return `<article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().writesLabel)}</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF${arm?.type==='incident'?'':' or a private link'}.</small></article><p><small>${esc(wedge(arm?.type).disclaimer)}</small></p>`;
+}
+// The booking funnel's landing, which is what already worked: one pain, one
+// field, one button, one line of proof. The email is the lead; there is no code
+// here, so nothing stands between the ad and the build.
+function goldenLanding(arm){
+  const g=arm.golden||{},sk=skin();
+  $('app').innerHTML=`<section class="hero golden"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(g.sub||arm.lede||'')}</p><form id="lead-form" class="lead-box" novalidate><input id="lead-email" type="email" autocomplete="email" inputmode="email" placeholder="Your email" aria-label="Your email" value="${esc(storedEmail())}"><button id="start">${esc(g.cta||`Build my free ${sk.doc} →`)}</button></form><p class="lead-note"><small>${esc(g.note||'')}</small></p>${g.proof?`<p class="proof">${esc(g.proof)}</p>`:''}<button id="see-plans" class="quiet">See prices</button><button id="sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button>${demoMarkup(arm)}</section>`;
+  $('demo-result').querySelector('.demo-note').textContent=arm.demoNote||'';
+  playDemo();
+  $('lead-form').onsubmit=event=>{
+    event.preventDefault();
+    const email=$('lead-email').value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){$('lead-email').classList.add('invalid');notice('Enter your email to build your report.','error');return;}
+    try{localStorage.setItem('inspect.email',email);}catch{}
+    api('/leads',{method:'POST',body:{email,tool:toolId(),visitorId,attribution:inspectAttribution}}).catch(()=>{});
+    haptic();setupFlow();
+  };
+  $('lead-email').oninput=()=>$('lead-email').classList.remove('invalid');
+  $('see-plans').onclick=previewPlans;
+  $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
+}
+// Two small steps before anything is asked of anyone, like the booking setup:
+// the business the report is sent under, then the first job. A returning owner
+// whose business is already on file goes straight to the job.
+function setupFlow(){
+  track('SetupStarted');
+  const arm=landingArm(),g=arm?.golden||{},w=wedge(arm?.type),sk=skin();
+  let business=account?.businessName||'';
+  try{business||=localStorage.getItem('inspect.business')||'';}catch{}
+  let logo=null,logoURL='';
+  const flow=flowScreen('','setup-screen');
+  const one=()=>{
+    flow.paint(`<p class="setup-step">Step 1 of 2</p><h2>What's your business called?</h2><p class="muted">Your ${esc(sk.doc)} is sent under this name.</p><label>Business name<input id="setup-business" maxlength="120" autocomplete="organization" placeholder="Pine Street Stays" value="${esc(business)}"></label>${logoURL?`<div class="logo-preview"><img src="${esc(logoURL)}" alt="Your logo"></div>`:''}<label class="button secondary logo-pick">${logo?'Change logo':'Add your logo'} <small>(optional)</small><input type="file" id="setup-logo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><button type="button" id="setup-next" class="wide">Continue →</button><p class="muted"><small>We'll save your progress as you go.</small></p>`);
+    $('setup-logo').onchange=event=>{
+      const file=event.target.files?.[0];if(!file)return;
+      if(file.size>12*1024*1024)return notice('That logo is too large. Maximum 12 MB.','error');
+      business=$('setup-business').value;logo=file;if(logoURL)URL.revokeObjectURL(logoURL);logoURL=URL.createObjectURL(file);one();
+    };
+    $('setup-next').onclick=()=>{
+      business=$('setup-business').value.trim();
+      if(!business)return notice('Enter your business name.','error');
+      try{localStorage.setItem('inspect.business',business);}catch{}
+      haptic();two();
+    };
+  };
+  const two=()=>{
+    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p><label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><label class="button secondary">${esc(g.photoLabel||'Add a first photo')} <small>(optional)</small><input type="file" id="setup-photo" data-files="0" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><p id="setup-photo-name" class="muted"></p><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
+    $('setup-photo').onchange=event=>{$('setup-photo-name').textContent=event.target.files?.[0]?'Photo added.':'';};
+    if($('setup-back'))$('setup-back').onclick=one;
+    $('setup-build').onclick=event=>run(async()=>{
+      const property=$('setup-property').value.trim();
+      if(!property)throw new Error(`Enter the ${(g.jobLabel||'property').toLowerCase()} first.`);
+      const date=$('setup-date').value||localDate();
+      const photo=$('setup-photo');
+      flow.paint(`<div class="building"><section class="loading">${esc(g.building||`Building your ${sk.doc}`)}…</section><p class="muted">${esc(property)}${business?` · ${esc(business)}`:''}</p></div>`);
+      clearURLs();
+      draft={document:newDocument(property,arm?.type||'routine'),files:[],serverId:null,finalizedAt:null,branding:{name:business,logo}};
+      draft.document.date=date;
+      if(!draft.document.author.trim())draft.document.author=business;
+      preview=false;await persist();
+      track('SetupCompleted');
+      await new Promise(resolve=>setTimeout(resolve,900));
+      flow.restore();
+      if(photo?.files?.length)await addPhotos(photo);else editor('rooms');
+    },event.currentTarget);
+  };
+  if(account?.businessName)two();else one();
+}
 // Pricing stays one tap away without turning a no-card free report into a
 // purchase decision. This is informational: it neither fires the post-report
 // offer event nor opens checkout.
@@ -555,7 +659,7 @@ function previewPlans(){
     const plan=PLANS[planInterval],each=plan.price/plan.reports;
     const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
     const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually · ${plan.save}`:'Cancel renewal anytime.';
-    flow.paint(`<h2>Plans after your free ${esc(skin().doc)}</h2><p class="muted">Finish and export your first complete ${esc(skin().doc)} before choosing anything.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} ${esc(skin().docPlural)} — about ${unit} each</li><li>${esc(skin().offerPoints[0])}</li><li>${esc(landingArm()?.type==='incident'?'PDF export on every record':'PDF export and a private share link')}</li></ul><button type="button" id="plan-start" class="wide">Create my first ${esc(skin().doc)} free</button><p><small>No card for your first complete report across the three Marketel tools. <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
+    flow.paint(`<h2>${payAtExport()?'Prices':`Plans after your free ${esc(skin().doc)}`}</h2><p class="muted">${payAtExport()?`Building a ${esc(skin().doc)} is free. You pay only when you send it: $${reportPrice()} for a single ${esc(skin().doc)}, or a plan.`:`Finish and export your first complete ${esc(skin().doc)} before choosing anything.`}</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} ${esc(skin().docPlural)} — about ${unit} each</li><li>${esc(skin().offerPoints[0])}</li><li>${esc(landingArm()?.type==='incident'?'PDF export on every record':'PDF export and a private share link')}</li></ul><button type="button" id="plan-start" class="wide">${payAtExport()?`Build my ${esc(skin().doc)} free`:`Create my first ${esc(skin().doc)} free`}</button><p><small>${payAtExport()?`Or $${reportPrice()} for a single ${esc(skin().doc)}, paid only when you send it.`:'No card for your first complete report across the three Marketel tools.'} <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
     document.querySelectorAll('[data-preview-plan]').forEach(button=>button.onclick=()=>{planInterval=button.dataset.previewPlan==='month'?'month':'year';paint();});
     $('plan-start').onclick=()=>{flow.restore();start();};
   };
@@ -563,6 +667,7 @@ function previewPlans(){
 }
 async function start(propertyName = '', type) {
   if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
+  if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
@@ -626,6 +731,8 @@ function editor(step) {
     if(d.type==='incident')for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
     if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel} the note.`;
     bindPhotoDrag();
+    if(payAtExport()&&$('preview'))$('preview').textContent=`Build my ${skin().doc} →`;
+    if(d.rooms.some(room=>room.photos.length))track('FirstPhotoAdded');
   }
   // Signed out in the app neither chrome is on screen, so these are the only exits.
   if($('editor-back'))$('editor-back').onclick=()=>run(()=>list());
@@ -869,6 +976,7 @@ function confirmAction({title,message,confirmLabel='Continue',danger=false}){
 // and one scroll position to reconcile with its keyboard and browser toolbar.
 function authCopy(intent){
   const sk=skin();
+  if(intent==='send')return {title:`Send your ${sk.doc}.`,message:'Confirm your email to send it and keep a copy. We will send you a 6-digit code.'};
   return intent==='signin'
     ?{title:`Sign in to Marketel ${sk.product}`,message:'Use the email you signed up with. We will send you a 6-digit code.'}
     :{title:`Keep your ${sk.doc}.`,message:`Verify your email to save, export and recover your work on another device. Your first complete ${sk.doc} is free.`};
@@ -878,11 +986,11 @@ function ensureAuth(after, intent='keep') {
   const copy=authCopy(intent);
   if(native){
     nativeAuth={after,email:''};
-    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectAuth',step:'email',title:copy.title,message:copy.message,product:skin().product});
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectAuth',step:'email',title:copy.title,message:copy.message,product:skin().product,email:storedEmail()});
     return;
   }
   let drawer=null;
-  let email='';
+  let email=storedEmail();
   const codeStep=()=>{
     drawer.paint(`<h2>Enter your code.</h2><p class="muted">Sent to ${esc(email)}</p><form id="code-form"><input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" aria-label="Six-digit code"></form><div class="row auth-back"><button type="button" id="auth-resend" class="quiet">Send a new code</button><button type="button" id="auth-back" class="quiet">← Change email</button></div>`);
     const input=$('code');
@@ -1177,10 +1285,18 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
-    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
+    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div><p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
+  paintBusinessLogo();
+  if(!draft.finalizedAt&&payAtExport()){
+    const eyebrow=$('app').querySelector('.row.spread .eyebrow');
+    if(eyebrow)eyebrow.textContent=landingArm()?.golden?.reveal||`Your ${skin().doc}, as it will be sent.`;
+    track('ReportRevealed');
+    $('send-report').onclick=()=>requestExport('share');
+    $('download-report').onclick=()=>requestExport('pdf');
+  }
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   if($('coverage-run'))$('coverage-run').onclick=event=>{
     const button=event.currentTarget;
@@ -1193,11 +1309,7 @@ function reportPreview(){
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
     await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice(d.type==='incident'?'Your record is ready. Download the PDF.':`Your ${skin().doc} is ready. Download the PDF or create a private link.`,'success');
   },button));};
-  if($('pdf'))$('pdf').onclick=()=>run(async()=>{
-    if(native){window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});return;}
-    const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
-    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=documentFileName(draft.document.type);a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
-  });
+  if($('pdf'))$('pdf').onclick=()=>run(downloadPdfNow);
   if($('originals'))$('originals').onclick=()=>{
     if(native){modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');$('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');return;}
     const photos=d.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
@@ -1206,7 +1318,7 @@ function reportPreview(){
   };
   // Revoke lives inside the share sheet rather than the floating action bar:
   // it is rare, destructive, and only means anything once a link exists.
-  if($('share'))$('share').onclick=()=>run(async()=>{const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);$('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});$('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});});
+  if($('share'))$('share').onclick=()=>run(openShareSheetNow);
   if($('another-report'))$('another-report').onclick=()=>{haptic();run(()=>start());};
   if($('back-to-reports'))$('back-to-reports').onclick=()=>run(()=>list());
   if($('send-app-handoff'))$('send-app-handoff').onclick=event=>run(async()=>{
@@ -1273,6 +1385,119 @@ async function requestStorefront(){
   if(!native)return storefront;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});
   return new Promise(resolve=>{const done=()=>{storefrontWaiters=storefrontWaiters.filter(item=>item!==done);resolve(storefront);};storefrontWaiters.push(done);setTimeout(done,1000);});
+}
+async function downloadPdfNow(){
+  if(native){window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});return;}
+  const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=documentFileName(draft.document.type);a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function openShareSheetNow(){
+  const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});
+  modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);
+  $('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});
+  $('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});
+}
+// The business a report is sent under: typed during setup (kept on the local
+// draft until there is an account), then snapshotted by the server at finalize.
+function businessHeader(d){
+  const name=d.business?.name||draft?.branding?.name||account?.businessName||'';
+  const hasLogo=!!(draft?.branding?.logo||d.business?.logoKey||account?.hasLogo);
+  if(!name&&!hasLogo)return '';
+  return `<header class="biz-header">${hasLogo?'<img id="biz-logo" alt="" hidden>':''}${name?`<strong>${esc(name)}</strong>`:''}</header>`;
+}
+async function paintBusinessLogo(){
+  const img=$('biz-logo');if(!img)return;
+  let blob=draft?.branding?.logo||null;
+  if(!blob&&session&&account?.hasLogo)blob=await api('/branding/logo',{blob:true}).catch(()=>null);
+  if(!blob||!document.body.contains(img))return;
+  img.src=URL.createObjectURL(blob);img.hidden=false;
+}
+async function pushBranding(){
+  const branding=draft?.branding;if(!branding)return;
+  if(branding.name&&branding.name!==account?.businessName)await api('/branding',{method:'PUT',body:{businessName:branding.name}});
+  if(branding.logo&&!branding.logoUploaded){
+    const form=new FormData();form.append('logo',branding.logo,'logo');
+    await api('/branding/logo',{method:'POST',body:form});
+    branding.logoUploaded=true;await persist();
+  }
+  await refresh();
+}
+// Send and Download are where a pay-at-export tool asks. Everything before
+// this was free; the report is on screen, finished, under their own name.
+function requestExport(action){
+  haptic();
+  if(!draft.document.rooms.some(room=>room.photos.length))return notice('Add at least one photo before sending.','error');
+  ensureAuth(()=>run(async()=>{
+    await pushBranding();
+    if(!draft.document.author.trim())draft.document.author=draft.branding?.name||account?.businessName||'';
+    if(!draft.document.author.trim())throw new Error('Add your name in the editor before sending.');
+    await save();await refresh();
+    if(canSend())return finishExport(action);
+    await exportOffer(action);
+  }),'send');
+}
+async function finishExport(action){
+  const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});
+  draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;
+  await persist();await refresh();preview=true;reportPreview();
+  if(action==='pdf')await downloadPdfNow();else if(draft.document.type!=='incident')await openShareSheetNow();
+  notice(`Your ${skin().doc} is finalized and ready to send.`,'success');
+}
+async function exportOffer(action){
+  await requestStorefront();
+  track('ExportOfferViewed',undefined,false);
+  const sk=skin();
+  if(native&&storefront!=='USA'){
+    modal(`<h2>Send it from the web.</h2><p>Single ${esc(sk.docPlural)} and plans are sold on bookmarketel.com. Open ${esc(sk.product)} in Safari, sign in with the same email, and send this ${esc(sk.doc)} from there.</p><button id="offer-web" class="wide">Open ${esc(sk.product)} on the web</button>`);
+    $('offer-web').onclick=()=>openExternal(`https://bookmarketel.com${sk.home||'/inspect/'}`);return;
+  }
+  const available=(Array.isArray(account?.plans)&&account.plans.length?account.plans:['month']).filter(value=>PLANS[value]);
+  const options=[...['year','month'].filter(value=>available.includes(value)),...(reportPrice()?['report']:[])];
+  const label={year:[`$${PLANS.year.price}/year`,`${PLANS.year.reports} ${sk.docPlural} a year · best value`],month:[`$${PLANS.month.price}/month`,`${PLANS.month.reports} ${sk.docPlural} a month`],report:[`$${reportPrice()}`,`Just this ${sk.doc}, once`]};
+  let choice=options.includes('year')?'year':options[0],settled=false;
+  const decline=reason=>{if(settled)return;settled=true;track('OfferDeclined',reason,false);};
+  const paint=()=>{
+    const html=`<h2>Send your ${esc(sk.doc)}.</h2><p class="muted">It is built. Choose how to send it.</p><div class="offer-options" role="radiogroup" aria-label="How to pay">${options.map(value=>`<button type="button" role="radio" class="offer-option${choice===value?' is-selected':''}" aria-checked="${choice===value}" data-offer="${value}"><strong>${esc(label[value][0])}</strong><small>${esc(label[value][1])}</small></button>`).join('')}</div><button type="button" id="offer-pay" class="wide">${choice==='report'?`Pay $${reportPrice()} and send`:'Continue to secure checkout'}</button><p class="offer-reversal">${choice==='report'?'One-time payment. No subscription.':'Cancel renewal anytime.'}</p><button type="button" id="offer-later" class="quiet">Not now</button><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
+    if(!$('dialog').open)modal(html,{fullscreen:true});else{$('dialog-body').innerHTML=html;settleSheet();}
+    document.querySelectorAll('[data-offer]').forEach(button=>button.onclick=()=>{if(choice===button.dataset.offer)return;choice=button.dataset.offer;haptic();paint();});
+    $('offer-pay').onclick=event=>run(async()=>{
+      haptic();
+      const body=choice==='report'?{interval:'report',reportId:draft.serverId,native}:{interval:choice,tool:toolId(),reportId:draft.serverId,native};
+      const r=await api('/checkout',{method:'POST',body});
+      settled=true;
+      try{localStorage.setItem('inspect.pendingExport',JSON.stringify({reportId:draft.serverId,action,tool:toolId(),at:Date.now()}));}catch{}
+      openExternal(r.url);
+    },event.currentTarget);
+    $('offer-later').onclick=()=>{
+      $('dialog-body').innerHTML=`<h2>What stopped you?</h2><p class="muted">One tap. It helps us price this fairly. Your ${esc(sk.doc)} stays saved.</p><div class="stack">${DECLINE_REASONS.map(([key,text])=>`<button type="button" class="secondary" data-reason="${key}">${esc(text)}</button>`).join('')}</div>`;
+      document.querySelectorAll('[data-reason]').forEach(button=>button.onclick=()=>{decline(button.dataset.reason);$('dialog').close();notice(`Your ${sk.doc} is saved. Send it whenever you are ready.`);});
+    };
+  };
+  paint();
+  $('dialog').addEventListener('close',()=>decline(undefined),{once:true});
+}
+// After checkout (a return to this page, or the app coming back from Safari)
+// the paid report finishes itself. A webhook can trail the redirect by a few
+// seconds, so the entitlement is polled briefly rather than read once.
+let resumingExport=false;
+async function resumePendingExport({wait=0}={}){
+  if(resumingExport)return false;
+  let pending=null;try{pending=JSON.parse(localStorage.getItem('inspect.pendingExport')||'null');}catch{}
+  if(!pending||pending.tool!==toolId()||Date.now()-Number(pending.at||0)>86400000||!session||!draft||draft.serverId!==pending.reportId)return false;
+  if(draft.finalizedAt){try{localStorage.removeItem('inspect.pendingExport');}catch{}return false;}
+  resumingExport=true;
+  try{
+    const deadline=Date.now()+wait;
+    for(;;){
+      await refresh().catch(()=>{});
+      if(canSend())break;
+      if(Date.now()>=deadline)return false;
+      await new Promise(resolve=>setTimeout(resolve,1500));
+    }
+    try{localStorage.removeItem('inspect.pendingExport');}catch{}
+    await finishExport(pending.action);
+    return true;
+  }finally{resumingExport=false;}
 }
 async function offer(){
   await requestStorefront();
@@ -1509,6 +1734,8 @@ function trackKeyboard(){
   apply();
 }
 trackKeyboard();
+// Back from Safari after paying in the app: finish the report that was waiting.
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumePendingExport({wait:8000}).catch(()=>{});});
 // Restored from the back/forward cache: the shell has moved on since, so tell
 // it where this page is again and redraw what was on screen.
 window.addEventListener('pageshow',event=>{
@@ -1557,10 +1784,17 @@ try{
   else if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
   booted=true;
   settleWedgeEntrance();
-  if(new URLSearchParams(location.search).get('checkout')==='success'&&session){
-    await api('/billing/refresh',{method:'POST'});
+  const returned=new URLSearchParams(location.search);
+  if(returned.get('checkout')==='success'&&session){
+    if(!native)history.replaceState(null,'',location.pathname);
+    const checkoutSession=returned.get('session')||'';
+    if(/^cs_[A-Za-z0-9_]{8,200}$/.test(checkoutSession))await api('/checkout/confirm',{method:'POST',body:{sessionId:checkoutSession}}).catch(()=>{});
+    await api('/billing/refresh',{method:'POST'}).catch(()=>{});
     await refresh();
-    notice(account.active?`${skin().product} is ready. Your subscription is active.`:'Payment confirmation is pending. Refresh billing status shortly.',account.active?'success':'');
+    if(returned.get('report')){
+      notice('Payment received. Finishing your report…');
+      if(!await resumePendingExport({wait:12000}))notice('Your payment is still confirming. Tap Send again in a moment.');
+    }else notice(account.active?`${skin().product} is ready. Your subscription is active.`:'Payment confirmation is pending. Refresh billing status shortly.',account.active?'success':'');
   }
 }catch(e){notice(e.message,'error');if(draft)editor();else landing();}
 finally{booted=true;clearTimeout(bootWatchdog);}

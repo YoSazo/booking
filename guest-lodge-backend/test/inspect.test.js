@@ -485,6 +485,186 @@ test('the app signs in through its glass banner and never inerts a page behind a
     assert.match(css, /\.native-inspect-shell \.hero #sign-in \{ margin-top: 12px;/);
 });
 
+// A small harness for the money path: a signed-in session, and just enough of
+// Prisma and Stripe to watch what each route asks them to do.
+function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {} } = {}) {
+  const express = require('express');
+  const calls = { accountUpdates: [], sessions: [], events: [], freeClaims: 0 };
+  const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsed: false, reportsUsed: 0, reportCredits: 0,
+    subscriptionStatus: null, periodEnd: null, stripeCustomerId: 'cus_1', businessName: 'Pine Stays', logoKey: 'inspect/logos/acct_1/a.png', ...accountOverrides };
+  const report = { id: 'rep_1', accountId: 'acct_1', finalizedAt: null, baselineReport: null, attachments: [{ id: 'p1' }],
+    document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-19', eventTime: 'unknown', author: 'Sam',
+      rooms: [{ name: 'Kitchen', observation: 'Chipped counter.', issue: true, photos: ['p1'] }], signatures: [] }, ...reportOverrides };
+  const seenEvents = new Set();
+  const db = {
+    $queryRaw: async () => [],
+    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }) },
+    inspectAccount: {
+      findUniqueOrThrow: async () => account,
+      findUnique: async () => account,
+      upsert: async ({ create }) => ({ ...account, email: create.email }),
+      update: async ({ data }) => {
+        calls.accountUpdates.push(data);
+        if (data.reportCredits?.increment) account.reportCredits += data.reportCredits.increment;
+        if (data.reportCredits?.decrement) account.reportCredits -= data.reportCredits.decrement;
+        return { ...account };
+      },
+    },
+    inspectReport: {
+      findFirst: async () => report,
+      update: async ({ data }) => ({ ...report, ...data }),
+    },
+    inspectFreeClaim: { findUnique: async () => null, create: async () => { calls.freeClaims += 1; } },
+    inspectEvent: {
+      findUnique: async ({ where }) => (seenEvents.has(where.sourceId) ? { id: where.sourceId } : null),
+      create: async ({ data }) => { if (data.sourceId) seenEvents.add(data.sourceId); calls.events.push(data); },
+      upsert: async ({ where, create }) => { if (!seenEvents.has(where.sourceId)) { seenEvents.add(where.sourceId); calls.events.push(create); } },
+    },
+  };
+  const prisma = { ...db, $transaction: async callback => callback(db) };
+  const stripe = {
+    prices: { retrieve: async () => ({}) },
+    customers: { create: async () => ({ id: 'cus_new' }) },
+    checkout: { sessions: { create: async (params, options) => { calls.sessions.push({ params, options }); return { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }; } } },
+    webhooks: { constructEvent: body => body },
+    ...stripeOverrides,
+  };
+  const app = express();
+  app.use(express.json());
+  const registration = registerInspect(app, {
+    prisma, mail: { sendMail: async () => {} }, stripe,
+    env: {
+      INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
+      INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+      R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
+      STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
+      STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
+      STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
+    },
+  });
+  const headers = { Authorization: `Bearer ${'b'.repeat(43)}`, 'Content-Type': 'application/json' };
+  return { app, registration, calls, account, report, headers };
+}
+
+test('a single Claims report is sold once, at the price the page shows, and returns to Claims', async () => {
+  const h = moneyHarness();
+  try {
+    const response = await request(h.app, '/api/inspect/checkout', { method: 'POST', headers: h.headers, body: JSON.stringify({ interval: 'report', reportId: 'rep_1' }) });
+    assert.equal(response.status, 200);
+    const { params, options } = h.calls.sessions[0];
+    assert.equal(params.mode, 'payment');
+    assert.deepEqual(params.line_items, [{ quantity: 1, price_data: { currency: 'usd', unit_amount: 1200, product_data: { name: 'Marketel Claims report' } } }]);
+    assert.deepEqual(params.metadata, { product: 'marketel-inspect-report', inspectAccountId: 'acct_1', reportId: 'rep_1', tool: 'claims' });
+    assert.equal(params.success_url, 'https://bookmarketel.com/claims?checkout=success&report=rep_1&session={CHECKOUT_SESSION_ID}');
+    assert.match(options.idempotencyKey, /^inspect-report-checkout:acct_1:rep_1:web:/);
+    assert.ok(h.calls.events.some(event => event.name === 'CheckoutStarted' && event.tool === 'claims' && event.detail === 'report'));
+  } finally { h.registration.close(); }
+
+  // A tool without a single-report price refuses rather than inventing one.
+  const inspect = moneyHarness({ report: { document: { propertyName: 'Oak', type: 'routine', date: '2026-09-19', author: 'Sam', rooms: [], signatures: [] } } });
+  try {
+    const response = await request(inspect.app, '/api/inspect/checkout', { method: 'POST', headers: inspect.headers, body: JSON.stringify({ interval: 'report', reportId: 'rep_1' }) });
+    assert.equal(response.status, 400);
+    assert.equal(inspect.calls.sessions.length, 0);
+  } finally { inspect.registration.close(); }
+});
+
+test('a paid single report grants exactly one credit, however often Stripe delivers it', async () => {
+  const h = moneyHarness();
+  const event = { type: 'checkout.session.completed', created: 1760000000, data: { object: {
+    id: 'cs_paid', mode: 'payment', payment_status: 'paid', amount_total: 1200, currency: 'usd',
+    metadata: { product: 'marketel-inspect-report', inspectAccountId: 'acct_1', reportId: 'rep_1', tool: 'claims' } } } };
+  try {
+    for (let delivery = 0; delivery < 3; delivery++) {
+      const response = await request(h.app, '/api/inspect-stripe-webhook', { method: 'POST', headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
+      assert.equal(response.status, 200);
+    }
+    assert.equal(h.account.reportCredits, 1);
+    assert.equal(h.calls.events.filter(e => e.name === 'PaymentSucceeded' && e.detail === 'report' && e.tool === 'claims').length, 1);
+    // An unpaid session grants nothing.
+    const unpaid = { ...event, data: { object: { ...event.data.object, id: 'cs_unpaid', payment_status: 'unpaid' } } };
+    await request(h.app, '/api/inspect-stripe-webhook', { method: 'POST', headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(unpaid) });
+    assert.equal(h.account.reportCredits, 1);
+  } finally { h.registration.close(); }
+});
+
+test('returning from Stripe confirms its own payment, for its own account only', async () => {
+  const paid = { id: 'cs_return_1', mode: 'payment', payment_status: 'paid', amount_total: 1200, currency: 'usd',
+    metadata: { product: 'marketel-inspect-report', inspectAccountId: 'acct_1', reportId: 'rep_1', tool: 'claims' } };
+  const sessions = { cs_return_1: paid, cs_someone_else: { ...paid, id: 'cs_someone_else', metadata: { ...paid.metadata, inspectAccountId: 'acct_2' } } };
+  const h = moneyHarness({ stripe: { checkout: { sessions: { retrieve: async id => sessions[id] } } } });
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await request(h.app, '/api/inspect/checkout/confirm', { method: 'POST', headers: h.headers, body: JSON.stringify({ sessionId: 'cs_return_1' }) });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).credits, 1);
+    }
+    await request(h.app, '/api/inspect/checkout/confirm', { method: 'POST', headers: h.headers, body: JSON.stringify({ sessionId: 'cs_someone_else' }) });
+    assert.equal(h.account.reportCredits, 1);
+    const invalid = await request(h.app, '/api/inspect/checkout/confirm', { method: 'POST', headers: h.headers, body: JSON.stringify({ sessionId: 'not-a-session' }) });
+    assert.equal(invalid.status, 400);
+  } finally { h.registration.close(); }
+});
+
+test('finalizing spends the right allowance for each tool and snapshots the business', async () => {
+  // Claims is pay-at-export: the lifetime free report does not apply.
+  let h = moneyHarness();
+  try {
+    const refused = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(refused.status, 402);
+    assert.equal(h.calls.freeClaims, 0);
+  } finally { h.registration.close(); }
+
+  h = moneyHarness({ account: { reportCredits: 1 } });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.calls.accountUpdates.at(-1), { reportCredits: { decrement: 1 } });
+    const body = await response.json();
+    assert.deepEqual(body.document.business, { name: 'Pine Stays', logoKey: 'inspect/logos/acct_1/a.png' });
+  } finally { h.registration.close(); }
+
+  // A plan's allowance is spent before a purchased credit.
+  h = moneyHarness({ account: { reportCredits: 1, subscriptionStatus: 'active', periodEnd: new Date(Date.now() + 86400000), freeReportUsed: true } });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.calls.accountUpdates.at(-1), { reportsUsed: { increment: 1 } });
+  } finally { h.registration.close(); }
+
+  // Inspect keeps its lifetime free report.
+  h = moneyHarness({ report: { document: { propertyName: 'Oak', type: 'routine', date: '2026-09-19', author: 'Sam', rooms: [{ name: 'Kitchen', observation: '', issue: false, photos: ['p1'] }], signatures: [] } } });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.calls.accountUpdates.at(-1), { freeReportUsed: true });
+    assert.equal(h.calls.freeClaims, 1);
+  } finally { h.registration.close(); }
+});
+
+test('the landing email is a lead once, reveals nothing, and ladder events keep only safe detail', async () => {
+  const h = moneyHarness();
+  try {
+    const lead = { email: 'New@Example.com', tool: 'claims', visitorId: 'v_abcdef123456' };
+    const first = await request(h.app, '/api/inspect/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) });
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { success: true });
+    await request(h.app, '/api/inspect/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) });
+    assert.equal(h.calls.events.filter(e => e.name === 'LeadFirst').length, 1);
+    assert.ok(h.calls.events.some(e => e.name === 'LeadCaptured' && e.tool === 'claims' && e.visitorId === 'v_abcdef123456'));
+    const bad = await request(h.app, '/api/inspect/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'nope' }) });
+    assert.equal(bad.status, 400);
+
+    const declined = await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'OfferDeclined', tool: 'claims', visitorId: 'v_abcdef123456', detail: 'too_expensive' }) });
+    assert.equal(declined.status, 200);
+    await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'OfferDeclined', tool: 'nowhere', visitorId: 'bad id', detail: '<script>' }) });
+    const decline = h.calls.events.filter(e => e.name === 'OfferDeclined');
+    assert.deepEqual(decline.map(e => [e.tool, e.visitorId, e.detail]), [['claims', 'v_abcdef123456', 'too_expensive'], ['inspect', null, null]]);
+  } finally { h.registration.close(); }
+});
+
 test('each tool lists only its own report types, and rejects unknown ones', async () => {
   const express = require('express');
   let where = null;
@@ -613,8 +793,8 @@ test('the AI is the path, and the note is never hidden once written', () => {
     // The recording event has to clear the auth boundary, because the owners it
     // exists to count are exactly the ones who have not signed in yet.
     const anon = server.slice(server.indexOf('const ANON_EVENTS'), server.indexOf('router.use((req, res, next) => {\n    const raw'));
-    assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded'\]\)/);
-    assert.match(anon, /record\(null, req\.body\.name\)/);
+    assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded', \.\.\.LADDER_EVENTS\]\)/);
+    assert.match(anon, /record\(null, req\.body\.name, undefined, eventExtra\(req\.body\)\)/);
     assert.match(anon, /rate\(`inspect-anon-events:/);
     assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in to Inspect.'),
         'the anonymous event route is below the auth boundary and can never fire');
@@ -675,7 +855,7 @@ test('the AI path is observable, and cannot be advertised while it is off', () =
 test('Inspect entitlement is separate, period-bound, and keeps the lifetime free report', () => {
   const future = new Date(Date.now() + 86400000);
   assert.deepEqual(entitlement({ subscriptionStatus: null, periodEnd: null, freeReportUsed: false, reportsUsed: 0 }), {
-    active: false, freeAvailable: true, remaining: 0, periodEnd: null,
+    active: false, freeAvailable: true, remaining: 0, credits: 0, businessName: '', hasLogo: false, periodEnd: null,
     cancellationScheduled: false, price: 29, interval: 'month', limits: LIMITS,
   });
   const paid = entitlement({ subscriptionStatus: 'active', periodEnd: future, freeReportUsed: true, reportsUsed: 7, cancelAtPeriodEnd: true });

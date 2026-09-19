@@ -391,6 +391,39 @@ async function dbSection() {
   return out.join('\n');
 }
 
+// Inspect tools: the ladder a cold visitor climbs, per tool. Steps before
+// sign-in are counted by anonymous visitor, later ones by account, so a person
+// who signs in mid-funnel is counted on both sides of that line; the ratios are
+// what to read. QA owners are left out, as above.
+const INSPECT_LADDER = ['LandingViewed', 'LeadCaptured', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'CheckoutStarted', 'PaymentSucceeded'];
+const INSPECT_PRICES = { report: 12, month: 29, year: 199 };
+async function inspectToolsSection() {
+  const since = new Date(Date.now() - DAYS * 86400000);
+  const qa = (await prisma.inspectAccount.findMany({ where: { email: { in: QA_OWNER_EMAILS } }, select: { id: true } })).map((a) => a.id);
+  const events = await prisma.inspectEvent.findMany({
+    where: { createdAt: { gte: since }, tool: { not: null }, ...(qa.length ? { OR: [{ accountId: null }, { accountId: { notIn: qa } }] } : {}) },
+    select: { name: true, tool: true, visitorId: true, accountId: true, detail: true },
+  });
+  const out = [`INSPECT TOOLS  (last ${DAYS} days)`];
+  for (const tool of ['claims', 'inspect', 'incident']) {
+    const rows = events.filter((e) => e.tool === tool);
+    if (!rows.length) { out.push(`  ${tool.padEnd(9)} no activity`); continue; }
+    let anonymous = 0;
+    const people = (name) => new Set(rows.filter((e) => e.name === name).map((e) => e.visitorId || e.accountId || `anon-${anonymous++}`)).size;
+    const steps = INSPECT_LADDER.map((name) => [name, people(name)]);
+    out.push(`  ${tool}`);
+    out.push(`    ${steps.map(([name, n], i) => `${name} ${n}${i ? ` (${pct(n, steps[i - 1][1])})` : ''}`).join('  →  ')}`);
+    const paid = rows.filter((e) => e.name === 'PaymentSucceeded');
+    const byOption = Object.fromEntries(Object.keys(INSPECT_PRICES).map((key) => [key, paid.filter((e) => e.detail === key).length]));
+    const revenue = Object.entries(byOption).reduce((sum, [key, n]) => sum + n * INSPECT_PRICES[key], 0);
+    out.push(`    purchases: ${byOption.report} single | ${byOption.month} monthly | ${byOption.year} annual  ·  first-payment cash ${money(revenue)}`);
+    const declines = rows.filter((e) => e.name === 'OfferDeclined');
+    const reasons = declines.reduce((acc, e) => { const key = e.detail || 'closed without answering'; acc[key] = (acc[key] || 0) + 1; return acc; }, {});
+    out.push(`    declined: ${declines.length ? Object.entries(reasons).map(([key, n]) => `${key} ${n}`).join(' | ') : 'none'}`);
+  }
+  return out.join('\n');
+}
+
 async function main() {
   console.log('='.repeat(112));
   console.log(`MARKETEL ACQUISITION REPORT  ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`);
@@ -398,6 +431,8 @@ async function main() {
   console.log(`\n${await metaSection()}`);
   console.log(`\n${'-'.repeat(112)}\n`);
   console.log(await dbSection());
+  console.log(`\n${'-'.repeat(112)}\n`);
+  console.log(await inspectToolsSection().catch((error) => `INSPECT TOOLS unavailable: ${error.message}`));
   console.log(`\n${'='.repeat(112)}`);
 }
 
