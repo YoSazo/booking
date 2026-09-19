@@ -281,11 +281,30 @@ function playDemo(){
   };
   cycle();
 }
+// One product, two promises. Keyed to utm_campaign because
+// captureInspectAttribution already stores it, so which arm someone arrived
+// from is attributed with no new plumbing — utm_content stays free for the
+// creative variant underneath it.
+//
+// The claims arm deliberately leads with the original files and the deadline
+// rather than the AI: Airbnb's April 2026 update bans AI-generated evidence
+// from claims, and while our notes are the host's own words restructured, those
+// two ideas do not belong next to each other on this page. The demo further
+// down still shows it — mentioned, not headlined.
+const LANDING_ARMS = {
+  claims: {
+    eyebrow: 'For short-let and rental hosts',
+    title: 'Document the damage<br>while it is in front of you.',
+    lede: 'Room-by-room photos kept as the original camera files, with a dated report you can send before the claim window closes.',
+  },
+};
+const landingArm = () => LANDING_ARMS[(new URLSearchParams(location.search).get('utm_campaign') || '').toLowerCase()] || null;
 function landing() {
   enterScreen('landing');
+  const arm = landingArm();
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">For small property managers</div><h1>Talk through each room.<br>Inspect writes the notes.</h1><p class="muted">Your photos and observations, packaged into a finished report before you leave.</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">EXAMPLE · NOT A REAL INSPECTION</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">Inspect writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
   playDemo();
   $('start').onclick = () => start();
   $('see-plans').onclick=previewPlans;
@@ -385,8 +404,24 @@ function viewPhoto(id){
   const url=photoURL(id);
   if(!url)return;
   const room=draft.document.rooms.findIndex(r=>r.photos.includes(id));
-  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo"><div class="row"><button type="button" id="photo-close" class="secondary">Done</button><button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
+  // loadReportFiles sets id === remoteId, so one lookup covers a loaded report
+  // and a draft whose photo has been uploaded. No remoteId means the original
+  // is still only on this device and there is nothing on the server to fetch.
+  const remoteId=draft.files.find(file=>file.id===id)?.remoteId;
+  // Downloads leave the page, which WKWebView does not allow; the app would
+  // need its own export handler the way the PDF has one.
+  const canDownload=!native&&draft.serverId&&remoteId;
+  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The original file, exactly as your camera saved it — resized copies are what appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
   $('photo-close').onclick=()=>$('dialog').close();
+  if($('photo-original'))$('photo-original').onclick=event=>run(async()=>{
+    const blob=await api(`/reports/${draft.serverId}/photos/${remoteId}/original`,{blob:true});
+    const href=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=href;
+    link.download=`marketel-original-${remoteId}`;
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(href),60000);
+  },event.currentTarget);
   $('photo-remove').onclick=()=>{
     const photos=draft.document.rooms[room]?.photos||[];
     const pos=photos.indexOf(id);

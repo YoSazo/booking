@@ -780,6 +780,35 @@ function registerInspect(app, {
     if (!a) throw fail(404, 'Photo not found.');
     res.type('jpeg').send(await object(a.objectKey));
   }));
+  // Every read path above serves the 1600px re-encode, which is the right file
+  // for reading a report and the wrong one for a damage claim: Airbnb's April
+  // 2026 terms require the original, unaltered camera file. We have kept one
+  // for every photo since day one and never had a way to hand it back.
+  //
+  // Owner only. A share link is for the other party to read the report; the
+  // originals are the owner's evidence and do not ride along with it.
+  //
+  // The real type was never recorded — uploads are stored as
+  // application/octet-stream and the attachment row has no mime column — so a
+  // camera-roll import is as likely to be HEIC as JPEG. Serving everything as
+  // .jpg would hand someone a file their claim tool rejects, so read it off the
+  // bytes instead.
+  const ORIGINAL_TYPES = [
+    { ext: 'jpg', mime: 'image/jpeg', match: b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+    { ext: 'png', mime: 'image/png', match: b => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
+    { ext: 'heic', mime: 'image/heic', match: b => b.length > 12 && b.toString('latin1', 4, 8) === 'ftyp'
+      && ['heic', 'heix', 'heif', 'mif1', 'msf1'].includes(b.toString('latin1', 8, 12)) },
+  ];
+  router.get('/reports/:id/photos/:photoId/original', guarded(async (req, res) => {
+    const r = await owned(prisma, req.inspect.id, req.params.id);
+    const a = r.attachments.find(x => x.id === req.params.photoId);
+    if (!a) throw fail(404, 'Photo not found.');
+    const bytes = await object(a.originalKey);
+    const kind = ORIGINAL_TYPES.find(type => type.match(bytes)) || { ext: 'jpg', mime: 'image/jpeg' };
+    res.type(kind.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="marketel-${a.id}.${kind.ext}"`);
+    res.send(bytes);
+  }));
   const voiceUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: LIMITS.audioBytes, files: 1, fields: 3 } }).single('audio');
   router.post('/reports/:id/voice-draft', voiceUpload, guarded(async (req, res) => {
     if (!env.OPENAI_API_KEY) throw fail(503, 'Voice notes are temporarily unavailable. You can continue typing.');

@@ -146,6 +146,57 @@ test('dictation works in the app without the shell owning the note', () => {
     assert.match(nativePath, /addEventListener\('close'[\s\S]*?stop\(\)/);
 });
 
+test('the original camera file can be handed over, and only to its owner', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const route = server.slice(server.indexOf('const ORIGINAL_TYPES'), server.indexOf('const voiceUpload'));
+
+    // Airbnb's April 2026 terms want the unaltered camera file. We have stored
+    // one for every photo since day one and never served it.
+    assert.match(route, /object\(a\.originalKey\)/);
+    assert.doesNotMatch(route, /object\(a\.objectKey\)/);
+    assert.match(route, /owned\(prisma, req\.inspect\.id, req\.params\.id\)/);
+
+    // Owner only: a share token reads the report, it does not carry evidence.
+    const shared = server.slice(server.indexOf("router.get('/shared/:token'"), server.indexOf("router.use((req, res, next) => {\n    const raw"));
+    assert.doesNotMatch(shared, /originalKey/);
+
+    // The type was never recorded, so a camera-roll import is as likely to be
+    // HEIC as JPEG and must not be handed over named .jpg.
+    assert.match(route, /ext: 'heic'/);
+    assert.match(route, /'ftyp'/);
+    assert.match(route, /ext: 'png'/);
+    assert.match(route, /\|\| \{ ext: 'jpg', mime: 'image\/jpeg' \}/);
+
+    // The reading copies stay the resized ones — that is the right file there.
+    assert.match(server, /res\.type\('jpeg'\)\.send\(await object\(a\.objectKey\)\)/);
+
+    // Offered only when there is something on the server to fetch.
+    assert.match(client, /const canDownload=!native&&draft\.serverId&&remoteId/);
+    assert.match(client, /photos\/\$\{remoteId\}\/original/);
+});
+
+test('the claims arm is attributed without new plumbing', () => {
+    const client = require('node:fs').readFileSync(
+        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+    // utm_campaign is already captured and persisted by captureInspectAttribution,
+    // so which arm someone arrived from needs no new event.
+    assert.match(client, /LANDING_ARMS\[\(new URLSearchParams\(location\.search\)\.get\('utm_campaign'\)/);
+    assert.match(client, /utm_campaign:/);
+
+    // The claims arm leads with the original files, never with the AI: Airbnb
+    // bans AI-generated evidence from claims in the same April 2026 update.
+    const arms = client.slice(client.indexOf('const LANDING_ARMS'), client.indexOf('const landingArm'));
+    assert.match(arms, /original camera files/);
+    assert.doesNotMatch(arms, /\bAI\b|writes the notes/);
+
+    // And it promises preservation, never an outcome.
+    assert.doesNotMatch(arms, /\b(guarantee[sd]?|approved|accepted|win|reimburse[sd]?)\b/i);
+});
+
 test('a sheet opens without summoning the keyboard', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
