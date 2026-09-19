@@ -106,7 +106,7 @@ function validateSignatures(value, type) {
 // multiplied by twelve, because the quota resets per *billing* period — leaving
 // it at 30 would sell a yearly plan one twelfth of the monthly plan's work.
 const INSPECT_PLANS = Object.freeze({
-  month: Object.freeze({ interval: 'month', amount: 2900, reports: LIMITS.reports, priceEnv: 'STRIPE_INSPECT_PRICE_ID', contentName: 'Marketel Inspect monthly plan' }),
+  month: Object.freeze({ interval: 'month', amount: 2500, reports: LIMITS.reports, priceEnv: 'STRIPE_INSPECT_PRICE_ID', contentName: 'Marketel Inspect monthly plan' }),
   year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
 });
 const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
@@ -116,7 +116,7 @@ function validateInspectPrice(price, interval = 'month') {
       || price.recurring?.interval !== plan.interval || price.recurring?.interval_count !== 1) {
     throw fail(503, plan.interval === 'year'
       ? 'The Inspect annual price must be USD 199 per year.'
-      : 'The Inspect price must be USD 29 per month.');
+      : 'The Inspect price must be USD 25 per month.');
   }
   return price;
 }
@@ -502,7 +502,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     });
     if (!result) throw fail(401, 'Invalid or expired code. Request another code.');
     await recordBestEffort(result.id, 'AccountVerified');
-    res.json({ token: sessionToken, email, ...entitlement(result), plans: purchasablePlans() });
+    res.json({ token: sessionToken, email, ...entitlement(result), plans: purchasablePlans(), priorReports: await priorReports(result.id) });
   }));
 
   // A handoff is deliberately separate from the normal bearer session. The
@@ -538,7 +538,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (!result) throw fail(401, 'This app link is invalid or expired.');
     await recordBestEffort(result.account.id, 'AppHandoffRedeemed');
     res.json({ token: sessionToken, email: result.account.email, reportId: result.reportId,
-      ...entitlement(result.account), plans: purchasablePlans() });
+      ...entitlement(result.account), plans: purchasablePlans(), priorReports: await priorReports(result.account.id) });
   }));
 
   // Used by the bundled iOS product picker. It intentionally exposes no
@@ -705,7 +705,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       req.inspect = session.account; req.inspectSessionHash = session.tokenHash; next();
     }).catch(next);
   });
-  router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect), plans: purchasablePlans() })));
+  router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect), plans: purchasablePlans(), priorReports: await priorReports(req.inspect.id) })));
   // What a report is sent under. Snapshotted into each report at finalize, so
   // changing the logo later never rewrites a document someone already has.
   router.put('/branding', guarded(async (req, res) => {
@@ -1212,6 +1212,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The paywall must only offer intervals that actually have a Stripe price,
   // so a missing annual price degrades to monthly instead of a failing tap.
   const purchasablePlans = () => ['year', 'month'].filter(interval => !!env[inspectPlan(interval).priceEnv]);
+  const priorReports = accountId => prisma.inspectReport.count({ where: { accountId, finalizedAt: { not: null } } });
   async function syncSubscription(subscription) {
     if (subscription.metadata?.product !== 'marketel-inspect') return false;
     const accountId = subscription.metadata.inspectAccountId;

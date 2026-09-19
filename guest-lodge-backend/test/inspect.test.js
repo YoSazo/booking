@@ -765,6 +765,58 @@ test('Inspect destructive choices use product UI instead of browser alerts', () 
     assert.doesNotMatch(client, /\balert\s*\(/);
 });
 
+test('the cold offer leads with the single report and hides the year until it means something', () => {
+    const fsx = require('node:fs'), pathx = require('node:path');
+    const root = pathx.join(__dirname, '..');
+    const client = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'inspect.js'), 'utf8');
+    const server = fsx.readFileSync(pathx.join(root, 'inspect.js'), 'utf8');
+
+    // A cold click is an impulse and an impulse does not sign up for a year.
+    // Run the real ordering rather than asserting on its spelling.
+    const offer = client.slice(client.indexOf('async function exportOffer'), client.indexOf('function resumePendingExport'));
+    const body = offer.slice(offer.indexOf('const available='), offer.indexOf('let choice='));
+    const build = new Function('accountPlans', 'priorReports', 'price', 'PLANS', `
+        const account = { plans: accountPlans, priorReports };
+        const reportPrice = () => price;
+        const sk = { doc: 'report', docPlural: 'reports' };
+        ${body}
+        return { options, label };`);
+    const PLANS = { year: { price: 199, reports: 360 }, month: { price: 25, reports: 30 } };
+
+    // Claims, cold: the single report first and selected, no year anywhere.
+    const cold = build(['year', 'month'], 0, 12, PLANS);
+    assert.deepEqual(cold.options, ['report', 'month']);
+    assert.equal(cold.options[0], 'report', 'the default is options[0]');
+    assert.equal(cold.label.report[0], '$12');
+    assert.equal(cold.label.month[0], '$25/month');
+
+    // Finishing one is the first evidence the need recurs, and only then is a
+    // year a real offer — framed by the arithmetic, not a percentage.
+    const repeat = build(['year', 'month'], 1, 12, PLANS);
+    assert.deepEqual(repeat.options, ['report', 'month', 'year']);
+    assert.match(repeat.label.year[1], /About 17 reports at the single price/);
+
+    // A first-free tool sells no single report, and still offers its plans.
+    assert.deepEqual(build(['year', 'month'], 1, 0, PLANS).options, ['month', 'year']);
+    // And a year-only configuration must never produce an empty sheet.
+    assert.deepEqual(build(['year'], 0, 0, PLANS).options, ['year']);
+
+    // $25 is the same number on both sides of the wire, and the guard that
+    // refuses a mispriced Stripe object names it.
+    assert.match(server, /month: Object\.freeze\(\{ interval: 'month', amount: 2500/);
+    assert.match(server, /must be USD 25 per month/);
+    assert.match(client, /month: Object\.freeze\(\{ price: 25/);
+    // Monthly leads everywhere a price is shown, not just here.
+    assert.match(client, /let planInterval = 'month'/);
+
+    // priorReports cannot be derived from the account row: reportsUsed stays
+    // at zero for a credit-funded finalize and freeReportUsed is never set by
+    // a pay-at-export tool. It counts finished documents only.
+    assert.match(server, /const priorReports = accountId => prisma\.inspectReport\.count\(\{ where: \{ accountId, finalizedAt: \{ not: null \} \} \}\)/);
+    assert.equal(server.split('priorReports: await priorReports(').length - 1, 3,
+        'the account route and both auth payloads must carry it');
+});
+
 test('a blocking wait shows the product waiting, and finishing offers every way out', () => {
     const fsx = require('node:fs'), pathx = require('node:path');
     const root = pathx.join(__dirname, '..');
@@ -911,7 +963,7 @@ test('Inspect entitlement is separate, period-bound, and keeps the lifetime free
   const future = new Date(Date.now() + 86400000);
   assert.deepEqual(entitlement({ subscriptionStatus: null, periodEnd: null, freeReportUsed: false, reportsUsed: 0 }), {
     active: false, freeAvailable: true, remaining: 0, credits: 0, businessName: '', hasLogo: false, periodEnd: null,
-    cancellationScheduled: false, price: 29, interval: 'month', limits: LIMITS,
+    cancellationScheduled: false, price: 25, interval: 'month', limits: LIMITS,
   });
   const paid = entitlement({ subscriptionStatus: 'active', periodEnd: future, freeReportUsed: true, reportsUsed: 7, cancelAtPeriodEnd: true });
   assert.equal(paid.active, true);
@@ -929,15 +981,15 @@ test('Inspect entitlement is separate, period-bound, and keeps the lifetime free
 });
 
 test('Inspect billing accepts only the promised price and ignores stale subscription events', () => {
-  const price = { unit_amount: 2900, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } };
+  const price = { unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } };
   assert.equal(validateInspectPrice(price), price);
-  assert.throws(() => validateInspectPrice({ ...price, unit_amount: 2999 }), /USD 29/);
-  assert.throws(() => validateInspectPrice({ ...price, recurring: { interval: 'year', interval_count: 1 } }), /USD 29/);
+  assert.throws(() => validateInspectPrice({ ...price, unit_amount: 2999 }), /USD 25/);
+  assert.throws(() => validateInspectPrice({ ...price, recurring: { interval: 'year', interval_count: 1 } }), /USD 25/);
   const yearPrice = { unit_amount: 19900, currency: 'usd', recurring: { interval: 'year', interval_count: 1 } };
   assert.equal(validateInspectPrice(yearPrice, 'year'), yearPrice);
   assert.throws(() => validateInspectPrice({ ...yearPrice, unit_amount: 19800 }, 'year'), /USD 199/);
   assert.throws(() => validateInspectPrice(price, 'year'), /USD 199/);
-  assert.throws(() => validateInspectPrice(yearPrice, 'month'), /USD 29/);
+  assert.throws(() => validateInspectPrice(yearPrice, 'month'), /USD 25/);
   const active = { stripeSubscriptionId: 'sub_new', subscriptionStatus: 'active', periodStart: new Date('2026-09-01') };
   assert.equal(shouldIgnoreSubscription(active, { id: 'sub_old' }), true);
   assert.equal(shouldIgnoreSubscription({ ...active, subscriptionStatus: 'canceled' }, { id: 'sub_newer' }), false);

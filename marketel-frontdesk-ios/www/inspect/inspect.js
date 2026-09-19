@@ -9,13 +9,15 @@ let currentPage = 'current';
 let reportsCache = null, propertiesCache = null, listRequest = 0;
 const DEFAULT_APP_STORE_URL = 'https://apps.apple.com/us/app/marketel/id6801005750';
 let appStoreUrl = DEFAULT_APP_STORE_URL;
-// $29 x 12 = $348, so the annual plan saves $149 — and its report allowance is
+// $25 x 12 = $300, so the annual plan saves $101 — and its report allowance is
 // the monthly one times twelve, because the quota resets per billing period.
 const PLANS = Object.freeze({
-  year: Object.freeze({ price: 199, per: '/year', save: 'Save $149', reports: 360, terms: '$199 charged today, then yearly until cancelled.' }),
-  month: Object.freeze({ price: 29, per: '/month', save: '', reports: 30, terms: '$29 charged today, then monthly until cancelled.' }),
+  year: Object.freeze({ price: 199, per: '/year', save: 'Save $101', reports: 360, terms: '$199 charged today, then yearly until cancelled.' }),
+  month: Object.freeze({ price: 25, per: '/month', save: '', reports: 30, terms: '$25 charged today, then monthly until cancelled.' }),
 });
-let planInterval = 'year';
+// Monthly leads everywhere a price is shown. A year is not a decision cold
+// traffic makes, and defaulting to it is what made the sheet read as a trap.
+let planInterval = 'month';
 let editorStep = 'details';
 const urls = new Map();
 const attributionKey = 'inspect.metaAttribution.v1';
@@ -1507,9 +1509,26 @@ async function exportOffer(action){
     $('offer-web').onclick=()=>openExternal(`https://bookmarketel.com${sk.home||'/inspect/'}`);return;
   }
   const available=(Array.isArray(account?.plans)&&account.plans.length?account.plans:['month']).filter(value=>PLANS[value]);
-  const options=[...['year','month'].filter(value=>available.includes(value)),...(reportPrice()?['report']:[])];
-  const label={year:[`$${PLANS.year.price}/year`,`${PLANS.year.reports} ${sk.docPlural} a year · best value`],month:[`$${PLANS.month.price}/month`,`${PLANS.month.reports} ${sk.docPlural} a month`],report:[`$${reportPrice()}`,`Just this ${sk.doc}, once`]};
-  let choice=options.includes('year')?'year':options[0],settled=false;
+  // A cold click is an impulse, and an impulse does not sign up for a year.
+  // The single report leads: it disarms the "they want to lock me in" reflex,
+  // and the step from it to a month is small enough to take voluntarily —
+  // where the step to a year is sixteen times the price and nobody takes it.
+  //
+  // A year only becomes a real offer once someone has finished a document
+  // before, because that is the first evidence the need actually recurs. Until
+  // then it is not shown at all.
+  const repeat=Number(account?.priorReports)>0;
+  const single=reportPrice()?['report']:[];
+  const options=[...single,...(available.includes('month')?['month']:[]),
+    ...(repeat&&available.includes('year')?['year']:[]),
+    ...(!single.length&&!available.includes('month')&&available.includes('year')?['year']:[])];
+  const perReport=reportPrice()?Math.max(1,Math.round(PLANS.year.price/reportPrice())):0;
+  const label={
+    year:[`$${PLANS.year.price}/year`,perReport?`About ${perReport} ${sk.docPlural} at the single price`:`${PLANS.year.reports} ${sk.docPlural} a year · best value`],
+    month:[`$${PLANS.month.price}/month`,`${PLANS.month.reports} ${sk.docPlural} a month`],
+    report:[`$${reportPrice()}`,`Just this ${sk.doc}`],
+  };
+  let choice=options[0],settled=false;
   const decline=reason=>{if(settled)return;settled=true;track('OfferDeclined',reason,false);};
   const paint=()=>{
     const html=`<h2>Send your ${esc(sk.doc)}.</h2><p class="muted">It is built. Choose how to send it.</p><div class="offer-options" role="radiogroup" aria-label="How to pay">${options.map(value=>`<button type="button" role="radio" class="offer-option${choice===value?' is-selected':''}" aria-checked="${choice===value}" data-offer="${value}"><strong>${esc(label[value][0])}</strong><small>${esc(label[value][1])}</small></button>`).join('')}</div><button type="button" id="offer-pay" class="wide">${choice==='report'?`Pay $${reportPrice()} and send`:'Continue to secure checkout'}</button><p class="offer-reversal">${choice==='report'?'One-time payment. No subscription.':'Cancel renewal anytime.'}</p><button type="button" id="offer-later" class="quiet">Not now</button><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
