@@ -64,8 +64,10 @@ expect(delegate, /case "inspectStorefront":[\s\S]{0,100}sendInspectStorefront/,
   'AppDelegate does not provide the App Store storefront to Inspect');
 expect(delegate, /case "inspectExportPDF":[\s\S]{0,220}exportInspectPDF/,
   'AppDelegate does not provide a native Inspect PDF export');
-expect(delegate, /case "inspectState":[\s\S]{0,180}setShellProduct\(\.inspect\)/,
+expect(delegate, /case "inspectState":[\s\S]{0,180}showInspectProduct\(/,
   'AppDelegate does not give Inspect the native navigation shell');
+expect(delegate, /func showInspectProduct[\s\S]{0,700}setShellProduct\(\.inspect\)/,
+  'AppDelegate does not switch the shell to Inspect when a tool page reports in');
 expect(delegate, /inspectReportsTabItem[\s\S]{0,900}inspectPropertiesTabItem/,
   'AppDelegate does not provide native Inspect tabs');
 expect(delegate, /case "tourMode":/,
@@ -103,6 +105,14 @@ expect(bundledRoot, /marketel\.product[\s\S]*inspect\/index\.html\?arm=\$\{produ
   'The native app entry does not preserve the selected report job');
 expect(bundledRoot, /localStorage\.getItem\('crmToken'\)/,
   'An existing Front Desk owner must still reach their booking workspace');
+expect(bundledRoot, /type: 'chooserState'/,
+  'The native app entry must ask the shell for its floating glass bar');
+expect(read('www/inspect/inspect.js'), /type:'inspectAuth'[\s\S]*window\.marketelInspectAuthVerify=/,
+  'Bundled Inspect must hand sign-in to the native glass banner');
+expect(delegate, /case "inspectAuth":[\s\S]{0,400}case "inspectAuthResult":/,
+  'The native shell does not open the glass sign-in drawer');
+expect(delegate, /case "chooserState":/,
+  'The native shell does not show its glass bar over the tool chooser');
 const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');
 const bundledAssets = fs.existsSync(bundledAssetsPath)
   ? fs.readdirSync(bundledAssetsPath)

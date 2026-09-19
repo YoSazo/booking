@@ -30,6 +30,8 @@ private var marketelPendingInspectHandoffToken: String?
 private enum MarketelShellProduct: Equatable {
     case frontDesk
     case inspect
+    /// The app's tool chooser: the glass bar alone, with nothing to navigate yet.
+    case chooser
 }
 
 private enum MarketelSharedCredentials {
@@ -119,7 +121,7 @@ private final class MarketelMarkView: UIView {
 /// owns top-level navigation so iOS 26 can render the real Liquid Glass tab
 /// and navigation treatments, while older iOS versions receive the standard
 /// system appearance automatically.
-final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate, SFSafariViewControllerDelegate {
+final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDelegate, WKScriptMessageHandler, CNContactViewControllerDelegate, SFSafariViewControllerDelegate, UITextFieldDelegate {
     private let backendOrigin = URL(string: "https://guest-lodge-backend.onrender.com")!
     private let bundledFrontDesk = URL(string: "capacitor://localhost/frontdesk/index.html")!
     private let statusBarBackdrop = UIView()
@@ -177,6 +179,29 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var activeHotelId = ""
     private var apnsDeviceToken = ""
     private let nativeSession = MarketelNativeSession()
+    // Inspect sign-in lives inside the glass bar: it grows downward to reveal
+    // the email and code steps, the way bookmarketel.com/inspect expands its
+    // banner. The web layer still does the network work and owns the session.
+    private let signInButton = UIButton(type: .system)
+    private let authCloseButton = UIButton(type: .system)
+    private let menuSlot = UIView()
+    private let authDrawer = UIStackView()
+    private let authTitleLabel = UILabel()
+    private let authMessageLabel = UILabel()
+    private let authEmailField = UITextField()
+    private let authCodeField = UITextField()
+    private let authSendButton = UIButton(type: .system)
+    private let authErrorLabel = UILabel()
+    private let authCodeActions = UIStackView()
+    private let authResendButton = UIButton(type: .system)
+    private let authChangeEmailButton = UIButton(type: .system)
+    private var authDrawerOpen = false
+    private var authEmail = ""
+    private var authEmailTitle = ""
+    private var authEmailMessage = ""
+    private var authLastTriedCode = ""
+    private var authVerifying = false
+    private var inspectProductName = "Inspect"
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -269,11 +294,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             width: bounds.width,
             height: safeInsets.top
         )
+        let topBarWidth = bounds.width - 16
         topBar.frame = CGRect(
             x: 8,
             y: safeInsets.top + 6,
-            width: bounds.width - 16,
-            height: 64
+            width: topBarWidth,
+            height: topBarHeight(width: topBarWidth)
         )
         // The menu sits visually inside the glass header but outside its view
         // hierarchy. iOS can then animate the context menu's source button
@@ -565,8 +591,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         // Reserve the trailing space inside the header for the independently
         // hosted menu button.
-        let menuSlot = UIView()
-        let actions = UIStackView(arrangedSubviews: [qrButton, menuSlot])
+        let actions = UIStackView(arrangedSubviews: [qrButton, signInButton, authCloseButton, menuSlot])
         actions.axis = .horizontal
         actions.alignment = .center
         actions.spacing = 2
@@ -588,11 +613,329 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             headerRow.leadingAnchor.constraint(equalTo: topBar.contentView.leadingAnchor, constant: 14),
             headerRow.trailingAnchor.constraint(equalTo: topBar.contentView.trailingAnchor, constant: -8),
             headerRow.topAnchor.constraint(equalTo: topBar.contentView.topAnchor, constant: 6),
-            headerRow.bottomAnchor.constraint(equalTo: topBar.contentView.bottomAnchor, constant: -6)
+            // Fixed rather than pinned to the bottom, so the bar can grow
+            // under the header row when sign-in opens.
+            headerRow.heightAnchor.constraint(equalToConstant: 52),
+            authCloseButton.widthAnchor.constraint(equalToConstant: 40),
+            authCloseButton.heightAnchor.constraint(equalToConstant: 44)
         ])
 
         view.addSubview(topBar)
         view.addSubview(menuButton)
+        configureAuthDrawer()
+    }
+
+    private func configureAuthDrawer() {
+        let green = UIColor(red: 46 / 255, green: 125 / 255, blue: 91 / 255, alpha: 1)
+        func font(_ size: CGFloat, _ weight: UIFont.Weight) -> UIConfigurationTextAttributesTransformer {
+            UIConfigurationTextAttributesTransformer { incoming in
+                var outgoing = incoming
+                outgoing.font = .systemFont(ofSize: size, weight: weight)
+                return outgoing
+            }
+        }
+
+        var signInConfiguration = UIButton.Configuration.filled()
+        signInConfiguration.title = "Sign in"
+        signInConfiguration.baseBackgroundColor = green
+        signInConfiguration.baseForegroundColor = .white
+        signInConfiguration.cornerStyle = .capsule
+        signInConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        signInConfiguration.titleTextAttributesTransformer = font(15, .semibold)
+        signInButton.configuration = signInConfiguration
+        signInButton.accessibilityLabel = "Sign in"
+        signInButton.isHidden = true
+        signInButton.addTarget(self, action: #selector(nativeSignInTapped), for: .touchUpInside)
+
+        var closeConfiguration = UIButton.Configuration.plain()
+        closeConfiguration.image = UIImage(systemName: "xmark")
+        closeConfiguration.baseForegroundColor = .secondaryLabel
+        closeConfiguration.contentInsets = .zero
+        authCloseButton.configuration = closeConfiguration
+        authCloseButton.accessibilityLabel = "Close sign in"
+        authCloseButton.isHidden = true
+        authCloseButton.addTarget(self, action: #selector(closeAuthDrawerTapped), for: .touchUpInside)
+
+        authTitleLabel.font = .systemFont(ofSize: 22, weight: .bold)
+        authTitleLabel.textColor = .label
+        authTitleLabel.numberOfLines = 0
+        authMessageLabel.font = .systemFont(ofSize: 15)
+        authMessageLabel.textColor = .secondaryLabel
+        authMessageLabel.numberOfLines = 0
+        authErrorLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        authErrorLabel.textColor = UIColor(red: 170 / 255, green: 56 / 255, blue: 43 / 255, alpha: 1)
+        authErrorLabel.numberOfLines = 0
+        authErrorLabel.isHidden = true
+
+        for field in [authEmailField, authCodeField] {
+            field.borderStyle = .none
+            field.backgroundColor = UIColor.white.withAlphaComponent(0.92)
+            field.layer.cornerRadius = 14
+            field.layer.cornerCurve = .continuous
+            field.layer.borderWidth = 1
+            field.layer.borderColor = UIColor(red: 216 / 255, green: 228 / 255, blue: 220 / 255, alpha: 1).cgColor
+            field.font = .systemFont(ofSize: 17)
+            field.textColor = .label
+            field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
+            field.leftViewMode = .always
+            field.delegate = self
+            field.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        }
+        authEmailField.placeholder = "Email"
+        authEmailField.keyboardType = .emailAddress
+        authEmailField.textContentType = .username
+        authEmailField.autocapitalizationType = .none
+        authEmailField.autocorrectionType = .no
+        authEmailField.spellCheckingType = .no
+        authEmailField.returnKeyType = .send
+        authEmailField.accessibilityLabel = "Email"
+        authCodeField.placeholder = "6-digit code"
+        authCodeField.keyboardType = .numberPad
+        authCodeField.textContentType = .oneTimeCode
+        authCodeField.font = .monospacedDigitSystemFont(ofSize: 22, weight: .semibold)
+        authCodeField.accessibilityLabel = "Six-digit code"
+        authCodeField.addTarget(self, action: #selector(authCodeChanged), for: .editingChanged)
+
+        var sendConfiguration = UIButton.Configuration.filled()
+        sendConfiguration.title = "Send sign-in code"
+        sendConfiguration.baseBackgroundColor = green
+        sendConfiguration.baseForegroundColor = .white
+        sendConfiguration.cornerStyle = .large
+        sendConfiguration.titleTextAttributesTransformer = font(16, .semibold)
+        authSendButton.configuration = sendConfiguration
+        authSendButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        authSendButton.addTarget(self, action: #selector(authSendTapped), for: .touchUpInside)
+
+        for (button, title) in [(authResendButton, "Send a new code"), (authChangeEmailButton, "\u{2190} Change email")] {
+            var configuration = UIButton.Configuration.plain()
+            configuration.title = title
+            configuration.baseForegroundColor = green
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0)
+            configuration.titleTextAttributesTransformer = font(14, .semibold)
+            button.configuration = configuration
+        }
+        authResendButton.addTarget(self, action: #selector(authResendTapped), for: .touchUpInside)
+        authChangeEmailButton.addTarget(self, action: #selector(authChangeEmailTapped), for: .touchUpInside)
+        authCodeActions.axis = .horizontal
+        authCodeActions.distribution = .equalSpacing
+        authCodeActions.addArrangedSubview(authResendButton)
+        authCodeActions.addArrangedSubview(authChangeEmailButton)
+
+        for item in [authTitleLabel, authMessageLabel, authEmailField, authCodeField, authSendButton, authErrorLabel, authCodeActions] as [UIView] {
+            authDrawer.addArrangedSubview(item)
+        }
+        authDrawer.axis = .vertical
+        authDrawer.spacing = 10
+        authDrawer.setCustomSpacing(6, after: authTitleLabel)
+        authDrawer.setCustomSpacing(14, after: authMessageLabel)
+        authDrawer.translatesAutoresizingMaskIntoConstraints = false
+        authDrawer.isHidden = true
+        authDrawer.alpha = 0
+        topBar.contentView.addSubview(authDrawer)
+        NSLayoutConstraint.activate([
+            authDrawer.topAnchor.constraint(equalTo: topBar.contentView.topAnchor, constant: 64),
+            authDrawer.leadingAnchor.constraint(equalTo: topBar.contentView.leadingAnchor, constant: 18),
+            authDrawer.trailingAnchor.constraint(equalTo: topBar.contentView.trailingAnchor, constant: -18)
+        ])
+    }
+
+    /// 64pt collapsed; open, it is the header row plus whatever the current
+    /// sign-in step needs, measured rather than guessed so a wrapped title or
+    /// an error line never gets clipped.
+    private func topBarHeight(width: CGFloat) -> CGFloat {
+        guard authDrawerOpen else { return 64 }
+        let fitting = authDrawer.systemLayoutSizeFitting(
+            CGSize(width: max(width - 36, 0), height: UIView.layoutFittingCompressedSize.height),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        )
+        return 64 + ceil(fitting.height) + 20
+    }
+
+    private func openAuthDrawer(title: String, message: String) {
+        guard shellProduct == .inspect, !inspectAuthenticated else { return }
+        authEmailTitle = title.isEmpty ? "Sign in" : title
+        authEmailMessage = message
+        showAuthStep(code: false)
+        shellSuppressedByModal = false
+        setShellVisible(true, animated: shellVisible)
+        setAuthDrawerOpen(true)
+        authEmailField.becomeFirstResponder()
+    }
+
+    private func setAuthDrawerOpen(_ open: Bool) {
+        guard open != authDrawerOpen else { return }
+        authDrawerOpen = open
+        // The page behind cannot be touched while the banner is a form, the same
+        // way the web makes its report inert under the expanded header.
+        webView?.isUserInteractionEnabled = !open
+        if open {
+            authDrawer.isHidden = false
+            authDrawer.alpha = 0
+            authDrawer.transform = CGAffineTransform(translationX: 0, y: -12)
+            // A capsule would round a tall bar into an oval. At 64pt a 32pt
+            // radius is the same capsule, so the swap itself is invisible.
+            if #available(iOS 26.0, *) {
+                topBar.cornerConfiguration = .corners(radius: .fixed(32))
+            }
+        } else {
+            authVerifying = false
+            view.endEditing(true)
+        }
+        setShellVisible(shellVisible, animated: true)
+        UIView.animate(
+            withDuration: 0.42,
+            delay: 0,
+            usingSpringWithDamping: 0.86,
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+            self.authDrawer.alpha = open ? 1 : 0
+            self.authDrawer.transform = open ? .identity : CGAffineTransform(translationX: 0, y: -12)
+        } completion: { _ in
+            guard !self.authDrawerOpen else { return }
+            self.authDrawer.isHidden = true
+            if #available(iOS 26.0, *) {
+                self.topBar.cornerConfiguration = .capsule()
+            }
+        }
+    }
+
+    /// Grows or shrinks the open bar to fit a new step or an error line.
+    private func refitAuthDrawer() {
+        guard authDrawerOpen else { return }
+        UIView.animate(
+            withDuration: 0.36,
+            delay: 0,
+            usingSpringWithDamping: 0.9,
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    private func showAuthStep(code: Bool) {
+        authErrorLabel.isHidden = true
+        authEmailField.isHidden = code
+        authSendButton.isHidden = code
+        authCodeField.isHidden = !code
+        authCodeActions.isHidden = !code
+        authVerifying = false
+        authLastTriedCode = ""
+        if code {
+            authTitleLabel.text = "Enter your code."
+            authMessageLabel.text = "Sent to \(authEmail)"
+            authCodeField.text = ""
+        } else {
+            authTitleLabel.text = authEmailTitle
+            authMessageLabel.text = authEmailMessage
+            authEmailField.text = authEmail
+        }
+    }
+
+    private func showAuthError(_ message: String) {
+        authErrorLabel.text = message
+        authErrorLabel.isHidden = false
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+        refitAuthDrawer()
+    }
+
+    private func submitAuthEmail() {
+        let email = (authEmailField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard email.contains("@"), email.count >= 3 else {
+            showAuthError("Enter the email you signed up with.")
+            return
+        }
+        authEmail = email
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        // Same order as the web: the code step appears at once and the request
+        // follows, so the number pad is already up when the email lands.
+        showAuthStep(code: true)
+        refitAuthDrawer()
+        authCodeField.becomeFirstResponder()
+        callWeb(function: "marketelInspectAuthRequest", argument: email)
+    }
+
+    private func handleInspectAuthResult(_ payload: [String: Any]) {
+        guard authDrawerOpen else { return }
+        switch payload["step"] as? String ?? "" {
+        case "verified":
+            setAuthDrawerOpen(false)
+        case "error":
+            authVerifying = false
+            showAuthError(payload["message"] as? String ?? "That did not work. Please try again.")
+            // Left selected, so the next digit typed replaces the wrong code.
+            if !authCodeField.isHidden { authCodeField.selectAll(nil) }
+        default:
+            break
+        }
+    }
+
+    @objc private func nativeSignInTapped() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        callWeb(function: "marketelInspectNativeAction", argument: "signin")
+    }
+
+    @objc private func closeAuthDrawerTapped() {
+        setAuthDrawerOpen(false)
+        callWeb(function: "marketelInspectAuthClosed", argument: "")
+    }
+
+    @objc private func authSendTapped() {
+        submitAuthEmail()
+    }
+
+    @objc private func authCodeChanged() {
+        let digits = String((authCodeField.text ?? "").filter { $0.isASCII && $0.isNumber }.prefix(6))
+        if authCodeField.text != digits { authCodeField.text = digits }
+        if !authErrorLabel.isHidden {
+            authErrorLabel.isHidden = true
+            refitAuthDrawer()
+        }
+        guard digits.count == 6, !authVerifying, digits != authLastTriedCode else { return }
+        authVerifying = true
+        authLastTriedCode = digits
+        callWeb(function: "marketelInspectAuthVerify", argument: digits)
+    }
+
+    @objc private func authResendTapped() {
+        authCodeField.text = ""
+        authLastTriedCode = ""
+        authCodeField.becomeFirstResponder()
+        callWeb(function: "marketelInspectAuthRequest", argument: authEmail)
+    }
+
+    @objc private func authChangeEmailTapped() {
+        showAuthStep(code: false)
+        refitAuthDrawer()
+        authEmailField.becomeFirstResponder()
+    }
+
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === authEmailField { submitAuthEmail() }
+        return false
+    }
+
+    /// Renames the bar in place when the tool changes. Only the brand
+    /// cross-fades; the glass itself never re-renders, so the banner reads as
+    /// one object staying put while the page underneath changes.
+    private func showInspectProduct(_ name: String) {
+        let product = name.isEmpty ? inspectProductName : name
+        guard shellProduct != .inspect || product != inspectProductName else { return }
+        UIView.transition(
+            with: propertyHeaderControl,
+            duration: 0.25,
+            options: [.transitionCrossDissolve, .allowUserInteraction]
+        ) {
+            self.inspectProductName = product
+            self.setShellProduct(.inspect)
+            self.propertyNameLabel.text = product
+            self.propertyHeaderControl.accessibilityLabel = "Switch tool, \(product)"
+        }
     }
 
     // Floating Assistant pill. Native because it has to sit beside the tab bar
@@ -739,6 +1082,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch product {
         case .frontDesk:
             productNameLabel.text = "Front Desk"
+            propertyNameLabel.isHidden = false
             propertyChevron.isHidden = false
             propertyHeaderControl.isUserInteractionEnabled = true
             qrButton.isHidden = false
@@ -757,15 +1101,25 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             }
         case .inspect:
             productNameLabel.text = "Marketel"
-            propertyNameLabel.text = "Inspect"
-            propertyChevron.isHidden = true
-            propertyHeaderControl.isUserInteractionEnabled = false
+            propertyNameLabel.text = inspectProductName
+            propertyNameLabel.isHidden = false
+            // The brand leads back to the tool chooser, the way it switches
+            // property in Front Desk.
+            propertyChevron.isHidden = false
+            propertyHeaderControl.accessibilityLabel = "Switch tool, \(inspectProductName)"
             qrButton.isHidden = true
             trialStatusBadge.isHidden = true
             menuButton.menu = inspectMenu
             menuButton.accessibilityLabel = "Inspect menu"
             tabBar.items = [inspectReportsTabItem, inspectCurrentTabItem, inspectPropertiesTabItem]
             tabBar.selectedItem = inspectCurrentTabItem
+        case .chooser:
+            productNameLabel.text = "Marketel"
+            propertyNameLabel.isHidden = true
+            propertyChevron.isHidden = true
+            propertyHeaderControl.accessibilityLabel = "Marketel"
+            qrButton.isHidden = true
+            trialStatusBadge.isHidden = true
         }
         view.setNeedsLayout()
     }
@@ -867,6 +1221,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
     @objc private func openPropertyPicker() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        if shellProduct == .inspect {
+            callWeb(function: "marketelInspectNativeAction", argument: "choose")
+            return
+        }
         guard nativeSession.isReady, presentedViewController == nil else {
             sendWebAction("properties")
             return
@@ -1249,17 +1607,24 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         topBar.alpha = 1
         menuButton.alpha = 1
         tabBar.alpha = 1
+        // Signed-out tool pages and the chooser get the floating glass bar on
+        // its own: there is no account yet for tabs or a menu to point at.
+        let signedOutInspect = shellProduct == .inspect && !inspectAuthenticated
+        let barOnly = shellProduct == .chooser || signedOutInspect
         statusBarBackdrop.isHidden = !visible
         topBar.isHidden = !visible
-        menuButton.isHidden = !visible
-        qrButton.isHidden = !visible || shellProduct == .inspect
-        tabBar.isHidden = !visible
-        assistantPill.isHidden = !visible || !assistantPillVisible || shellProduct == .inspect
+        menuButton.isHidden = !visible || barOnly
+        menuSlot.isHidden = barOnly
+        signInButton.isHidden = !visible || !signedOutInspect || authDrawerOpen
+        authCloseButton.isHidden = !visible || !authDrawerOpen
+        qrButton.isHidden = !visible || shellProduct != .frontDesk
+        tabBar.isHidden = !visible || barOnly
+        assistantPill.isHidden = !visible || !assistantPillVisible || shellProduct != .frontDesk
         assistantPillButton.isHidden = assistantPill.isHidden
         topBar.isUserInteractionEnabled = visible && !nativeTourActive
-        menuButton.isUserInteractionEnabled = visible && !nativeTourActive
-        propertyHeaderControl.isUserInteractionEnabled = visible && !nativeTourActive && shellProduct == .frontDesk
-        tabBar.isUserInteractionEnabled = visible && !nativeTourActive
+        menuButton.isUserInteractionEnabled = visible && !nativeTourActive && !barOnly
+        propertyHeaderControl.isUserInteractionEnabled = visible && !nativeTourActive && !authDrawerOpen && shellProduct != .chooser
+        tabBar.isUserInteractionEnabled = visible && !nativeTourActive && !barOnly
         assistantPillButton.isUserInteractionEnabled = visible && !nativeTourActive
     }
 
@@ -1477,16 +1842,42 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             let requestedVisible = payload["visible"] as? Bool ?? true
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "inspectState":
-            setShellProduct(.inspect)
+            showInspectProduct(payload["product"] as? String ?? "")
             shellSuppressedByModal = !(payload["visible"] as? Bool ?? true)
             inspectAuthenticated = payload["authenticated"] as? Bool ?? false
             updateInspectSelectedTab(
                 payload["selectedTab"] as? String ?? "current",
                 hasDraft: payload["hasUnfinishedDraft"] as? Bool ?? false
             )
-            // Reports and Properties mean nothing to a signed-out owner, so the
-            // whole bar stays hidden until there is an account behind it.
-            setShellVisible(inspectAuthenticated && !shellSuppressedByModal, animated: shellVisible)
+            if authDrawerOpen && (inspectAuthenticated || shellSuppressedByModal) {
+                setAuthDrawerOpen(false)
+            }
+            // Signed out, the glass bar still floats over the page with Sign in
+            // in it; Reports and Properties wait until there is an account.
+            setShellVisible(!shellSuppressedByModal, animated: shellVisible)
+        case "chooserState":
+            if authDrawerOpen { setAuthDrawerOpen(false) }
+            UIView.transition(
+                with: propertyHeaderControl,
+                duration: 0.25,
+                options: [.transitionCrossDissolve, .allowUserInteraction]
+            ) {
+                self.setShellProduct(.chooser)
+            }
+            shellSuppressedByModal = false
+            setShellVisible(true, animated: shellVisible)
+        case "shellProduct":
+            // Sent by the chooser just before it navigates, so the bar has
+            // already renamed itself when the tool page arrives beneath it.
+            showInspectProduct(payload["product"] as? String ?? "")
+            setShellVisible(!shellSuppressedByModal, animated: shellVisible)
+        case "inspectAuth":
+            openAuthDrawer(
+                title: payload["title"] as? String ?? "",
+                message: payload["message"] as? String ?? ""
+            )
+        case "inspectAuthResult":
+            handleInspectAuthResult(payload)
         case "saveContact":
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":

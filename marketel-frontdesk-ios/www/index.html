@@ -9,29 +9,53 @@
   <style>
     @font-face { font-family: "DM Sans"; src: url("frontdesk/assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
     @font-face { font-family: "DM Sans"; src: url("frontdesk/assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-display: swap; }
-    :root { color: #173326; background: #eff4f0; font-family: "DM Sans", -apple-system, sans-serif; }
+    :root { color: #1a2b22; background: #eff4f0; font-family: "DM Sans", -apple-system, sans-serif; font-synthesis: none; }
     * { box-sizing: border-box; }
-    body { min-height: 100vh; min-height: 100dvh; margin: 0; background: radial-gradient(circle at 5% 0%, #e0ede4 0%, #eff4f0 36%); }
-    header { position: fixed; inset: 0 0 auto; z-index: 2; padding: calc(env(safe-area-inset-top) + 12px) 18px 14px; border-radius: 0 0 22px 22px; background: #ffffffeb; backdrop-filter: blur(20px) saturate(150%); box-shadow: 0 2px 6px #2e7d5b0f; }
-    .brand { display: flex; align-items: center; gap: 9px; height: 34px; }
-    .brand-icon { width: 30px; height: 30px; border-radius: 8px; }
-    .brand-wordmark { width: 120px; max-height: 32px; object-fit: contain; object-position: left center; }
+    /* Same ground as the tool pages, so the hand-off between documents is
+       invisible and only the content appears to move. */
+    body { min-height: 100vh; min-height: 100dvh; margin: 0; background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; }
+    /* The native glass bar floats over the top 82pt (6pt gap, 64pt bar, 12pt
+       below it), exactly as it does on every tool page. */
     main { width: min(100%, 490px); padding: calc(env(safe-area-inset-top) + 110px) 20px calc(env(safe-area-inset-bottom) + 36px); margin: auto; }
     h1 { margin: 0 0 8px; font-size: clamp(27px, 8vw, 36px); letter-spacing: -.04em; line-height: 1.12; }
     p { margin: 0; color: #596d60; line-height: 1.5; }
     .choices { display: grid; gap: 14px; margin-top: 30px; }
-    .choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; width: 100%; padding: 22px 20px; text-align: left; color: inherit; background: #ffffffeb; border: 1px solid #dbe7de; border-radius: 22px; box-shadow: 0 2px 6px #2e7d5b0f, 0 12px 30px #2e7d5b12; font: inherit; cursor: pointer; transition: transform .15s ease; }
+    .choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; width: 100%; padding: 22px 20px; text-align: left; color: inherit; background: #ffffffeb; border: 1px solid #dbe7de; border-radius: 22px; box-shadow: 0 2px 6px #2e7d5b0f, 0 12px 30px #2e7d5b12; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s ease, opacity .2s ease, border-color .2s ease; }
     .choice:active { transform: scale(.97); }
     .choice:disabled { opacity: .55; cursor: wait; }
     .choice strong, .choice small { display: block; }
     .choice strong { font-size: 19px; }
     .choice small { color: #596d60; margin-top: 5px; font-size: 13px; line-height: 1.4; }
-    .arrow { color: #328057; font-size: 24px; }
+    .arrow { color: #328057; font-size: 24px; transition: transform .2s ease; }
     .hidden { display: none; }
+
+    /* Arrival: heading, then each tool in order. `backwards` holds only the
+       starting frame, so :active and :disabled still own the resting state. */
+    h1, #intro, .choice { animation: rise 460ms cubic-bezier(.32, .72, 0, 1) backwards; }
+    #intro { animation-delay: 45ms; }
+    .choice:nth-child(1) { animation-delay: 100ms; }
+    .choice:nth-child(2) { animation-delay: 145ms; }
+    .choice:nth-child(3) { animation-delay: 190ms; }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+
+    /* Departure: the others step back first, then the chosen tool lifts away
+       into its own page while the glass bar stays exactly where it is. */
+    html.leaving h1, html.leaving #intro, html.leaving .choice:not(.chosen) { animation: settle 220ms ease forwards; }
+    html.leaving .choice.chosen { border-color: #9cc9ae; animation: lift 320ms cubic-bezier(.32, .72, 0, 1) forwards; }
+    html.leaving .choice.chosen .arrow { transform: translateX(4px); }
+    html.leaving .choices { pointer-events: none; }
+    @keyframes settle { to { opacity: 0; transform: translateY(10px); } }
+    @keyframes lift {
+      0% { transform: scale(.97); }
+      45% { transform: scale(1); opacity: 1; }
+      100% { transform: translateY(-10px); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
-  <header><div class="brand"><img class="brand-icon" src="marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="marketel.svg" alt="Marketel"></div></header>
   <main>
     <h1>What are you working on?</h1>
     <p id="intro">Choose what you need today. All three use the same account.</p>
@@ -44,6 +68,8 @@
   <script>
     (() => {
       const products = ['inspect', 'claims', 'incident'];
+      const names = { inspect: 'Inspect', claims: 'Claims', incident: 'Incident' };
+      const shell = message => window.webkit?.messageHandlers?.marketelShell?.postMessage(message);
       const open = product => {
         localStorage.setItem('marketel.product', product);
         location.replace(products.includes(product) ? `inspect/index.html?arm=${product}` : 'frontdesk/index.html?native=ios');
@@ -52,8 +78,26 @@
       const choosing = new URLSearchParams(location.search).get('choose') === '1';
       if (!choosing && products.includes(selected)) return open(selected);
       if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
+      // Only now is this page staying on screen, so only now does the shell
+      // show its floating glass bar over it.
+      shell({ type: 'chooserState' });
+      let leaving = false;
+      const choose = button => {
+        if (leaving) return;
+        leaving = true;
+        const product = button.dataset.product;
+        // The bar renames itself while the page underneath changes; the tool
+        // page reads this flag and rises in to meet it.
+        shell({ type: 'shellProduct', product: names[product] });
+        shell({ type: 'inspectHaptic' });
+        try { sessionStorage.setItem('marketel.enter', '1'); } catch {}
+        button.classList.add('chosen');
+        document.documentElement.classList.add('leaving');
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        setTimeout(() => open(product), reduced ? 0 : 300);
+      };
       const choices = [...document.querySelectorAll('[data-product]')];
-      choices.forEach(button => { button.disabled = true; button.onclick = () => open(button.dataset.product); });
+      choices.forEach(button => { button.disabled = true; button.onclick = () => choose(button); });
       document.getElementById('choices').classList.remove('hidden');
       fetch('https://bookmarketel.com/api/inspect/config', { cache: 'no-store' })
         .then(response => response.ok ? response.json() : null)

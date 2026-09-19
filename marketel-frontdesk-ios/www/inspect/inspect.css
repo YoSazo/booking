@@ -21,6 +21,10 @@
      viewport still counts those bands but nothing may be placed in them. */
   --shell-top: 0px;
   --shell-bottom: 0px;
+  /* The fixed chrome a centred flow card must clear: the web banner, or the
+     app's floating glass bar and whatever sits at the bottom edge. */
+  --chrome-top: 64px;
+  --chrome-bottom: 0px;
 }
 * { box-sizing: border-box; }
 /* A long press is how photos get reordered, so the chrome must not answer it
@@ -246,11 +250,14 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .app-handoff-card p { margin: 0; }
 .app-handoff-card button { flex: 0 0 auto; }
 .flow-screen { min-height: var(--flow-page-height, calc(100svh - 100px)); }
+/* Cancels main's top margin, so the card's resting position is its sticky
+   position and a centred card is centred whether or not the page is scrolled. */
+.flow-screen { margin-top: -18px; }
 /* Authentication contains the one input that every new user must touch. Keep it
    in normal document flow instead of a top-layer dialog over a fixed body: iOS
    can pan and scroll the page naturally without exposing a second coordinate
    system or a blank strip underneath the browser toolbar. */
-.flow-frame { position: sticky; top: calc(64px + env(safe-area-inset-top)); min-height: calc(100svh - 64px - env(safe-area-inset-top)); display: grid; place-items: center; padding: 18px 0; }
+.flow-frame { position: sticky; top: calc(var(--chrome-top) + env(safe-area-inset-top)); min-height: calc(100svh - var(--chrome-top) - env(safe-area-inset-top) - var(--chrome-bottom)); display: grid; place-items: center; padding: 18px 0; }
 .flow-card { position: relative; width: min(480px, 100%); margin: 0; background: #fbfdfb; }
 .flow-card h2 { margin-top: 0; padding-right: 38px; }
 .flow-close { position: absolute; top: 10px; right: 10px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; color: var(--muted); border-radius: 999px; }
@@ -273,7 +280,17 @@ dialog:focus, dialog:focus-visible { outline: none; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
 .native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(98px + env(safe-area-inset-bottom)); }
 .native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
-.native-inspect-shell.inspect-authenticated { --shell-top: 82px; --shell-bottom: 98px; }
+/* The glass bar floats over every app screen now, signed in or not; only the
+   tab bar waits for an account. The bar is 64pt tall, 6pt below the safe area,
+   so 82px leaves the same 12pt gap under it that the tab bar gets above it. */
+.native-inspect-shell { --shell-top: 82px; --chrome-top: 82px; --chrome-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.native-inspect-shell.inspect-authenticated { --shell-bottom: 98px; --chrome-bottom: calc(62px + env(safe-area-inset-bottom)); }
+/* Most app users arrive from the web funnel with an account already, so their
+   way back in is an outlined button of full weight, not a text link. */
+.native-inspect-shell .hero #sign-in { background: #ffffffe6; border: 1.5px solid #9cc9ae; }
+.native-inspect-shell .hero #sign-in:active { background: #e8f5ee; }
+/* In the app main has 16px of top padding instead of the margin. */
+.native-inspect-shell .flow-screen { margin-top: -16px; }
 /* A sheet tall enough to need the whole screen takes the shell with it. */
 html.sheet-full { --shell-top: 0px; --shell-bottom: 0px; }
 /* The plan sheet already hides the native header and tab bar. Give it the room
@@ -297,7 +314,16 @@ html.sheet-full dialog {
 @keyframes plan-in { from { opacity: 0; transform: translateY(22px) scale(.99); } to { opacity: 1; transform: none; } }
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
-.native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+.native-inspect-shell:not(.inspect-authenticated) body { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+/* Arriving from the app's tool chooser. The glass bar never moves, so only the
+   page content rises in, in reading order. */
+html.wedge-enter .hero > *, html.wedge-enter #app > :not(.hero) { animation: wedge-in 460ms cubic-bezier(.32,.72,0,1) backwards; }
+html.wedge-enter .hero > :nth-child(2) { animation-delay: 45ms; }
+html.wedge-enter .hero > :nth-child(3) { animation-delay: 90ms; }
+html.wedge-enter .hero > :nth-child(4) { animation-delay: 135ms; }
+html.wedge-enter .hero > :nth-child(5) { animation-delay: 170ms; }
+html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
+@keyframes wedge-in { from { opacity: 0; transform: translateY(12px); } }
 .native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
   header { padding: 0 15px; }

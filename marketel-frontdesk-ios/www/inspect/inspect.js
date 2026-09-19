@@ -186,7 +186,7 @@ function enterScreen(key){
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({
-    type:'inspectState',visible,selectedTab:page,authenticated:!!account,hasUnfinishedDraft:hasUnfinishedDraft(),
+    type:'inspectState',visible,selectedTab:page,authenticated:!!account,hasUnfinishedDraft:hasUnfinishedDraft(),product:skin().product,
   });
 }
 // A sheet is a card on top of the app, so the shell stays put — `true` keeps the
@@ -481,9 +481,11 @@ function landing() {
   playDemo();
   $('start').onclick = () => start();
   $('see-plans').onclick=previewPlans;
-  // The native shell hides the web header, so without this there was no way back
-  // in after signing out short of the overflow menu.
-  if($('sign-in'))$('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
+  // People reach the app through the web funnel, so most of them already have
+  // an account there. On the web the free report stays the one primary action.
+  if(native){$('sign-in').className='secondary wide';$('start').classList.add('wide');$('start').after($('sign-in'));}
+  $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
+  settleWedgeEntrance();
 }
 // Pricing stays one tap away without turning a no-card free report into a
 // purchase decision. This is informational: it neither fires the post-report
@@ -518,7 +520,7 @@ function editor(step) {
   enterScreen(`editor:${editorStep}`);
   const bar = `<div class="screen-bar">${account
     ? `<button type="button" id="editor-back" class="quiet">← All ${esc(skin().docPlural)}</button>`
-    : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
+    : `<button type="button" id="editor-signin" class="quiet">Already have ${esc(skin().docPlural)}? Sign in</button>`}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
   if (editorStep === 'details') {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
       // The report's date and the finalized timestamp both say when it was
@@ -568,7 +570,7 @@ function editor(step) {
   }
   // Signed out in the app neither chrome is on screen, so these are the only exits.
   if($('editor-back'))$('editor-back').onclick=()=>run(()=>list());
-  if($('editor-signin'))$('editor-signin').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()));
+  if($('editor-signin'))$('editor-signin').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   $('editor-discard').onclick=async()=>{
     if(!await confirmAction({title:'Discard this report?',message:'Anything not saved online will be removed from this device.',confirmLabel:'Discard report',danger:true}))return;
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();if(account)await openAccountHome();else landing();});
@@ -762,6 +764,10 @@ function flowScreen(content,kind=''){
 function headerDrawer(content){
   const drawer=$('header-drawer'),body=$('header-drawer-body'),close=$('header-drawer-close');
   const app=$('app'),nav=$('nav'),bar=document.querySelector('.header-bar');
+  // The app hides this banner and draws its own. Opening a drawer nobody can
+  // see still inerted the page behind it, which left every button dead until
+  // the app was killed.
+  if(!bar?.getClientRects().length)throw new Error('Sign in could not open here. Please try again.');
   let restored=false;
   const restore=()=>{
     if(restored)return;
@@ -802,8 +808,20 @@ function confirmAction({title,message,confirmLabel='Continue',danger=false}){
 // Authentication expands the already-fixed header. It never opens a top-layer
 // dialog, freezes the body or replaces the report, so Safari has only one page
 // and one scroll position to reconcile with its keyboard and browser toolbar.
-function ensureAuth(after) {
+function authCopy(intent){
+  const sk=skin();
+  return intent==='signin'
+    ?{title:`Sign in to Marketel ${sk.product}`,message:'Use the email you signed up with. We will send you a 6-digit code.'}
+    :{title:`Keep your ${sk.doc}.`,message:`Verify your email to save, export and recover your work on another device. Your first complete ${sk.doc} is free.`};
+}
+function ensureAuth(after, intent='keep') {
   if(session && account) return after();
+  const copy=authCopy(intent);
+  if(native){
+    nativeAuth={after,email:''};
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectAuth',step:'email',title:copy.title,message:copy.message,product:skin().product});
+    return;
+  }
   let drawer=null;
   let email='';
   const codeStep=()=>{
@@ -841,7 +859,7 @@ function ensureAuth(after) {
     $('auth-back').onclick=()=>emailStep(false);
   };
   const emailStep=open=>{
-    const html=`<h2>Keep your report.</h2><p>Verify your email to save, export and recover your work on another device. Your first complete report is free.</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
+    const html=`<h2>${esc(copy.title)}</h2><p>${esc(copy.message)}</p><form id="email-form"><label>Email<input id="email" type="email" required autocomplete="email" value="${esc(email)}"></label><button class="wide">Send sign-in code</button></form>`;
     if(open)drawer=headerDrawer(html);else drawer.paint(html);
     if(!open)$('email').focus();
     $('email-form').onsubmit=event=>{
@@ -854,6 +872,35 @@ function ensureAuth(after) {
   };
   emailStep(true);
 }
+// In the app the email and code fields live in the native glass banner. The
+// account work stays here so the session, attribution and header logic have
+// one home; the shell only carries what was typed.
+let nativeAuth=null;
+const postAuthResult=result=>window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectAuthResult',...result});
+window.marketelInspectAuthRequest=raw=>{
+  const email=String(raw||'').trim();
+  if(!nativeAuth||!email)return;
+  nativeAuth.email=email;
+  api('/auth/request',{method:'POST',body:{email}})
+    .then(()=>{postAuthResult({step:'code',email});notice('Check your email for the code.','success');})
+    .catch(error=>postAuthResult({step:'error',message:error.message}));
+};
+window.marketelInspectAuthVerify=raw=>{
+  const code=String(raw||'').replace(/\D/g,'').slice(0,6);
+  if(!nativeAuth||code.length!==6)return;
+  const pending=nativeAuth;
+  api('/auth/verify',{method:'POST',body:{email:pending.email,code,attribution:inspectAttribution}})
+    .then(result=>{
+      if(nativeAuth!==pending)return;
+      nativeAuth=null;
+      session=result.token;localStorage.setItem('inspect.session',session);account=result;
+      postAuthResult({step:'verified'});
+      updateHeader();prefetchLists();
+      pending.after();
+    })
+    .catch(error=>postAuthResult({step:'error',message:error.message}));
+};
+window.marketelInspectAuthClosed=()=>{nativeAuth=null;};
 async function refresh(){if(session){account=await api('/account');updateHeader();}}
 async function syncInspectAttribution(){
   if(session&&account&&inspectAttribution)await api('/attribution',{method:'POST',body:{attribution:inspectAttribution}});
@@ -1276,7 +1323,7 @@ async function openAccountHome(){
 }
 function prefetchLists(){if(!account)return;api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});api('/reports?take=50').then(result=>{reportsCache=result;}).catch(()=>{});}
 $('account-button').onclick=async()=>{
-  if(!account)return ensureAuth(()=>run(()=>openAccountHome()));
+  if(!account)return ensureAuth(()=>run(()=>openAccountHome()),'signin');
   await requestStorefront();
   const sk = skin();
   modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:`One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
@@ -1332,14 +1379,26 @@ window.marketelInspectOpenHandoff=async rawToken=>{
     notice('Signed in. Your report is ready.','success');
   }catch(error){
     notice(error.message||'This app link is invalid or expired.','error');
-    ensureAuth(()=>run(()=>openAccountHome()));
+    ensureAuth(()=>run(()=>openAccountHome()),'signin');
   }
 };
 window.marketelInspectNativeAction=action=>{
   if(action==='account'){$('account-button').click();return;}
+  if(action==='signin'){if($('dialog').open)$('dialog').close();ensureAuth(()=>run(()=>openAccountHome()),'signin');return;}
+  if(action==='choose'){location.assign('../index.html?choose=1');return;}
   if(action==='frontdesk'){syncNativeInspectState(currentPage,false);localStorage.setItem('marketel.product','bookings');location.assign('../frontdesk/index.html?native=ios');return;}
   if(action==='refresh')run(async()=>{await refresh();if(draft)editor();else if(account)await list(currentPage==='properties'?'properties':'reports');else landing();notice(`${skin().product} refreshed.`);});
 };
+function beginWedgeEntrance(){
+  let entering=false;
+  try{entering=sessionStorage.getItem('marketel.enter')==='1';sessionStorage.removeItem('marketel.enter');}catch{}
+  if(entering)document.documentElement.classList.add('wedge-enter');
+}
+// Removed once the first screen has had time to arrive, so a later landing
+// (after Discard, say) does not replay the entrance.
+function settleWedgeEntrance(){
+  if(document.documentElement.classList.contains('wedge-enter'))setTimeout(()=>document.documentElement.classList.remove('wedge-enter'),900);
+}
 function showNativeKeyboardDoneButton(){
   if(!native)return;
   let attempts=0;
@@ -1393,7 +1452,7 @@ document.addEventListener('visibilitychange',()=>{
   lastForegroundSync=Date.now();
   run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});},null);
 });
-if(native){const chosen=new URLSearchParams(location.search).get('arm');if(LANDING_ARMS[chosen])localStorage.setItem('marketel.product',chosen);else if(!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
+if(native){beginWedgeEntrance();const chosen=new URLSearchParams(location.search).get('arm');if(LANDING_ARMS[chosen])localStorage.setItem('marketel.product',chosen);else if(!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 // A cold start often runs before the network is ready. That is not a failure
 // worth alarming anyone about: the session and the local draft are intact, so
 // boot quietly and let the next action surface any real problem. Only a genuine
@@ -1403,6 +1462,7 @@ try{
   await refresh().catch(()=>{});
   if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}
   if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
+  settleWedgeEntrance();
   if(new URLSearchParams(location.search).get('checkout')==='success'&&session){
     await api('/billing/refresh',{method:'POST'});
     await refresh();

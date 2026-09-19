@@ -440,6 +440,47 @@ test('the required email flow expands the persistent header without replacing th
     assert.match(css, /html\.auth-open \.header-bar, html\.auth-open main, html\.auth-open nav\s*\{[^}]*pointer-events:\s*none/);
 });
 
+test('the app signs in through its glass banner and never inerts a page behind a hidden header', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.css'), 'utf8');
+    const chooser = fs.readFileSync(path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'www', 'index.html'), 'utf8');
+    const drawer = client.slice(client.indexOf('function headerDrawer('), client.indexOf('function confirmAction('));
+    const auth = client.slice(client.indexOf('function ensureAuth('), client.indexOf('async function refresh('));
+    const nativeBranch = auth.slice(auth.indexOf('if(native){'), auth.indexOf('let drawer=null;'));
+
+    // The app hides the web header; a drawer inside it must refuse to open
+    // before anything is made inert, or every button on the page goes dead.
+    assert.ok(drawer.indexOf('getClientRects().length') > -1);
+    assert.ok(drawer.indexOf('getClientRects().length') < drawer.indexOf('app.inert=true'));
+    assert.match(nativeBranch, /type:'inspectAuth'/);
+    assert.match(nativeBranch, /return;/);
+    assert.doesNotMatch(nativeBranch, /headerDrawer\(/);
+    for (const bridge of ['marketelInspectAuthRequest', 'marketelInspectAuthVerify', 'marketelInspectAuthClosed']) {
+        assert.match(client, new RegExp(`window\\.${bridge}=`));
+    }
+    assert.match(client, /type:'inspectAuthResult'/);
+    assert.match(client, /\$\('sign-in'\)\.onclick=\(\)=>ensureAuth\(\(\)=>run\(\(\)=>openAccountHome\(\)\),'signin'\)/);
+    assert.match(client, /if\(action==='signin'\)/);
+    assert.match(client, /if\(action==='choose'\)/);
+    assert.match(client, /type:'inspectState',[^}]*product:skin\(\)\.product/);
+
+    // Flow cards centre between the chrome that is actually on screen.
+    assert.match(css, /\.flow-frame \{[^}]*top: calc\(var\(--chrome-top\)/);
+    assert.match(css, /\.flow-frame \{[^}]*var\(--chrome-bottom\)/);
+    assert.doesNotMatch(css, /\.flow-frame \{[^}]*64px/);
+    assert.match(css, /\.native-inspect-shell \{[^}]*--chrome-top: 82px/);
+    assert.match(css, /\.native-inspect-shell \.flow-screen \{ margin-top: -16px; \}/);
+
+    // The chooser hands the bar to the shell and cues the tool page's entrance.
+    assert.match(chooser, /type: 'chooserState'/);
+    assert.match(chooser, /type: 'shellProduct'/);
+    assert.match(chooser, /sessionStorage\.setItem\('marketel\.enter', '1'\)/);
+    assert.match(client, /sessionStorage\.getItem\('marketel\.enter'\)/);
+    assert.match(css, /html\.wedge-enter \.hero > \*/);
+});
+
 test('the landing defers pricing by one transparent tap without opening checkout', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
