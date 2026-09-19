@@ -1212,7 +1212,7 @@ app.get('/inspect/open', (req, res) => {
 // someone to discover it at the card.
 const INSPECT_ARMS = Object.freeze({
     incident: Object.freeze({ product: 'Incident', title: 'Marketel Incident \u2014 Write it before anyone goes home' }),
-    claims: Object.freeze({ product: 'Inspect', title: 'Marketel Inspect \u2014 Document the damage while it is in front of you' }),
+    claims: Object.freeze({ product: 'Claims', title: 'Marketel Claims \u2014 Document the damage while it is in front of you' }),
 });
 
 // The shell and the terms page are shipped as ordinary, complete HTML and
@@ -1231,7 +1231,7 @@ function inspectSkinned(file, slug) {
     const source = fs.readFileSync(path.join(INSPECT_PUBLIC_ROOT, file), 'utf8');
     let html = source;
     if (arm) {
-        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover both.</div>`;
+        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover all three. ${slug === 'claims' ? 'Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.' : ''}</div>`;
         const swaps = file === 'index.html' ? [
             ['<title>Marketel Inspect \u2014 Your walkthrough, a finished report</title>', `<title>${arm.title}</title>`],
             ['<span>Inspect</span>', `<span>${arm.product}</span>`],

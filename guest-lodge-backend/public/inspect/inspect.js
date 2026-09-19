@@ -77,6 +77,13 @@ const WEDGES = {
     signers: { manager: 'staff', other: 'witness' },
     disclaimer: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
   },
+  damage: {
+    noun: 'room', nounPlural: 'rooms',
+    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
+    eyebrow: 'New damage report', dateLabel: 'Date you found the damage',
+    signers: { manager: 'owner', other: 'guest' },
+    disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
+  },
   default: {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
@@ -86,6 +93,16 @@ const WEDGES = {
   },
 };
 const wedge = type => WEDGES[type] || WEDGES.default;
+const SIGNER_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
+const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
+const ROLE_LABELS = { witness: 'Witness', resident: 'Resident / tenant', owner: 'Owner / host', guest: 'Guest', manager: 'Manager / inspector' };
+const roleLabel = role => ROLE_LABELS[role] || ROLE_LABELS.manager;
+// The enum is storage. This is the name the document calls itself.
+const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
+const typeLabel = type => TYPE_LABELS[type] || TYPE_LABELS.routine;
+// Only Inspect offers a choice of document. The other arms were chosen by the
+// door someone came through, so a dropdown there is a question with one answer.
+const TYPED_ARMS = new Set(['incident', 'damage']);
 const COMMON_ROOMS = WEDGES.default.seeds;
 const nextRoomName = rooms => {
   const used = new Set((rooms || []).map(room => String(room.name || '').trim().toLowerCase()));
@@ -279,6 +296,16 @@ function photoURL(id) {
   const url = URL.createObjectURL(file.blob); urls.set(id, url); return url;
 }
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
+const ORIGINAL_EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic', 'image/heif': 'heif', 'image/webp': 'webp', 'image/avif': 'avif' };
+async function downloadOriginal(remoteId){
+  const blob=await api(`/reports/${draft.serverId}/photos/${remoteId}/original`,{blob:true});
+  const href=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=href;
+  link.download=`marketel-original-${remoteId}.${ORIGINAL_EXTENSIONS[blob.type]||'bin'}`;
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(href),60000);
+}
 // The hero promises a transformation, so the proof beneath it has to show one
 // rather than the finished artifact. Canned, not a recording: it must be
 // legible on first paint and still read correctly when frozen.
@@ -287,11 +314,12 @@ let demoTimer = 0;
 function playDemo(){
   const demo=$('demo'),said=$('demo-said');
   if(!demo||!said)return;
+  const script=landingArm()?.demoSaid||DEMO_SAID;
   clearTimeout(demoTimer);
   // inspect.css only collapses CSS animation and transition durations under
   // reduced motion; a JS typing loop runs straight through that, so ask here.
   if(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches){
-    said.textContent=DEMO_SAID;demo.classList.add('is-in');return;
+    said.textContent=script;demo.classList.add('is-in');return;
   }
   const cycle=()=>{
     // The landing screen can be replaced mid-loop; stop rather than resurrect it.
@@ -300,8 +328,8 @@ function playDemo(){
     let at=0;
     const type=()=>{
       if(!document.body.contains(said))return;
-      said.textContent=DEMO_SAID.slice(0,++at);
-      if(at<DEMO_SAID.length){demoTimer=setTimeout(type,32);return;}
+      said.textContent=script.slice(0,++at);
+      if(at<script.length){demoTimer=setTimeout(type,32);return;}
       demoTimer=setTimeout(()=>{demo.classList.add('is-in');demoTimer=setTimeout(cycle,4600);},420);
     };
     type();
@@ -315,19 +343,18 @@ function playDemo(){
 // sourceUrl, so the arm is attributed with no new plumbing and utm_campaign
 // goes back to naming the campaign rather than doubling as the arm.
 //
-// `product` is what the person believes they signed up for, and it only differs
-// where the job differs. The claims arm is a condition report sold to a
-// different reader, so it stays Inspect. The incident arm makes a different
-// document, so it does not — someone who clicked an ad about incidents must not
-// land inside a product that talks about move-out comparisons.
+// Claims and Incident make distinct documents with distinct language; all
+// three share the same account and report allowance.
 //
 // The claims arm deliberately leads with the original files and the deadline
-// rather than the AI: Airbnb's April 2026 update bans AI-generated evidence
-// from claims, and while our notes are the host's own words restructured, those
-// two ideas do not belong next to each other on this page. The demo further
+// rather than the AI: evidence must reflect what the owner actually saw, and
+// these two ideas do not belong next to each other on this page. The demo further
 // down still shows it — mentioned, not headlined.
 const SKIN = {
   product: 'Inspect',
+  writesLabel: 'Inspect writes',
+  doc: 'report', docPlural: 'reports',
+  comparisons: true,
   home: '/inspect/',
   terms: 'https://bookmarketel.com/inspect/terms.html',
   termsLabel: 'Inspect terms',
@@ -351,11 +378,16 @@ const SKIN = {
 const LANDING_ARMS = {
   incident: {
     type: 'incident',
+    demoSaid: 'The guest reported slipping near the lobby entrance at 6 pm. I put out a warning sign and called the manager.',
+    demoNote: 'Guest reported slipping near the lobby entrance at 6 pm. A warning sign was placed and the manager was called.',
     eyebrow: 'For hotels, short-lets and venues',
     title: 'Write the incident report<br>before anyone goes home.',
     lede: 'What happened, where, who was involved and what you did \u2014 photographed, timed, signed by a witness, and exported as a PDF.',
     skin: {
       product: 'Incident',
+      writesLabel: 'it writes',
+      doc: 'record', docPlural: 'records',
+      comparisons: false,
       home: '/incident',
       terms: 'https://bookmarketel.com/incident/terms',
       termsLabel: 'Incident terms',
@@ -378,12 +410,40 @@ const LANDING_ARMS = {
     },
   },
   claims: {
+    demoSaid: 'Kitchen, chipped counter edge beside the sink. Found it at checkout. I took photos before cleaning.',
+    demoNote: 'Chipped counter edge beside the kitchen sink, found at checkout. Photos taken before cleaning.',
     eyebrow: 'For short-let and rental hosts',
     title: 'Document the damage<br>while it is in front of you.',
-    lede: 'Room-by-room photos kept as the original camera files, with a dated report you can send before the claim window closes.',
-    skin: { home: '/claims' },
+    lede: 'Room-by-room photos kept as uploaded, with a dated report you can send before the claim window closes.',
+    type: 'damage',
+    skin: {
+      product: 'Claims',
+      writesLabel: 'it writes',
+      doc: 'report', docPlural: 'reports',
+      comparisons: false,
+      navList: 'Reports', navCreate: '+ New damage report', navPlaces: 'Properties',
+      propertyPrompt: 'Which rental property?',
+      placesHeading: 'Properties',
+      placesEmpty: 'Properties appear here after you save a damage report.',
+      home: '/claims',
+      terms: 'https://bookmarketel.com/claims/terms',
+      termsLabel: 'Claims terms',
+      listHeading: 'Your damage reports',
+      placesLede: 'Start a fresh damage report for a property you have documented before.',
+      demoBadge: 'EXAMPLE \u00b7 NOT REAL DAMAGE',
+      documentLabel: 'MARKETEL CLAIMS',
+      offerHeading: 'Document it while it is still there.',
+      offerAnchor: 'One claim you cannot evidence costs more than a year of this subscription.',
+      offerPoints: [
+        'Talk through a room and it writes the note',
+        'Every uploaded photo kept as received',
+        'No per-property or per-room fees',
+        'PDF export and a private share link on every report',
+      ],
+    },
   },
 };
+const documentFileName = type => type === 'incident' ? 'incident-record.pdf' : type === 'damage' ? 'damage-report.pdf' : 'inspection-report.pdf';
 // Root path first, then the legacy /inspect/<arm> path, then utm_campaign as a
 // fallback so links already in flight keep working. The SPA never rewrites the
 // URL, so this answer is stable for the whole session.
@@ -392,6 +452,11 @@ const LANDING_ARMS = {
 // a slug collides with it.
 const ARM_PATH = /^\/(?:inspect\/)?(?!inspect\/?$)([a-z][a-z-]*)\/?$/;
 const landingArm = () => {
+  if (native) {
+    const chosen = new URLSearchParams(location.search).get('arm');
+    const stored = localStorage.getItem('marketel.product');
+    return LANDING_ARMS[chosen] || LANDING_ARMS[stored] || null;
+  }
   const fromPath = (location.pathname.match(ARM_PATH) || [])[1];
   const fromParam = new URLSearchParams(location.search).get('utm_campaign') || '';
   return LANDING_ARMS[fromPath] || LANDING_ARMS[fromParam.toLowerCase()] || null;
@@ -406,7 +471,13 @@ function landing() {
   const arm = landingArm();
   updateHeader();
   setActiveNav('current');
-  $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||`Talk through each room.<br>${esc(skin().product)} writes the notes.`}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first report free</button><p><small>One complete report free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().product)} writes</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF or a private link.</small></article><p><small>Your report records what you observe. It is not a professional building inspection or legal certification.</small></p></section>`;
+  $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first ${esc(skin().doc)} free</button><p><small>Your first complete report across Marketel Inspect is free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button><article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().writesLabel)}</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF${arm?.type==='incident'?'':' or a private link'}.</small></article><p><small>${esc(wedge(arm?.type).disclaimer)}</small></p></section>`;
+  if(arm){
+    $('demo-result').querySelector('.demo-note').textContent=arm.demoNote;
+    if(arm.type==='incident')$('demo-result').querySelector('.demo-badge').remove();
+    $('sign-in').textContent=`Already have ${skin().docPlural}? Sign in`;
+    $('app').querySelector('.hero > p > small').textContent='Your first complete report across Inspect, Claims and Incident is free. No card.';
+  }
   playDemo();
   $('start').onclick = () => start();
   $('see-plans').onclick=previewPlans;
@@ -423,14 +494,14 @@ function previewPlans(){
     const plan=PLANS[planInterval],each=plan.price/plan.reports;
     const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
     const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually · ${plan.save}`:'Cancel renewal anytime.';
-    flow.paint(`<h2>Plans after your free report</h2><p class="muted">Finish and export your first complete report before choosing anything.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} reports — about ${unit} each</li><li>AI-written room notes from your walkthrough</li><li>PDF export and a private share link</li></ul><button type="button" id="plan-start" class="wide">Create my first report free</button><p><small>No card for your first complete report. <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
+    flow.paint(`<h2>Plans after your free ${esc(skin().doc)}</h2><p class="muted">Finish and export your first complete ${esc(skin().doc)} before choosing anything.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} ${esc(skin().docPlural)} — about ${unit} each</li><li>${esc(skin().offerPoints[0])}</li><li>${esc(landingArm()?.type==='incident'?'PDF export on every record':'PDF export and a private share link')}</li></ul><button type="button" id="plan-start" class="wide">Create my first ${esc(skin().doc)} free</button><p><small>No card for your first complete report across the three Marketel tools. <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
     document.querySelectorAll('[data-preview-plan]').forEach(button=>button.onclick=()=>{planInterval=button.dataset.previewPlan==='month'?'month':'year';paint();});
     $('plan-start').onclick=()=>{flow.restore();start();};
   };
   flow=flowScreen('','plans-screen');paint();
 }
 async function start(propertyName = '', type) {
-  if (draftUnsaved() && !await confirmAction({title:'Start a new report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start new report',danger:true})) return;
+  if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
@@ -446,15 +517,17 @@ function editor(step) {
   const w = wedge(d.type);
   enterScreen(`editor:${editorStep}`);
   const bar = `<div class="screen-bar">${account
-    ? '<button type="button" id="editor-back" class="quiet">← All reports</button>'
+    ? `<button type="button" id="editor-back" class="quiet">← All ${esc(skin().docPlural)}</button>`
     : '<button type="button" id="editor-signin" class="quiet">Already have reports? Sign in</button>'}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
   if (editorStep === 'details') {
-    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${d.type === 'incident'
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
       // The report's date and the finalized timestamp both say when it was
       // written down. Neither says when it happened, which is the field an
       // insurer looks for first. Unknown is a real answer.
-      ? `<label class="date-field">Time it happened<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label><label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
-      : `<label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
+      ? `<label class="date-field">${d.type === 'damage' ? 'Time you found it' : 'Time it happened'}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label><label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
+      : `<label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
+    if(d.type==='incident')$('property').parentElement.firstChild.textContent='Location / site name';
+    if(d.type==='damage')$('property').parentElement.firstChild.textContent='Rental property / unit name';
     for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) if($(id)) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
     if($('event-time'))$('event-time').oninput = event => { d.eventTime = event.target.value; if($('event-time-unknown'))$('event-time-unknown').checked = false; remember(); };
     if($('event-time-unknown'))$('event-time-unknown').onchange = event => { d.eventTime = event.target.checked ? 'unknown' : ($('event-time')?.value || ''); remember(); };
@@ -466,7 +539,7 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview report →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -484,6 +557,13 @@ function editor(step) {
     $('add-room').onclick = () => { if (d.rooms.length >=30) return notice(`Maximum 30 ${w.nounPlural}.`); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
     $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
     $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor('rooms');}, button)); };
+    if(d.type==='damage')for(const figure of $('rooms').querySelectorAll('figure[data-photo-id]')){
+      if(draft.files.some(file=>file.id===figure.dataset.photoId&&file.remoteId))figure.querySelector('figcaption').textContent='Original file kept';
+    }
+    if(d.type==='incident')for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent='Detail heading';
+    if(d.type==='incident'||d.type==='damage')$('app').querySelector('.screen-bar + .row .eyebrow').textContent=d.propertyName||w.eyebrow;
+    if(d.type==='incident')for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
+    if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel} the note.`;
     bindPhotoDrag();
   }
   // Signed out in the app neither chrome is on screen, so these are the only exits.
@@ -521,17 +601,9 @@ function viewPhoto(id){
   // Downloads leave the page, which WKWebView does not allow; the app would
   // need its own export handler the way the PDF has one.
   const canDownload=!native&&draft.serverId&&remoteId;
-  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The original file, exactly as your camera saved it — resized copies are what appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
+  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The uploaded file as received — resized copies appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
   $('photo-close').onclick=()=>$('dialog').close();
-  if($('photo-original'))$('photo-original').onclick=event=>run(async()=>{
-    const blob=await api(`/reports/${draft.serverId}/photos/${remoteId}/original`,{blob:true});
-    const href=URL.createObjectURL(blob);
-    const link=document.createElement('a');
-    link.href=href;
-    link.download=`marketel-original-${remoteId}`;
-    link.click();
-    setTimeout(()=>URL.revokeObjectURL(href),60000);
-  },event.currentTarget);
+  if($('photo-original'))$('photo-original').onclick=event=>run(()=>downloadOriginal(remoteId),event.currentTarget);
   $('photo-remove').onclick=()=>{
     const photos=draft.document.rooms[room]?.photos||[];
     const pos=photos.indexOf(id);
@@ -968,7 +1040,8 @@ async function recordRoom(index){
   sendVoiceNote(index,blob,Math.min(60000,Math.max(250,Date.now()-started)));
 }
 function reviewVoiceNote(index,result){
-  modal(`<h2>Review this room note</h2><p class="muted">AI only organized what it heard. Check every detail before adding it.</p><blockquote>${esc(result.suggestion)}</blockquote><details><summary>What Inspect heard</summary><p class="transcript">${esc(result.transcript)}</p></details><div class="stack"><button id="replace-note">Use as room note</button><button id="append-note" class="secondary">Add after my note</button><button id="discard-note" class="quiet">Discard</button></div>`);
+  const noun=wedge(draft.document.type).noun;
+  modal(`<h2>Review this ${noun} note</h2><p class="muted">AI only organized what it heard. Check every detail before adding it.</p><blockquote>${esc(result.suggestion)}</blockquote><details><summary>What ${esc(skin().product)} heard</summary><p class="transcript">${esc(result.transcript)}</p></details><div class="stack"><button id="replace-note">Use as ${noun} note</button><button id="append-note" class="secondary">Add after my note</button><button id="discard-note" class="quiet">Discard</button></div>`);
   // Whether the draft was kept is the only read on whether the AI actually
   // helped. Closing the sheet is an answer too, so every exit records one.
   let kept=false;
@@ -978,10 +1051,10 @@ function reviewVoiceNote(index,result){
 }
 function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
-  return `<section class="signature-preview"><strong>${signature.role==='witness'?'Witness':signature.role==='resident'?'Resident / tenant':'Manager / inspector'} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
+  return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label=''){
-  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded room condition"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
+  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded photo"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -998,9 +1071,10 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?'Finalized report':'Your report preview'}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>${esc(skin().documentLabel)}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(d.type)} · ${esc(d.date)} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(baseline.type)} report from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">Add a manager or resident sign-off before finalizing.</p></div><div class="row"><button class="secondary" data-sign="manager">${d.signatures.some(s=>s.role==='manager')?`Replace ${pw.signers.manager} signature`:`Add ${pw.signers.manager} signature`}</button><button class="secondary" data-sign="${d.type==='incident'?'witness':'resident'}">${d.signatures.some(s=>s.role===(d.type==='incident'?'witness':'resident'))?`Replace ${pw.signers.other} signature`:`Add ${pw.signers.other} signature`}</button></div></section>`:''}${draft.finalizedAt
-    ? `<p class="muted">This version cannot change. Create a new report for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div><div class="next-actions"><button type="button" id="another-report" class="secondary">+ New report</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All reports</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this report with you.</h2><p class="muted">We will email one secure link that signs you in and opens this report in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
-    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my report →</button></div><p class="muted">Finalizing freezes this version. Your first report includes PDF export and a revocable share link, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>${esc(skin().documentLabel)}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+    ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
+    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
+  if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   if($('coverage-run'))$('coverage-run').onclick=event=>{
     const button=event.currentTarget;
@@ -1011,13 +1085,19 @@ function reportPreview(){
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
     await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
-    await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice('Your report is ready. Download the PDF or create a private link.','success');
+    await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice(d.type==='incident'?'Your record is ready. Download the PDF.':`Your ${skin().doc} is ready. Download the PDF or create a private link.`,'success');
   },button));};
   if($('pdf'))$('pdf').onclick=()=>run(async()=>{
     if(native){window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});return;}
     const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
-    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='inspection-report.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=documentFileName(draft.document.type);a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
   });
+  if($('originals'))$('originals').onclick=()=>{
+    if(native){modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');$('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');return;}
+    const photos=d.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
+    modal(`<h2>Original photos</h2><p class="muted">These are the files received when you uploaded them, not the smaller copies shown in the report. Download only the photos you need.</p><div class="stack">${photos.map((photo,index)=>`<button class="secondary" data-original-photo="${index}">Download ${esc(photo.room)} photo ${index+1}</button>`).join('')}</div>`);
+    document.querySelectorAll('[data-original-photo]').forEach(button=>button.onclick=()=>run(()=>downloadOriginal(photos[Number(button.dataset.originalPhoto)].id),button));
+  };
   // Revoke lives inside the share sheet rather than the floating action bar:
   // it is rare, destructive, and only means anything once a link exists.
   if($('share'))$('share').onclick=()=>run(async()=>{const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);$('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});$('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});});
@@ -1035,8 +1115,8 @@ function reportPreview(){
 // keyboard shoved it around the screen on every focus.
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
-  const title=role==='witness'?'Witness':role==='resident'?'Resident / tenant':'Manager / inspector';
-  let name=existing?.name || (role==='manager' ? (draft.document.author||rememberedAuthor()) : '');
+  const title=roleLabel(role);
+  let name=existing?.name || (role==='manager'||role==='owner' ? (draft.document.author||rememberedAuthor()) : '');
   const strokes=existing?structuredClone(existing.strokes):[];
 
   const nameStep=()=>{
@@ -1107,8 +1187,8 @@ async function offer(){
     const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
     const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually${plan.save?` · ${plan.save}`:''}`:plan.save;
     const sk=skin();
-    const points=[sk.offerPoints[0],sk.offerPoints[1],`${plan.reports} ${plan.reports===1?'report':'reports'} — about ${unit} each`,...sk.offerPoints.slice(2)];
-    const html=`<h2>${esc(sk.offerHeading)}</h2><p class="offer-anchor">${esc(sk.offerAnchor)}</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points">${points.map(point=>`<li>${esc(point)}</li>`).join('')}</ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The report you just finished is saved and waiting, and existing finalized reports stay available. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
+    const points=[sk.offerPoints[0],sk.offerPoints[1],`${plan.reports} ${sk.docPlural} — about ${unit} each`,...sk.offerPoints.slice(2)];
+    const html=`<h2>${esc(sk.offerHeading)}</h2><p class="offer-anchor">${esc(sk.offerAnchor)}</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points">${points.map(point=>`<li>${esc(point)}</li>`).join('')}</ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The ${esc(sk.doc)} you just finished is saved and waiting, and existing finalized ${esc(sk.docPlural)} stay available. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
     if(first)modal(html,{fullscreen:true});else{$('dialog-body').innerHTML=html;settleSheet();}
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
     $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
@@ -1119,7 +1199,8 @@ function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShe
 function renderProperties(data){
   enterScreen('properties');
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
-  $('app').innerHTML=`<h1>${esc(skin().placesHeading)}</h1><p class="muted">${esc(skin().placesLede)}</p><button id="new-property">+ New ${esc(skin().placesHeading.replace(/s$/,'').toLowerCase())}</button>${details.length?'':`<section class="card">${esc(skin().placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
+  $('app').innerHTML=`<h1>${esc(skin().placesHeading)}</h1><p class="muted">${esc(skin().placesLede)}</p><button id="new-property">+ New ${esc(skin().placesHeading.replace(/s$/,'').toLowerCase())}</button>${details.length?'':`<section class="card">${esc(skin().placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${skin().comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
+  if(skin().doc!=='report')for(const button of $('app').querySelectorAll('[data-property]'))button.textContent=`New ${skin().doc}`;
   $('new-property').onclick=()=>{haptic();run(()=>start());};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
@@ -1127,11 +1208,11 @@ function renderProperties(data){
 function renderReports(){
   enterScreen('reports');
   const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
-  const status=account.freeAvailable?'Your first complete report is free.':account.active?`${account.remaining} reports remaining this billing period.`:'Your saved reports remain available.';
+  const status=account.freeAvailable?`Your first complete ${skin().doc} is free.`:account.active?`${account.remaining} ${skin().docPlural} remaining this billing period.`:`Your saved ${skin().docPlural} remain available.`;
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(draft.document.date)} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
-  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':'<section class="card">No saved reports yet. Start your first walkthrough.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
+  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':'<section class="card">No saved ${esc(skin().docPlural)} yet. Start your first one.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
@@ -1178,7 +1259,7 @@ async function list(page='reports',append=false){
     if(currentPage==='properties'&&request===listRequest)renderProperties(result);return;
   }
   if(reportsCache&&!append){reports=reportsCache.reports;nextReportCursor=reportsCache.nextCursor;renderReports();}
-  else if(!append)$('app').innerHTML='<h1>Your reports</h1><section class="loading">Loading saved reports…</section>';
+  else if(!append)$('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><section class="loading">Loading saved ${esc(skin().docPlural)}…</section>`;
   const pageResult=await api(`/reports?take=50${append&&nextReportCursor?`&cursor=${encodeURIComponent(nextReportCursor)}`:''}`);
   reports=append?reports.concat(pageResult.reports):pageResult.reports;nextReportCursor=pageResult.nextCursor;
   reportsCache={reports:[...reports],nextCursor:nextReportCursor};
@@ -1198,7 +1279,7 @@ $('account-button').onclick=async()=>{
   if(!account)return ensureAuth(()=>run(()=>openAccountHome()));
   await requestStorefront();
   const sk = skin();
-  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} reports left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:'One complete report free. Existing reports stay available.'}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
+  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:`One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
   $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
@@ -1246,7 +1327,7 @@ window.marketelInspectOpenHandoff=async rawToken=>{
     if(!response.ok)throw new Error(result.error||'This app link is invalid or expired.');
     session=result.token;localStorage.setItem('inspect.session',session);account=result;
     clearURLs();draft=null;preview=false;await stored('delete');reportsCache=null;propertiesCache=null;
-    updateHeader();prefetchLists();localStorage.setItem('marketel.product','inspect');
+    updateHeader();prefetchLists();if(native&&!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');
     if(result.reportId)await openReport(result.reportId);else await openAccountHome();
     notice('Signed in. Your report is ready.','success');
   }catch(error){
@@ -1312,7 +1393,7 @@ document.addEventListener('visibilitychange',()=>{
   lastForegroundSync=Date.now();
   run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});},null);
 });
-if(native){localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
+if(native){const chosen=new URLSearchParams(location.search).get('arm');if(LANDING_ARMS[chosen])localStorage.setItem('marketel.product',chosen);else if(!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 // A cold start often runs before the network is ready. That is not a failure
 // worth alarming anyone about: the session and the local draft are intact, so
 // boot quietly and let the next action surface any real problem. Only a genuine

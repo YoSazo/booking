@@ -1,88 +1,68 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#EEF2EF">
-    <link rel="icon" href="marketel-icon.png">
-    <title>Marketel</title>
-    <style>
-      :root {
-        color: #17231d;
-        background: #eef2ef;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      body {
-        min-height: 100vh;
-        margin: 0;
-        display: grid;
-        place-items: center;
-      }
-
-      main {
-        padding: 32px;
-        text-align: center;
-      }
-
-      img {
-        width: 72px;
-        height: 72px;
-        border-radius: 18px;
-      }
-
-      p {
-        color: #607067;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      .choices { display: grid; gap: 12px; width: min(100%, 430px); margin-top: 28px; }
-      .choice { appearance: none; border: 1px solid #d4ded6; border-radius: 18px; background: white; color: inherit; padding: 19px; text-align: left; font: inherit; }
-      .choice:disabled { opacity: .55; }
-      .choice strong, .choice span { display: block; }
-      .choice strong { font-size: 18px; }
-      .choice span { color: #607067; margin-top: 5px; }
-      .hidden { display: none; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <img src="marketel-icon.png" alt="">
-      <h1>Marketel</h1>
-      <p id="intro">Opening your workspace…</p>
-      <div id="choices" class="choices hidden">
-        <button class="choice" data-product="bookings"><strong>Front Desk</strong><span>Bookings, availability and your guest page</span></button>
-        <button class="choice" data-product="inspect"><strong>Inspect</strong><span>Walkthrough photos and finished condition reports</span></button>
-      </div>
-    </main>
-    <script>
-      (() => {
-        const open = product => {
-          localStorage.setItem('marketel.product', product);
-          location.replace(product === 'inspect' ? 'inspect/index.html' : 'frontdesk/index.html?native=ios');
-        };
-        const selected = localStorage.getItem('marketel.product');
-        const choosing = new URLSearchParams(location.search).get('choose') === '1';
-        if (!choosing && selected === 'inspect') return open('inspect');
-        if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
-        const inspect = document.querySelector('[data-product="inspect"]');
-        const inspectDetail = inspect.querySelector('span');
-        inspect.disabled = true;
-        inspectDetail.textContent = 'Checking availability…';
-        document.querySelector('[data-product="bookings"]').onclick = () => open('bookings');
-        inspect.onclick = () => open('inspect');
-        document.getElementById('intro').textContent = 'What are you working on?';
-        document.getElementById('choices').classList.remove('hidden');
-        fetch('https://bookmarketel.com/api/inspect/config', { cache: 'no-store' })
-          .then(response => response.ok ? response.json() : null)
-          .then(value => {
-            inspect.disabled = value?.enabled !== true;
-            inspectDetail.textContent = value?.enabled === true
-              ? 'Walkthrough photos and finished condition reports'
-              : 'Inspect is not available yet';
-          })
-          .catch(() => { inspectDetail.textContent = 'Inspect is temporarily unavailable'; });
-      })();
-    </script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eff4f0">
+  <link rel="icon" href="marketel-frontdesk-icon.png">
+  <title>Marketel</title>
+  <style>
+    @font-face { font-family: "DM Sans"; src: url("frontdesk/assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "DM Sans"; src: url("frontdesk/assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+    :root { color: #173326; background: #eff4f0; font-family: "DM Sans", -apple-system, sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; min-height: 100dvh; margin: 0; background: radial-gradient(circle at 5% 0%, #e0ede4 0%, #eff4f0 36%); }
+    header { position: fixed; inset: 0 0 auto; z-index: 2; padding: calc(env(safe-area-inset-top) + 12px) 18px 14px; border-radius: 0 0 22px 22px; background: #ffffffeb; backdrop-filter: blur(20px) saturate(150%); box-shadow: 0 2px 6px #2e7d5b0f; }
+    .brand { display: flex; align-items: center; gap: 9px; height: 34px; }
+    .brand-icon { width: 30px; height: 30px; border-radius: 8px; }
+    .brand-wordmark { width: 120px; max-height: 32px; object-fit: contain; object-position: left center; }
+    main { width: min(100%, 490px); padding: calc(env(safe-area-inset-top) + 110px) 20px calc(env(safe-area-inset-bottom) + 36px); margin: auto; }
+    h1 { margin: 0 0 8px; font-size: clamp(27px, 8vw, 36px); letter-spacing: -.04em; line-height: 1.12; }
+    p { margin: 0; color: #596d60; line-height: 1.5; }
+    .choices { display: grid; gap: 14px; margin-top: 30px; }
+    .choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; width: 100%; padding: 22px 20px; text-align: left; color: inherit; background: #ffffffeb; border: 1px solid #dbe7de; border-radius: 22px; box-shadow: 0 2px 6px #2e7d5b0f, 0 12px 30px #2e7d5b12; font: inherit; cursor: pointer; transition: transform .15s ease; }
+    .choice:active { transform: scale(.97); }
+    .choice:disabled { opacity: .55; cursor: wait; }
+    .choice strong, .choice small { display: block; }
+    .choice strong { font-size: 19px; }
+    .choice small { color: #596d60; margin-top: 5px; font-size: 13px; line-height: 1.4; }
+    .arrow { color: #328057; font-size: 24px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header><div class="brand"><img class="brand-icon" src="marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="marketel.svg" alt="Marketel"></div></header>
+  <main>
+    <h1>What are you working on?</h1>
+    <p id="intro">Choose what you need today. All three use the same account.</p>
+    <div id="choices" class="choices hidden">
+      <button class="choice" data-product="inspect"><span><strong>Inspect</strong><small>Walk through a property and finish a condition report.</small></span><span class="arrow" aria-hidden="true">→</span></button>
+      <button class="choice" data-product="claims"><span><strong>Claims</strong><small>Record damage and keep the original uploaded photos.</small></span><span class="arrow" aria-hidden="true">→</span></button>
+      <button class="choice" data-product="incident"><span><strong>Incident</strong><small>Record what happened and export a signed incident record.</small></span><span class="arrow" aria-hidden="true">→</span></button>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const products = ['inspect', 'claims', 'incident'];
+      const open = product => {
+        localStorage.setItem('marketel.product', product);
+        location.replace(products.includes(product) ? `inspect/index.html?arm=${product}` : 'frontdesk/index.html?native=ios');
+      };
+      const selected = localStorage.getItem('marketel.product');
+      const choosing = new URLSearchParams(location.search).get('choose') === '1';
+      if (!choosing && products.includes(selected)) return open(selected);
+      if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
+      const choices = [...document.querySelectorAll('[data-product]')];
+      choices.forEach(button => { button.disabled = true; button.onclick = () => open(button.dataset.product); });
+      document.getElementById('choices').classList.remove('hidden');
+      fetch('https://bookmarketel.com/api/inspect/config', { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : null)
+        .then(value => {
+          choices.forEach(button => { button.disabled = value?.enabled !== true; });
+          if (value?.enabled !== true) document.getElementById('intro').textContent = 'These tools are temporarily unavailable. Please try again later.';
+        })
+        .catch(() => { document.getElementById('intro').textContent = 'Could not check availability. Please try again when connected.'; });
+    })();
+  </script>
+</body>
 </html>

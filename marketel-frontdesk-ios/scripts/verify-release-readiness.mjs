@@ -97,8 +97,12 @@ if (/<script[^>]+src=["']https?:/i.test(bundledInspect)) {
 }
 expect(read('www/inspect/inspect.js'), /type:'inspectState'[\s\S]{0,180}selectedTab/,
   'Bundled Inspect does not synchronize its native tab selection');
-expect(bundledRoot, /marketel\.product[\s\S]{0,800}data-product="inspect"/,
-  'The native app entry does not preserve a focused Marketel product choice');
+expect(bundledRoot, /data-product="inspect"[\s\S]*data-product="claims"[\s\S]*data-product="incident"/,
+  'The native app entry must offer all three report jobs');
+expect(bundledRoot, /marketel\.product[\s\S]*inspect\/index\.html\?arm=\$\{product\}/,
+  'The native app entry does not preserve the selected report job');
+expect(bundledRoot, /localStorage\.getItem\('crmToken'\)/,
+  'An existing Front Desk owner must still reach their booking workspace');
 const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');
 const bundledAssets = fs.existsSync(bundledAssetsPath)
   ? fs.readdirSync(bundledAssetsPath)

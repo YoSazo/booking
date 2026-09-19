@@ -35,6 +35,47 @@ test('Inspect signatures are bounded and cannot supply their own timestamp', () 
   assert.throws(() => validateSignatures([{ role: 'manager', name: 'A', strokes: [[{ x: -1, y: 0 }, { x: 1, y: 1 }]] }]), /Invalid signature point/);
 });
 
+test('Claims creates an honest damage document without changing condition reports', () => {
+  for (const type of ['routine', 'move-in', 'move-out', 'incident', 'damage']) {
+    assert.equal(validateDocument({ ...validDocument(), type }).type, type);
+  }
+  assert.equal(validateDocument({ ...validDocument(), type: 'damage', eventTime: 'unknown' }).eventTime, 'unknown');
+  assert.equal(validateDocument({ ...validDocument(), type: 'damage', eventTime: '16:45' }).eventTime, '16:45');
+  assert.throws(() => validateDocument({ ...validDocument(), type: 'damage', eventTime: 'late' }), /HH:MM/);
+  const signature = role => ({ role, name: 'Alex', strokes: [[{ x: 0, y: 0 }, { x: 1, y: 1 }]] });
+  assert.deepEqual(validateSignatures([signature('owner'), signature('guest')], 'damage').map(s => s.role), ['owner', 'guest']);
+  assert.deepEqual(validateSignatures([], 'damage'), []);
+  assert.throws(() => validateSignatures([signature('resident')], 'damage'), /one owner and one guest/);
+  assert.deepEqual(validateSignatures([signature('manager'), signature('resident')], 'routine').map(s => s.role), ['manager', 'resident']);
+});
+
+test('damage voice notes and artifacts use the Claims guardrails and identity', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const root = path.join(__dirname, '..');
+  const server = fs.readFileSync(path.join(root, 'inspect.js'), 'utf8');
+  const client = fs.readFileSync(path.join(root, 'public/inspect/inspect.js'), 'utf8');
+  const web = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const terms = fs.readFileSync(path.join(root, 'public/inspect/terms.html'), 'utf8');
+  const chooser = fs.readFileSync(path.join(root, '../marketel-frontdesk-ios/www/index.html'), 'utf8');
+  assert.match(server, /damage: `You format a spoken damage note/);
+  assert.match(server, /Never estimate repair or replacement cost, assign blame, or state a cause/);
+  assert.match(server, /VOICE_INSTRUCTIONS\[report\.document\.type\]/);
+  assert.match(server, /damage: \{ brand: 'MARKETEL CLAIMS', file: 'damage-report\.pdf' \}/);
+  assert.match(server, /res\.type\('html'\)\.send\(`<!doctype html><html><head>.*?<title>\$\{safe\(typeLabel\(d\.type\)\)\}/);
+  assert.match(server, /roleLabel\(signature\.role\)/);
+  assert.match(client, /damage: \['owner', 'guest'\]/);
+  assert.match(client, /data-original-photo/);
+  assert.match(client, /const documentFileName = type => type === 'incident'.*?'damage-report\.pdf'/);
+  assert.match(web, /Claims produces documentation; it does not file, submit or manage claims/);
+  assert.match(terms, /it does not file, submit or manage claims/);
+  for (const arm of ['inspect', 'claims', 'incident']) {
+    assert.match(chooser, new RegExp(`data-product="${arm}"`));
+  }
+  assert.match(chooser, /inspect\/index\.html\?arm=\$\{product\}/);
+  assert.doesNotMatch(chooser, /data-product="bookings"/);
+  assert.match(client, /if\(LANDING_ARMS\[chosen\]\)localStorage\.setItem\('marketel\.product',chosen\)/);
+});
+
 test('Inspect voice notes and comparisons fail closed around evidence', () => {
   const fs = require('node:fs');
   const path = require('node:path');
@@ -51,7 +92,7 @@ test('Inspect voice notes and comparisons fail closed around evidence', () => {
   assert.match(source, /signedAt is never taken from the client/);
   assert.doesNotMatch(source, /signedAt: signature\?\.signedAt|signedAt: input/);
   assert.match(source, /function stampSignatures\(next, previous, at = new Date\(\)\)/);
-  assert.match(source, /seen\.get\(`\$\{signature\.role\}:\$\{signature\.name\}`\) \|\| at\.toISOString\(\)/);
+  assert.match(source, /seen\.get\(`\$\{signature\.role\}:\$\{signature\.name\}:\$\{JSON\.stringify\(signature\.strokes\)\}`\) \|\| at\.toISOString\(\)/);
   assert.match(source, /baselineReportId/);
   assert.match(schema, /onDelete: SetNull/);
   assert.match(client, /AI only organized what it heard\. Check every detail/);
@@ -160,8 +201,8 @@ test('the original camera file can be handed over, and only to its owner', () =>
     const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
     const route = server.slice(server.indexOf('const ORIGINAL_TYPES'), server.indexOf('const voiceUpload'));
 
-    // Airbnb's April 2026 terms want the unaltered camera file. We have stored
-    // one for every photo since day one and never served it.
+    // Preserve the uploaded bytes for the owner; a resized share image is not
+    // interchangeable with the uploaded file in an evidence workflow.
     assert.match(route, /object\(a\.originalKey\)/);
     assert.doesNotMatch(route, /object\(a\.objectKey\)/);
     assert.match(route, /owned\(prisma, req\.inspect\.id, req\.params\.id\)/);
@@ -175,7 +216,9 @@ test('the original camera file can be handed over, and only to its owner', () =>
     assert.match(route, /ext: 'heic'/);
     assert.match(route, /'ftyp'/);
     assert.match(route, /ext: 'png'/);
-    assert.match(route, /\|\| \{ ext: 'jpg', mime: 'image\/jpeg' \}/);
+    assert.match(route, /ext: 'webp'/);
+    assert.match(route, /ext: 'avif'/);
+    assert.match(route, /ext: 'bin', mime: 'application\/octet-stream'/);
 
     // The reading copies stay the resized ones — that is the right file there.
     assert.match(server, /res\.type\('jpeg'\)\.send\(await object\(a\.objectKey\)\)/);
@@ -193,7 +236,7 @@ test('an incident record does not misstate anything to an insurer', () => {
 
     // type is the wedge discriminator and needs no migration, but the three
     // existing types must keep working.
-    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident'\]/);
+    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident', 'damage'\]/);
 
     // date is when it was written down; neither it nor finalizedAt says when
     // the thing happened. Optional, and unknown is a real answer.
@@ -308,15 +351,13 @@ test('each wedge is a root path, skinned per arm, and still attributed for free'
     assert.doesNotMatch(surfaces, /a year of Inspect/);
     assert.match(surfaces, /esc\(sk\.terms\)/);
 
-    // The claims arm is a condition report sold to a different reader, so it
-    // stays Inspect; the incident arm makes a different document, so it does not.
+    // Each arm has its own name; all use one account and report allowance.
     assert.match(server, /incident: Object\.freeze\(\{ product: 'Incident'/);
-    assert.match(server, /claims: Object\.freeze\(\{ product: 'Inspect'/);
+    assert.match(server, /claims: Object\.freeze\(\{ product: 'Claims'/);
 
-    // The claims arm leads with the original files, never with the AI: Airbnb
-    // bans AI-generated evidence from claims in the same April 2026 update.
+    // Claims leads with uploaded evidence rather than an AI-generated finding.
     const arms = client.slice(client.indexOf('const LANDING_ARMS'), client.indexOf('const ARM_PATH'));
-    assert.match(arms, /original camera files/);
+    assert.match(arms, /photos kept as uploaded/);
     assert.doesNotMatch(arms, /\bAI\b|writes the notes/);
 
     // And it promises preservation, never an outcome.
@@ -405,12 +446,12 @@ test('the landing defers pricing by one transparent tap without opening checkout
     const landing = client.slice(client.indexOf('function landing()'), client.indexOf('async function start('));
     const preview = landing.slice(landing.indexOf('function previewPlans()'));
 
-    assert.match(landing, /One complete report free\. No card\./);
+    assert.match(landing, /Your first complete report across Marketel Inspect is free\. No card\./);
     assert.match(landing, /id="see-plans"/);
     assert.doesNotMatch(landing.slice(0,landing.indexOf('function previewPlans()')), /\$199|\$29\/month/);
-    assert.match(preview, /Plans after your free report/);
+    assert.match(preview, /Plans after your free \$\{esc\(skin\(\)\.doc\)\}/);
     assert.match(preview, /PLANS\[planInterval\]/);
-    assert.match(preview, /Create my first report free/);
+    assert.match(preview, /Create my first \$\{esc\(skin\(\)\.doc\)\} free/);
     assert.doesNotMatch(preview, /logInspect\(/);
     assert.doesNotMatch(preview, /\/checkout/);
 });
@@ -433,7 +474,7 @@ test('the landing demo still reads when nothing is allowed to move', () => {
     // inspect.css only collapses CSS animations; a JS typing loop runs straight
     // through that, so reduced motion has to be asked about here.
     assert.match(demo, /prefers-reduced-motion: reduce/);
-    assert.match(demo, /said\.textContent=DEMO_SAID;demo\.classList\.add\('is-in'\);return;/);
+    assert.match(demo, /said\.textContent=script;demo\.classList\.add\('is-in'\);return;/);
     // And the loop must stop when the screen is replaced under it.
     assert.match(demo, /document\.body\.contains\(said\)/);
 });
@@ -474,7 +515,8 @@ test('the AI is the path, and the note is never hidden once written', () => {
     // The promise must not overclaim on a document used in disputes.
     assert.doesNotMatch(client, /report writes itself/i);
     // The arm supplies the name; the claim it makes must stay the same one.
-    assert.match(client, /\$\{esc\(skin\(\)\.product\)\} writes the notes/);
+    assert.match(client, /\$\{esc\(skin\(\)\.product\)\} writes the note/);
+    assert.match(client, /\$\{skin\(\)\.writesLabel\} the note/);
 });
 
 test('the AI path is observable, and cannot be advertised while it is off', () => {
