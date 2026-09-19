@@ -765,6 +765,61 @@ test('Inspect destructive choices use product UI instead of browser alerts', () 
     assert.doesNotMatch(client, /\balert\s*\(/);
 });
 
+test('a blocking wait shows the product waiting, and finishing offers every way out', () => {
+    const fsx = require('node:fs'), pathx = require('node:path');
+    const root = pathx.join(__dirname, '..');
+    const client = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'inspect.js'), 'utf8');
+    const css = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'inspect.css'), 'utf8');
+
+    // Uploading photos is blocking work — losing the page loses the photos —
+    // so it gets the breathing Marketel mark every other wait uses, not a
+    // toast that slides past the corner of the report.
+    const save = client.slice(client.indexOf('async function save()'), client.indexOf('function liveMeter'));
+    assert.doesNotMatch(save, /notice\('Uploading/);
+    assert.match(save, /busyVeil\(/);
+    // Counted, so it says how much is left rather than merely that something
+    // is happening.
+    assert.match(save, /\$\{done\} of \$\{pending\.length\} uploaded/);
+    // And the veil is removed even when an upload throws, or it would strand
+    // the operator behind a permanent overlay.
+    assert.match(save, /finally \{ veil\?\.done\(\); \}/);
+
+    // The veil reuses .loading, so the animation cannot drift from the rest of
+    // the product, and it sits above every other layer.
+    const veil = client.slice(client.indexOf('function busyVeil'), client.indexOf('function flowScreen'));
+    assert.match(veil, /class="loading"/);
+    assert.match(veil, /role','status'/);
+    assert.match(css, /\.busy-veil \{[^}]*z-index: 70/);
+    assert.match(css, /prefers-reduced-motion: reduce[\s\S]{0,200}\.busy-veil \{ animation: none/);
+
+    // Finishing is the moment the document becomes real. Both the paid and the
+    // free path show it the same way, and both end in the same chooser.
+    for (const path of ['async function finishExport', "if($('finalize'))"]) {
+        const region = client.slice(client.indexOf(path), client.indexOf(path) + 1200);
+        assert.match(region, /busyVeil\(`Building your \$\{skin\(\)\.doc\}`/, `${path} must show the build state`);
+        assert.match(region, /deliverySheet\(/, `${path} must end in the delivery sheet`);
+    }
+
+    // The chooser lists every way out, and never offers a link for a document
+    // that is not allowed to have one.
+    const sheet = client.slice(client.indexOf('function deliverySheet'), client.indexOf('function exportOffer'));
+    assert.match(sheet, /is built\./);
+    assert.match(sheet, /const canShare=d\.type!=='incident'/);
+    assert.match(sheet, /delivery-share/);
+    assert.match(sheet, /delivery-pdf/);
+    // The original files are the reason a damage report is worth paying for,
+    // so they are a listed choice rather than something to go hunting for.
+    assert.match(sheet, /hasOriginals=d\.type==='damage'/);
+    assert.match(sheet, /delivery-originals/);
+    // Declining is a real answer and must not trap anyone in the sheet.
+    assert.match(sheet, /delivery-later/);
+
+    // One implementation of the originals list, reachable from the finalized
+    // screen and the chooser alike.
+    assert.equal(client.split('function originalsSheet(').length - 1, 1);
+    assert.match(client, /if\(\$\('originals'\)\)\$\('originals'\)\.onclick=\(\)=>originalsSheet\(\);/);
+});
+
 test('the landing demo still reads when nothing is allowed to move', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

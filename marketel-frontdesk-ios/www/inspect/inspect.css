@@ -386,3 +386,25 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .loading::before { animation: none; opacity: .9; }
 }
+
+/* Uploading photos used to be a toast: it slid in from the edge, sat over the
+   report, and said nothing about how far along it was. The work is blocking —
+   losing the page mid-upload loses the photos — so it gets the same breathing
+   Marketel mark every other wait in the product uses, over a veil that makes
+   the page visibly unavailable rather than merely covered. */
+.busy-veil { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: #eff4f0e0; -webkit-backdrop-filter: blur(6px) saturate(130%); backdrop-filter: blur(6px) saturate(130%); animation: busyVeilIn .18s ease both; }
+@keyframes busyVeilIn { from { opacity: 0; } to { opacity: 1; } }
+.busy-veil .card { width: min(360px, 100%); margin: 0; text-align: center; }
+.busy-veil .loading { padding: 8px 0 4px; }
+.busy-veil h2 { margin: 0 0 4px; font-size: 19px; }
+.busy-veil p { margin: 0; color: var(--muted); font-size: 13px; }
+/* A determinate track only once there is more than one file to count. */
+.busy-track { height: 5px; margin-top: 14px; border-radius: 999px; background: var(--green-pale); overflow: hidden; }
+.busy-track span { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width .3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .busy-veil { animation: none; }
+  .busy-track span { transition: none; }
+}
+/* The hint under each delivery choice. Tight to its button so the pair reads
+   as one option rather than as a button and a loose sentence. */
+.delivery-hint { margin: -4px 0 6px; font-size: 12px; }

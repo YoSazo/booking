@@ -903,6 +903,18 @@ async function addPhotos(input) {
 // browser alert or fixed dialog. Detaching preserves the exact DOM and event
 // handlers, and keeping the old document height prevents Safari from collapsing
 // its toolbar just because a card replaced a long report.
+function busyVeil(title, note = '', ratio){
+  const veil=document.createElement('div');
+  veil.className='busy-veil';
+  veil.setAttribute('role','status');
+  veil.setAttribute('aria-live','polite');
+  const paint=(heading,message,ratio)=>{
+    veil.innerHTML=`<article class="card"><section class="loading"></section><h2>${esc(heading)}</h2><p>${esc(message)}</p>${typeof ratio==='number'?`<div class="busy-track"><span style="width:${Math.round(Math.min(1,Math.max(0,ratio))*100)}%"></span></div>`:''}</article>`;
+  };
+  paint(title,note,ratio);
+  document.body.appendChild(veil);
+  return { update: paint, done: () => veil.remove() };
+}
 function flowScreen(content,kind=''){
   const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
   const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
@@ -1091,12 +1103,22 @@ async function save() {
   // adding replacements. This keeps the 100-photo quota truthful.
   const existingDoc=remoteDocument();
   await api(`/reports/${draft.serverId}`,{method:'PUT',body:existingDoc});
-  for(const room of draft.document.rooms) for(const id of room.photos){
-    const f=draft.files.find(f=>f.id===id);if(!f)throw new Error('A report photo is missing from this device. Remove it or add it again.');if(f.remoteId)continue;
-    notice('Uploading report photos… Keep this page open.');
-    const form=new FormData();form.append('photo',f.blob,f.name||'photo.jpg');form.append('source',f.source);
-    const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});f.remoteId=a.id;await persist();
-  }
+  const pending=draft.document.rooms.flatMap(room=>room.photos).filter(id=>{
+    const file=draft.files.find(f=>f.id===id);return file&&!file.remoteId;
+  });
+  const veil=pending.length?busyVeil(`Uploading ${pending.length===1?'your photo':`${pending.length} photos`}`,'Keep this page open.',0):null;
+  let done=0;
+  try{
+    for(const room of draft.document.rooms) for(const id of room.photos){
+      const f=draft.files.find(f=>f.id===id);if(!f)throw new Error('A report photo is missing from this device. Remove it or add it again.');if(f.remoteId)continue;
+      const form=new FormData();form.append('photo',f.blob,f.name||'photo.jpg');form.append('source',f.source);
+      const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});f.remoteId=a.id;await persist();
+      done++;
+      veil?.update(`Uploading ${pending.length===1?'your photo':`${pending.length} photos`}`,
+        pending.length>1?`${done} of ${pending.length} uploaded. Keep this page open.`:'Keep this page open.',
+        done/pending.length);
+    }
+  } finally { veil?.done(); }
   const doc=remoteDocument();
   await api(`/reports/${draft.serverId}`,{method:'PUT',body:doc});reportsCache=null;propertiesCache=null;await persist();
 }
@@ -1307,15 +1329,18 @@ function reportPreview(){
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
     await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
-    await save();const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();notice(d.type==='incident'?'Your record is ready. Download the PDF.':`Your ${skin().doc} is ready. Download the PDF or create a private link.`,'success');
+    await save();
+    // The same moment as the paid path, so finishing a document looks the same
+    // whichever tool made it — and the ways out of it are buttons, not a toast
+    // describing buttons somewhere else.
+    const veil=busyVeil(`Building your ${skin().doc}`,'Finalizing this version.');
+    let r;
+    try{ r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'}); } finally { veil.done(); }
+    draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();
+    deliverySheet('share');
   },button));};
   if($('pdf'))$('pdf').onclick=()=>run(downloadPdfNow);
-  if($('originals'))$('originals').onclick=()=>{
-    if(native){modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');$('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');return;}
-    const photos=d.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
-    modal(`<h2>Original photos</h2><p class="muted">These are the files received when you uploaded them, not the smaller copies shown in the report. Download only the photos you need.</p><div class="stack">${photos.map((photo,index)=>`<button class="secondary" data-original-photo="${index}">Download ${esc(photo.room)} photo ${index+1}</button>`).join('')}</div>`);
-    document.querySelectorAll('[data-original-photo]').forEach(button=>button.onclick=()=>run(()=>downloadOriginal(photos[Number(button.dataset.originalPhoto)].id),button));
-  };
+  if($('originals'))$('originals').onclick=()=>originalsSheet();
   // Revoke lives inside the share sheet rather than the floating action bar:
   // it is rare, destructive, and only means anything once a link exists.
   if($('share'))$('share').onclick=()=>run(openShareSheetNow);
@@ -1436,12 +1461,42 @@ function requestExport(action){
     await exportOffer(action);
   }),'send');
 }
+function originalsSheet(){
+  if(native){
+    modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');
+    $('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');
+    return;
+  }
+  const photos=draft.document.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
+  if(!photos.length)return notice('No uploaded photos on this device to download.','error');
+  modal(`<h2>Original photos</h2><p class="muted">These are the files received when you uploaded them, not the smaller copies shown in the report. Download only the photos you need.</p><div class="stack">${photos.map((photo,index)=>`<button class="secondary" data-original-photo="${index}">Download ${esc(photo.room)} photo ${index+1}</button>`).join('')}</div>`);
+  document.querySelectorAll('[data-original-photo]').forEach(button=>button.onclick=()=>run(()=>downloadOriginal(photos[Number(button.dataset.originalPhoto)].id),button));
+}
 async function finishExport(action){
-  const r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});
+  const veil=busyVeil(`Building your ${skin().doc}`,'Finalizing this version.');
+  let r;
+  try{ r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'}); } finally { veil.done(); }
   draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;
   await persist();await refresh();preview=true;reportPreview();
-  if(action==='pdf')await downloadPdfNow();else if(draft.document.type!=='incident')await openShareSheetNow();
-  notice(`Your ${skin().doc} is finalized and ready to send.`,'success');
+  deliverySheet(action);
+}
+// One sheet at the moment the document becomes real, listing every way out of
+// it. The button pressed before paying is only the default here, never the
+// whole answer.
+function deliverySheet(preferred='share'){
+  const d=draft.document,sk=skin(),doc=esc(sk.doc);
+  const canShare=d.type!=='incident';
+  const hasOriginals=d.type==='damage'&&d.rooms.some(room=>room.photos.length);
+  const order=[
+    canShare?{id:'delivery-share',label:'Create a private link',hint:'Anyone with the link can read and download this version.',primary:preferred!=='pdf'}:null,
+    {id:'delivery-pdf',label:'Download the PDF',hint:`The finished ${sk.doc}, ready to attach.`,primary:preferred==='pdf'||!canShare},
+    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:'The files as received, not the smaller copies in the PDF.',primary:false}:null,
+  ].filter(Boolean).sort((a,b)=>Number(b.primary)-Number(a.primary));
+  modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p><div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
+  if($('delivery-share'))$('delivery-share').onclick=event=>run(()=>openShareSheetNow(),event.currentTarget);
+  if($('delivery-pdf'))$('delivery-pdf').onclick=event=>run(async()=>{await downloadPdfNow();notice(`Your ${sk.doc} was downloaded.`,'success');},event.currentTarget);
+  if($('delivery-originals'))$('delivery-originals').onclick=()=>originalsSheet();
+  $('delivery-later').onclick=()=>{$('dialog').close();notice(`Your ${sk.doc} is saved and ready whenever you are.`,'success');};
 }
 async function exportOffer(action){
   await requestStorefront();
