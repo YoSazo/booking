@@ -40,6 +40,7 @@ const VOICE_INSTRUCTIONS = {
 };
 const SIGNATURE_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
 const signatureRoles = type => SIGNATURE_ROLES[type] || SIGNATURE_ROLES.default;
+const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident', 'damage']);
 // Printed on the document, so it says what the person actually was. Both
 // damage roles stay optional: a host documenting a wrecked room after checkout
 // has nobody left to sign, and an empty "Resident / tenant" slot on an evidence
@@ -124,7 +125,7 @@ function validateDocument(input) {
   };
   const propertyName = text(input?.propertyName, 160);
   const author = text(input?.author || '', 120);
-  if (!propertyName || !['routine', 'move-in', 'move-out', 'incident', 'damage'].includes(input?.type)) throw fail(400, 'Enter a property name and report type.');
+  if (!propertyName || !REPORT_TYPES.includes(input?.type)) throw fail(400, 'Enter a property name and report type.');
   const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.date || '');
   const parsedDate = dateMatch && new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3])));
   if (!dateMatch || parsedDate.getUTCFullYear() !== Number(dateMatch[1])
@@ -706,7 +707,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const take = Math.min(50, Math.max(1, Number(req.query.take) || 50));
     const cursor = String(req.query.cursor || '');
     if (cursor && !/^[A-Za-z0-9_-]{1,64}$/.test(cursor)) throw fail(400, 'Invalid report cursor.');
-    const reports = await prisma.inspectReport.findMany({ where: { accountId: req.inspect.id },
+    // Each tool lists only its own documents; one account sits behind all of
+    // them, so without this Claims showed condition reports as damage reports.
+    const types = String(req.query.types || '').split(',').map(type => type.trim()).filter(Boolean);
+    if (types.length > REPORT_TYPES.length || types.some(type => !REPORT_TYPES.includes(type))) throw fail(400, 'Invalid report type filter.');
+    const byType = types.length ? { OR: types.map(type => ({ document: { path: ['type'], equals: type } })) } : {};
+    const reports = await prisma.inspectReport.findMany({ where: { accountId: req.inspect.id, ...byType },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
     const more = reports.length > take;

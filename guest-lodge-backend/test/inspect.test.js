@@ -485,6 +485,80 @@ test('the app signs in through its glass banner and never inerts a page behind a
     assert.match(css, /\.native-inspect-shell \.hero #sign-in \{ margin-top: 12px;/);
 });
 
+test('each tool lists only its own report types, and rejects unknown ones', async () => {
+  const express = require('express');
+  let where = null;
+  const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsedAt: null, subscriptionStatus: null };
+  const prisma = {
+    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }) },
+    inspectReport: { findMany: async query => { where = query.where; return []; } },
+  };
+  const app = express();
+  app.use(express.json());
+  const registration = registerInspect(app, {
+    prisma, mail: { sendMail: async () => {} }, stripe: {},
+    env: {
+      INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
+      INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
+      R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
+      STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
+      STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
+      STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
+    },
+  });
+  const headers = { Authorization: `Bearer ${'b'.repeat(43)}` };
+  try {
+    const claims = await request(app, '/api/inspect/reports?take=50&types=damage', { headers });
+    assert.equal(claims.status, 200);
+    assert.deepEqual(where, { accountId: 'acct_1', OR: [{ document: { path: ['type'], equals: 'damage' } }] });
+
+    const inspect = await request(app, '/api/inspect/reports?take=50&types=routine,move-in,move-out', { headers });
+    assert.equal(inspect.status, 200);
+    assert.deepEqual(where.OR.map(clause => clause.document.equals), ['routine', 'move-in', 'move-out']);
+
+    where = null;
+    const unknown = await request(app, '/api/inspect/reports?types=damage,anything', { headers });
+    assert.equal(unknown.status, 400);
+    assert.equal(where, null);
+
+    const all = await request(app, '/api/inspect/reports', { headers });
+    assert.equal(all.status, 200);
+    assert.deepEqual(where, { accountId: 'acct_1' });
+  } finally {
+    registration.close();
+  }
+});
+
+test('switching tools can never strand the app on a blank page', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const chooser = fs.readFileSync(path.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'www', 'index.html'), 'utf8');
+  const boot = client.slice(client.indexOf('let booted=false;'));
+
+  // Storage is opened on demand with a bound, never awaited raw at boot.
+  assert.doesNotMatch(client, /const db = new Promise/);
+  assert.match(client, /request\.onblocked = /);
+  assert.match(boot, /draft=await withTimeout\(stored\('get'\),\s*\d+\)/);
+  assert.match(boot, /await withTimeout\(refresh\(\),\s*\d+\)/);
+  assert.match(boot, /setTimeout\(\(\)=>\{if\(!booted\)renderRecovery\(\);\}/);
+  // No database write as a page leaves; leaving closes the connection instead.
+  assert.doesNotMatch(client, /addEventListener\('pagehide',\s*\(\)\s*=>\s*remember\(\)\)/);
+  assert.match(client, /addEventListener\('pagehide', \(\) => \{ const open = dbPromise; dbPromise = null; open\?\.then\(database => database\.close\(\)/);
+  // Every JSON request is bounded.
+  assert.match(client, /setTimeout\(\(\) => controller\.abort\(\), 15000\)/);
+  // Hops between tools replace the page instead of stacking history.
+  assert.match(client, /if\(action==='choose'\)\{location\.replace\('\.\.\/index\.html\?choose=1'\)/);
+  assert.doesNotMatch(client, /location\.assign\('\.\.\/index\.html/);
+  // Each tool keeps its own draft and asks only for its own reports.
+  assert.match(client, /const draftKey = \(\) => `current:\$\{toolId\(\)\}`/);
+  assert.match(client, /inspect: \['routine', 'move-in', 'move-out'\], claims: \['damage'\], incident: \['incident'\]/);
+  assert.equal((client.match(/\/reports\?take=50&\$\{toolTypesQuery\(\)\}/g) || []).length, 3);
+  assert.match(client, /<small>\$\{esc\(documentLabelFor\(d\.type\)\)\}<\/small>/);
+  // A chooser restored from the back/forward cache undoes its departure.
+  assert.match(chooser, /addEventListener\('pageshow'[\s\S]{0,200}classList\.remove\('leaving'\)/);
+});
+
 test('the landing defers pricing by one transparent tap without opening checkout', () => {
     const client = require('node:fs').readFileSync(
         require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');

@@ -87,6 +87,16 @@
       // show its floating glass bar over it.
       shell({ type: 'chooserState' });
       let leaving = false;
+      // Restored from the back/forward cache after a departure, the page would
+      // keep its leaving state: every tile faded out and taps ignored, which is
+      // a blank screen. Undo it and hand the bar back to the chooser.
+      window.addEventListener('pageshow', event => {
+        if (!event.persisted) return;
+        leaving = false;
+        document.documentElement.classList.remove('leaving');
+        document.querySelectorAll('.choice.chosen').forEach(choice => choice.classList.remove('chosen'));
+        shell({ type: 'chooserState' });
+      });
       const choose = button => {
         if (leaving) return;
         leaving = true;

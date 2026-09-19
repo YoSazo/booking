@@ -118,6 +118,13 @@ expect(delegate, /case "chooserState":/,
 if (/webView\?\.isUserInteractionEnabled\s*=/.test(delegate)) {
   failures.push('Never disable the whole web view: the native glass bar is inside it');
 }
+// A chooser restored from the back/forward cache must undo its departure, and
+// hops between tools must replace the page rather than leave one cached.
+expect(bundledRoot, /addEventListener\('pageshow'[\s\S]{0,200}classList\.remove\('leaving'\)/,
+  'The tool chooser must recover from a back/forward cache restore');
+if (/location\.assign\('\.\.\/(index|frontdesk)/.test(read('www/inspect/inspect.js'))) {
+  failures.push('Hops between tools must use location.replace, never location.assign');
+}
 expect(delegate, /inputAccessoryView = toolbar/,
   'Native sign-in fields need a Done bar to dismiss the keyboard');
 for (const file of ['DMSans-Regular', 'DMSans-Medium', 'DMSans-Bold']) {

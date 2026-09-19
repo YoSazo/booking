@@ -110,18 +110,59 @@ const nextRoomName = rooms => {
   return w.seeds.find(name => !used.has(name.toLowerCase())) || (w.noun[0].toUpperCase() + w.noun.slice(1));
 };
 const newDocument = (propertyName, type = 'routine') => ({ propertyName: propertyName || '', author: rememberedAuthor(), type, date: localDate(), rooms: [{ name: wedge(type).seeds[0], observation: '', issue: false, photos: [] }], signatures: [] });
-const db = new Promise((resolve, reject) => {
-  const request = indexedDB.open('marketel-inspect', 1);
-  request.onupgradeneeded = () => request.result.createObjectStore('drafts');
-  request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+// Every wait on storage is bounded and the database is opened on demand, never
+// at module load. WebKit can leave indexedDB.open() pending forever, and a page
+// kept in the back/forward cache holds its connection; the boot used to wait on
+// that with no limit, which left the banner over a blank page.
+const withTimeout = (promise, ms, message = 'Timed out.') => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(message)), ms);
+  promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
 });
+let dbPromise = null;
+function openDb() {
+  if (!dbPromise) {
+    const opening = withTimeout(new Promise((resolve, reject) => {
+      const request = indexedDB.open('marketel-inspect', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('drafts');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(new Error('Device storage is busy.'));
+    }), 2500, 'Device storage did not respond.');
+    dbPromise = opening;
+    opening.catch(() => { if (dbPromise === opening) dbPromise = null; });
+  }
+  return dbPromise;
+}
+// Leaving closes the connection (outstanding writes still finish), so a cached
+// page never holds the database the next tool page needs.
+window.addEventListener('pagehide', () => { const open = dbPromise; dbPromise = null; open?.then(database => database.close(), () => {}); });
+// Each tool keeps its own work in progress: an Inspect draft is not a Claims draft.
+const draftKey = () => `current:${toolId()}`;
 async function stored(action, value) {
-  const database = await db;
+  const database = await openDb();
   return new Promise((resolve, reject) => {
     const tx = database.transaction('drafts', action === 'get' ? 'readonly' : 'readwrite');
     const store = tx.objectStore('drafts');
-    const request = action === 'get' ? store.get('current') : action === 'delete' ? store.delete('current') : store.put(value, 'current');
+    const key = draftKey();
+    const request = action === 'get' ? store.get(key) : action === 'delete' ? store.delete(key) : store.put(value, key);
     tx.oncomplete = () => resolve(request.result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+  });
+}
+// Drafts used to share one slot across every tool. Move a legacy draft into the
+// slot of the tool whose document it is, once, without overwriting newer work.
+async function migrateLegacyDraft() {
+  const database = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = database.transaction('drafts', 'readwrite');
+    const store = tx.objectStore('drafts');
+    const legacy = store.get('current');
+    legacy.onsuccess = () => {
+      if (!legacy.result) return;
+      const key = `current:${toolForType(legacy.result.document?.type)}`;
+      const existing = store.get(key);
+      existing.onsuccess = () => { if (!existing.result) store.put(legacy.result, key); store.delete('current'); };
+    };
+    tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
   });
 }
 function notice(message, type = '') {
@@ -161,7 +202,16 @@ function confirmSessionLost() {
 }
 async function api(path, options = {}) {
   const headers = { ...(session ? { Authorization: `Bearer ${session}` } : {}), ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) };
-  const response = await fetch(API + path, { ...options, headers: { ...headers, ...options.headers }, body: options.body && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body });
+  // Uploads and downloads can legitimately take a while; everything else gets
+  // a bound, so a request that never answers cannot hold the boot or a button.
+  const controller = options.body instanceof FormData || options.blob ? null : new AbortController();
+  const timer = controller ? setTimeout(() => controller.abort(), 15000) : 0;
+  let response;
+  try {
+    response = await fetch(API + path, { ...options, ...(controller ? { signal: controller.signal } : {}), headers: { ...headers, ...options.headers }, body: options.body && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body });
+  } catch (error) {
+    throw new Error(error?.name === 'AbortError' ? 'Marketel took too long to answer. Check your connection and retry.' : 'Could not reach Marketel. Check your connection and retry.');
+  } finally { clearTimeout(timer); }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     if (response.status === 401) await confirmSessionLost();
@@ -187,6 +237,7 @@ function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({
     type:'inspectState',visible,selectedTab:page,authenticated:!!account,hasUnfinishedDraft:hasUnfinishedDraft(),product:skin().product,
+    labels:{list:skin().navList,places:skin().navPlaces},
   });
 }
 // A sheet is a card on top of the app, so the shell stays put — `true` keeps the
@@ -466,6 +517,14 @@ const landingArm = () => {
 // even while opening an incident, which is honest, because the account really
 // is one account.
 const skin = () => ({ ...SKIN, ...(landingArm()?.skin || {}) });
+// Which document types belong to which tool. Drafts, lists and hand-offs all
+// follow it, so switching tools never shows one tool's work under another's name.
+const TOOL_TYPES = Object.freeze({ inspect: ['routine', 'move-in', 'move-out'], claims: ['damage'], incident: ['incident'] });
+const toolId = () => { const arm = landingArm(); return Object.keys(LANDING_ARMS).find(key => LANDING_ARMS[key] === arm) || 'inspect'; };
+const toolForType = type => Object.keys(TOOL_TYPES).find(tool => TOOL_TYPES[tool].includes(type)) || 'inspect';
+const toolTypesQuery = () => `types=${TOOL_TYPES[toolId()].join(',')}`;
+// A document carries its own brand, whichever tool it was opened through.
+const documentLabelFor = type => type === 'damage' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
 function landing() {
   enterScreen('landing');
   const arm = landingArm();
@@ -1118,7 +1177,7 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>${esc(skin().documentLabel)}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card"><small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
@@ -1289,7 +1348,12 @@ async function openReport(id){
   if(draftUnsaved()&&draft.serverId!==id&&!await confirmAction({title:'Replace this draft?',message:'Your current draft is not saved online yet.',confirmLabel:'Replace draft',danger:true}))return;
   haptic();
   $('app').innerHTML='<section class="loading">Opening your report…</section>';
-  await useComparisonPayload(await api(`/reports/${id}/comparison`));
+  const payload=await api(`/reports/${id}/comparison`);
+  // A report belongs to its own tool. Opened from elsewhere (an app hand-off,
+  // say), the app moves there first so its lists and draft slot line up.
+  const owner=toolForType(payload.report?.document?.type);
+  if(native&&owner!==toolId()){localStorage.setItem('marketel.product',owner);location.replace(`index.html?arm=${owner}&open=${encodeURIComponent(id)}`);return;}
+  await useComparisonPayload(payload);
 }
 async function startComparison(baselineId){
   if(draftUnsaved()&&!await confirmAction({title:'Start a comparison report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start comparison',danger:true}))return;
@@ -1307,7 +1371,7 @@ async function list(page='reports',append=false){
   }
   if(reportsCache&&!append){reports=reportsCache.reports;nextReportCursor=reportsCache.nextCursor;renderReports();}
   else if(!append)$('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><section class="loading">Loading saved ${esc(skin().docPlural)}…</section>`;
-  const pageResult=await api(`/reports?take=50${append&&nextReportCursor?`&cursor=${encodeURIComponent(nextReportCursor)}`:''}`);
+  const pageResult=await api(`/reports?take=50&${toolTypesQuery()}${append&&nextReportCursor?`&cursor=${encodeURIComponent(nextReportCursor)}`:''}`);
   reports=append?reports.concat(pageResult.reports):pageResult.reports;nextReportCursor=pageResult.nextCursor;
   reportsCache={reports:[...reports],nextCursor:nextReportCursor};
   if(currentPage==='reports'&&request===listRequest)renderReports();
@@ -1316,12 +1380,12 @@ async function openAccountHome(){
   if(!account)return landing();
   if(hasUnfinishedDraft())return editor();
   updateHeader();setActiveNav('reports');
-  const result=reportsCache||await api('/reports?take=50');
+  const result=reportsCache||await api(`/reports?take=50&${toolTypesQuery()}`);
   reports=result.reports||[];nextReportCursor=result.nextCursor||null;reportsCache={reports:[...reports],nextCursor:nextReportCursor};
   if(!reports.length)return start();
   renderReports();
 }
-function prefetchLists(){if(!account)return;api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});api('/reports?take=50').then(result=>{reportsCache=result;}).catch(()=>{});}
+function prefetchLists(){if(!account)return;api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});api(`/reports?take=50&${toolTypesQuery()}`).then(result=>{reportsCache=result;}).catch(()=>{});}
 $('account-button').onclick=async()=>{
   if(!account)return ensureAuth(()=>run(()=>openAccountHome()),'signin');
   await requestStorefront();
@@ -1329,7 +1393,7 @@ $('account-button').onclick=async()=>{
   modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:`One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
-  $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');location.assign(native?'../frontdesk/index.html?native=ios':'/frontdesk');};
+  $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');if(native)location.replace('../frontdesk/index.html?native=ios');else location.assign('/frontdesk');};
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
   $('delete-account').onclick=async()=>{
     $('dialog').close();
@@ -1341,7 +1405,10 @@ $('account-button').onclick=async()=>{
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});if($('dialog').open)$('dialog').close();landing();}
 $('nav').onclick=e=>{const page=e.target.closest('[data-page]')?.dataset.page;if(!page)return;if(page==='new')start();else if(page==='current')editor();else list(page).catch(error=>notice(error.message));};
 $('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.classList.remove('sheet-full');$('dialog').style.removeProperty('--sheet-top');$('dialog').style.removeProperty('--sheet-max-height');syncNativeInspectState(currentPage,true);});
-$('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.assign('../index.html?choose=1');};
+// In the app every hop between tools replaces the page. A page left in the
+// back/forward cache keeps its storage connection and scripts alive, which is
+// what stranded the next tool on a blank screen.
+$('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.replace('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
 window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
@@ -1385,8 +1452,8 @@ window.marketelInspectOpenHandoff=async rawToken=>{
 window.marketelInspectNativeAction=action=>{
   if(action==='account'){$('account-button').click();return;}
   if(action==='signin'){if($('dialog').open)$('dialog').close();ensureAuth(()=>run(()=>openAccountHome()),'signin');return;}
-  if(action==='choose'){location.assign('../index.html?choose=1');return;}
-  if(action==='frontdesk'){syncNativeInspectState(currentPage,false);localStorage.setItem('marketel.product','bookings');location.assign('../frontdesk/index.html?native=ios');return;}
+  if(action==='choose'){location.replace('../index.html?choose=1');return;}
+  if(action==='frontdesk'){syncNativeInspectState(currentPage,false);localStorage.setItem('marketel.product','bookings');location.replace('../frontdesk/index.html?native=ios');return;}
   if(action==='refresh')run(async()=>{await refresh();if(draft)editor();else if(account)await list(currentPage==='properties'?'properties':'reports');else landing();notice(`${skin().product} refreshed.`);});
 };
 function beginWedgeEntrance(){
@@ -1442,7 +1509,13 @@ function trackKeyboard(){
   apply();
 }
 trackKeyboard();
-window.addEventListener('pagehide',()=>remember());
+// Restored from the back/forward cache: the shell has moved on since, so tell
+// it where this page is again and redraw what was on screen.
+window.addEventListener('pageshow',event=>{
+  if(!event.persisted)return;
+  syncNativeInspectState(currentPage,!$('dialog').open);
+  if(hasUnfinishedDraft())editor();else if(account)openAccountHome().catch(()=>landing());else landing();
+});
 // Every foreground used to fire two calls; errors are swallowed here so a
 // background refresh can never overwrite the sign-out notice or disable a button.
 let lastForegroundSync=0;
@@ -1457,11 +1530,32 @@ if(native){beginWedgeEntrance();const chosen=new URLSearchParams(location.search
 // worth alarming anyone about: the session and the local draft are intact, so
 // boot quietly and let the next action surface any real problem. Only a genuine
 // 401 signs the operator out, and confirmSessionLost says so itself.
+//
+// Nothing the boot waits on may hold the screen blank: storage and the network
+// are each bounded, a signed-in start shows its loading state at once, and a
+// watchdog offers a way out if no screen has drawn.
+let booted=false;
+function renderRecovery(){
+  const sk=skin();
+  $('app').innerHTML=`<section class="card recovery"><h2>Couldn't open Marketel ${esc(sk.product)}</h2><p class="muted">Your saved ${esc(sk.docPlural)} are safe. Check your connection and try again.</p><div class="stack"><button type="button" id="recovery-retry" class="wide">Try again</button>${native?'<button type="button" id="recovery-tools" class="secondary wide">Back to tools</button>':''}</div></section>`;
+  $('recovery-retry').onclick=()=>location.reload();
+  if($('recovery-tools'))$('recovery-tools').onclick=()=>location.replace('../index.html?choose=1');
+}
+const bootWatchdog=setTimeout(()=>{if(!booted)renderRecovery();},12000);
 try{
-  draft=await stored('get');
-  await refresh().catch(()=>{});
-  if(account){await syncInspectAttribution().catch(()=>{});prefetchLists();}
-  if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
+  $('app').innerHTML=`<section class="loading">Opening Marketel ${esc(skin().product)}…</section>`;
+  // Storage gets one bounded chance. If it does not answer, open without the
+  // local draft rather than wait on it a second time.
+  if(await withTimeout(openDb(),1500).then(()=>true,()=>false)){
+    await withTimeout(migrateLegacyDraft(),1500).catch(()=>{});
+    draft=await withTimeout(stored('get'),1500).catch(()=>null);
+  }
+  await withTimeout(refresh(),10000).catch(()=>{});
+  if(account){syncInspectAttribution().catch(()=>{});prefetchLists();}
+  const opening=new URLSearchParams(location.search).get('open');
+  if(account&&opening&&/^[A-Za-z0-9_-]{1,64}$/.test(opening))await openReport(opening);
+  else if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
+  booted=true;
   settleWedgeEntrance();
   if(new URLSearchParams(location.search).get('checkout')==='success'&&session){
     await api('/billing/refresh',{method:'POST'});
@@ -1469,3 +1563,4 @@ try{
     notice(account.active?`${skin().product} is ready. Your subscription is active.`:'Payment confirmation is pending. Refresh billing status shortly.',account.active?'success':'');
   }
 }catch(e){notice(e.message,'error');if(draft)editor();else landing();}
+finally{booted=true;clearTimeout(bootWatchdog);}

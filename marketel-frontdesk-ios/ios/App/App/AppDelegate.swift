@@ -601,25 +601,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 signOutAction,
             ]
         )
-        let inspectRefreshAction = UIAction(
-            title: "Refresh",
-            image: UIImage(systemName: "arrow.clockwise")
-        ) { [weak self] _ in
-            self?.callWeb(function: "marketelInspectNativeAction", argument: "refresh")
-        }
-        let inspectAccountAction = UIAction(
-            title: "Inspect account",
-            image: UIImage(systemName: "person.crop.circle")
-        ) { [weak self] _ in
-            self?.callWeb(function: "marketelInspectNativeAction", argument: "account")
-        }
-        let frontDeskAction = UIAction(
-            title: "Open booking Front Desk",
-            image: UIImage(systemName: "bed.double")
-        ) { [weak self] _ in
-            self?.callWeb(function: "marketelInspectNativeAction", argument: "frontdesk")
-        }
-        inspectMenu = UIMenu(children: [inspectRefreshAction, inspectAccountAction, frontDeskAction])
+        inspectMenu = makeInspectMenu(product: inspectProductName)
         menuButton.menu = frontDeskMenu
         menuButton.showsMenuAsPrimaryAction = true
         menuButton.changesSelectionAsPrimaryAction = false
@@ -661,6 +643,24 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         view.addSubview(menuButton)
         configureInspectBrand()
         configureAuthDrawer()
+    }
+
+    /// Rebuilt whenever the tool changes: a menu cannot be edited once shown,
+    /// and its entries name the tool the owner is actually in.
+    private func makeInspectMenu(product: String) -> UIMenu {
+        let refresh = UIAction(title: "Refresh", image: UIImage(systemName: "arrow.clockwise")) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "refresh")
+        }
+        let account = UIAction(title: "\(product) account", image: UIImage(systemName: "person.crop.circle")) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "account")
+        }
+        let tools = UIAction(title: "Switch tool", image: UIImage(systemName: "square.grid.2x2")) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "choose")
+        }
+        let frontDesk = UIAction(title: "Open booking Front Desk", image: UIImage(systemName: "bed.double")) { [weak self] _ in
+            self?.callWeb(function: "marketelInspectNativeAction", argument: "frontdesk")
+        }
+        return UIMenu(children: [refresh, account, tools, frontDesk])
     }
 
     private func configureInspectBrand() {
@@ -772,9 +772,19 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             field.font = MarketelFont.dmSans(.regular, size: 17)
             field.textColor = .label
             // Neither keyboard has a way down on its own (the number pad has no
-            // return key), so both get the same Done bar the web fields show.
+            // return key), so both get the bar every web field shows: the
+            // previous/next pair, then Done. Each sign-in step has a single
+            // field, so the arrows sit disabled exactly as they do on the web.
             let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+            let previous = UIBarButtonItem(image: UIImage(systemName: "chevron.up"), style: .plain, target: nil, action: nil)
+            let next = UIBarButtonItem(image: UIImage(systemName: "chevron.down"), style: .plain, target: nil, action: nil)
+            previous.isEnabled = false
+            next.isEnabled = false
+            previous.accessibilityLabel = "Previous field"
+            next.accessibilityLabel = "Next field"
             toolbar.items = [
+                previous,
+                next,
                 UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
                 UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(dismissAuthKeyboard))
             ]
@@ -793,10 +803,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         authEmailField.spellCheckingType = .no
         authEmailField.returnKeyType = .send
         authEmailField.accessibilityLabel = "Email"
-        authCodeField.placeholder = "6-digit code"
+        // The prompt is quieter than the code it asks for, in the page's type.
+        authCodeField.attributedPlaceholder = NSAttributedString(
+            string: "6-digit code",
+            attributes: [
+                .font: MarketelFont.dmSans(.regular, size: 17),
+                .foregroundColor: UIColor(red: 107 / 255, green: 125 / 255, blue: 114 / 255, alpha: 1)
+            ]
+        )
         authCodeField.keyboardType = .numberPad
         authCodeField.textContentType = .oneTimeCode
-        authCodeField.font = .monospacedDigitSystemFont(ofSize: 22, weight: .semibold)
+        authCodeField.font = MarketelFont.dmSans(.bold, size: 22)
         authCodeField.accessibilityLabel = "Six-digit code"
         authCodeField.addTarget(self, action: #selector(authCodeChanged), for: .editingChanged)
 
@@ -1043,6 +1060,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             options: [.transitionCrossDissolve, .allowUserInteraction]
         ) {
             self.inspectProductName = product
+            self.inspectMenu = self.makeInspectMenu(product: product)
+            if self.shellProduct == .inspect { self.menuButton.menu = self.inspectMenu }
             self.setShellProduct(.inspect)
             self.inspectWedgeLabel.text = product
             self.propertyHeaderControl.accessibilityLabel = "Switch tool, \(product)"
@@ -1959,6 +1978,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             setShellVisible(requestedVisible && !shellSuppressedByModal, animated: shellVisible)
         case "inspectState":
             showInspectProduct(payload["product"] as? String ?? "")
+            // Each tool names its own lists: Records and Locations in Incident.
+            if let labels = payload["labels"] as? [String: Any] {
+                if let list = labels["list"] as? String, !list.isEmpty { inspectReportsTabItem.title = list }
+                if let places = labels["places"] as? String, !places.isEmpty { inspectPropertiesTabItem.title = places }
+            }
             shellSuppressedByModal = !(payload["visible"] as? Bool ?? true)
             inspectAuthenticated = payload["authenticated"] as? Bool ?? false
             updateInspectSelectedTab(
@@ -1968,11 +1992,15 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             if authDrawerOpen && (inspectAuthenticated || shellSuppressedByModal) {
                 setAuthDrawerOpen(false)
             }
+            // A page that reports in is live: whatever happened mid-sign-in on the
+            // page before it, touches reach this one.
+            if !authDrawerOpen { webView?.scrollView.isUserInteractionEnabled = true }
             // Signed out, the glass bar still floats over the page with Sign in
             // in it; Reports and Properties wait until there is an account.
             setShellVisible(!shellSuppressedByModal, animated: shellVisible)
         case "chooserState":
             if authDrawerOpen { setAuthDrawerOpen(false) }
+            webView?.scrollView.isUserInteractionEnabled = true
             UIView.transition(
                 with: propertyHeaderControl,
                 duration: 0.25,
