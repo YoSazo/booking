@@ -1202,23 +1202,79 @@ app.get('/inspect/open', (req, res) => {
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
     res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open Marketel Inspect</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#eff4f0;color:#1a2b22;font:16px system-ui,-apple-system,sans-serif}.card{width:min(100%,440px);padding:28px;background:#fff;border:1px solid #d9e4dc;border-radius:20px;box-shadow:0 18px 50px #1a2b2214}h1{font-size:26px;margin:0 0 10px}p{color:#52665b;line-height:1.55}.button{display:block;margin-top:20px;padding:14px 18px;border-radius:12px;background:#2e7d5b;color:#fff;text-align:center;text-decoration:none;font-weight:700}</style></head><body><main class="card"><h1>Continue in Marketel</h1><p>Install Marketel, then return to the email titled <strong>Open your report in Marketel</strong> and tap its button again.</p><a class="button" href="${appStoreUrl}">Download Marketel on the App Store</a><p><small>The secure email link expires after 10 minutes and works once.</small></p></main></body></html>`);
 });
-const INSPECT_ARMS = new Set(['', '/', '/incident', '/claims']);
-app.use('/inspect/', (req, res, next) => {
+// Each wedge gets a root-level path. The URL is the one piece of positioning
+// that survives being copied out of an advertisement: /incident reads as a
+// product, /inspect/incident reads as a feature of Inspect. /inspect/<arm>
+// keeps working so links already in flight do not break.
+//
+// One account, one subscription and one report allowance sit behind all of
+// them, which the arm's terms page says in its own words rather than leaving
+// someone to discover it at the card.
+const INSPECT_ARMS = Object.freeze({
+    incident: Object.freeze({ product: 'Incident', title: 'Marketel Incident \u2014 Write it before anyone goes home' }),
+    claims: Object.freeze({ product: 'Inspect', title: 'Marketel Inspect \u2014 Document the damage while it is in front of you' }),
+});
+
+// The shell and the terms page are shipped as ordinary, complete HTML and
+// rewritten per arm at send time. Tokens would have been simpler here but they
+// leak: Capacitor serves the same two files straight out of www/ with no
+// server in front of them, so whatever is on disk has to render correctly by
+// itself. Substituting exact literals keeps the disk copy honest.
+//
+// A missing literal means someone edited the copy; serve the file unchanged
+// rather than 500, and let the test that pins these literals catch it first.
+const inspectSkins = new Map();
+function inspectSkinned(file, slug) {
+    const key = `${file}:${slug}`;
+    if (inspectSkins.has(key)) return inspectSkins.get(key);
+    const arm = INSPECT_ARMS[slug];
+    const source = fs.readFileSync(path.join(INSPECT_PUBLIC_ROOT, file), 'utf8');
+    let html = source;
+    if (arm) {
+        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover both.</div>`;
+        const swaps = file === 'index.html' ? [
+            ['<title>Marketel Inspect \u2014 Your walkthrough, a finished report</title>', `<title>${arm.title}</title>`],
+            ['<span>Inspect</span>', `<span>${arm.product}</span>`],
+            ['href="/inspect/"', `href="/${slug}"`],
+            ['aria-label="Sign in to Marketel Inspect"', `aria-label="Sign in to Marketel ${arm.product}"`],
+        ] : [
+            ['<title>Marketel Inspect \u2014 terms and privacy</title>', `<title>Marketel ${arm.product} \u2014 terms and privacy</title>`],
+            ['<a href="./">\u2190 Marketel Inspect</a>', `<a href="/${slug}">\u2190 Marketel ${arm.product}</a>`],
+            ['<h1>Inspect terms &amp; privacy</h1>', `<h1>Marketel ${arm.product} terms &amp; privacy</h1>`],
+            ['<div class="box"><strong>Plain-language summary.</strong>', `${shared}<div class="box"><strong>Plain-language summary.</strong>`],
+        ];
+        for (const [from, to] of swaps) if (html.includes(from)) html = html.replace(from, to);
+    }
+    inspectSkins.set(key, html);
+    return html;
+}
+
+// microphone=() is an empty allowlist: it disables the microphone for every
+// origin including this one. Safari does not appear to enforce it, which is
+// why dictation works there, but Chrome does — so the headline feature was
+// dead on Android. (self) permits this origin and nobody else. Every arm goes
+// through this one gate so a new path cannot quietly ship without it.
+function inspectGate(req, res, next) {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
-    // microphone=() is an empty allowlist: it disables the microphone for every
-    // origin including this one. Safari does not appear to enforce it, which is
-    // why dictation works there, but Chrome does — so the headline feature was
-    // dead on Android. (self) permits this origin and nobody else.
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self), payment=()');
-    // Each wedge gets a real path rather than a query parameter, so the arm is
-    // shareable, survives a copied link, and is already captured in sourceUrl
-    // via location.pathname — which leaves utm_campaign free to mean the
-    // campaign again instead of doubling as the arm.
-    if (INSPECT_ARMS.has(req.path)) return res.sendFile(path.join(INSPECT_PUBLIC_ROOT, 'index.html'));
     next();
+}
+
+for (const slug of Object.keys(INSPECT_ARMS)) {
+    // Express is non-strict, so each of these also answers the trailing-slash
+    // form. The client's arm regex accepts both.
+    app.get(`/${slug}`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('index.html', slug)));
+    app.get(`/${slug}/terms`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('terms.html', slug)));
+}
+
+const INSPECT_LEGACY_ARMS = new Set(['', '/', ...Object.keys(INSPECT_ARMS).map(slug => `/${slug}`)]);
+app.use('/inspect/', inspectGate, (req, res, next) => {
+    if (!INSPECT_LEGACY_ARMS.has(req.path)) return next();
+    const slug = req.path.replace(/^\/|\/$/g, '');
+    res.type('html').send(inspectSkinned('index.html', slug));
 });
 app.use('/inspect', express.static(INSPECT_PUBLIC_ROOT, { index: false, maxAge: 0 }));
 

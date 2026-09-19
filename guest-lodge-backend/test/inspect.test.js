@@ -224,29 +224,98 @@ test('an incident record does not misstate anything to an insurer', () => {
     assert.match(client, /esc\(pw\.disclaimer\)/);
 });
 
-test('the claims arm is attributed without new plumbing', () => {
-    const client = require('node:fs').readFileSync(
-        require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+test('each wedge is a root path, skinned per arm, and still attributed for free', () => {
+    const fsx = require('node:fs'), pathx = require('node:path');
+    const root = pathx.join(__dirname, '..');
+    const client = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'inspect.js'), 'utf8');
+    const shell = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'index.html'), 'utf8');
+    const termsHtml = fsx.readFileSync(pathx.join(root, 'public', 'inspect', 'terms.html'), 'utf8');
+    const server = fsx.readFileSync(pathx.join(root, 'server.js'), 'utf8');
 
-    // utm_campaign is already captured and persisted by captureInspectAttribution,
-    // so which arm someone arrived from needs no new event.
-    // The path is canonical so a shared link keeps the arm, and utm_campaign is
-    // freed to name the campaign instead of doubling as the arm. pathname is
-    // already in sourceUrl, so attribution still needs no new plumbing.
-    assert.match(client, /location\.pathname\.match\(\/\\\/inspect\\\/\(\[a-z-\]\+\)/);
+    // The path is canonical: it survives a shared link, reads as a product
+    // rather than a feature, and is already in sourceUrl via location.pathname
+    // — so attribution needs no new plumbing and utm_campaign goes back to
+    // naming the campaign instead of doubling as the arm.
+    const armPath = client.match(/const ARM_PATH = (\/.+\/);/);
+    assert.ok(armPath, 'the client must expose its arm-path pattern');
+    const pattern = new RegExp(armPath[1].slice(1, -1));
+    for (const url of ['/incident', '/incident/', '/inspect/incident', '/inspect/incident/', '/claims']) {
+        assert.match(url, pattern, `${url} must resolve to an arm`);
+    }
+    // The bare product path is not an arm, and a deeper path never is.
+    assert.doesNotMatch('/inspect/', pattern);
+    assert.doesNotMatch('/incident/terms/extra', pattern);
     assert.match(client, /LANDING_ARMS\[fromPath\] \|\| LANDING_ARMS\[fromParam\.toLowerCase\(\)\]/);
     assert.match(client, /utm_campaign:/);
-    const server = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
-    assert.match(server, /INSPECT_ARMS = new Set\(\['', '\/', '\/incident', '\/claims'\]\)/);
-    // An empty allowlist disables the microphone for every origin including
-    // this one, which killed dictation in Chrome while Safari let it through.
+
+    // Served from a root path, the shell can no longer resolve its own assets
+    // relatively. Capacitor serves www/ as its root with the bundle at
+    // www/inspect/, so absolute product-scoped URLs work in the app too.
+    assert.doesNotMatch(shell, /(src|href)="\.\//);
+    assert.match(shell, /href="\/inspect\/inspect\.css/);
+    assert.match(shell, /src="\/inspect\/inspect\.js/);
+
+    // Every arm goes through one gate, so a new path cannot ship without the
+    // headers. An empty allowlist disables the microphone for every origin
+    // including this one, which killed dictation in Chrome while Safari let it
+    // through.
+    assert.match(server, /function inspectGate\(req, res, next\)/);
+    assert.match(server, /app\.get\(`\/\$\{slug\}`, inspectGate/);
+    assert.match(server, /app\.get\(`\/\$\{slug\}\/terms`, inspectGate/);
+    assert.match(server, /app\.use\('\/inspect\/', inspectGate/);
     const policy = (server.match(/setHeader\('Permissions-Policy', '[^']+'\)/g) || []).join(' ');
     assert.match(policy, /microphone=\(self\)/);
     assert.doesNotMatch(policy, /microphone=\(\)/);
 
+    // A slug has to survive the root namespace, which it shares with Booking's
+    // own pages and with express.static(public) serving every file in there.
+    const slugs = [...server.matchAll(/^    (\w+): Object\.freeze\(\{ product: '(\w+)'/gm)].map(m => m[1]);
+    assert.deepEqual(slugs, ['incident', 'claims']);
+    const taken = new Set([...server.matchAll(/app\.(?:get|post|use|all)\('\/([a-z0-9-]+)'/g)].map(m => m[1]));
+    for (const slug of slugs) {
+        assert.ok(!taken.has(slug), `/${slug} collides with an existing route`);
+        assert.ok(!fsx.existsSync(pathx.join(root, 'public', slug)), `/${slug} collides with a public file`);
+    }
+
+    // The shell and the terms page ship as complete HTML and are rewritten per
+    // arm at send time, because Capacitor serves both straight off disk with no
+    // server in front of them. That only holds while the literals still exist:
+    // check every one the server expects to find, so a copy edit cannot quietly
+    // turn the skin off and leave an incident visitor inside Inspect.
+    const swaps = server.slice(server.indexOf('function inspectSkinned'), server.indexOf('function inspectGate'));
+    const literals = [...swaps.matchAll(/^            \['([^']+)',/gm)].map(m => m[1]);
+    assert.ok(literals.length >= 8, 'expected the shell and terms substitutions');
+    for (const literal of literals) {
+        const decoded = literal.replace(/\\u2014/g, '\u2014').replace(/\\u2190/g, '\u2190');
+        assert.ok(shell.includes(decoded) || termsHtml.includes(decoded),
+            `no file contains the literal the server substitutes: ${decoded}`);
+    }
+
+    // Someone who clicked an advertisement about incidents must not land inside
+    // a product that talks about move-out comparisons, so the chrome, the
+    // paywall and the terms link all follow the arm rather than the codebase.
+    const skin = client.slice(client.indexOf('const SKIN = {'), client.indexOf('const landingArm'));
+    for (const key of ['product', 'home', 'terms', 'navList', 'navCreate', 'navPlaces',
+                       'listHeading', 'placesHeading', 'documentLabel', 'offerHeading',
+                       'offerAnchor', 'offerPoints']) {
+        assert.match(skin, new RegExp(`\\b${key}:`), `the incident arm must override ${key}`);
+        assert.ok(skin.split(`${key}:`).length > 2, `${key} needs a default and an incident value`);
+    }
+    // No surface may hardcode the product name or its terms URL any more.
+    const surfaces = client.slice(client.indexOf('function landing()'));
+    assert.doesNotMatch(surfaces, /bookmarketel\.com\/inspect\/terms/);
+    assert.doesNotMatch(surfaces, /MARKETEL INSPECT/);
+    assert.doesNotMatch(surfaces, /a year of Inspect/);
+    assert.match(surfaces, /esc\(sk\.terms\)/);
+
+    // The claims arm is a condition report sold to a different reader, so it
+    // stays Inspect; the incident arm makes a different document, so it does not.
+    assert.match(server, /incident: Object\.freeze\(\{ product: 'Incident'/);
+    assert.match(server, /claims: Object\.freeze\(\{ product: 'Inspect'/);
+
     // The claims arm leads with the original files, never with the AI: Airbnb
     // bans AI-generated evidence from claims in the same April 2026 update.
-    const arms = client.slice(client.indexOf('const LANDING_ARMS'), client.indexOf('const landingArm'));
+    const arms = client.slice(client.indexOf('const LANDING_ARMS'), client.indexOf('const ARM_PATH'));
     assert.match(arms, /original camera files/);
     assert.doesNotMatch(arms, /\bAI\b|writes the notes/);
 
@@ -404,7 +473,8 @@ test('the AI is the path, and the note is never hidden once written', () => {
 
     // The promise must not overclaim on a document used in disputes.
     assert.doesNotMatch(client, /report writes itself/i);
-    assert.match(client, /Inspect writes the notes/);
+    // The arm supplies the name; the claim it makes must stay the same one.
+    assert.match(client, /\$\{esc\(skin\(\)\.product\)\} writes the notes/);
 });
 
 test('the AI path is observable, and cannot be advertised while it is off', () => {

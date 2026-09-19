@@ -28,8 +28,21 @@
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable], .report-note, .transcript, .comparison-banner, blockquote { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 html { min-height: 100%; background: #eff4f0; }
-body { min-height: 100vh; margin: 0; padding: env(safe-area-inset-top) 0 calc(100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
-header { position: sticky; z-index: 8; top: 0; max-width: 1040px; margin: auto; padding: 12px 20px; min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffffb8; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+body { min-height: 100vh; margin: 0; padding: calc(64px + env(safe-area-inset-top)) 0 calc(100px + env(safe-area-inset-bottom)); background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; letter-spacing: -.01em; }
+/* This is also the top edge of every web sheet. Sticky stopped participating
+   once the body was scroll-locked at -scrollY, so opening Sign in near the end
+   of a page could make the banner disappear. */
+header { position: fixed; z-index: 12; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 0 20px; min-height: 64px; overflow: hidden; background: #ffffffeb; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+.header-bar { min-height: 63px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.header-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 320ms cubic-bezier(.32,.72,0,1), opacity 180ms ease; }
+.header-drawer-clip { min-height: 0; overflow: hidden; }
+.header-drawer-content { position: relative; width: min(620px, 100%); margin: 0 auto; padding: 6px 0 22px; transform: translateY(-12px); opacity: 0; transition: transform 280ms cubic-bezier(.32,.72,0,1), opacity 180ms ease; }
+.header-drawer-content h2 { margin: 0; padding-right: 42px; }
+.header-drawer-content p { margin: 8px 0 12px; }
+.header-drawer-close { position: absolute; top: 0; right: 0; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; border-radius: 999px; color: var(--muted); }
+html.auth-open .header-drawer { grid-template-rows: 1fr; opacity: 1; }
+html.auth-open .header-drawer-content { transform: none; opacity: 1; }
+html.auth-open .header-bar, html.auth-open main, html.auth-open nav { pointer-events: none; }
 .brand { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; font-weight: 750; font-size: 18px; }
 .brand-icon { display: block; width: 30px; height: 30px; border-radius: 8px; }
 .brand-wordmark { display: block; width: 120px; height: auto; }
@@ -178,23 +191,24 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
 .toast.error { background: #aa382b; }
 @keyframes toast-in { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes toast-out { to { opacity: 0; transform: translateX(20px); } }
-/* One formula for every case. --kb is the keyboard height and is 0 when it is
-   closed, so the sheet simply centres in whatever space is left. Nothing here
-   reads visualViewport.offsetTop: iOS 26 leaves that stale and non-zero after
-   the keyboard closes, which is what pinned the sheet to the top of the screen. */
-/* A card resting on the app, not a takeover: opaque, so nothing behind it is
-   frosted, and nudged up only by however much the keyboard actually covers
-   (--sheet-shift, computed in inspect.js). Re-centring in the leftover space
-   moved it far enough to collide with the status bar. */
-dialog { position: fixed; left: 50%; top: 50%; transform: translate(-50%, calc(-50% + var(--sheet-shift, 0px))); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: calc(100dvh - max(var(--kb, 0px), var(--shell-bottom)) - var(--shell-top) - env(safe-area-inset-top) - 32px); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; transition: transform .2s ease, max-height .2s ease; }
+/* The layout viewport never resizes for the keyboard. JS publishes one top and
+   one usable height from visualViewport, so Safari cannot resize the layout and
+   then have us independently translate the sheet a second time. */
+dialog { position: fixed; left: 50%; top: var(--sheet-top, 50%); transform: translate(-50%, -50%); margin: 0; border: 1px solid #e3ebe6; border-radius: 24px; padding: 26px; max-width: 480px; width: calc(100% - 28px); max-height: var(--sheet-max-height, calc(100svh - var(--shell-bottom) - var(--shell-top) - env(safe-area-inset-top) - 32px)); overflow: hidden; color: inherit; background: #fbfdfb; box-shadow: 0 24px 70px #173b2333; }
 /* Only when open — a bare display:flex would override the UA's display:none
    and leave the sheet on screen permanently. The body scrolls rather than the
    dialog, so the absolutely-positioned close control cannot scroll away. */
 dialog[open] { display: flex; flex-direction: column; }
 html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: none; }
+/* iOS can pan the visual viewport even while a fixed body is scroll-locked.
+   Counter that pan on the visible page pieces without turning body into a
+   containing block for its fixed header. */
 html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; }
+html.sheet-open header, html.sheet-open main, html.sheet-open nav { transform: translateY(var(--viewport-pan, 0px)); }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-dialog::backdrop { background: #15261c24; }
+/* No blur, tint or dimming behind sheets. It remains a real modal backdrop, so
+   taps cannot leak into the page underneath. */
+dialog::backdrop { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
 dialog h2 { margin-top: 0; padding-right: 38px; }
 /* The sheet takes focus itself when it has no field, so opening one never lands
    a focus ring on whichever control happened to be first in the markup. */
@@ -231,6 +245,16 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .app-handoff-card h2 { margin: 5px 0 4px; }
 .app-handoff-card p { margin: 0; }
 .app-handoff-card button { flex: 0 0 auto; }
+.flow-screen { min-height: var(--flow-page-height, calc(100svh - 100px)); }
+/* Authentication contains the one input that every new user must touch. Keep it
+   in normal document flow instead of a top-layer dialog over a fixed body: iOS
+   can pan and scroll the page naturally without exposing a second coordinate
+   system or a blank strip underneath the browser toolbar. */
+.flow-frame { position: sticky; top: calc(64px + env(safe-area-inset-top)); min-height: calc(100svh - 64px - env(safe-area-inset-top)); display: grid; place-items: center; padding: 18px 0; }
+.flow-card { position: relative; width: min(480px, 100%); margin: 0; background: #fbfdfb; }
+.flow-card h2 { margin-top: 0; padding-right: 38px; }
+.flow-close { position: absolute; top: 10px; right: 10px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; color: var(--muted); border-radius: 999px; }
+.danger-button { background: #aa382b; color: #fff; }
 .property-row, .report-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; -webkit-tap-highlight-color: transparent; transition: transform .16s ease; }
 .property-row:active, .report-row:active { transform: scale(.995); }
 /* Both of these sat under a comfortable 44px target. */
@@ -270,15 +294,14 @@ html.sheet-full dialog {
      global reduced-motion rule collapses this to nothing on its own. */
   animation: plan-in 280ms cubic-bezier(.32, .72, 0, 1) both;
 }
-html.sheet-full dialog::backdrop { animation: plan-scrim 280ms ease both; }
 @keyframes plan-in { from { opacity: 0; transform: translateY(22px) scale(.99); } to { opacity: 1; transform: none; } }
-@keyframes plan-scrim { from { opacity: 0; } to { opacity: 1; } }
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell:not(.inspect-authenticated) body { padding-top: env(safe-area-inset-top); padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
 .native-inspect-shell:not(.inspect-authenticated) #notice { bottom: calc(var(--kb, 0px) + 24px + env(safe-area-inset-bottom)); }
 @media (max-width: 540px) {
-  header { padding: 15px; }
+  header { padding: 0 15px; }
+  .header-drawer-content { padding-bottom: 18px; }
   .card { padding: 18px; }
   .grid { grid-template-columns: 1fr; }
   .hero { margin: 32px 0; }
