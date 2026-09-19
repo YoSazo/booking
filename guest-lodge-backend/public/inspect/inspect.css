@@ -287,7 +287,7 @@ blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 
 .native-inspect-shell.inspect-authenticated { --shell-bottom: 98px; --chrome-bottom: calc(62px + env(safe-area-inset-bottom)); }
 /* Most app users arrive from the web funnel with an account already, so their
    way back in is an outlined button of full weight, not a text link. */
-.native-inspect-shell .hero #sign-in { background: #ffffffe6; border: 1.5px solid #9cc9ae; }
+.native-inspect-shell .hero #sign-in { margin-top: 12px; background: #ffffffe6; border: 1.5px solid #9cc9ae; }
 .native-inspect-shell .hero #sign-in:active { background: #e8f5ee; }
 /* In the app main has 16px of top padding instead of the margin. */
 .native-inspect-shell .flow-screen { margin-top: -16px; }
@@ -315,6 +315,14 @@ html.sheet-full dialog {
 html.sheet-full #dialog-close { top: calc(env(safe-area-inset-top, 0px) + 12px); }
 .native-inspect-shell main { margin-top: 0; padding-top: 16px; }
 .native-inspect-shell:not(.inspect-authenticated) body { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+/* In the app the page runs up under the status bar and the shell paints no
+   strip there any more. The glow is pinned to the screen, and a copy of the
+   same paint covers just the status-bar band, so the top of the screen is one
+   continuous colour at rest and while content scrolls beneath it. */
+.native-inspect-shell body { background: transparent; }
+.native-inspect-shell body::before, .native-inspect-shell body::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; }
+.native-inspect-shell body::before { z-index: -1; }
+.native-inspect-shell body::after { z-index: 11; clip-path: inset(0 0 calc(100% - env(safe-area-inset-top, 0px)) 0); }
 /* Arriving from the app's tool chooser. The glass bar never moves, so only the
    page content rises in, in reading order. */
 html.wedge-enter .hero > *, html.wedge-enter #app > :not(.hero) { animation: wedge-in 460ms cubic-bezier(.32,.72,0,1) backwards; }

@@ -13,7 +13,12 @@
     * { box-sizing: border-box; }
     /* Same ground as the tool pages, so the hand-off between documents is
        invisible and only the content appears to move. */
-    body { min-height: 100vh; min-height: 100dvh; margin: 0; background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; }
+    body { min-height: 100vh; min-height: 100dvh; margin: 0; background: transparent; -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; }
+    /* The glow is pinned to the screen and repeated over the status-bar band,
+       so the top of the screen is one colour, exactly as on the tool pages. */
+    body::before, body::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% -10%, #dceee3 0, transparent 36%), #eff4f0; }
+    body::before { z-index: -1; }
+    body::after { z-index: 5; clip-path: inset(0 0 calc(100% - env(safe-area-inset-top, 0px)) 0); }
     /* The native glass bar floats over the top 82pt (6pt gap, 64pt bar, 12pt
        below it), exactly as it does on every tool page. */
     main { width: min(100%, 490px); padding: calc(env(safe-area-inset-top) + 110px) 20px calc(env(safe-area-inset-bottom) + 36px); margin: auto; }

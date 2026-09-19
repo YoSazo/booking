@@ -6,6 +6,7 @@ import Contacts
 import ContactsUI
 import UserNotifications
 import SafariServices
+import CoreText
 import StoreKit
 #if canImport(ActivityKit)
 import ActivityKit
@@ -26,6 +27,35 @@ private extension Notification.Name {
 
 private var marketelPendingNotificationDestination: [String: String]?
 private var marketelPendingInspectHandoffToken: String?
+
+/// DM Sans, the web's typeface, bundled as TTF next to the web assets so the
+/// native banner and sign-in read in the same type as the page beneath them.
+/// Falls back to the system font if the files are ever missing.
+private enum MarketelFont {
+    private static let registered: Void = {
+        for file in ["DMSans-Regular", "DMSans-Medium", "DMSans-Bold"] {
+            guard let url = Bundle.main.url(
+                forResource: file,
+                withExtension: "ttf",
+                subdirectory: "public/native-fonts"
+            ) else { continue }
+            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        }
+    }()
+
+    static func dmSans(_ weight: UIFont.Weight, size: CGFloat) -> UIFont {
+        _ = registered
+        let name: String
+        if weight.rawValue >= UIFont.Weight.semibold.rawValue {
+            name = "DMSans-Bold"
+        } else if weight.rawValue >= UIFont.Weight.medium.rawValue {
+            name = "DMSans-Medium"
+        } else {
+            name = "DMSans-Regular"
+        }
+        return UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
+    }
+}
 
 private enum MarketelShellProduct: Equatable {
     case frontDesk
@@ -202,6 +232,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
     private var authLastTriedCode = ""
     private var authVerifying = false
     private var inspectProductName = "Inspect"
+    // The Inspect family's banner is the web header, natively: app icon, the
+    // Marketel wordmark, then the tool's name in muted DM Sans.
+    private let frontDeskBrandRow = UIStackView()
+    private let inspectBrandRow = UIStackView()
+    private let inspectWedgeLabel = UILabel()
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -451,7 +486,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         labels.spacing = 0
         labels.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let brandRow = UIStackView(arrangedSubviews: [logo, labels])
+        let brandRow = frontDeskBrandRow
+        brandRow.addArrangedSubview(logo)
+        brandRow.addArrangedSubview(labels)
         brandRow.translatesAutoresizingMaskIntoConstraints = false
         brandRow.axis = .horizontal
         brandRow.alignment = .center
@@ -622,7 +659,57 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
 
         view.addSubview(topBar)
         view.addSubview(menuButton)
+        configureInspectBrand()
         configureAuthDrawer()
+    }
+
+    private func configureInspectBrand() {
+        let icon = Bundle.main.url(
+            forResource: "marketel-frontdesk-icon",
+            withExtension: "png",
+            subdirectory: "public"
+        ).flatMap { try? Data(contentsOf: $0) }.flatMap { UIImage(data: $0) }
+        let logo = UIImageView(image: icon)
+        logo.translatesAutoresizingMaskIntoConstraints = false
+        logo.contentMode = .scaleAspectFit
+        logo.layer.cornerRadius = 8
+        logo.layer.cornerCurve = .continuous
+        logo.clipsToBounds = true
+
+        // The same vector the web header draws, from the asset catalog, so it
+        // stays sharp at every scale.
+        let wordmark = UIImageView(image: UIImage(named: "MarketelWordmark"))
+        wordmark.translatesAutoresizingMaskIntoConstraints = false
+        wordmark.contentMode = .scaleAspectFit
+        wordmark.isAccessibilityElement = true
+        wordmark.accessibilityLabel = "Marketel"
+
+        inspectWedgeLabel.font = MarketelFont.dmSans(.medium, size: 16)
+        inspectWedgeLabel.textColor = UIColor(red: 107 / 255, green: 125 / 255, blue: 114 / 255, alpha: 1)
+        inspectWedgeLabel.text = inspectProductName
+        inspectWedgeLabel.lineBreakMode = .byTruncatingTail
+        inspectWedgeLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        for item in [logo, wordmark, inspectWedgeLabel] as [UIView] {
+            inspectBrandRow.addArrangedSubview(item)
+        }
+        inspectBrandRow.axis = .horizontal
+        inspectBrandRow.alignment = .center
+        inspectBrandRow.spacing = 8
+        inspectBrandRow.isUserInteractionEnabled = false
+        inspectBrandRow.translatesAutoresizingMaskIntoConstraints = false
+        inspectBrandRow.isHidden = true
+        propertyHeaderControl.addSubview(inspectBrandRow)
+        NSLayoutConstraint.activate([
+            logo.widthAnchor.constraint(equalToConstant: 28),
+            logo.heightAnchor.constraint(equalToConstant: 28),
+            // 296 x 53 artwork at the web's 104px phone width.
+            wordmark.widthAnchor.constraint(equalToConstant: 104),
+            wordmark.heightAnchor.constraint(equalToConstant: 19),
+            inspectBrandRow.leadingAnchor.constraint(equalTo: propertyHeaderControl.leadingAnchor),
+            inspectBrandRow.centerYAnchor.constraint(equalTo: propertyHeaderControl.centerYAnchor),
+            inspectBrandRow.trailingAnchor.constraint(lessThanOrEqualTo: propertyHeaderControl.trailingAnchor)
+        ])
     }
 
     private func configureAuthDrawer() {
@@ -630,19 +717,27 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         func font(_ size: CGFloat, _ weight: UIFont.Weight) -> UIConfigurationTextAttributesTransformer {
             UIConfigurationTextAttributesTransformer { incoming in
                 var outgoing = incoming
-                outgoing.font = .systemFont(ofSize: size, weight: weight)
+                outgoing.font = MarketelFont.dmSans(weight, size: size)
                 return outgoing
             }
         }
 
-        var signInConfiguration = UIButton.Configuration.filled()
+        // The web header's quiet button: green DM Sans on nothing, with the
+        // pale green press state instead of a filled pill.
+        var signInConfiguration = UIButton.Configuration.plain()
         signInConfiguration.title = "Sign in"
-        signInConfiguration.baseBackgroundColor = green
-        signInConfiguration.baseForegroundColor = .white
-        signInConfiguration.cornerStyle = .capsule
-        signInConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-        signInConfiguration.titleTextAttributesTransformer = font(15, .semibold)
+        signInConfiguration.baseForegroundColor = green
+        signInConfiguration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12)
+        signInConfiguration.background.cornerRadius = 12
+        signInConfiguration.titleTextAttributesTransformer = font(16, .bold)
         signInButton.configuration = signInConfiguration
+        signInButton.configurationUpdateHandler = { button in
+            var configuration = button.configuration
+            configuration?.background.backgroundColor = button.isHighlighted
+                ? UIColor(red: 228 / 255, green: 239 / 255, blue: 232 / 255, alpha: 1)
+                : .clear
+            button.configuration = configuration
+        }
         signInButton.accessibilityLabel = "Sign in"
         signInButton.isHidden = true
         signInButton.addTarget(self, action: #selector(nativeSignInTapped), for: .touchUpInside)
@@ -656,13 +751,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         authCloseButton.isHidden = true
         authCloseButton.addTarget(self, action: #selector(closeAuthDrawerTapped), for: .touchUpInside)
 
-        authTitleLabel.font = .systemFont(ofSize: 22, weight: .bold)
+        authTitleLabel.font = MarketelFont.dmSans(.bold, size: 22)
         authTitleLabel.textColor = .label
         authTitleLabel.numberOfLines = 0
-        authMessageLabel.font = .systemFont(ofSize: 15)
+        authMessageLabel.font = MarketelFont.dmSans(.regular, size: 15)
         authMessageLabel.textColor = .secondaryLabel
         authMessageLabel.numberOfLines = 0
-        authErrorLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        authErrorLabel.font = MarketelFont.dmSans(.medium, size: 14)
         authErrorLabel.textColor = UIColor(red: 170 / 255, green: 56 / 255, blue: 43 / 255, alpha: 1)
         authErrorLabel.numberOfLines = 0
         authErrorLabel.isHidden = true
@@ -674,8 +769,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             field.layer.cornerCurve = .continuous
             field.layer.borderWidth = 1
             field.layer.borderColor = UIColor(red: 216 / 255, green: 228 / 255, blue: 220 / 255, alpha: 1).cgColor
-            field.font = .systemFont(ofSize: 17)
+            field.font = MarketelFont.dmSans(.regular, size: 17)
             field.textColor = .label
+            // Neither keyboard has a way down on its own (the number pad has no
+            // return key), so both get the same Done bar the web fields show.
+            let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+            toolbar.items = [
+                UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(dismissAuthKeyboard))
+            ]
+            toolbar.sizeToFit()
+            field.inputAccessoryView = toolbar
             field.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
             field.leftViewMode = .always
             field.delegate = self
@@ -767,8 +871,11 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         guard open != authDrawerOpen else { return }
         authDrawerOpen = open
         // The page behind cannot be touched while the banner is a form, the same
-        // way the web makes its report inert under the expanded header.
-        webView?.isUserInteractionEnabled = !open
+        // way the web makes its report inert under the expanded header. Only
+        // the scroll view: Capacitor makes the web view this controller's root
+        // view, so disabling the web view itself disabled the glass bar inside
+        // it too, which is why neither Send nor the close button responded.
+        webView?.scrollView.isUserInteractionEnabled = !open
         if open {
             authDrawer.isHidden = false
             authDrawer.alpha = 0
@@ -915,6 +1022,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         authEmailField.becomeFirstResponder()
     }
 
+    @objc private func dismissAuthKeyboard() {
+        view.endEditing(true)
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         if textField === authEmailField { submitAuthEmail() }
         return false
@@ -933,7 +1044,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         ) {
             self.inspectProductName = product
             self.setShellProduct(.inspect)
-            self.propertyNameLabel.text = product
+            self.inspectWedgeLabel.text = product
             self.propertyHeaderControl.accessibilityLabel = "Switch tool, \(product)"
         }
     }
@@ -1082,6 +1193,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         switch product {
         case .frontDesk:
             productNameLabel.text = "Front Desk"
+            frontDeskBrandRow.isHidden = false
+            inspectBrandRow.isHidden = true
             propertyNameLabel.isHidden = false
             propertyChevron.isHidden = false
             propertyHeaderControl.isUserInteractionEnabled = true
@@ -1100,12 +1213,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 tabBar.selectedItem = yourPageTabItem
             }
         case .inspect:
-            productNameLabel.text = "Marketel"
-            propertyNameLabel.text = inspectProductName
-            propertyNameLabel.isHidden = false
-            // The brand leads back to the tool chooser, the way it switches
-            // property in Front Desk.
-            propertyChevron.isHidden = false
+            // The brand leads back to the tool chooser, like the web header's
+            // brand link; it switches property in Front Desk.
+            frontDeskBrandRow.isHidden = true
+            inspectBrandRow.isHidden = false
+            inspectWedgeLabel.text = inspectProductName
+            inspectWedgeLabel.isHidden = false
             propertyHeaderControl.accessibilityLabel = "Switch tool, \(inspectProductName)"
             qrButton.isHidden = true
             trialStatusBadge.isHidden = true
@@ -1114,9 +1227,9 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             tabBar.items = [inspectReportsTabItem, inspectCurrentTabItem, inspectPropertiesTabItem]
             tabBar.selectedItem = inspectCurrentTabItem
         case .chooser:
-            productNameLabel.text = "Marketel"
-            propertyNameLabel.isHidden = true
-            propertyChevron.isHidden = true
+            frontDeskBrandRow.isHidden = true
+            inspectBrandRow.isHidden = false
+            inspectWedgeLabel.isHidden = true
             propertyHeaderControl.accessibilityLabel = "Marketel"
             qrButton.isHidden = true
             trialStatusBadge.isHidden = true
@@ -1611,7 +1724,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         // its own: there is no account yet for tabs or a menu to point at.
         let signedOutInspect = shellProduct == .inspect && !inspectAuthenticated
         let barOnly = shellProduct == .chooser || signedOutInspect
-        statusBarBackdrop.isHidden = !visible
+        // Only Front Desk paints a flat strip behind the status bar. Inspect
+        // pages carry their own glow up under it; a flat strip over that read
+        // as a white band at the top of the screen.
+        statusBarBackdrop.isHidden = !visible || shellProduct != .frontDesk
         topBar.isHidden = !visible
         menuButton.isHidden = !visible || barOnly
         menuSlot.isHidden = barOnly

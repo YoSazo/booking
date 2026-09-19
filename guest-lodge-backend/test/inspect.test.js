@@ -479,6 +479,10 @@ test('the app signs in through its glass banner and never inerts a page behind a
     assert.match(chooser, /sessionStorage\.setItem\('marketel\.enter', '1'\)/);
     assert.match(client, /sessionStorage\.getItem\('marketel\.enter'\)/);
     assert.match(css, /html\.wedge-enter \.hero > \*/);
+    // One continuous colour under the status bar in the app.
+    assert.match(css, /\.native-inspect-shell body::after \{[^}]*clip-path: inset\(0 0 calc\(100% - env\(safe-area-inset-top/);
+    assert.match(chooser, /body::after \{[^}]*clip-path: inset\(0 0 calc\(100% - env\(safe-area-inset-top/);
+    assert.match(css, /\.native-inspect-shell \.hero #sign-in \{ margin-top: 12px;/);
 });
 
 test('the landing defers pricing by one transparent tap without opening checkout', () => {

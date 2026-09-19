@@ -113,6 +113,19 @@ expect(delegate, /case "inspectAuth":[\s\S]{0,400}case "inspectAuthResult":/,
   'The native shell does not open the glass sign-in drawer');
 expect(delegate, /case "chooserState":/,
   'The native shell does not show its glass bar over the tool chooser');
+// Capacitor makes the web view the controller's root view, so the native bar
+// lives inside it: disabling the web view kills every control in the bar.
+if (/webView\?\.isUserInteractionEnabled\s*=/.test(delegate)) {
+  failures.push('Never disable the whole web view: the native glass bar is inside it');
+}
+expect(delegate, /inputAccessoryView = toolbar/,
+  'Native sign-in fields need a Done bar to dismiss the keyboard');
+for (const file of ['DMSans-Regular', 'DMSans-Medium', 'DMSans-Bold']) {
+  if (!fs.existsSync(path.resolve(root, `www/native-fonts/${file}.ttf`))) failures.push(`Missing www/native-fonts/${file}.ttf`);
+}
+if (!fs.existsSync(path.resolve(root, 'ios/App/App/Assets.xcassets/MarketelWordmark.imageset/marketel-wordmark.svg'))) {
+  failures.push('Missing the Marketel wordmark asset for the native banner');
+}
 const bundledAssetsPath = path.resolve(root, 'www/frontdesk/assets');
 const bundledAssets = fs.existsSync(bundledAssetsPath)
   ? fs.readdirSync(bundledAssetsPath)
