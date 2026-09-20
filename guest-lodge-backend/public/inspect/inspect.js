@@ -471,7 +471,6 @@ const LANDING_ARMS = {
     type: 'damage',
     // Free to build; paid when the finished report is sent. The ask lands at
     // the moment someone has just seen their own report, in the same session.
-    offer: { mode: 'pay-at-export', reportPrice: 12 },
     golden: {
       headline: 'Document guest damage <span class="green">before the claim window closes.</span>',
       sub: 'Build a dated, photo-by-photo damage report in under 3 minutes.',
@@ -542,9 +541,20 @@ const toolId = () => { const arm = landingArm(); return Object.keys(LANDING_ARMS
 const toolForType = type => Object.keys(TOOL_TYPES).find(tool => TOOL_TYPES[tool].includes(type)) || 'inspect';
 const toolTypesQuery = () => `types=${TOOL_TYPES[toolId()].join(',')}`;
 // A tool is either 'first-free' (one lifetime free finalized report) or
-// 'pay-at-export' (free to build, paid when a finished report is sent).
-const payAtExport = () => landingArm()?.offer?.mode === 'pay-at-export';
-const reportPrice = () => landingArm()?.offer?.reportPrice || 0;
+// 'pay-at-export' (free to build, paid when a finished report is sent). The
+// two are independent of the single-report price: a first-free tool gives the
+// first one away and then sells the next at the same impulse price, because
+// the alternative at that moment is a monthly subscription — and asking a cold
+// click for a subscription is the shape that produced nothing on the booking
+// funnel. Mirrors TOOLS in inspect.js; keep the two in step.
+const TOOL_OFFERS = Object.freeze({
+  inspect: Object.freeze({ mode: 'first-free', reportPrice: 12 }),
+  claims: Object.freeze({ mode: 'pay-at-export', reportPrice: 12 }),
+  incident: Object.freeze({ mode: 'first-free', reportPrice: 12 }),
+});
+const toolOffer = () => TOOL_OFFERS[toolId()] || TOOL_OFFERS.inspect;
+const payAtExport = () => toolOffer().mode === 'pay-at-export';
+const reportPrice = () => toolOffer().reportPrice || 0;
 const canSend = () => !!account && ((account.active && account.remaining > 0) || account.credits > 0 || (!payAtExport() && account.freeAvailable));
 const storedEmail = () => { try { return localStorage.getItem('inspect.email') || ''; } catch { return ''; } };
 // Each step a visitor takes, per tool, before and after sign-in. Never content:

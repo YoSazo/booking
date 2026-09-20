@@ -560,13 +560,24 @@ test('a single Claims report is sold once, at the price the page shows, and retu
     assert.ok(h.calls.events.some(event => event.name === 'CheckoutStarted' && event.tool === 'claims' && event.detail === 'report'));
   } finally { h.registration.close(); }
 
-  // A tool without a single-report price refuses rather than inventing one.
+  // Every tool sells a single report now, at the same impulse price. A
+  // first-free tool still gives the first one away — that is offerMode, which
+  // is independent of whether the next one can be bought outright — but the
+  // wall after it is $12 rather than a monthly subscription.
   const inspect = moneyHarness({ report: { document: { propertyName: 'Oak', type: 'routine', date: '2026-09-19', author: 'Sam', rooms: [], signatures: [] } } });
   try {
     const response = await request(inspect.app, '/api/inspect/checkout', { method: 'POST', headers: inspect.headers, body: JSON.stringify({ interval: 'report', reportId: 'rep_1' }) });
-    assert.equal(response.status, 400);
-    assert.equal(inspect.calls.sessions.length, 0);
+    assert.equal(response.status, 200);
+    assert.equal(inspect.calls.sessions.length, 1);
+    const line = inspect.calls.sessions[0].params.line_items[0];
+    assert.equal(line.price_data.unit_amount, 1200);
+    assert.match(line.price_data.product_data.name, /Marketel Inspect report/);
   } finally { inspect.registration.close(); }
+
+  // The guard that refuses an unpriced tool still exists, so adding a tool
+  // without a price cannot silently invent one.
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  assert.match(src, /if \(!amount\) throw fail\(400, 'Single reports are not sold for this tool\.'\)/);
 });
 
 test('a paid single report grants exactly one credit, however often Stripe delivers it', async () => {
@@ -862,6 +873,48 @@ function rawInterpolations(src) {
   }
   return bad;
 }
+
+test('every tool sells a single report, and the free first one survives it', () => {
+    const fsx=require('node:fs'), pathx=require('node:path');
+    const root=pathx.join(__dirname,'..');
+    const server=fsx.readFileSync(pathx.join(root,'inspect.js'),'utf8');
+    const client=fsx.readFileSync(pathx.join(root,'public','inspect','inspect.js'),'utf8');
+
+    // The offer used to hang off the landing arm, but /inspect/ has no arm
+    // entry — landingArm() is null there — so Inspect could never be priced.
+    // It belongs to the tool, beside the types.
+    assert.match(client, /const TOOL_OFFERS = Object\.freeze\(\{/);
+    assert.match(client, /const payAtExport = \(\) => toolOffer\(\)\.mode === 'pay-at-export'/);
+    assert.match(client, /const reportPrice = \(\) => toolOffer\(\)\.reportPrice \|\| 0/);
+    assert.doesNotMatch(client, /landingArm\(\)\?\.offer/);
+
+    // Two tables describe the same three tools; drift between them is a
+    // priced page that cannot take the payment, or the reverse.
+    const readTools = (src, re) => Object.fromEntries([...src.matchAll(re)].map(m => [m[1], m[2]]));
+    const serverTools = readTools(server, /^  (\w+): Object\.freeze\(\{[^}]*offerMode: '([\w-]+)'/gm);
+    const clientTools = readTools(client, /^  (\w+): Object\.freeze\(\{ mode: '([\w-]+)'/gm);
+    assert.deepEqual(clientTools, serverTools, 'client and server offer modes must agree');
+
+    const price = (src, re) => Object.fromEntries([...src.matchAll(re)].map(m => [m[1], Number(m[2])]));
+    const serverPrices = price(server, /^  (\w+): Object\.freeze\(\{[^}]*reportPrice: (\d+)/gm);
+    const clientPrices = price(client, /^  (\w+): Object\.freeze\(\{[^}]*reportPrice: (\d+)/gm);
+    assert.deepEqual(Object.keys(serverPrices).sort(), ['claims','incident','inspect']);
+    for (const [tool, cents] of Object.entries(serverPrices)) {
+        assert.equal(cents, clientPrices[tool] * 100, `${tool}: server cents must match the client's dollars`);
+    }
+
+    // offerMode is independent of the price. A first-free tool still gives the
+    // first report away; what changed is that the wall after it is $12 rather
+    // than a monthly subscription — the shape that sold nothing on booking.
+    assert.match(serverTools.inspect, /first-free/);
+    assert.match(serverTools.incident, /first-free/);
+    assert.match(serverTools.claims, /pay-at-export/);
+    assert.match(client, /\(!payAtExport\(\) && account\.freeAvailable\)/,
+        'the free first report must not depend on the tool being unpriced');
+    // Finalize spends the free report first, then plan allowance, then a
+    // bought credit — credits work for a first-free tool too.
+    assert.match(server, /offerMode === 'first-free' && access\.freeAvailable \? \{ freeReportUsed: true \}[\s\S]{0,200}reportCredits: \{ decrement: 1 \}/);
+});
 
 test('no template expression ships to the screen as literal text', () => {
     const fsx=require('node:fs'), pathx=require('node:path');

@@ -46,9 +46,9 @@ const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident'
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
 const TOOLS = Object.freeze({
-  inspect: Object.freeze({ types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', label: 'Marketel Inspect', home: '/inspect/' }),
+  inspect: Object.freeze({ types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Inspect', home: '/inspect/' }),
   claims: Object.freeze({ types: ['damage'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
-  incident: Object.freeze({ types: ['incident'], offerMode: 'first-free', label: 'Marketel Incident', home: '/incident' }),
+  incident: Object.freeze({ types: ['incident'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Incident', home: '/incident' }),
 });
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
 const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
