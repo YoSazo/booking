@@ -967,6 +967,28 @@ test('a report can say where it was made, without claiming more than it knows', 
     // And iOS denies silently without a usage description.
     assert.match(shell, /<key>NSLocationWhenInUseUsageDescription<\/key>/);
 
+    // A fix has no time until the server gives it one, so the preview rendered
+    // new Date(undefined) and printed "Invalid Date" on a real device. Showing
+    // the device's own clock instead would defeat the reason it is stamped
+    // server-side at all, so the time is simply withheld until it is real.
+    const preview=client.slice(client.indexOf('const fixStamp ='), client.indexOf('function signaturePreview'));
+    const escLocal=v=>String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+    const {locationPreview}=new Function('esc', preview+'; return {locationPreview};')(escLocal);
+    const unsaved=locationPreview({location:{start:{lat:41.8781234,lon:-87.6298123,accuracy:8.437}}});
+    assert.doesNotMatch(unsaved, /Invalid Date/);
+    assert.match(unsaved, /time recorded when you save/);
+    assert.match(unsaved, /±8 m/, 'accuracy is rounded, not printed to three decimals');
+    assert.doesNotMatch(unsaved, /On site/, 'a duration needs two real times');
+    const saved=locationPreview({location:{
+        start:{lat:41.878123,lon:-87.629812,accuracy:8,at:'2026-09-20T21:02:00.000Z'},
+        end:{lat:41.878140,lon:-87.629790,accuracy:12,at:'2026-09-20T22:41:00.000Z'}}});
+    assert.match(saved, /On site 1h 39m/);
+    assert.doesNotMatch(saved, /time recorded when you save|Invalid Date/);
+    assert.doesNotMatch(locationPreview({location:{start:{lat:1,lon:2,accuracy:3,at:'not-a-date'}}}), /Invalid Date/);
+    // The PDF must never carry it either, whatever is stored.
+    const lines=new Function(server.slice(server.indexOf("const LOCATION_NOTE ="), server.indexOf('const signaturesHtml'))+'; return locationLines;')();
+    assert.doesNotMatch(lines({location:{start:{lat:1,lon:2,accuracy:3}}}).join(' '), /Invalid Date/);
+
     // Capture must never be able to stop someone finishing a report.
     const capture=client.slice(client.indexOf('const LOCATION_TIMEOUT'), client.indexOf('const newDocument'));
     assert.match(capture, /if\(!navigator\.geolocation\)return Promise\.resolve\(null\)/);

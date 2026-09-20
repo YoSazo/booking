@@ -1374,7 +1374,11 @@ function reviewVoiceNote(index,result){
   const accept=mode=>{const room=draft.document.rooms[index];room.observation=mode==='append'&&room.observation.trim()?`${room.observation.trim()}\n${result.suggestion}`:result.suggestion;if(result.issueMentioned)room.issue=true;remember();kept=true;$('dialog').close();editor();};
   $('replace-note').onclick=()=>accept('replace');$('append-note').onclick=()=>accept('append');$('discard-note').onclick=()=>$('dialog').close();
 }
-const fixLabel = fix => `${fix.lat.toFixed(5)}, ${fix.lon.toFixed(5)} · ±${fix.accuracy} m · ${new Date(fix.at).toLocaleString()}`;
+const fixStamp = fix => {
+  const at = fix?.at ? new Date(fix.at) : null;
+  return at && !Number.isNaN(at.getTime()) ? at.toLocaleString() : 'time recorded when you save';
+};
+const fixLabel = fix => `${fix.lat.toFixed(5)}, ${fix.lon.toFixed(5)} · ±${Math.round(fix.accuracy)} m · ${fixStamp(fix)}`;
 function locationPreview(document){
   const location=document?.location;
   if(!location||(!location.start&&!location.end))return '';
@@ -1382,8 +1386,9 @@ function locationPreview(document){
   if(location.start)rows.push(['Started',location.start]);
   if(location.end)rows.push(['Completed',location.end]);
   let onSite='';
-  if(location.start?.at&&location.end?.at){
-    const minutes=Math.round((new Date(location.end.at)-new Date(location.start.at))/60000);
+  const started=location.start?.at?new Date(location.start.at):null, ended=location.end?.at?new Date(location.end.at):null;
+  if(started&&ended&&!Number.isNaN(started.getTime())&&!Number.isNaN(ended.getTime())){
+    const minutes=Math.round((ended-started)/60000);
     if(minutes>0)onSite=`<p class="muted">On site ${Math.floor(minutes/60)}h ${minutes%60}m</p>`;
   }
   return `<section class="location-block">${rows.map(([label,fix])=>`<p><strong>${label}</strong> <span class="muted">${esc(fixLabel(fix))}</span></p>`).join('')}${onSite}<p><small>Location and times as reported by the device. Coordinates are not verified.</small></p></section>`;

@@ -452,8 +452,14 @@ function registerInspect(app, {
 };
 const disclaimerFor = type => DISCLAIMER[type] || DISCLAIMER.default;
 const LOCATION_NOTE = 'Location and times as reported by the device. Coordinates are not verified.';
-const fixTime = fix => new Date(fix.at).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
-const fixText = fix => `${fix.lat.toFixed(6)}, ${fix.lon.toFixed(6)} (+/-${fix.accuracy} m) at ${fixTime(fix)}`;
+const fixTime = fix => {
+  const at = fix?.at ? new Date(fix.at) : null;
+  return at && !Number.isNaN(at.getTime()) ? at.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '';
+};
+const fixText = fix => {
+  const when = fixTime(fix);
+  return `${fix.lat.toFixed(6)}, ${fix.lon.toFixed(6)} (+/-${fix.accuracy} m)${when ? ` at ${when}` : ''}`;
+};
 function locationLines(document) {
   const location = document?.location;
   if (!location) return [];
