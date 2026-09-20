@@ -25,6 +25,30 @@ const LIMITS = Object.freeze({
 // A signature is stamped once, when it first appears in a stored document, and
 // keeps that time forever after. Stamping at finalize instead would claim every
 // signer put their name down at the moment the report was frozen.
+const LOCATION_ACCURACY_LIMIT = 2000;
+function validateFix(input, at) {
+  if (input == null) return undefined;
+  const lat = Number(input.lat), lon = Number(input.lon), accuracy = Number(input.accuracy);
+  if (![lat, lon, accuracy].every(Number.isFinite)) throw fail(400, 'Invalid location.');
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180 || accuracy < 0) throw fail(400, 'Invalid location.');
+  if (accuracy > LOCATION_ACCURACY_LIMIT) return undefined;
+  const round = value => Math.round(value * 1e6) / 1e6;
+  return { lat: round(lat), lon: round(lon), accuracy: Math.round(accuracy), at: at.toISOString() };
+}
+// A fix already stored keeps the time it was received; only one arriving for
+// the first time is stamped now. Without this, every save would move the
+// arrival time forward to the last edit.
+function stampLocation(next, previous, at = new Date()) {
+  if (!next) return undefined;
+  const keep = (fresh, older) => {
+    if (!fresh) return older;
+    return older && older.lat === fresh.lat && older.lon === fresh.lon ? older : fresh;
+  };
+  const start = keep(validateFix(next.start, at), previous?.start);
+  const end = keep(validateFix(next.end, at), previous?.end);
+  if (!start && !end) return undefined;
+  return { ...(start ? { start } : {}), ...(end ? { end } : {}) };
+}
 function stampSignatures(next, previous, at = new Date()) {
   const seen = new Map((Array.isArray(previous) ? previous : []).map(s => [`${s.role}:${s.name}:${JSON.stringify(s.strokes)}`, s.signedAt]));
   return next.map(signature => ({
@@ -166,6 +190,9 @@ function validateDocument(input) {
     document.eventTime = eventTime;
   }
   if (input.signatures != null) document.signatures = validateSignatures(input.signatures, input.type);
+  // Kept raw here and stamped in the PUT and finalize paths, where the
+  // previously stored fix is available to compare against.
+  if (input.location != null && typeof input.location === 'object') document.location = input.location;
   return document;
 }
 
@@ -424,6 +451,22 @@ function registerInspect(app, {
   default: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
 };
 const disclaimerFor = type => DISCLAIMER[type] || DISCLAIMER.default;
+const LOCATION_NOTE = 'Location and times as reported by the device. Coordinates are not verified.';
+const fixTime = fix => new Date(fix.at).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+const fixText = fix => `${fix.lat.toFixed(6)}, ${fix.lon.toFixed(6)} (+/-${fix.accuracy} m) at ${fixTime(fix)}`;
+function locationLines(document) {
+  const location = document?.location;
+  if (!location) return [];
+  const lines = [];
+  if (location.start) lines.push(`Started: ${fixText(location.start)}`);
+  if (location.end) lines.push(`Completed: ${fixText(location.end)}`);
+  if (location.start && location.end) {
+    const minutes = Math.round((new Date(location.end.at) - new Date(location.start.at)) / 60000);
+    if (minutes > 0) lines.push(`On site: ${Math.floor(minutes / 60)}h ${minutes % 60}m`);
+  }
+  if (lines.length) lines.push(LOCATION_NOTE);
+  return lines;
+}
 const signaturesHtml = document => (document.signatures || []).map(signature => `<section class="signature"><h3>${safe(roleLabel(signature.role))} signature</h3>${signatureSvg(signature)}<p>${safe(signature.name)} · Signed ${safe(signature.signedAt || 'when this document was finalized')}</p></section>`).join('');
   const roomHtml = (room, report, photoPrefix, heading = '') => `<section>${heading}<h2>${safe(room.name)}${room.issue ? ' · Issue noted' : ''}</h2><p>${safe(room.observation || 'No observation recorded.')}</p>${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${report.attachments.find(a => a.id === id)?.source === 'camera' ? 'Camera capture' : 'Imported photo'} · Upload date recorded separately</figcaption></figure>`).join('')}</section>`;
   const claimAiUse = async (accountId, reportId) => prisma.$transaction(async tx => {
@@ -569,7 +612,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       ? `<header style="display:flex;align-items:center;gap:14px;margin:0 0 18px">${d.business.logoKey ? `<img src="${req.params.token}/logo" alt="" style="max-height:56px;max-width:160px">` : ''}<strong style="font-size:22px">${safe(d.business.name)}</strong></header>`
       : '';
     res.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(d.date)}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}</p>` : ''}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
+    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}.location{margin:2px 0;font-size:13px;color:#587064}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(d.date)}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}</p>` : ''}${locationLines(d).map(line => `<p class="location">${safe(line)}</p>`).join('')}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
   }));
   router.get('/shared/:token/logo', guarded(async (req, res) => {
     const r = await shared(req.params.token);
@@ -628,6 +671,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const legacy = report.document.type !== 'incident' && report.document.type !== 'damage';
     doc.fontSize(11).text(`${legacy ? report.document.type : typeLabel(report.document.type)} | ${report.document.date}${report.document.eventTime ? ` | ${report.document.type === 'damage' ? 'found' : 'occurred'} ${report.document.eventTime}` : ''} | ${report.document.author}`);
     doc.moveDown().fontSize(9).text(disclaimerFor(report.document.type));
+    const located = locationLines(report.document);
+    if (located.length) { doc.moveDown(.5); for (const line of located) doc.fontSize(9).text(line); }
     try {
       if (report.baselineReport) {
         doc.moveDown().fontSize(10).text(legacy
@@ -884,6 +929,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const row = await owned(tx, req.inspect.id, req.params.id); mutable(row);
       if (document.rooms.some(r => r.photos.some(id => !row.attachments.some(a => a.id === id)))) throw fail(400, 'A photo has not finished uploading.');
       if (document.signatures) document.signatures = stampSignatures(document.signatures, row.document?.signatures);
+      const located = stampLocation(document.location, row.document?.location);
+      if (located) document.location = located; else delete document.location;
       const kept = new Set(document.rooms.flatMap(r => r.photos));
       const removed = row.attachments.filter(a => !kept.has(a.id));
       if (removed.length) {
@@ -1158,6 +1205,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const finalizedDocument = {
         ...document,
         ...(document.signatures ? { signatures: stampSignatures(document.signatures, r.document?.signatures, finalizedAt) } : {}),
+        // The completion fix is seen for the first time here, so it carries
+        // the finalize time — which is exactly what it is claiming.
+        ...(() => { const located = stampLocation(document.location, r.document?.location, finalizedAt); return located ? { location: located } : {}; })(),
         ...(a.businessName || a.logoKey ? { business: { name: a.businessName || '', logoKey: a.logoKey || '' } } : {}),
       };
       const finalized = await tx.inspectReport.update({ where: { id: r.id }, data: { document: finalizedDocument, finalizedAt }, include: {

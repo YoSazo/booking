@@ -34,6 +34,8 @@
 	<string>Marketel uses the camera only when you choose to add a report, property, or room photo.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Front Desk lets you save the Marketel messaging number as a contact.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Marketel records where a report was started and finished, so the finished document can show the location it was made. Reports still work if you decline.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Marketel Inspect uses the microphone only while you choose to dictate a room observation.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -916,6 +916,68 @@ test('every tool sells a single report, and the free first one survives it', () 
     assert.match(server, /offerMode === 'first-free' && access\.freeAvailable \? \{ freeReportUsed: true \}[\s\S]{0,200}reportCredits: \{ decrement: 1 \}/);
 });
 
+test('a report can say where it was made, without claiming more than it knows', () => {
+    const fsx=require('node:fs'), pathx=require('node:path');
+    const root=pathx.join(__dirname,'..');
+    const server=fsx.readFileSync(pathx.join(root,'inspect.js'),'utf8');
+    const client=fsx.readFileSync(pathx.join(root,'public','inspect','inspect.js'),'utf8');
+    const shell=fsx.readFileSync(pathx.join(root,'..','marketel-frontdesk-ios','ios','App','App','Info.plist'),'utf8');
+    const serverJs=fsx.readFileSync(pathx.join(root,'server.js'),'utf8');
+
+    // Run the real validator rather than asserting on its spelling.
+    const block=server.slice(server.indexOf('const LOCATION_ACCURACY_LIMIT'), server.indexOf('function stampSignatures'));
+    const failLocal=(code,message)=>Object.assign(new Error(message),{status:code});
+    const {validateFix,stampLocation}=new Function('fail', block+'; return {validateFix,stampLocation};')(failLocal);
+    const T0=new Date('2026-09-20T21:02:00Z'), T1=new Date('2026-09-20T22:41:00Z');
+    const fix={lat:41.8781234567,lon:-87.6298123,accuracy:8.4};
+
+    // The time is ours. A client-supplied clock is not evidence of anything,
+    // which is why signatures are stamped server-side for the same reason.
+    assert.equal(validateFix({...fix,at:'1999-01-01T00:00:00.000Z'},T0).at, T0.toISOString());
+    assert.equal(validateFix(fix,T0).lat, 41.878123, 'six decimal places is ~0.1 m; more is false precision');
+
+    // A fix vaguer than two kilometres says nothing about being at a property.
+    assert.equal(validateFix({...fix,accuracy:5000},T0), undefined);
+    assert.equal(validateFix(null,T0), undefined);
+    for (const bad of [{lat:91,lon:0,accuracy:5},{lat:0,lon:181,accuracy:5},{lat:'x',lon:0,accuracy:5},{lat:0,lon:0,accuracy:-1}]) {
+        assert.throws(() => validateFix(bad,T0), /Invalid location/, `accepted ${JSON.stringify(bad)}`);
+    }
+
+    // Arrival must survive every later save, or each edit would drag the
+    // arrival time forward and the on-site duration would collapse to zero.
+    const first=stampLocation({start:fix},undefined,T0);
+    const later=stampLocation({start:fix,end:{...fix,accuracy:12}},first,T1);
+    assert.equal(later.start.at, first.start.at, 'the arrival time must not move');
+    assert.equal(later.end.at, T1.toISOString(), 'a completion fix is stamped when it first appears');
+    // A genuinely different coordinate is a new fix and gets a new time.
+    assert.equal(stampLocation({start:{lat:40,lon:-80,accuracy:9}},first,T1).start.at, T1.toISOString());
+    assert.equal(stampLocation({start:{...fix,accuracy:9999}},undefined,T0), undefined);
+
+    // Both artifacts that leave the product carry it, and neither calls it proof.
+    assert.match(server, /const LOCATION_NOTE = 'Location and times as reported by the device\. Coordinates are not verified\.'/);
+    assert.match(server, /locationLines\(d\)\.map/, 'the share page must render it');
+    assert.match(server, /const located = locationLines\(report\.document\)/, 'the PDF must render it');
+    assert.doesNotMatch(server, /\bLOCATION_NOTE[\s\S]{0,400}\bproof\b/i);
+
+    // The same empty-allowlist trap as the microphone: geolocation=() disables
+    // it for every origin including this one.
+    const policy=(serverJs.match(/setHeader\('Permissions-Policy', '[^']+'\)/g)||[]).join(' ');
+    assert.match(policy, /geolocation=\(self\)/);
+    assert.doesNotMatch(policy, /geolocation=\(\)/);
+    // And iOS denies silently without a usage description.
+    assert.match(shell, /<key>NSLocationWhenInUseUsageDescription<\/key>/);
+
+    // Capture must never be able to stop someone finishing a report.
+    const capture=client.slice(client.indexOf('const LOCATION_TIMEOUT'), client.indexOf('const newDocument'));
+    assert.match(capture, /if\(!navigator\.geolocation\)return Promise\.resolve\(null\)/);
+    assert.match(capture, /setTimeout\(\(\)=>finish\(null\),LOCATION_TIMEOUT\+1000\)/, 'a webview may ignore the built-in timeout');
+    assert.match(capture, /\}catch\{ finish\(null\); \}/);
+    assert.match(capture, /\.catch\(\(\)=>\{\}\)/);
+    // Recorded at the start of a report and at the end of every send path.
+    assert.equal(client.split("markLocation('start')").length - 1, 2, 'both places a draft is created');
+    assert.equal(client.split("markLocation('end')").length - 1, 2, 'both the paid and the free finalize path');
+});
+
 test('no template expression ships to the screen as literal text', () => {
     const fsx=require('node:fs'), pathx=require('node:path');
     const root=pathx.join(__dirname,'..');

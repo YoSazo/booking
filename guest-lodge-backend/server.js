@@ -1264,7 +1264,10 @@ function inspectGate(req, res, next) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(self), payment=()');
+    // Same empty-allowlist trap as the microphone: geolocation=() disables it
+    // for every origin including this one, so navigator.geolocation was dead
+    // on arrival in Chrome. A report says where it was made now.
+    res.setHeader('Permissions-Policy', 'geolocation=(self), microphone=(self), payment=()');
     next();
 }
 

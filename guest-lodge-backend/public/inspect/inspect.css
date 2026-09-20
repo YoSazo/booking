@@ -408,3 +408,8 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 /* The hint under each delivery choice. Tight to its button so the pair reads
    as one option rather than as a button and a loose sentence. */
 .delivery-hint { margin: -4px 0 6px; font-size: 12px; }
+/* Where the report says it was made. Quiet by design — it corroborates the
+   property name rather than competing with it. */
+.location-block { margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--green-pale); }
+.location-block p { margin: 2px 0; font-size: 13px; }
+.location-block small { color: var(--muted); font-size: 11px; }

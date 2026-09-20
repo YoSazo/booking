@@ -111,6 +111,41 @@ const nextRoomName = rooms => {
   const w = wedge(draft?.document?.type);
   return w.seeds.find(name => !used.has(name.toLowerCase())) || (w.noun[0].toUpperCase() + w.noun.slice(1));
 };
+// Where the report was made. Never blocking: a refusal, a timeout or a
+// browser without geolocation all resolve to null and the report carries on
+// without the line. A document that cannot be finished because someone
+// declined a permission prompt is worse than one that says less.
+//
+// The server stamps the time and rejects anything vaguer than two kilometres,
+// so nothing here needs to be trusted — this only has to ask politely and
+// give up quickly.
+const LOCATION_TIMEOUT = 12000;
+function captureFix(){
+  if(!navigator.geolocation)return Promise.resolve(null);
+  return new Promise(resolve=>{
+    let settled=false;
+    const finish=value=>{ if(!settled){ settled=true; resolve(value); } };
+    // getCurrentPosition's own timeout is not always honoured in a webview.
+    setTimeout(()=>finish(null),LOCATION_TIMEOUT+1000);
+    try{
+      navigator.geolocation.getCurrentPosition(
+        position=>finish({lat:position.coords.latitude,lon:position.coords.longitude,accuracy:position.coords.accuracy}),
+        ()=>finish(null),
+        {enableHighAccuracy:true,timeout:LOCATION_TIMEOUT,maximumAge:0});
+    }catch{ finish(null); }
+  });
+}
+// Fired when a report is created and again when it is sent, so the pair says
+// arrived and finished rather than merely present at an instant. Both are
+// best-effort and neither delays the screen.
+function markLocation(which){
+  if(!draft||draft.finalizedAt)return Promise.resolve();
+  return captureFix().then(fix=>{
+    if(!fix||!draft||draft.finalizedAt)return;
+    draft.document.location={...(draft.document.location||{}),[which]:fix};
+    remember();
+  }).catch(()=>{});
+}
 const newDocument = (propertyName, type = 'routine') => ({ propertyName: propertyName || '', author: rememberedAuthor(), type, date: localDate(), rooms: [{ name: wedge(type).seeds[0], observation: '', issue: false, photos: [] }], signatures: [] });
 // Every wait on storage is bounded and the database is opened on demand, never
 // at module load. WebKit can leave indexedDB.open() pending forever, and a page
@@ -651,6 +686,7 @@ function setupFlow(){
       flow.paint(`<div class="building"><section class="loading">${esc(g.building||`Building your ${sk.doc}`)}…</section><p class="muted">${esc(property)}${business?` · ${esc(business)}`:''}</p></div>`);
       clearURLs();
       draft={document:newDocument(property,arm?.type||'routine'),files:[],serverId:null,finalizedAt:null,branding:{name:business,logo}};
+      markLocation('start');
       draft.document.date=date;
       if(!draft.document.author.trim())draft.document.author=business;
       preview=false;await persist();
@@ -682,6 +718,7 @@ async function start(propertyName = '', type) {
   if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
   if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
+  markLocation('start');
   await persist(); editor();
 }
 function editor(step) {
@@ -1337,6 +1374,20 @@ function reviewVoiceNote(index,result){
   const accept=mode=>{const room=draft.document.rooms[index];room.observation=mode==='append'&&room.observation.trim()?`${room.observation.trim()}\n${result.suggestion}`:result.suggestion;if(result.issueMentioned)room.issue=true;remember();kept=true;$('dialog').close();editor();};
   $('replace-note').onclick=()=>accept('replace');$('append-note').onclick=()=>accept('append');$('discard-note').onclick=()=>$('dialog').close();
 }
+const fixLabel = fix => `${fix.lat.toFixed(5)}, ${fix.lon.toFixed(5)} · ±${fix.accuracy} m · ${new Date(fix.at).toLocaleString()}`;
+function locationPreview(document){
+  const location=document?.location;
+  if(!location||(!location.start&&!location.end))return '';
+  const rows=[];
+  if(location.start)rows.push(['Started',location.start]);
+  if(location.end)rows.push(['Completed',location.end]);
+  let onSite='';
+  if(location.start?.at&&location.end?.at){
+    const minutes=Math.round((new Date(location.end.at)-new Date(location.start.at))/60000);
+    if(minutes>0)onSite=`<p class="muted">On site ${Math.floor(minutes/60)}h ${minutes%60}m</p>`;
+  }
+  return `<section class="location-block">${rows.map(([label,fix])=>`<p><strong>${label}</strong> <span class="muted">${esc(fixLabel(fix))}</span></p>`).join('')}${onSite}<p><small>Location and times as reported by the device. Coordinates are not verified.</small></p></section>`;
+}
 function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
@@ -1359,7 +1410,7 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${locationPreview(d)}${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div><p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
@@ -1381,6 +1432,7 @@ function reportPreview(){
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
     await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
+    await markLocation('end');
     await save();
     // The same moment as the paid path, so finishing a document looks the same
     // whichever tool made it — and the ways out of it are buttons, not a toast
@@ -1513,6 +1565,7 @@ function requestExport(action,trigger){
       await pushBranding();
       if(!draft.document.author.trim())draft.document.author=draft.branding?.name||account?.businessName||'';
       if(!draft.document.author.trim())throw new Error('Add your name in the editor before sending.');
+      await markLocation('end');
       await save();await refresh();
     } finally { veil.done(); }
     if(canSend())return finishExport(action);
