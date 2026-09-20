@@ -805,6 +805,21 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const sourceId = CLIENT_EVENTS.get(req.body.name);
     if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
     await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body));
+    // The deepest identified step before payment: a finished report, and a
+    // request to send it. Meta has no Purchase history to learn from at this
+    // budget, so this is the event worth optimising on when Purchase cannot
+    // deliver. Bucketed hourly so reopening the sheet is not a second event.
+    if (req.body.name === 'ExportOfferViewed') {
+      const tool = toolOf(req.body.tool);
+      await queueInspectCapi('AddToCart', {
+        account: req.inspect,
+        req,
+        eventId: `inspect-offer.${req.inspect.id}.${Math.floor(Date.now() / 3600000)}`,
+        value: (TOOLS[tool].reportPrice || 0) / 100,
+        currency: 'USD',
+        contentName: `${TOOLS[tool].label} ready to send`,
+      }).catch(error => console.error('Inspect offer CAPI queue failed:', error.message));
+    }
     res.json({ success: true });
   }));
   router.post('/auth/logout', guarded(async (req, res) => {

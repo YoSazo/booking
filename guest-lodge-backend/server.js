@@ -11174,7 +11174,15 @@ const FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS = [
 // inflating /funnel, the portfolio, MRR, or the acquisition report.
 const FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS = [
     'bro2theno@gmail.com',
+    'samatarsalahudeen@gmail.com',
 ];
+// Test runs use plus-aliases (owner+claims1@gmail.com), which are the same
+// mailbox. Normalize before matching so a test purchase never trains Meta.
+function normalizeExcludedEmail(email) {
+    const value = String(email || '').trim().toLowerCase();
+    const [user, domain] = value.split('@');
+    return user && domain ? `${user.split('+')[0]}@${domain}` : value;
+}
 let funnelDashboardExclusionCache = {
     expiresAt: 0,
     hotelIds: FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS,
@@ -18771,7 +18779,7 @@ require('./inspect').registerInspect(app, {
     queueCapi: queueMarketelCAPI,
     capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
     isCapiExcludedEmail: (email) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(
-        String(email || '').trim().toLowerCase()
+        normalizeExcludedEmail(email)
     ),
 });
 telemetry.setupRoutes(app);

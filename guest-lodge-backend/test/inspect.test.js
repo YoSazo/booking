@@ -489,7 +489,7 @@ test('the app signs in through its glass banner and never inerts a page behind a
 // Prisma and Stripe to watch what each route asks them to do.
 function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {} } = {}) {
   const express = require('express');
-  const calls = { accountUpdates: [], sessions: [], events: [], freeClaims: 0 };
+  const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0 };
   const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsed: false, reportsUsed: 0, reportCredits: 0,
     subscriptionStatus: null, periodEnd: null, stripeCustomerId: 'cus_1', businessName: 'Pine Stays', logoKey: 'inspect/logos/acct_1/a.png', ...accountOverrides };
   const report = { id: 'rep_1', accountId: 'acct_1', finalizedAt: null, baselineReport: null, attachments: [{ id: 'p1' }],
@@ -533,6 +533,9 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   app.use(express.json());
   const registration = registerInspect(app, {
     prisma, mail: { sendMail: async () => {} }, stripe,
+    capiConfigured: true,
+    queueCapi: async (name, payload) => { calls.capi.push({ name, value: payload.value, contentName: payload.contentName, eventId: payload.eventId }); },
+    isCapiExcludedEmail: (email) => String(email || '').includes('+qa@'),
     env: {
       INSPECT_ENABLED: 'true', INSPECT_AUTH_SECRET: 'a'.repeat(32),
       INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
@@ -651,6 +654,34 @@ test('finalizing spends the right allowance for each tool and snapshots the busi
     assert.deepEqual(h.calls.accountUpdates.at(-1), { freeReportUsed: true });
     assert.equal(h.calls.freeClaims, 1);
   } finally { h.registration.close(); }
+});
+
+test('asking to send a report is what Meta hears, when a purchase cannot be', async () => {
+  const h = moneyHarness();
+  try {
+    const seen = await request(h.app, '/api/inspect/events', { method: 'POST', headers: h.headers, body: JSON.stringify({ name: 'ExportOfferViewed', tool: 'claims', visitorId: 'v_abcdef123456' }) });
+    assert.equal(seen.status, 200);
+    const sent = h.calls.capi.filter(e => e.name === 'AddToCart');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].value, 12);
+    assert.match(sent[0].contentName, /Marketel Claims ready to send/);
+    // Reopening the sheet in the same hour carries the same event id, so Meta
+    // counts one intent however many times the sheet is opened.
+    await request(h.app, '/api/inspect/events', { method: 'POST', headers: h.headers, body: JSON.stringify({ name: 'ExportOfferViewed', tool: 'claims' }) });
+    assert.equal(new Set(h.calls.capi.map(e => e.eventId)).size, 1);
+    // A step that is not the offer stays internal.
+    await request(h.app, '/api/inspect/events', { method: 'POST', headers: h.headers, body: JSON.stringify({ name: 'ReportRevealed', tool: 'claims' }) });
+    assert.equal(h.calls.capi.filter(e => e.name === 'AddToCart').length, 2);
+  } finally { h.registration.close(); }
+});
+
+test('a test run from the owner mailbox never reaches Meta', () => {
+  const fs = require('node:fs');
+  const server = fs.readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8');
+  // Plus-aliases are the same mailbox, so a +claims1 test purchase is excluded too.
+  assert.match(server, /function normalizeExcludedEmail/);
+  assert.match(server, /isCapiExcludedEmail: \(email\) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS\.includes\(\s*normalizeExcludedEmail\(email\)/);
+  assert.match(server, /'samatarsalahudeen@gmail\.com',/);
 });
 
 test('the landing email is a lead once, reveals nothing, and ladder events keep only safe detail', async () => {

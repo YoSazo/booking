@@ -13,7 +13,14 @@ const QA_HOTEL_IDS = [
 ];
 const QA_OWNER_EMAILS = [
   'bro2theno@gmail.com',
+  'samatarsalahudeen@gmail.com',
 ];
+// Test runs use plus-aliases of the same mailbox; match on the base address.
+const normalizeOwnerEmail = (email) => {
+  const value = String(email || '').trim().toLowerCase();
+  const [user, domain] = value.split('@');
+  return user && domain ? `${user.split('+')[0]}@${domain}` : value;
+};
 const DAYS = Math.max(1, Math.min(180, Number(process.argv[2]) || 7));
 const TOKEN = process.env.MARKETEL_META_ADS_READ_TOKEN || process.env.MARKETEL_META_ACCESS_TOKEN;
 const ACCOUNT_ID = String(process.env.MARKETEL_META_AD_ACCOUNT_ID || '').replace(/^act_/, '');
@@ -399,7 +406,9 @@ const INSPECT_LADDER = ['LandingViewed', 'LeadCaptured', 'SetupStarted', 'SetupC
 const INSPECT_PRICES = { report: 12, month: 29, year: 199 };
 async function inspectToolsSection() {
   const since = new Date(Date.now() - DAYS * 86400000);
-  const qa = (await prisma.inspectAccount.findMany({ where: { email: { in: QA_OWNER_EMAILS } }, select: { id: true } })).map((a) => a.id);
+  const qa = (await prisma.inspectAccount.findMany({ select: { id: true, email: true } }))
+    .filter((a) => QA_OWNER_EMAILS.includes(normalizeOwnerEmail(a.email)))
+    .map((a) => a.id);
   const events = await prisma.inspectEvent.findMany({
     where: { createdAt: { gte: since }, tool: { not: null }, ...(qa.length ? { OR: [{ accountId: null }, { accountId: { notIn: qa } }] } : {}) },
     select: { name: true, tool: true, visitorId: true, accountId: true, detail: true },
