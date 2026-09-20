@@ -413,3 +413,14 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .location-block { margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--green-pale); }
 .location-block p { margin: 2px 0; font-size: 13px; }
 .location-block small { color: var(--muted); font-size: 11px; }
+
+/* The half of the screen the camera sheet leaves uncovered. Large targets,
+   because this is tapped one-handed while holding a phone up at a wall. */
+.camera-companion { padding-top: 4px; }
+.camera-companion h1 { font-size: 24px; margin: 6px 0 14px; }
+.camera-rooms { display: grid; gap: 8px; }
+.camera-room { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; min-height: 54px; padding: 12px 16px; text-align: left; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
+.camera-room strong { font-weight: 650; }
+.camera-room span { color: var(--muted); font-size: 13px; font-weight: 450; }
+.camera-room.is-active { background: var(--green); border-color: var(--green); color: #fff; }
+.camera-room.is-active span { color: #ffffffc2; }

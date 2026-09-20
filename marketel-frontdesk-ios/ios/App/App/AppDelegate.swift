@@ -1277,24 +1277,35 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         callWeb(function: function, argument: text)
     }
 
+    // The sheet deliberately opens at the medium detent: the half of the
+    // screen it leaves uncovered is the report itself, and the page puts the
+    // room list there so a whole property can be photographed without the
+    // camera closing once per room.
     private func presentInspectCamera(room: Int) {
         guard presentedViewController == nil else { return }
-        let camera = MarketelInspectCameraViewController { [weak self] dataUrl in
+        let camera = MarketelInspectCameraViewController(room: room) { [weak self] dataUrl, capturedRoom in
             guard let self else { return }
-            let payload: [String: Any] = ["room": room, "dataUrl": dataUrl]
+            // capturedRoom, not the room this was opened with — it may have
+            // been changed from the list above the sheet since.
+            let payload: [String: Any] = ["room": capturedRoom, "dataUrl": dataUrl]
             guard
                 let json = try? JSONSerialization.data(withJSONObject: payload),
                 let text = String(data: json, encoding: .utf8)
             else { return }
             self.callWeb(function: "marketelInspectPhotoCaptured", argument: text)
+        } onDismiss: { [weak self] in
+            self?.callWeb(function: "marketelInspectCameraClosed", argument: "")
         }
         camera.modalPresentationStyle = .pageSheet
         if let sheet = camera.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
+            sheet.selectedDetentIdentifier = .medium
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 28
         }
-        present(camera, animated: true)
+        present(camera, animated: true) { [weak self] in
+            self?.callWeb(function: "marketelInspectCameraOpened", argument: "\(room)")
+        }
     }
 
     @objc private func openInspectHandoff(_ notification: Notification) {
@@ -2043,6 +2054,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             dictation.stop()
         case "inspectCamera":
             presentInspectCamera(room: payload["room"] as? Int ?? 0)
+        case "inspectCameraRoom":
+            // Retarget the open camera from the room list showing above it.
+            if let camera = presentedViewController as? MarketelInspectCameraViewController {
+                camera.room = payload["room"] as? Int ?? camera.room
+                camera.roomName = payload["name"] as? String ?? ""
+            }
         case "inspectHaptic":
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         case "inspectSignOut":

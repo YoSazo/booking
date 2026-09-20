@@ -1828,6 +1828,38 @@ window.marketelInspectStorefront=country=>{storefront=country;const waiters=stor
 window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
 // Each shot arrives on its own while the sheet stays open, so the room rebuilds
 // between captures and the photo is already in the draft if the app is killed.
+// The camera sheet stops at the medium detent, and the half of the screen it
+// leaves uncovered is this page. It used to be whatever the editor happened to
+// be scrolled to — so photographing a property meant closing the camera once
+// per room just to reach the next one.
+//
+// That space becomes the room list instead. Tapping a room retargets the open
+// camera, so a whole property is one session.
+let cameraRoom=null;
+function cameraCompanion(){
+  if(cameraRoom===null||!draft)return;
+  const rooms=draft.document.rooms,w=wedge(draft.document.type);
+  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>Where do these go?</h1><div class="camera-rooms">${rooms.map((room,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(room.name)||`${esc(w.noun)} ${index+1}`}</strong><span>${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></button>`).join('')}</div><p class="muted"><small>Tap a ${esc(w.noun)} to send the next shots there. Close the camera when you are done.</small></p></section>`;
+  document.querySelectorAll('[data-camera-room]').forEach(button=>button.onclick=()=>{
+    const index=Number(button.dataset.cameraRoom);
+    if(index===cameraRoom)return;
+    cameraRoom=index;haptic();
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:draft.document.rooms[index]?.name||''});
+    cameraCompanion();
+  });
+}
+window.marketelInspectCameraOpened=raw=>{
+  if(!draft)return;
+  cameraRoom=Number(raw)||0;
+  // Name the room the shell opened on, so its caption is right before any tap.
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:draft.document.rooms[cameraRoom]?.name||''});
+  cameraCompanion();
+};
+window.marketelInspectCameraClosed=()=>{
+  if(cameraRoom===null)return;
+  cameraRoom=null;
+  if(draft&&!preview&&!draft.finalizedAt)editor('rooms');else if(draft)reportPreview();else landing();
+};
 window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   let data; try{data=JSON.parse(raw);}catch{return;}
   const i=Number(data.room);
@@ -1838,7 +1870,8 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`});
   draft.document.rooms[i].photos.push(id);
   remember();await persist();
-  if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
+  if(cameraRoom!==null)cameraCompanion();
+  else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
 },null);
 window.marketelInspectNativeSelectTab=page=>{
   // The tab bar stays visible over a sheet now, so a tap has to dismiss it first.

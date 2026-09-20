@@ -1052,6 +1052,42 @@ test('a report can say where it was made, without claiming more than it knows', 
     assert.equal(client.split("markLocation('end')").length - 1, 2, 'both the paid and the free finalize path');
 });
 
+test('the camera sheet leaves the room list usable above it', () => {
+    const fsx=require('node:fs'), pathx=require('node:path');
+    const root=pathx.join(__dirname,'..');
+    const client=fsx.readFileSync(pathx.join(root,'public','inspect','inspect.js'),'utf8');
+    const shell=fsx.readFileSync(pathx.join(root,'..','marketel-frontdesk-ios','ios','App','App','AppDelegate.swift'),'utf8');
+    const camera=fsx.readFileSync(pathx.join(root,'..','marketel-frontdesk-ios','ios','App','App','NativeCamera.swift'),'utf8');
+
+    // The sheet must stop at the medium detent or there is no page to use.
+    assert.match(shell, /sheet\.detents = \[\.medium\(\), \.large\(\)\][\s\S]{0,80}selectedDetentIdentifier = \.medium/);
+
+    // The room a shot lands in is read at capture time, not bound when the
+    // camera was presented — otherwise retargeting silently does nothing and
+    // every photo still lands in the room it opened on.
+    assert.match(camera, /var room: Int \{ didSet/);
+    assert.match(camera, /self\.onCapture\(encoded, self\.room\)/);
+    assert.doesNotMatch(shell, /"room": room, "dataUrl"/, 'the presented room must not be captured in the closure');
+    assert.match(shell, /"room": capturedRoom, "dataUrl": dataUrl/);
+    assert.match(shell, /case "inspectCameraRoom":/);
+    assert.match(shell, /camera\.room = payload\["room"\] as\? Int \?\? camera\.room/);
+
+    // Both ways out of the sheet must tell the page, or the companion stays
+    // up with no camera behind it.
+    assert.match(camera, /if isBeingDismissed \{ onDismiss\(\) \}/);
+    assert.match(shell, /marketelInspectCameraClosed/);
+    assert.match(shell, /marketelInspectCameraOpened/);
+
+    // The page side: tapping retargets, and a photo arriving updates the
+    // counts rather than repainting the editor hidden behind the sheet.
+    const companion=client.slice(client.indexOf('let cameraRoom=null'), client.indexOf('window.marketelInspectPhotoCaptured'));
+    assert.match(companion, /type:'inspectCameraRoom',room:index/);
+    assert.match(companion, /data-camera-room/);
+    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(\);/);
+    // Closing restores whatever screen the operator was actually on.
+    assert.match(companion, /cameraRoom=null;\s*if\(draft&&!preview&&!draft\.finalizedAt\)editor\('rooms'\)/);
+});
+
 test('no template expression ships to the screen as literal text', () => {
     const fsx=require('node:fs'), pathx=require('node:path');
     const root=pathx.join(__dirname,'..');

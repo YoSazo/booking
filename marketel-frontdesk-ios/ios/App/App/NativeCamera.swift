@@ -8,7 +8,11 @@ import UIKit
 // would put every photo below the 1600px the upload pipeline already keeps —
 // on a document whose whole job is proving condition.
 final class MarketelInspectCameraViewController: UIViewController {
-    private let onCapture: (String) -> Void
+    private let onCapture: (String, Int) -> Void
+    private let onDismiss: () -> Void
+    // Read at capture time, not bound at present time.
+    var room: Int { didSet { if room != oldValue { updateMessage() } } }
+    var roomName: String = "" { didSet { updateMessage() } }
     private let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "com.bookmarketel.inspect.camera")
@@ -20,8 +24,10 @@ final class MarketelInspectCameraViewController: UIViewController {
     private let message = UILabel()
     private var captured = 0
 
-    init(onCapture: @escaping (String) -> Void) {
+    init(room: Int, onCapture: @escaping (String, Int) -> Void, onDismiss: @escaping () -> Void) {
+        self.room = room
         self.onCapture = onCapture
+        self.onDismiss = onDismiss
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -44,6 +50,16 @@ final class MarketelInspectCameraViewController: UIViewController {
         sessionQueue.async { [session] in
             if session.isRunning { session.stopRunning() }
         }
+        if isBeingDismissed { onDismiss() }
+    }
+
+    // Says where the next shot lands, because the room can now be changed
+    // from the list showing above the sheet while this stays open.
+    private func updateMessage() {
+        let name = roomName.trimmingCharacters(in: .whitespacesAndNewlines)
+        message.text = name.isEmpty
+            ? "Photos are added to this room as you take them."
+            : "Photos are being added to \(name)."
     }
 
     private func buildInterface() {
@@ -244,7 +260,7 @@ extension MarketelInspectCameraViewController: AVCapturePhotoCaptureDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             self.addThumbnail(image)
-            self.onCapture(encoded)
+            self.onCapture(encoded, self.room)
         }
     }
 }
