@@ -505,6 +505,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       upsert: async ({ create }) => ({ ...account, email: create.email }),
       update: async ({ data }) => {
         calls.accountUpdates.push(data);
+        if ('stripeCustomerId' in data) account.stripeCustomerId = data.stripeCustomerId;
         if (data.reportCredits?.increment) account.reportCredits += data.reportCredits.increment;
         if (data.reportCredits?.decrement) account.reportCredits -= data.reportCredits.decrement;
         return { ...account };
@@ -524,7 +525,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const prisma = { ...db, $transaction: async callback => callback(db) };
   const stripe = {
     prices: { retrieve: async () => ({}) },
-    customers: { create: async () => ({ id: 'cus_new' }) },
+    customers: { create: async () => ({ id: 'cus_new' }), retrieve: async id => ({ id }) },
     checkout: { sessions: { create: async (params, options) => { calls.sessions.push({ params, options }); return { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }; } } },
     webhooks: { constructEvent: body => body },
     ...stripeOverrides,
@@ -581,6 +582,26 @@ test('a single Claims report is sold once, at the price the page shows, and retu
   // without a price cannot silently invent one.
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
   assert.match(src, /if \(!amount\) throw fail\(400, 'Single reports are not sold for this tool\.'\)/);
+});
+
+test('a customer id from the other Stripe mode is replaced, not a dead end', async () => {
+  const retrieved = [];
+  const h = moneyHarness({
+    account: { stripeCustomerId: 'cus_from_live_mode' },
+    stripe: { customers: {
+      retrieve: async id => { retrieved.push(id); const error = new Error(`No such customer: ${id}`); error.code = 'resource_missing'; throw error; },
+      create: async () => ({ id: 'cus_test_new' }),
+    } },
+  });
+  try {
+    const response = await request(h.app, '/api/inspect/checkout', { method: 'POST', headers: h.headers, body: JSON.stringify({ interval: 'report', reportId: 'rep_1' }) });
+    assert.equal(response.status, 200);
+    assert.deepEqual(retrieved, ['cus_from_live_mode']);
+    // The unusable id is cleared, a fresh customer is stored, checkout proceeds.
+    assert.ok(h.calls.accountUpdates.some(update => update.stripeCustomerId === null));
+    assert.ok(h.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_test_new'));
+    assert.equal(h.calls.sessions.length, 1);
+  } finally { h.registration.close(); }
 });
 
 test('a paid single report grants exactly one credit, however often Stripe delivers it', async () => {

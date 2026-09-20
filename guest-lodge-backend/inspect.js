@@ -1310,7 +1310,17 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     });
   }
   const ensureCustomer = async (tx, a) => {
-    if (a.stripeCustomerId) return a;
+    // A customer id from the other Stripe mode — or one deleted in the
+    // dashboard — is not a dead end. Switching keys used to make checkout throw
+    // "No such customer" with no way out but editing the database by hand.
+    if (a.stripeCustomerId) {
+      const existing = await stripe.customers.retrieve(a.stripeCustomerId).catch(error => {
+        if (error?.code === 'resource_missing') return null;
+        throw error;
+      });
+      if (existing && !existing.deleted) return a;
+      a = await tx.inspectAccount.update({ where: { id: a.id }, data: { stripeCustomerId: null } });
+    }
     const customer = await stripe.customers.create({ email: a.email, metadata: { product: 'marketel-inspect', inspectAccountId: a.id } }, { idempotencyKey: `inspect-customer:${a.id}` });
     return tx.inspectAccount.update({ where: { id: a.id }, data: { stripeCustomerId: customer.id } });
   };
@@ -1358,8 +1368,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const checkout = await prisma.$transaction(async tx => {
       let a = await lockAccount(tx, req.inspect.id);
       if (a.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(a.stripeSubscriptionId);
-        if (!['canceled', 'incomplete_expired'].includes(subscription.status)) throw fail(409, 'You already have a subscription. Use Manage subscription.');
+        // Same tolerance as the customer above: a subscription this Stripe mode
+        // cannot see does not block a new checkout.
+        const subscription = await stripe.subscriptions.retrieve(a.stripeSubscriptionId).catch(error => {
+          if (error?.code === 'resource_missing') return null;
+          throw error;
+        });
+        if (subscription && !['canceled', 'incomplete_expired'].includes(subscription.status)) throw fail(409, 'You already have a subscription. Use Manage subscription.');
       }
       const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
       a = await ensureCustomer(tx, a);
