@@ -76,6 +76,7 @@ const WEDGES = {
     noun: 'detail', nounPlural: 'details',
     seeds: ['What happened', 'Where it happened', 'Who was involved', 'What we did'],
     eyebrow: 'New incident record', dateLabel: 'Date of the incident',
+    shots: ['The scene, wide', 'Where it happened, close', 'Anything that caused it', 'Signage or barriers'],
     signers: { manager: 'staff', other: 'witness' },
     disclaimer: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
   },
@@ -83,6 +84,7 @@ const WEDGES = {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
     eyebrow: 'New damage report', dateLabel: 'Date you found the damage',
+    shots: ['Wide shot of the room', 'Close-up of the damage', 'Something for scale', 'Serial or label (if any)'],
     signers: { manager: 'owner', other: 'guest' },
     disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
   },
@@ -90,6 +92,7 @@ const WEDGES = {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
     eyebrow: 'New condition report', dateLabel: 'Inspection date',
+    shots: ['Wide shot of the room', 'Floor', 'Walls and ceiling', 'Fixtures and appliances'],
     signers: { manager: 'manager', other: 'resident' },
     disclaimer: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
   },
@@ -716,6 +719,7 @@ function previewPlans(){
 async function start(propertyName = '', type) {
   dismissFlow();
   if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
+  cameraShots.clear();
   if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
@@ -1836,16 +1840,52 @@ window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF expor
 // That space becomes the room list instead. Tapping a room retargets the open
 // camera, so a whole property is one session.
 let cameraRoom=null;
+// Which shot each room is up to. Kept per room, so coming back to one resumes
+// where it left off rather than starting the list again.
+const cameraShots=new Map();
+const shotStep=index=>Math.min(cameraShots.get(index)??0,(wedge(draft?.document?.type).shots||[]).length);
 function cameraCompanion(){
   if(cameraRoom===null||!draft)return;
-  const rooms=draft.document.rooms,w=wedge(draft.document.type);
-  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>Where do these go?</h1><div class="camera-rooms">${rooms.map((room,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(room.name)||`${esc(w.noun)} ${index+1}`}</strong><span>${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></button>`).join('')}</div><p class="muted"><small>Tap a ${esc(w.noun)} to send the next shots there. Close the camera when you are done.</small></p></section>`;
+  document.documentElement.classList.add('camera-open');
+  const rooms=draft.document.rooms,w=wedge(draft.document.type),shots=w.shots||[];
+  const room=rooms[cameraRoom];
+  if(!room)return;
+  const step=shotStep(cameraRoom);
+  // Now, then what is coming, then what is behind — dimmed, not ticked. None of
+  // this can see the photograph, so none of it says what a photograph shows.
+  // Three rows at most: the shot to take and the two after it. Everything
+  // already passed collapses to one line, because the sheet leaves about a
+  // third of a screen and the strip and the rooms have to fit under this.
+  const upcoming=shots.map((text,index)=>({text,index})).filter(shot=>shot.index>=step).slice(0,3);
+  const prompts=upcoming.map(shot=>{
+    const state=shot.index===step?'now':'next';
+    return `<button type="button" class="shot is-${state}" data-shot="${shot.index}"><span>${state==='now'?'Now':'Next'}</span><strong>${esc(shot.text)}</strong></button>`;
+  }).join('');
+  const done=step?`<button type="button" class="shot is-done" data-shot="${step-1}"><span>Done</span><strong>${step} of ${shots.length}${step===1?'':''} \u00b7 tap to go back</strong></button>`:'';
+  const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
+  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>${esc(room.name)||`${esc(w.noun)} ${cameraRoom+1}`} <span class="camera-count">${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></h1><div class="shots">${step>=shots.length?`<p class="shot is-now"><span>Now</span><strong>Extra angles welcome</strong></p>`:''}${prompts}${done}</div><div class="camera-rooms">${rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(item.name)||`${esc(w.noun)} ${index+1}`}</strong><span>${item.photos.length}</span></button>`).join('')}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here. Tap another ${esc(w.noun)} to send them there.</small></p>`}</div></section>`;
   document.querySelectorAll('[data-camera-room]').forEach(button=>button.onclick=()=>{
     const index=Number(button.dataset.cameraRoom);
     if(index===cameraRoom)return;
     cameraRoom=index;haptic();
     window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:draft.document.rooms[index]?.name||''});
     cameraCompanion();
+  });
+  document.querySelectorAll('[data-shot]').forEach(button=>button.onclick=()=>{
+    cameraShots.set(cameraRoom,Number(button.dataset.shot));
+    haptic();cameraCompanion();
+  });
+  // A blurred shot is worth catching here, in front of the thing, rather than
+  // at the reveal. The cross rather than the photo itself: one hand is holding
+  // the phone, and a whole-thumbnail target would fire by accident.
+  document.querySelectorAll('[data-strip-remove]').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.stripRemove,photos=draft.document.rooms[cameraRoom].photos,at=photos.indexOf(id);
+    if(at<0)return;
+    photos.splice(at,1);
+    const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}
+    draft.files=draft.files.filter(file=>file.id!==id);
+    cameraShots.set(cameraRoom,Math.max(0,shotStep(cameraRoom)-1));
+    haptic();remember();persist().catch(()=>{});cameraCompanion();
   });
 }
 window.marketelInspectCameraOpened=raw=>{
@@ -1856,6 +1896,7 @@ window.marketelInspectCameraOpened=raw=>{
   cameraCompanion();
 };
 window.marketelInspectCameraClosed=()=>{
+  document.documentElement.classList.remove('camera-open');
   if(cameraRoom===null)return;
   cameraRoom=null;
   if(draft&&!preview&&!draft.finalizedAt)editor('rooms');else if(draft)reportPreview();else landing();
@@ -1869,6 +1910,7 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   const id=uid();
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`});
   draft.document.rooms[i].photos.push(id);
+  if(cameraRoom!==null&&i===cameraRoom)cameraShots.set(i,shotStep(i)+1);
   remember();await persist();
   if(cameraRoom!==null)cameraCompanion();
   else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');

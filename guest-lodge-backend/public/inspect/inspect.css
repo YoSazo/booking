@@ -417,9 +417,30 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 /* The half of the screen the camera sheet leaves uncovered. Large targets,
    because this is tapped one-handed while holding a phone up at a wall. */
 .camera-companion { padding-top: 4px; }
-.camera-companion h1 { font-size: 24px; margin: 6px 0 14px; }
-.camera-rooms { display: grid; gap: 8px; }
-.camera-room { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; min-height: 54px; padding: 12px 16px; text-align: left; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
+/* Everything here has to read at arm's length, in sunlight, in the half of the
+   screen the camera sheet leaves — and answer a thumb without being aimed at. */
+.camera-companion h1 { font-size: 21px; margin: 2px 0 8px; letter-spacing: -.6px; }
+.camera-count { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+/* The shell steps aside while the camera is open, so its band is not reserved. */
+.native-inspect-shell.camera-open body { padding-top: calc(env(safe-area-inset-top) + 6px); padding-bottom: 6px; }
+.camera-open main { padding-top: 0; }
+.shots { display: grid; gap: 6px; margin-bottom: 12px; }
+.shot { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 8px 14px; text-align: left; background: var(--surface); color: inherit; border: 1.5px solid var(--border); border-radius: 14px; box-shadow: none; font: inherit; min-height: 0; }
+.shot span { flex: 0 0 auto; width: 42px; font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.shot strong { font-weight: 650; }
+.shot.is-now { background: var(--green-pale); border-color: var(--green); }
+.shot.is-now span { color: var(--green); }
+.shot.is-now strong { font-size: 17px; }
+.shot.is-done { opacity: .5; }
+.shot.is-done strong { font-weight: 500; }
+/* Rooms become chips so the prompts and the strip have room above the sheet. */
+.camera-rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.camera-strip { display: flex; gap: 8px; overflow-x: auto; margin: 10px 0 6px; min-height: 8px; -webkit-overflow-scrolling: touch; }
+.camera-strip figure { position: relative; flex: 0 0 auto; width: 56px; height: 56px; margin: 0; }
+.camera-strip img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.camera-strip .photo-x { top: -4px; right: -4px; }
+.camera-strip p { margin: 0; }
+.camera-room { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex: 0 0 auto; width: auto; min-height: 44px; border-radius: 999px; padding: 12px 16px; text-align: left; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
 .camera-room strong { font-weight: 650; }
 .camera-room span { color: var(--muted); font-size: 13px; font-weight: 450; }
 .camera-room.is-active { background: var(--green); border-color: var(--green); color: #fff; }

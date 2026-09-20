@@ -1294,7 +1294,10 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             else { return }
             self.callWeb(function: "marketelInspectPhotoCaptured", argument: text)
         } onDismiss: { [weak self] in
-            self?.callWeb(function: "marketelInspectCameraClosed", argument: "")
+            guard let self else { return }
+            self.shellSuppressedByModal = false
+            self.setShellVisible(true, animated: true)
+            self.callWeb(function: "marketelInspectCameraClosed", argument: "")
         }
         camera.modalPresentationStyle = .pageSheet
         if let sheet = camera.sheetPresentationController {
@@ -1302,7 +1305,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             sheet.selectedDetentIdentifier = .medium
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 28
+            // Without this a page sheet dims the page behind it and swallows
+            // every touch, which would leave the room list above the camera
+            // looking right and answering nothing. Dragging the sheet up to
+            // large dims it again, and nothing that matters lives only there.
+            sheet.largestUndimmedDetentIdentifier = .medium
         }
+        // The bar and tabs are inside the web view, so they undim with it. A
+        // thumb landing on Reports mid-shoot would navigate the page out from
+        // under the camera, so the shell steps aside until the camera closes.
+        shellSuppressedByModal = true
+        setShellVisible(false, animated: shellVisible)
         present(camera, animated: true) { [weak self] in
             self?.callWeb(function: "marketelInspectCameraOpened", argument: "\(room)")
         }

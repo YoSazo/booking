@@ -772,6 +772,41 @@ test('each tool lists only its own report types, and rejects unknown ones', asyn
   }
 });
 
+test('the half-screen above the camera guides the next shot without judging the last', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const companion = client.slice(client.indexOf('function cameraCompanion('), client.indexOf('window.marketelInspectCameraOpened'));
+
+  // Every report type names its own shots, and Inspect borrows the coverage
+  // checker's vocabulary so the check at the end cannot contradict the prompts.
+  const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+  const surfaces = server.match(/const COVERAGE_SURFACES = \[([^\]]+)\]/)[1];
+  for (const type of ['incident', 'damage', 'default']) {
+    const wedge = client.slice(client.indexOf(`  ${type}: {`), client.indexOf('disclaimer', client.indexOf(`  ${type}: {`)));
+    assert.match(wedge, /shots: \[/, `${type} has no shot list`);
+  }
+  const inspectShots = client.slice(client.indexOf('  default: {'), client.indexOf('disclaimer', client.indexOf('  default: {')));
+  for (const surface of ['Floor', 'Walls and ceiling', 'Fixtures and appliances']) {
+    assert.ok(inspectShots.includes(surface));
+    assert.ok(surfaces.includes(surface.split(' ')[0].toLowerCase()), `${surface} is not a coverage surface`);
+  }
+
+  // The prompt describes the sequence, never the photograph: no tick, no claim.
+  assert.match(companion, /state==='now'\?'Now':'Next'/);
+  assert.match(companion, /<span>Done<\/span>/);
+  // Only what fits above the sheet: the shot now and the two after it.
+  assert.match(companion, /\.slice\(0,3\)/);
+  assert.doesNotMatch(companion, /✓|&check;|is-verified/);
+  // A shot moves the prompt on, and removing one steps it back.
+  assert.match(client, /if\(cameraRoom!==null&&i===cameraRoom\)cameraShots\.set\(i,shotStep\(i\)\+1\)/);
+  assert.match(companion, /cameraShots\.set\(cameraRoom,Math\.max\(0,shotStep\(cameraRoom\)-1\)\)/);
+  // The room chips still retarget the open camera, and the strip can remove.
+  assert.match(companion, /type:'inspectCameraRoom',room:index/);
+  assert.match(companion, /data-strip-remove/);
+  assert.match(companion, /draft\.files=draft\.files\.filter\(file=>file\.id!==id\)/);
+});
+
 test('switching tools can never strand the app on a blank page', () => {
   const fs = require('node:fs');
   const path = require('node:path');

@@ -125,6 +125,10 @@ expect(bundledRoot, /addEventListener\('pageshow'[\s\S]{0,200}classList\.remove\
 if (/location\.assign\('\.\.\/(index|frontdesk)/.test(read('www/inspect/inspect.js'))) {
   failures.push('Hops between tools must use location.replace, never location.assign');
 }
+// One line, invisible when missing: without it a page sheet dims and swallows
+// the half-screen above the camera, and the room list there answers nothing.
+expect(delegate, /sheet\.largestUndimmedDetentIdentifier = \.medium/,
+  'The camera sheet must leave the half-screen above it live');
 expect(delegate, /inputAccessoryView = toolbar/,
   'Native sign-in fields need a Done bar to dismiss the keyboard');
 for (const file of ['DMSans-Regular', 'DMSans-Medium', 'DMSans-Bold']) {
