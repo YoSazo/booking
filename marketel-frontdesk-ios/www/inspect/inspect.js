@@ -668,13 +668,16 @@ function previewPlans(){
   flow=flowScreen('','plans-screen');paint();
 }
 async function start(propertyName = '', type) {
+  dismissFlow();
   if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
   if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   await persist(); editor();
 }
 function editor(step) {
-  if (!draft) return landing(); updateHeader();
+  if (!draft) return landing();
+  dismissFlow();
+  updateHeader();
   setActiveNav('current');
   const d = draft.document;
   d.signatures ||= [];
@@ -905,38 +908,75 @@ async function addPhotos(input) {
 // browser alert or fixed dialog. Detaching preserves the exact DOM and event
 // handlers, and keeping the old document height prevents Safari from collapsing
 // its toolbar just because a card replaced a long report.
+// Waits nest: the export run covers branding/save/refresh, and save() raises
+// its own for the photo upload inside that. One element, reference counted —
+// two stacked veils would paint the backdrop blur twice and read as a
+// different, darker screen.
+let veilEl=null,veilDepth=0;
 function busyVeil(title, note = '', ratio){
-  const veil=document.createElement('div');
-  veil.className='busy-veil';
-  veil.setAttribute('role','status');
-  veil.setAttribute('aria-live','polite');
-  const paint=(heading,message,ratio)=>{
-    veil.innerHTML=`<article class="card"><section class="loading"></section><h2>${esc(heading)}</h2><p>${esc(message)}</p>${typeof ratio==='number'?`<div class="busy-track"><span style="width:${Math.round(Math.min(1,Math.max(0,ratio))*100)}%"></span></div>`:''}</article>`;
+  if(!veilEl){
+    veilEl=document.createElement('div');
+    veilEl.className='busy-veil';
+    veilEl.setAttribute('role','status');
+    veilEl.setAttribute('aria-live','polite');
+    document.body.appendChild(veilEl);
+  }
+  veilDepth++;
+  let closed=false;
+  const paint=(heading,message,fraction)=>{
+    if(closed||!veilEl)return;
+    veilEl.innerHTML=`<article class="card"><section class="loading"></section><h2>${esc(heading)}</h2><p>${esc(message)}</p>${typeof fraction==='number'?`<div class="busy-track"><span style="width:${Math.round(Math.min(1,Math.max(0,fraction))*100)}%"></span></div>`:''}</article>`;
   };
   paint(title,note,ratio);
-  document.body.appendChild(veil);
-  return { update: paint, done: () => veil.remove() };
+  return {
+    update: paint,
+    done: () => {
+      if(closed)return;
+      closed=true;
+      veilDepth=Math.max(0,veilDepth-1);
+      if(!veilDepth&&veilEl){veilEl.remove();veilEl=null;}
+    },
+  };
+}
+// A flow holds the screen it covered in a detached fragment and hands back a
+// restore() that puts it back. Nothing used to invalidate that closure, so a
+// flow the operator had already navigated away from could still repaint itself
+// over whatever replaced it — the setup flow restores on a 900ms timer, which
+// is long enough to tap a tab first and watch the old screen reappear on top.
+//
+// One flow is current at a time. Navigating dismisses it, and a restore() from
+// a flow that is no longer current does nothing.
+let activeFlow=null;
+function dismissFlow(){
+  const flow=activeFlow;
+  activeFlow=null;
+  if(flow)flow.abandon();
 }
 function flowScreen(content,kind=''){
+  dismissFlow();
   const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
   const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
   while(app.firstChild)origin.appendChild(app.firstChild);
-  let restored=false;
+  let settled=false;
+  // The account button is disabled for the life of the flow, so it is
+  // re-enabled on every way out — not only the one that restores the screen.
+  // Previously any exit but restore() left it dead for the rest of the session.
+  const release=()=>{ settled=true; if(activeFlow===handle)activeFlow=null; $('account-button').disabled=false; };
   const restore=()=>{
-    if(restored)return;
-    restored=true;
+    if(settled||activeFlow!==handle)return;
+    release();
     app.replaceChildren(origin);
-    document.documentElement.classList.remove('flow-open');
-    $('account-button').disabled=false;
     requestAnimationFrame(()=>{window.scrollTo(0,originScroll);if($('demo'))playDemo();});
     syncNativeInspectState(currentPage,true);
   };
+  const handle={restore,abandon:release,paint:html=>{ if(!settled)$('flow-body').innerHTML=html; }};
   app.innerHTML=`<section class="flow-screen ${kind}" style="--flow-page-height:${Math.round(originHeight)}px"><div class="flow-frame"><article class="card flow-card"><div id="flow-body">${content}</div><button type="button" id="flow-cancel" class="quiet flow-close" aria-label="Close">&#10005;</button></article></div></section>`;
-  document.documentElement.classList.add('flow-open');
   $('account-button').disabled=true;
   $('flow-cancel').onclick=restore;
   syncNativeInspectState(currentPage,true);
-  return {restore,paint:html=>{$('flow-body').innerHTML=html;},closeButton:$('flow-cancel')};
+  activeFlow=handle;
+  handle.closeButton=$('flow-cancel');
+  return handle;
 }
 // Authentication belongs to the Marketel banner, not on a replacement page.
 // The report stays mounted at the same scroll offset while the banner's bottom
@@ -1310,7 +1350,7 @@ function reportPreview(){
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
   $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
-    ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?'<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>':''}</div>${!native&&account?'<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>':''}`
+    ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div><p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
   paintBusinessLogo();
@@ -1318,8 +1358,8 @@ function reportPreview(){
     const eyebrow=$('app').querySelector('.row.spread .eyebrow');
     if(eyebrow)eyebrow.textContent=landingArm()?.golden?.reveal||`Your ${skin().doc}, as it will be sent.`;
     track('ReportRevealed');
-    $('send-report').onclick=()=>requestExport('share');
-    $('download-report').onclick=()=>requestExport('pdf');
+    $('send-report').onclick=event=>requestExport('share',event.currentTarget);
+    $('download-report').onclick=event=>requestExport('pdf',event.currentTarget);
   }
   if($('edit'))$('edit').onclick=()=>{preview=false;editor();};
   if($('coverage-run'))$('coverage-run').onclick=event=>{
@@ -1451,17 +1491,23 @@ async function pushBranding(){
 }
 // Send and Download are where a pay-at-export tool asks. Everything before
 // this was free; the report is on screen, finished, under their own name.
-function requestExport(action){
+function requestExport(action,trigger){
   haptic();
   if(!draft.document.rooms.some(room=>room.photos.length))return notice('Add at least one photo before sending.','error');
   ensureAuth(()=>run(async()=>{
-    await pushBranding();
-    if(!draft.document.author.trim())draft.document.author=draft.branding?.name||account?.businessName||'';
-    if(!draft.document.author.trim())throw new Error('Add your name in the editor before sending.');
-    await save();await refresh();
+    // save() raises its own veil for photos still to upload; this one covers
+    // the branding, save and refresh round trips either side of it, so the
+    // wait is never silent.
+    const veil=busyVeil(`Preparing your ${skin().doc}`,'One moment.');
+    try{
+      await pushBranding();
+      if(!draft.document.author.trim())draft.document.author=draft.branding?.name||account?.businessName||'';
+      if(!draft.document.author.trim())throw new Error('Add your name in the editor before sending.');
+      await save();await refresh();
+    } finally { veil.done(); }
     if(canSend())return finishExport(action);
     await exportOffer(action);
-  }),'send');
+  },trigger),'send');
 }
 function originalsSheet(){
   if(native){
@@ -1617,7 +1663,7 @@ function renderReports(){
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(draft.document.date)} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
-  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':'<section class="card">No saved ${esc(skin().docPlural)} yet. Start your first one.</section>'}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
+  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':`<section class="card">No saved ${esc(skin().docPlural)} yet. Start your first one.</section>`}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
@@ -1661,6 +1707,7 @@ async function startComparison(baselineId){
 }
 async function list(page='reports',append=false){
   if(!account)return ensureAuth(()=>list(page).catch(error=>notice(error.message)));
+  dismissFlow();
   updateHeader();setActiveNav(page);
   const request=++listRequest;
   if(page==='properties'){

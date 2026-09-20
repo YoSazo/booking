@@ -817,6 +817,114 @@ test('the cold offer leads with the single report and hides the year until it me
         'the account route and both auth payloads must carry it');
 });
 
+// A ${...} inside a plain string never runs; it ships to the screen as source
+// text. A regex cannot find these — an apostrophe in prose and a ${} inside an
+// HTML attribute in a template literal both defeat it, and a character class
+// like /[&<>"']/ desynchronises a naive scan for the rest of the file. So walk
+// the context stack: quotes, backticks, template expressions, comments and
+// regex literals each nest properly.
+function rawInterpolations(src) {
+  const bad=[], stack=[]; const top=()=>stack[stack.length-1];
+  let line=1, prev='';
+  const REGEX_OK=new Set(['','(',',','=',':','[','!','&','|','?','{','}',';','+','-','*','%','~','^','<','>','\n']);
+  for(let i=0;i<src.length;i++){
+    const c=src[i], n=src[i+1];
+    if(c==='\n'){line++; if(!top())prev='\n'; continue;}
+    const t=top();
+    if(t==='sq'||t==='dq'){
+      if(c==='\\'){i++;continue;}
+      if(c==='$'&&n==='{')bad.push({line,near:src.slice(i,i+40)});
+      if((t==='sq'&&c==="'")||(t==='dq'&&c==='"')){stack.pop();prev=c;}
+      continue;
+    }
+    if(t==='tpl'){
+      if(c==='\\'){i++;continue;}
+      if(c==='`'){stack.pop();prev=c;continue;}
+      if(c==='$'&&n==='{'){stack.push('expr');i++;prev='{';}
+      continue;
+    }
+    if(t==='re'){
+      if(c==='\\'){i++;continue;}
+      if(c==='['){stack.push('recls');continue;}
+      if(c==='/'){stack.pop();prev='/';}
+      continue;
+    }
+    if(t==='recls'){ if(c==='\\'){i++;continue;} if(c===']')stack.pop(); continue; }
+    if(/\s/.test(c))continue;
+    if(c==='/'&&n==='/'){while(i<src.length&&src[i]!=='\n')i++;line++;continue;}
+    if(c==='/'&&n==='*'){i+=2;while(i<src.length&&!(src[i]==='*'&&src[i+1]==='/')){if(src[i]==='\n')line++;i++;}i++;continue;}
+    if(c==='/'&&REGEX_OK.has(prev)){stack.push('re');continue;}
+    if(c==="'")stack.push('sq');
+    else if(c==='"')stack.push('dq');
+    else if(c==='`')stack.push('tpl');
+    else if(c==='}'&&top()==='expr')stack.pop();
+    prev=c;
+  }
+  return bad;
+}
+
+test('no template expression ships to the screen as literal text', () => {
+    const fsx=require('node:fs'), pathx=require('node:path');
+    const root=pathx.join(__dirname,'..');
+
+    // The scanner must find a real one and ignore the things that break a regex.
+    assert.equal(rawInterpolations("const x=`a${c?'<p>No saved ${esc(s().d)} yet.</p>':''}b`;").length, 1,
+        'must catch a ${} in a single-quoted ternary branch');
+    assert.equal(rawInterpolations('const e=v=>v.replace(/[&<>"\']/g,c=>m[c]); const t=`x${y}`;').length, 0,
+        'a character class holding quotes must not desynchronise the scan');
+    assert.equal(rawInterpolations("const t=`it's ${x} fine`;").length, 0,
+        'an apostrophe in prose is not a string');
+    assert.equal(rawInterpolations('const t=`<img src="${esc(u)}">`;').length, 0,
+        'an attribute inside a template literal interpolates normally');
+
+    // Three of these shipped: the reports empty state rendered the source of
+    // its own interpolation, because the language pass put ${} into branches
+    // that were single-quoted strings.
+    for (const file of ['public/inspect/inspect.js', 'public/inspect/index.html']) {
+        if (!file.endsWith('.js')) continue;
+        const found = rawInterpolations(fsx.readFileSync(pathx.join(root, file), 'utf8'));
+        assert.deepEqual(found, [], `${file} ships raw \${...}: ` +
+            found.map(f => `line ${f.line} ${f.near}`).join(' | '));
+    }
+});
+
+test('a flow cannot repaint the screen after the operator has left it', () => {
+    const client=require('node:fs').readFileSync(
+        require('node:path').join(__dirname,'..','public','inspect','inspect.js'),'utf8');
+
+    // The setup flow restores on a 900ms timer. Tapping a tab inside that
+    // window used to let the old screen land back on top of the new one.
+    assert.match(client, /let activeFlow=null/);
+    assert.match(client, /function dismissFlow\(\)/);
+    assert.match(client, /if\(settled\|\|activeFlow!==handle\)return;/,
+        'restore must no-op once the flow is no longer current');
+    // Opening a flow retires any previous one.
+    assert.match(client.slice(client.indexOf('function flowScreen')), /^function flowScreen\([^)]*\)\{\s*dismissFlow\(\);/m);
+    // Every screen that paints #app directly must retire an open flow first.
+    for (const entry of ['async function list(', 'async function start(', 'function editor(']) {
+        const region = client.slice(client.indexOf(entry), client.indexOf(entry) + 320);
+        assert.match(region, /dismissFlow\(\)/, `${entry} must dismiss an open flow`);
+    }
+    // The account button is disabled for the life of a flow, so it is released
+    // on every exit — not only the one that restores the screen.
+    assert.match(client, /const release=\(\)=>\{[^}]*\$\('account-button'\)\.disabled=false/);
+    // A class toggled on <html> that no stylesheet reads is not containment.
+    assert.doesNotMatch(client, /flow-open/);
+
+    // One veil element, reference counted: the export run raises one and the
+    // upload inside it raises another, and two would paint the blur twice.
+    assert.match(client, /let veilEl=null,veilDepth=0/);
+    assert.match(client, /veilDepth=Math\.max\(0,veilDepth-1\)/);
+
+    // run() falls back to document.activeElement, which is nothing after a
+    // touch — so these two buttons never went busy while three round trips ran.
+    assert.match(client, /\$\('send-report'\)\.onclick=event=>requestExport\('share',event\.currentTarget\)/);
+    assert.match(client, /\$\('download-report'\)\.onclick=event=>requestExport\('pdf',event\.currentTarget\)/);
+    const req=client.slice(client.indexOf('function requestExport'), client.indexOf('async function finishExport'));
+    assert.match(req, /busyVeil\(`Preparing your \$\{skin\(\)\.doc\}`/, 'the wait before the sheet must be covered');
+    assert.match(req, /finally \{ veil\.done\(\); \}/);
+});
+
 test('a blocking wait shows the product waiting, and finishing offers every way out', () => {
     const fsx = require('node:fs'), pathx = require('node:path');
     const root = pathx.join(__dirname, '..');
