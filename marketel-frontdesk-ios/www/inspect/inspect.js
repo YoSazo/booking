@@ -738,19 +738,35 @@ function dictationSchedule(text){
 }
 function simStage(index=0){
   enterScreen('sim');
-  const s=simTool();
+  const s=simTool(),sk=skin();
   if(!simRun)simRun=s.findings.map(f=>({finding:f,note:'',photo:false}));
   const at=Math.max(0,Math.min(simRun.length-1,index));
   const row=simRun[at],f=row.finding;
   const levels=speechEnvelope(f.said),schedule=dictationSchedule(f.said);
-  const shot=simRun.filter(r=>r.photo).length;
-  const done=simRun.some(r=>r.photo&&r.note);
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">Say what you are looking at, then photograph it.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button"${row.note?' disabled':''}>${row.note?'Noted':'Hold to talk'}</button><button type="button" id="sim-next" class="secondary">Next finding</button></div><div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo?'1 photo':'—'}</span></button>`).join('')}</div><p class="muted sim-foot"><small>In the real app this is your voice, and your camera.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note">${shot?`${shot} ${shot===1?'photo':'photos'} in this ${esc(skin().doc)}.`:`Photographing ${esc(f.room).toLowerCase()}.`}</p><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"${row.photo?' disabled':''}></button></div></aside>`;
+  // Photograph it, then say what it is. One control is live at a time and the
+  // other is visibly out of play, because two live buttons and no stated order
+  // is the same as no instruction at all.
+  const step=!row.photo?'shoot':!row.note?'say':'done';
+  const complete=simRun.filter(r=>r.photo&&r.note).length;
+  const last=complete>=simRun.length;
+  const hint=step==='say'?'Hold the button and say what you are looking at.':'Photograph it, then say what you are looking at.';
+  const caption=step==='shoot'?`Photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?'Now say what it is.':`${esc(f.room)} documented.`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions">${last?'':`<button type="button" id="sim-talk-button" class="sim-talk-button${step==='say'?' is-live-step':''}"${step==='say'?'':' disabled'}>${row.note?'Noted ✓':'Hold to talk'}</button>`}${complete?`<button type="button" id="sim-see" class="${last?'is-live-step':'secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}</div>${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>Simulated — your microphone is never used. In the app these are your own words.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
-  $('sim-next').onclick=()=>simStage(at+1<simRun.length?at+1:0);
   $('sim-done').onclick=()=>simReport();
+  if($('sim-see'))$('sim-see').onclick=()=>simReport();
   for(const chip of $('app').querySelectorAll('[data-sim-chip]'))chip.onclick=()=>simStage(Number(chip.dataset.simChip));
-  if(!row.note)simListen(at,levels,schedule);
+  if(step==='say')simListen(at,levels,schedule);
+}
+// A finding is done when it has both a photo and a note, and then there is
+// only one sensible next thing — so it happens by itself rather than being
+// offered as a decision.
+function simAdvance(at){
+  // On the last one it repaints where it is instead, which is what turns the
+  // exit into a full-width call to action rather than leaving them to find
+  // Done in the corner of the camera.
+  const next=at+1<simRun.length?at+1:at;
+  setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(next); },900);
 }
 function simShoot(at){
   const row=simRun[at];
@@ -763,9 +779,6 @@ function simShoot(at){
     $('sim-flash').classList.add('is-on');
     setTimeout(()=>{$('sim-view')?.classList.remove('is-capturing');$('sim-flash')?.classList.remove('is-on');},220);
   }
-  const heading=$('app').querySelector('.sim-count');
-  if(heading)heading.textContent='1 photo';
-  $('sim-shutter').disabled=true;
   const sheetStrip=$('app').querySelector('.sim-sheet-strip');
   if(sheetStrip){
     const tile=document.createElement('img');
@@ -773,12 +786,8 @@ function simShoot(at){
     sheetStrip.appendChild(tile);
     requestAnimationFrame(()=>tile.classList.add('is-in'));
   }
-  const note=$('app').querySelector('.sim-sheet-note');
-  const shot=simRun.filter(r=>r.photo).length;
-  if(note)note.textContent=`${shot} ${shot===1?'photo':'photos'} in this ${skin().doc}.`;
-  const chip=$('app').querySelector(`[data-sim-chip="${at}"] span`);
-  if(chip)chip.textContent='1 photo';
-  if(simRun.some(r=>r.photo&&r.note))$('sim-done').hidden=false;
+  // Repaint into the talking step once the capture has been seen.
+  setTimeout(()=>{ if(simRun)simStage(at); },quick?0:620);
 }
 // The hold is the speaking. No microphone and no permission prompt: a
 // permission dialog on cold traffic is a hard stop, and the words arriving
@@ -811,7 +820,8 @@ function simListen(at,levels,schedule){
     const reveal=()=>{
       note.classList.add('is-written');
       wave.classList.add('is-done');
-      if(simRun.some(r=>r.photo&&r.note))$('sim-done').hidden=false;
+      $('sim-done').hidden=false;
+      simAdvance(at);
     };
     // A beat long enough to read the line they just said, before it is
     // rewritten. The rewrite is the product; swapping it out from under them
@@ -855,6 +865,13 @@ function simListen(at,levels,schedule){
     if(!pointered&&!settled)settle();
   });
 }
+function simBuy(trigger){
+  return run(async()=>{
+    haptic();
+    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId}});
+    openExternal(r.url);
+  },trigger);
+}
 function simReport(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
@@ -865,23 +882,21 @@ function simReport(){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month;
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-sim-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-sim-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:'Cancel anytime.'}</p><ul class="offer-points"><li>Unlimited ${esc(sk.docPlural)}</li><li>No per-property or per-room fees</li><li>Talk through it and ${esc(sk.writesLabel||'it writes')} the notes</li><li>PDF export on every ${esc(sk.doc)}</li></ul><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section>`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-sim-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-sim-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:'Cancel anytime.'}</p><ul class="offer-points"><li>Unlimited ${esc(sk.docPlural)}</li><li>No per-property or per-room fees</li><li>Talk through it and ${esc(sk.writesLabel||'it writes')} the notes</li><li>PDF export on every ${esc(sk.doc)}</li></ul><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$${plan.price}</strong><small>${esc(plan.per)}</small></div><button type="button" id="sim-paybar-buy">Start Marketel ${esc(sk.product)} →</button></aside>`;
   for(const button of $('app').querySelectorAll('[data-sim-plan]'))
     button.onclick=()=>{planInterval=button.dataset.simPlan==='year'?'year':'month';simReport();};
-  $('sim-buy').onclick=event=>run(async()=>{
-    haptic();
-    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId}});
-    openExternal(r.url);
-  },event.currentTarget);
-  // "Viewed" should mean seen, not merely rendered — the offer sits below a
-  // full page of report.
-  const offer=$('sim-offer');
+  $('sim-buy').onclick=event=>simBuy(event.currentTarget);
+  $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
+  // The price is on screen from the moment the report is, so the offer really
+  // has been seen by now — it is no longer something they scroll down to find.
+  track('SimOfferViewed');
+  const offer=$('sim-offer'),bar=$('sim-paybar');
   if(typeof IntersectionObserver==='function'){
     const watch=new IntersectionObserver(entries=>{
-      if(entries.some(entry=>entry.isIntersecting)){track('SimOfferViewed');watch.disconnect();}
-    },{threshold:0.35});
+      bar.classList.toggle('is-stood-down',entries.some(entry=>entry.isIntersecting));
+    },{threshold:0.3});
     watch.observe(offer);
-  }else track('SimOfferViewed');
+  }
 }
 function landing() {
   enterScreen('landing');

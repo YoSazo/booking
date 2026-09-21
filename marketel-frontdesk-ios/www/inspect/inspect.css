@@ -569,6 +569,34 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
    finding" still walks the loop, which is the part that matters. */
 @media (max-height: 720px) { .sim-chips { display: none; } }
 
+/* Whichever control is live wears the ring; the other is visibly out of play.
+   Two live buttons with no stated order is the same as no instruction. */
+.is-live-step { animation: sim-pulse 1.9s ease-in-out infinite; }
+.sim-talk-button:disabled, .sim-shutter:disabled { opacity: .38; animation: none; }
+.sim-talk-button:disabled { box-shadow: none; }
+.sim-demo { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #2e7d5b1f; color: var(--green-dark); font-size: 10px; font-weight: 800; letter-spacing: .1em; vertical-align: middle; }
+
+/* The price rides with the report. Before this the buy button sat 3.3 screens
+   down, which on cold traffic is the same as not being there. */
+.sim-paybar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: center; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #fbfdfbf2; border-top: 1px solid var(--border); box-shadow: 0 -8px 24px #173b231a; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: transform .28s ease, opacity .28s ease; }
+.sim-paybar.is-stood-down { transform: translateY(105%); opacity: 0; pointer-events: none; }
+.sim-paybar div { flex: 0 0 auto; display: flex; align-items: baseline; gap: 3px; }
+.sim-paybar strong { font-size: 22px; font-weight: 750; }
+.sim-paybar small { color: var(--muted); font-weight: 600; }
+.sim-paybar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; }
+.sim-report { padding-bottom: 96px; }
+/* Three full-bleed photos are what made the report card 2266px tall. The
+   sample only has to read as the document; the real renderer is untouched. */
+.sim-doc .report-photo { max-height: 200px; object-fit: cover; }
+.sim-doc .report-room { margin-bottom: 4px; }
+.sim-doc .report-room h2 { margin-bottom: 6px; }
+.sim-doc .report-note { margin: 0 0 10px; }
+/* "Camera capture" under every photo is provenance that matters on a real
+   report and is noise on a sample. */
+.sim-doc .report-photo + small { display: none; }
+
+@keyframes sim-pulse { 0%, 100% { box-shadow: 0 0 0 0 #2e7d5b5c; } 55% { box-shadow: 0 0 0 11px #2e7d5b00; } }
+
 @keyframes sim-drift { from { transform: scale(1.02); } to { transform: scale(1.05) translate3d(-1%, .8%, 0); } }
 @keyframes sim-flash { from { opacity: .92; } to { opacity: 0; } }
 @keyframes sim-lock { 0% { opacity: 0; transform: scale(1.5); } 40% { opacity: .95; transform: scale(1); } 70% { opacity: .95; transform: scale(.92); } 100% { opacity: .4; transform: scale(.92); } }
