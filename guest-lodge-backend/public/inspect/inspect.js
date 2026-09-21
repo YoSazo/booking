@@ -629,14 +629,14 @@ const SIMS = {
     property: '123 Main Street', unit: 'Unit 4B',
     findings: [
       { id: 'wall', label: 'Wall scuff', room: 'Living Room', photo: 'inspect-wall',
-        said: 'living room wall beside the door has a scuff and some of the paint has come away',
-        note: 'Scuffing and localised paint loss on the lower wall beside the door frame, approximately 30cm across. Photographed for record.' },
+        said: 'wall beside the door has a scuff and some paint has come off',
+        note: 'Scuffing and paint loss on the lower wall beside the door frame, approx. 30cm across. Photographed for record.' },
       { id: 'carpet', label: 'Carpet wear', room: 'Bedroom', photo: 'inspect-carpet',
-        said: 'bedroom carpet is worn flat along the walkway through to the hall',
-        note: 'Flattened pile and visible wear along the traffic path between the bedroom and hallway. No staining or tearing observed.' },
+        said: 'carpet is worn flat along the walkway through to the hall',
+        note: 'Flattened pile and wear along the traffic path between the bedroom and hallway. No staining or tearing.' },
       { id: 'grout', label: 'Grout and sealant', room: 'Bathroom', photo: 'inspect-grout',
-        said: 'bathroom grout along the bottom of the tiles is going black in the corner',
-        note: 'Discoloured grout and early mildew along the base of the tiled wall in the corner. Cleaning or resealing recommended.' },
+        said: 'grout at the bottom of the tiles is going black in the corner',
+        note: 'Discoloured grout and early mildew along the base of the tiled wall. Cleaning or resealing recommended.' },
     ],
   },
   claims: {
@@ -644,14 +644,14 @@ const SIMS = {
     property: '123 Main Street', unit: 'Unit 4B',
     findings: [
       { id: 'wall', label: 'Wall damage', room: 'Living Room', photo: 'claims-wall',
-        said: 'there is a hole punched right through the wall by the bedroom door, the plasterboard is broken through',
-        note: 'Impact damage to the wall beside the bedroom door: plasterboard punctured through, approximately 15cm across, with cracked paint around the opening.' },
+        said: 'there is a hole punched right through the wall by the bedroom door',
+        note: 'Plasterboard punctured through beside the bedroom door, approx. 15cm across, paint cracked around it.' },
       { id: 'carpet', label: 'Carpet stain', room: 'Bedroom', photo: 'claims-carpet',
-        said: 'big red wine stain soaked into the bedroom carpet next to the drawers',
-        note: 'Large red wine stain soaked into the bedroom carpet beside the chest of drawers, approximately 50cm across. Photographed before any cleaning.' },
+        said: 'big red wine stain soaked into the carpet next to the drawers',
+        note: 'Large red wine stain soaked into the carpet beside the drawers, approx. 50cm, photographed before cleaning.' },
       { id: 'cabinet', label: 'Broken cabinet', room: 'Kitchen', photo: 'claims-cabinet',
-        said: 'kitchen cabinet door is hanging off, the hinge has torn straight out of the wood',
-        note: 'Kitchen cabinet door detached at the hinge, with the screw fixings torn out of the door frame and the surrounding timber split.' },
+        said: 'cabinet door is hanging off, the hinge tore straight out of the wood',
+        note: 'Cabinet door detached at the hinge, screw fixings torn out and the surrounding timber split.' },
     ],
   },
 };
@@ -711,47 +711,88 @@ function simIntro(){
   document.documentElement.classList.add('sim-mode');
   track('SimStarted');
   $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">We have filled in the details and picked the sample photos for you. We just want to show you what you get.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p></section>`;
+  simRun=null;
   for(const button of $('app').querySelectorAll('[data-sim-pick]'))
-    button.onclick=()=>simCamera(s.findings.find(f=>f.id===button.dataset.simPick)||s.findings[0]);
+    button.onclick=()=>{
+      const chosen=Math.max(0,s.findings.findIndex(f=>f.id===button.dataset.simPick));
+      simPicked=s.findings[chosen];
+      try{sessionStorage.setItem('inspect.sim.pick',simPicked.id);}catch{}
+      track('SimFindingPicked',simPicked.id);
+      simStage(chosen);
+    };
 }
-function simCamera(finding){
+// One screen, laid out the way the app actually is: the camera is a sheet
+// across the bottom half and the HUD sits above it the whole time, so what
+// they tap here is what they will tap on their phone. Talk, photograph, next
+// finding — the same loop, in the same places.
+let simRun = null;
+// Real dictation lands a word at a time and unevenly: longer words take
+// longer and a comma is a breath. Interpolating a progress bar across the
+// sentence looks like a progress bar, which is the one thing it must not.
+function dictationSchedule(text){
+  let at=0;
+  return String(text||'').split(/\s+/).filter(Boolean).map(word=>{
+    at+=250+word.replace(/[^A-Za-z']/g,'').length*22+(/[,.;:]$/.test(word)?280:0);
+    return {word,at};
+  });
+}
+function simStage(index=0){
   enterScreen('sim');
-  simPicked=finding;
-  try{sessionStorage.setItem('inspect.sim.pick',finding.id);}catch{}
-  track('SimFindingPicked',finding.id);
-  $('app').innerHTML=`<section class="sim sim-camera"><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(finding.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div><p class="sim-hint">${esc(finding.room)} · ${esc(finding.label)}</p></div><div class="sim-bar"><div class="sim-strip" id="sim-strip"></div><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"></button><p class="muted"><small>Tap to photograph it.</small></p></div></section>`;
-  let taken=false;
-  $('sim-shutter').onclick=()=>{
-    if(taken)return;taken=true;
-    track('SimPhotoTaken',finding.id);
-    const quick=simReduced();
-    if(!quick){
-      $('sim-view').classList.add('is-capturing');
-      $('sim-flash').classList.add('is-on');
-      setTimeout(()=>{$('sim-view')?.classList.remove('is-capturing');$('sim-flash')?.classList.remove('is-on');},220);
-    }
+  const s=simTool();
+  if(!simRun)simRun=s.findings.map(f=>({finding:f,note:'',photo:false}));
+  const at=Math.max(0,Math.min(simRun.length-1,index));
+  const row=simRun[at],f=row.finding;
+  const levels=speechEnvelope(f.said),schedule=dictationSchedule(f.said);
+  const shot=simRun.filter(r=>r.photo).length;
+  const done=simRun.some(r=>r.photo&&r.note);
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">Say what you are looking at, then photograph it.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button"${row.note?' disabled':''}>${row.note?'Noted':'Hold to talk'}</button><button type="button" id="sim-next" class="secondary">Next finding</button></div><div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo?'1 photo':'—'}</span></button>`).join('')}</div><p class="muted sim-foot"><small>In the real app this is your voice, and your camera.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"${row.photo?' disabled':''}></button><p class="sim-sheet-note">${shot?`${shot} ${shot===1?'photo':'photos'} in this ${esc(skin().doc)}.`:`Photographing ${esc(f.room).toLowerCase()}.`}</p></div></aside>`;
+  $('sim-shutter').onclick=()=>simShoot(at);
+  $('sim-next').onclick=()=>simStage(at+1<simRun.length?at+1:0);
+  $('sim-done').onclick=()=>simReport();
+  for(const chip of $('app').querySelectorAll('[data-sim-chip]'))chip.onclick=()=>simStage(Number(chip.dataset.simChip));
+  if(!row.note)simListen(at,levels,schedule);
+}
+function simShoot(at){
+  const row=simRun[at];
+  if(row.photo)return;
+  row.photo=true;
+  track('SimPhotoTaken',row.finding.id);
+  const quick=simReduced();
+  if(!quick){
+    $('sim-view').classList.add('is-capturing');
+    $('sim-flash').classList.add('is-on');
+    setTimeout(()=>{$('sim-view')?.classList.remove('is-capturing');$('sim-flash')?.classList.remove('is-on');},220);
+  }
+  const heading=$('app').querySelector('.sim-count');
+  if(heading)heading.textContent='1 photo';
+  $('sim-shutter').disabled=true;
+  const sheetStrip=$('app').querySelector('.sim-sheet-strip');
+  if(sheetStrip){
     const tile=document.createElement('img');
-    tile.className='sim-shot';tile.src=simPhoto(finding.photo,true);tile.alt='';
-    $('sim-strip').appendChild(tile);
+    tile.className='sim-shot';tile.src=simPhoto(row.finding.photo,true);tile.alt='';
+    sheetStrip.appendChild(tile);
     requestAnimationFrame(()=>tile.classList.add('is-in'));
-    setTimeout(()=>simTalk(finding),quick?0:540);
-  };
+  }
+  const note=$('app').querySelector('.sim-sheet-note');
+  const shot=simRun.filter(r=>r.photo).length;
+  if(note)note.textContent=`${shot} ${shot===1?'photo':'photos'} in this ${skin().doc}.`;
+  const chip=$('app').querySelector(`[data-sim-chip="${at}"] span`);
+  if(chip)chip.textContent='1 photo';
+  if(simRun.some(r=>r.photo&&r.note))$('sim-done').hidden=false;
 }
 // The hold is the speaking. No microphone and no permission prompt: a
-// permission dialog on cold traffic is a hard stop, and the words appearing
-// under their own finger is what makes this feel like theirs rather than a
-// video they are stuck in.
-function simTalk(finding){
-  enterScreen('sim');
-  const s=simTool(),levels=speechEnvelope(finding.said),words=finding.said.split(/\s+/).filter(Boolean);
-  $('app').innerHTML=`<section class="sim sim-talk"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(finding.room)} <span class="sim-count">1 photo</span></h1><div class="sim-note" id="sim-note"><span class="sim-hint-line" id="sim-hint-line">Hold the button and say what you are looking at.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(finding.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-strip"><img class="sim-shot is-in" src="${esc(simPhoto(finding.photo,true))}" alt=""></div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button">Hold to talk</button><p class="muted"><small>In the real app this is your voice.</small></p></div></section>`;
+// permission dialog on cold traffic is a hard stop, and the words arriving
+// under their own finger is what separates this from a video.
+function simListen(at,levels,schedule){
+  const row=simRun[at];
   const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),button=$('sim-talk-button');
   const ticks=[...wave.querySelectorAll('i')];
-  const perWord=220,span=Math.max(900,words.length*perWord);
+  const span=schedule[schedule.length-1]?.at||1200;
   let holding=false,elapsed=0,last=0,frame=0,settled=false;
   const paint=progress=>{
-    const shown=Math.max(1,Math.round(words.length*Math.min(1,progress)));
-    said.textContent=words.slice(0,shown).join(' ');
+    const now=progress*span;
+    const shown=schedule.filter(step=>step.at<=now).length;
+    said.textContent=schedule.slice(0,Math.max(1,shown)).map(step=>step.word).join(' ');
     hint.classList.add('is-gone');
     const head=Math.min(1,progress)*ticks.length;
     ticks.forEach((bar,i)=>{
@@ -762,20 +803,16 @@ function simTalk(finding){
   const settle=()=>{
     if(settled)return;settled=true;
     cancelAnimationFrame(frame);
-    holding=false;button.classList.remove('is-live');button.textContent='Hold to talk';
-    button.disabled=true;
+    holding=false;button.classList.remove('is-live');button.textContent='Noted';button.disabled=true;
     paint(1);
-    track('SimNoteWritten',finding.id);
+    row.note=row.finding.note;
+    track('SimNoteWritten',row.finding.id);
     const reveal=()=>{
       note.classList.add('is-written');
       wave.classList.add('is-done');
-      const next=document.createElement('button');
-      next.type='button';next.id='sim-see';next.className='wide';next.textContent=`See the ${skin().doc} →`;
-      next.onclick=()=>simReport();
-      $('app').querySelector('.sim-actions').replaceChildren(next);
-      if(!simReduced())setTimeout(()=>{if($('sim-see'))simReport();},2200);
+      if(simRun.some(r=>r.photo&&r.note))$('sim-done').hidden=false;
     };
-    simReduced()?reveal():setTimeout(reveal,420);
+    simReduced()?reveal():setTimeout(reveal,380);
   };
   const tick=now=>{
     if(!holding)return;
@@ -793,13 +830,13 @@ function simTalk(finding){
     frame=requestAnimationFrame(tick);
   };
   // Letting go early finishes the line rather than truncating it: the written
-  // note is the whole point of the screen, and a half sentence would sell it short.
+  // note is the point of the screen, and half a sentence would sell it short.
   const stop=()=>{ if(!holding||settled)return; holding=false; cancelAnimationFrame(frame); settle(); };
   button.addEventListener('pointerdown',start);
   button.addEventListener('pointerup',stop);
   button.addEventListener('pointercancel',stop);
   button.addEventListener('pointerleave',stop);
-  // A plain click (assistive tech, or a browser that sends no pointer events)
+  // A plain click — assistive tech, or a browser sending no pointer events —
   // still has to reach the note.
   button.addEventListener('click',event=>{event.preventDefault();if(!settled&&!holding)settle();});
 }
@@ -807,7 +844,9 @@ function simReport(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
   track('SimReportShown');
-  const ordered=[simPicked,...s.findings.filter(f=>f!==simPicked)].filter(Boolean);
+  const documented=(simRun||[]).filter(row=>row.photo||row.note).map(row=>row.finding);
+  const lead=documented.length?documented:[simPicked].filter(Boolean);
+  const ordered=[...lead,...s.findings.filter(f=>!lead.includes(f))];
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month;
