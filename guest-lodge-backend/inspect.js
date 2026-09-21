@@ -70,9 +70,9 @@ const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident'
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
 const TOOLS = Object.freeze({
-  inspect: Object.freeze({ types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Inspect', home: '/inspect/' }),
-  claims: Object.freeze({ types: ['damage'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
-  incident: Object.freeze({ types: ['incident'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Incident', home: '/incident' }),
+  inspect: Object.freeze({ unit: 'room', types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Inspect', home: '/inspect/' }),
+  claims: Object.freeze({ unit: 'entry', types: ['damage'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
+  incident: Object.freeze({ unit: 'room', types: ['incident'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Incident', home: '/incident' }),
 });
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
 const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
@@ -177,7 +177,7 @@ function validateDocument(input) {
       if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || ids.has(id)) throw fail(400, 'Invalid or duplicate photo.');
       ids.add(id); photoCount++; return id;
     });
-    return { name: text(room.name, 100) || 'Room', observation: text(room.observation || '', 4000), issue: room.issue === true, photos };
+    return { name: text(room.name, 100), observation: text(room.observation || '', 4000), issue: room.issue === true, photos };
   });
   if (photoCount > LIMITS.photos) throw fail(400, 'Maximum 100 photos per report.');
   const document = { propertyName, author, type: input.type, date: input.date, rooms };
@@ -474,7 +474,8 @@ function locationLines(document) {
   return lines;
 }
 const signaturesHtml = document => (document.signatures || []).map(signature => `<section class="signature"><h3>${safe(roleLabel(signature.role))} signature</h3>${signatureSvg(signature)}<p>${safe(signature.name)} · Signed ${safe(signature.signedAt || 'when this document was finalized')}</p></section>`).join('');
-  const roomHtml = (room, report, photoPrefix, heading = '') => `<section>${heading}<h2>${safe(room.name)}${room.issue ? ' · Issue noted' : ''}</h2><p>${safe(room.observation || 'No observation recorded.')}</p>${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${report.attachments.find(a => a.id === id)?.source === 'camera' ? 'Camera capture' : 'Imported photo'} · Upload date recorded separately</figcaption></figure>`).join('')}</section>`;
+  const entryHeading = (room, index) => room.name || `Finding ${index + 1}`;
+  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${room.issue ? ' · Issue noted' : ''}</h2><p>${safe(room.observation || 'No observation recorded.')}</p>${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${report.attachments.find(a => a.id === id)?.source === 'camera' ? 'Camera capture' : 'Imported photo'} · Upload date recorded separately</figcaption></figure>`).join('')}</section>`;
   const claimAiUse = async (accountId, reportId) => prisma.$transaction(async tx => {
     await lockAccount(tx, accountId);
     const report = await owned(tx, accountId, reportId); mutable(report);
@@ -612,7 +613,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const baselineRooms = new Map((baseline?.document?.rooms || []).map(room => [room.name.toLowerCase(), room]));
     const rooms = d.rooms.map((room, index) => {
       const before = baselineRooms.get(room.name.toLowerCase()) || baseline?.document?.rooms?.[index];
-      return `${before ? roomHtml(before, baseline, `${req.params.token}/photos`, '<p class="compare-label">Previous finalized report</p>') : ''}${roomHtml(room, report, `${req.params.token}/photos`, before ? '<p class="compare-label">Current report</p>' : '')}`;
+      return `${before ? roomHtml(before, baseline, `${req.params.token}/photos`, '<p class="compare-label">Previous finalized report</p>', index) : ''}${roomHtml(room, report, `${req.params.token}/photos`, before ? '<p class="compare-label">Current report</p>' : '', index)}`;
     }).join('');
     const business = d.business && (d.business.name || d.business.logoKey)
       ? `<header style="display:flex;align-items:center;gap:14px;margin:0 0 18px">${d.business.logoKey ? `<img src="${req.params.token}/logo" alt="" style="max-height:56px;max-width:160px">` : ''}<strong style="font-size:22px">${safe(d.business.name)}</strong></header>`
@@ -649,9 +650,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       }
     }
   };
-  async function appendPdfRoom(doc, report, room, label) {
+  async function appendPdfRoom(doc, report, room, label, index = 0) {
     doc.addPage().fontSize(9).fillColor('#587064').text(label.toUpperCase());
-    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${room.name}${room.issue ? ' - Issue noted' : ''}`);
+    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index)}${room.issue ? ' - Issue noted' : ''}`);
     doc.moveDown().fontSize(11).text(room.observation || 'No observation recorded.');
     for (const id of room.photos) {
       const a = report.attachments.find(item => item.id === id);
@@ -687,11 +688,11 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         const previous = report.baselineReport.document.rooms;
         for (const [index, room] of report.document.rooms.entries()) {
           const before = previous.find(item => item.name.toLowerCase() === room.name.toLowerCase()) || previous[index];
-          if (before) await appendPdfRoom(doc, report.baselineReport, before, 'Previous finalized report');
-          await appendPdfRoom(doc, report, room, 'Current report');
+          if (before) await appendPdfRoom(doc, report.baselineReport, before, 'Previous finalized report', index);
+          await appendPdfRoom(doc, report, room, 'Current report', index);
         }
       } else {
-        for (const room of report.document.rooms) await appendPdfRoom(doc, report, room, 'Recorded condition');
+        for (const [index, room] of report.document.rooms.entries()) await appendPdfRoom(doc, report, room, 'Recorded condition', index);
       }
       drawPdfSignatures(doc, report.document);
       doc.end();

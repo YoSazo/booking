@@ -772,39 +772,47 @@ test('each tool lists only its own report types, and rejects unknown ones', asyn
   }
 });
 
-test('the half-screen above the camera guides the next shot without judging the last', () => {
+test('a damage report is findings, and the capture screen is the recording', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
   const companion = client.slice(client.indexOf('function cameraCompanion('), client.indexOf('window.marketelInspectCameraOpened'));
 
-  // Every report type names its own shots, and Inspect borrows the coverage
-  // checker's vocabulary so the check at the end cannot contradict the prompts.
-  const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
-  const surfaces = server.match(/const COVERAGE_SURFACES = \[([^\]]+)\]/)[1];
-  for (const type of ['incident', 'damage', 'default']) {
-    const wedge = client.slice(client.indexOf(`  ${type}: {`), client.indexOf('disclaimer', client.indexOf(`  ${type}: {`)));
-    assert.match(wedge, /shots: \[/, `${type} has no shot list`);
-  }
-  const inspectShots = client.slice(client.indexOf('  default: {'), client.indexOf('disclaimer', client.indexOf('  default: {')));
-  for (const surface of ['Floor', 'Walls and ceiling', 'Fixtures and appliances']) {
-    assert.ok(inspectShots.includes(surface));
-    assert.ok(surfaces.includes(surface.split(' ')[0].toLowerCase()), `${surface} is not a coverage surface`);
-  }
+  // Claims counts findings; Inspect and Incident still walk rooms, because
+  // comparisons match by room name and coverage is per room.
+  assert.match(client, /damage: \{[\s\S]{0,400}unit: 'entry'/);
+  assert.match(server, /claims: Object\.freeze\(\{ unit: 'entry'/);
+  for (const tool of ['inspect', 'incident']) assert.match(server, new RegExp(`${tool}: Object\\.freeze\\(\\{ unit: 'room'`));
+  assert.match(client, /rooms: \[\{ name: entryTool\(type\) \? '' : wedge\(type\)\.seeds\[0\]/);
 
-  // The prompt describes the sequence, never the photograph: no tick, no claim.
-  assert.match(companion, /state==='now'\?'Now':'Next'/);
-  assert.match(companion, /<span>Done<\/span>/);
-  // Only what fits above the sheet: the shot now and the two after it.
-  assert.match(companion, /\.slice\(0,3\)/);
-  assert.doesNotMatch(companion, /✓|&check;|is-verified/);
-  // A shot moves the prompt on, and removing one steps it back.
-  assert.match(client, /if\(cameraRoom!==null&&i===cameraRoom\)cameraShots\.set\(i,shotStep\(i\)\+1\)/);
-  assert.match(companion, /cameraShots\.set\(cameraRoom,Math\.max\(0,shotStep\(cameraRoom\)-1\)\)/);
-  // The room chips still retarget the open camera, and the strip can remove.
-  assert.match(companion, /type:'inspectCameraRoom',room:index/);
-  assert.match(companion, /data-strip-remove/);
-  assert.match(companion, /draft\.files=draft\.files\.filter\(file=>file\.id!==id\)/);
+  // An unnamed entry keeps its empty name through validation and is numbered
+  // where it is read, so no document claims a location nobody gave.
+  assert.doesNotMatch(server, /text\(room\.name, 100\) \|\| 'Room'/);
+  assert.match(server, /const entryHeading = \(room, index\) => room\.name \|\| `Finding \$\{index \+ 1\}`/);
+  assert.match(client, /const entryLabel = \(room, index\) => room\?\.name \|\| `Finding \$\{index \+ 1\}`/);
+  for (const renderer of ['roomHtml', 'appendPdfRoom']) assert.ok(server.includes(`${renderer}`) && server.includes('entryHeading('), `${renderer} does not number an unnamed entry`);
+
+  // The capture screen is the words and the photographs. Nothing instructs.
+  assert.doesNotMatch(client, /shots:|shotStep|data-shot/);
+  assert.match(companion, /hud-note/);
+  assert.match(companion, /id="hud-talk"/);
+  assert.match(companion, /Next \$\{esc\(entries\?'finding'/);
+  // Dictation writes the speaker's own words, with nothing uploaded from here.
+  assert.match(client, /if\(hudDictation&&draft\?\.document\?\.rooms\[hudDictation\.index\]/);
+  assert.match(client, /if\(hudDictation\)\{hudDictation=null;/);
+});
+
+test('on the web a photograph asks what it is, before anything else', () => {
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const screen = client.slice(client.indexOf('function entryScreen('), client.indexOf('// One step visible at a time'));
+  // Adding a photo on the web opens the finding it just filled.
+  assert.match(client, /if\(entryTool\(\)&&!native&&cameraRoom===null\)return entryScreen\(i\)/);
+  assert.match(screen, /What is this\?/);
+  assert.match(screen, /id="entry-text"/);
+  assert.match(screen, /Add another photo/);
+  // Recording is only offered where it can work: it needs an account.
+  assert.match(screen, /\$\{session\?`<button type="button" class="secondary wide" data-voice/);
 });
 
 test('switching tools can never strand the app on a blank page', () => {

@@ -76,7 +76,7 @@ const WEDGES = {
     noun: 'detail', nounPlural: 'details',
     seeds: ['What happened', 'Where it happened', 'Who was involved', 'What we did'],
     eyebrow: 'New incident record', dateLabel: 'Date of the incident',
-    shots: ['The scene, wide', 'Where it happened, close', 'Anything that caused it', 'Signage or barriers'],
+    unit: 'room',
     signers: { manager: 'staff', other: 'witness' },
     disclaimer: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
   },
@@ -84,7 +84,9 @@ const WEDGES = {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
     eyebrow: 'New damage report', dateLabel: 'Date you found the damage',
-    shots: ['Wide shot of the room', 'Close-up of the damage', 'Something for scale', 'Serial or label (if any)'],
+    // A damage report is a list of findings, not a walk through rooms, so
+    // nothing has to be named before the first photograph.
+    unit: 'entry',
     signers: { manager: 'owner', other: 'guest' },
     disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
   },
@@ -92,12 +94,17 @@ const WEDGES = {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
     eyebrow: 'New condition report', dateLabel: 'Inspection date',
-    shots: ['Wide shot of the room', 'Floor', 'Walls and ceiling', 'Fixtures and appliances'],
+    unit: 'room',
     signers: { manager: 'manager', other: 'resident' },
     disclaimer: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
   },
 };
 const wedge = type => WEDGES[type] || WEDGES.default;
+// An entry is a room with no name: a thing you said plus the photos of it.
+// Numbered where it is read, never stored, so nothing claims a location that
+// was never given.
+const entryTool = type => wedge(type ?? draft?.document?.type).unit === 'entry';
+const entryLabel = (room, index) => room?.name || `Finding ${index + 1}`;
 const SIGNER_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
 const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
 const ROLE_LABELS = { witness: 'Witness', resident: 'Resident / tenant', owner: 'Owner / host', guest: 'Guest', manager: 'Manager / inspector' };
@@ -149,7 +156,7 @@ function markLocation(which){
     remember();
   }).catch(()=>{});
 }
-const newDocument = (propertyName, type = 'routine') => ({ propertyName: propertyName || '', author: rememberedAuthor(), type, date: localDate(), rooms: [{ name: wedge(type).seeds[0], observation: '', issue: false, photos: [] }], signatures: [] });
+const newDocument = (propertyName, type = 'routine') => ({ propertyName: propertyName || '', author: rememberedAuthor(), type, date: localDate(), rooms: [{ name: entryTool(type) ? '' : wedge(type).seeds[0], observation: '', issue: false, photos: [] }], signatures: [] });
 // Every wait on storage is bounded and the database is opened on demand, never
 // at module load. WebKit can leave indexedDB.open() pending forever, and a page
 // kept in the back/forward cache holds its connection; the boot used to wait on
@@ -719,7 +726,6 @@ function previewPlans(){
 async function start(propertyName = '', type) {
   dismissFlow();
   if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
-  cameraShots.clear();
   if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
@@ -776,7 +782,7 @@ function editor(step) {
       if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
       if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
     };
-    $('add-room').onclick = () => { if (d.rooms.length >=30) return notice(`Maximum 30 ${w.nounPlural}.`); d.rooms.push({name:nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
+    $('add-room').onclick = () => { if (d.rooms.length >=30) return notice(`Maximum 30 ${entryTool()?'findings':w.nounPlural}.`); d.rooms.push({name:entryTool()?'':nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
     $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
     $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor('rooms');}, button)); };
     if(d.type==='damage')for(const figure of $('rooms').querySelectorAll('figure[data-photo-id]')){
@@ -787,6 +793,22 @@ function editor(step) {
     if(d.type==='incident')for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
     if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel} the note.`;
     bindPhotoDrag();
+    // A finding is numbered, not named: the room name field has nothing to ask.
+    if(entryTool()){
+      const heading=$('app').querySelector('.row.spread h1');
+      if(heading)heading.textContent='What did you find?';
+      [...$('rooms').querySelectorAll('.room-card')].forEach((card,index)=>{
+        const name=card.querySelector('label');
+        if(name&&name.querySelector('[data-field="name"]'))name.remove();
+        const title=document.createElement('h2');
+        title.className='finding-heading';
+        title.textContent=entryLabel(d.rooms[index],index);
+        card.prepend(title);
+        const voice=card.querySelector('[data-voice]');
+        if(voice)voice.textContent='Talk through this finding';
+      });
+      if($('add-room'))$('add-room').textContent='+ Add finding';
+    }
     if(payAtExport()&&$('preview'))$('preview').textContent=`Build my ${skin().doc} →`;
     if(d.rooms.some(room=>room.photos.length))track('FirstPhotoAdded');
   }
@@ -950,7 +972,38 @@ async function addPhotos(input) {
     } catch { notice(`${file.name} could not be opened. Export it as JPEG or take a photo.`); }
     finally {URL.revokeObjectURL(objectURL);}
   }
-  await persist();editor();
+  await persist();
+  if(entryTool()&&!native&&cameraRoom===null)return entryScreen(i);
+  editor();
+}
+// One finding at a time: what you just added, what it is, and the way on.
+function entryScreen(index){
+  const d=draft.document,room=d.rooms[index];
+  if(!room)return editor('rooms');
+  enterScreen(`entry:${index}`);
+  updateHeader();setActiveNav('current');
+  const photos=room.photos.map((id,at)=>`<figure data-photo-id="${esc(id)}"><img src="${esc(photoURL(id))}" alt="Photo ${at+1}"><button type="button" class="photo-x" data-entry-remove="${esc(id)}" aria-label="Remove photo ${at+1}">&#10005;</button></figure>`).join('');
+  $('app').innerHTML=`<section class="entry-screen"><div class="screen-bar"><button type="button" id="entry-back" class="quiet">← All findings</button><span class="muted">${esc(entryLabel(room,index))}</span></div><div class="entry-photos">${photos}</div><label class="entry-note">What is this?<input id="entry-text" maxlength="4000" value="${esc(room.observation)}" placeholder="Chipped counter edge by the sink" autocomplete="off"></label>${session?`<button type="button" class="secondary wide" data-voice="${index}">Or record it</button>`:''}<div class="stack entry-actions"><label class="button wide">Add another photo<input type="file" id="entry-more" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><button type="button" id="entry-done" class="secondary wide">Done · ${d.rooms.filter(item=>item.photos.length||item.observation.trim()).length} ${d.rooms.filter(item=>item.photos.length||item.observation.trim()).length===1?'finding':'findings'}</button></div></section>`;
+  $('entry-text').oninput=event=>{room.observation=event.target.value;remember();};
+  $('entry-back').onclick=()=>editor('rooms');
+  $('entry-done').onclick=()=>editor('rooms');
+  document.querySelectorAll('[data-voice]').forEach(button=>button.onclick=()=>run(()=>recordRoom(index),button));
+  document.querySelectorAll('[data-entry-remove]').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.entryRemove,at=room.photos.indexOf(id);
+    if(at<0)return;
+    room.photos.splice(at,1);
+    const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}
+    draft.files=draft.files.filter(file=>file.id!==id);
+    remember();persist().catch(()=>{});entryScreen(index);
+  });
+  // Another photo is another finding, which is the rhythm the report wants.
+  $('entry-more').onchange=event=>run(async()=>{
+    if(!event.target.files?.length)return;
+    if(d.rooms.length>=30)return notice('Maximum 30 findings.');
+    d.rooms.push({name:'',observation:'',issue:false,photos:[]});
+    event.target.dataset.files=String(d.rooms.length-1);
+    await addPhotos(event.target);
+  });
 }
 // One step visible at a time. Both forms used to sit in the sheet together, so
 // the six-digit field appeared directly under "Send sign-in code" and the sheet
@@ -1325,10 +1378,22 @@ function nativeRecordRoom(index){
 }
 window.marketelInspectDictationText=raw=>{
   let data;try{data=JSON.parse(raw);}catch{return;}
+  if(hudDictation&&draft?.document?.rooms[hudDictation.index]&&typeof data.text==='string'){
+    const spoken=data.text.trim();
+    if(spoken){
+      const room=draft.document.rooms[hudDictation.index];
+      room.observation=hudDictation.base?`${hudDictation.base}\n${spoken}`:spoken;
+      remember();
+      const box=$('app').querySelector('.hud-note');
+      if(box)box.textContent=room.observation;
+    }
+    return;
+  }
   const box=$('live-caption');
   if(box&&typeof data.text==='string'&&data.text.trim())box.textContent=data.text;
 };
 window.marketelInspectAudioCaptured=raw=>{
+  if(hudDictation){hudDictation=null;persist().catch(()=>{});cameraCompanion();return;}
   const pending=nativeDictation;
   nativeDictation=null;
   if(!pending)return;
@@ -1401,8 +1466,8 @@ function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
-function reportRoom(r,label=''){
-  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(r.name)}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded photo"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
+function reportRoom(r,label='',index=0){
+  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded photo"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -1418,7 +1483,7 @@ function reportPreview(){
   const pw = wedge(draft?.document?.type);
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
-  const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report'):''}${reportRoom(room,before?'Current report':'')}</div>`;}).join('');
+  const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report',index):''}${reportRoom(room,before?'Current report':'',index)}</div>`;}).join('');
   $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${locationPreview(d)}${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div><p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
@@ -1840,40 +1905,47 @@ window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF expor
 // That space becomes the room list instead. Tapping a room retargets the open
 // camera, so a whole property is one session.
 let cameraRoom=null;
-// Which shot each room is up to. Kept per room, so coming back to one resumes
-// where it left off rather than starting the list again.
-const cameraShots=new Map();
-const shotStep=index=>Math.min(cameraShots.get(index)??0,(wedge(draft?.document?.type).shots||[]).length);
+// Dictation while the camera is open writes the speaker's own words straight
+// into the finding. It is the device's own engine, so there is no upload, no
+// account and no AI allowance between someone and their note.
+let hudDictation=null;
+function hudTalk(){
+  const shell=window.webkit?.messageHandlers?.marketelShell;
+  if(!shell||cameraRoom===null||!draft)return;
+  if(hudDictation){shell.postMessage({type:'inspectDictateStop'});hudDictation=null;cameraCompanion();return;}
+  const room=draft.document.rooms[cameraRoom];
+  hudDictation={index:cameraRoom,base:(room.observation||'').trim()};
+  shell.postMessage({type:'inspectDictate',room:cameraRoom});
+  haptic();cameraCompanion();
+}
 function cameraCompanion(){
   if(cameraRoom===null||!draft)return;
   document.documentElement.classList.add('camera-open');
-  const rooms=draft.document.rooms,w=wedge(draft.document.type),shots=w.shots||[];
+  const rooms=draft.document.rooms,w=wedge(draft.document.type),entries=entryTool();
   const room=rooms[cameraRoom];
   if(!room)return;
-  const step=shotStep(cameraRoom);
-  // Now, then what is coming, then what is behind — dimmed, not ticked. None of
-  // this can see the photograph, so none of it says what a photograph shows.
-  // Three rows at most: the shot to take and the two after it. Everything
-  // already passed collapses to one line, because the sheet leaves about a
-  // third of a screen and the strip and the rooms have to fit under this.
-  const upcoming=shots.map((text,index)=>({text,index})).filter(shot=>shot.index>=step).slice(0,3);
-  const prompts=upcoming.map(shot=>{
-    const state=shot.index===step?'now':'next';
-    return `<button type="button" class="shot is-${state}" data-shot="${shot.index}"><span>${state==='now'?'Now':'Next'}</span><strong>${esc(shot.text)}</strong></button>`;
-  }).join('');
-  const done=step?`<button type="button" class="shot is-done" data-shot="${step-1}"><span>Done</span><strong>${step} of ${shots.length}${step===1?'':''} \u00b7 tap to go back</strong></button>`:'';
+  const talking=!!hudDictation;
+  const note=(room.observation||'').trim();
   const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
-  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>${esc(room.name)||`${esc(w.noun)} ${cameraRoom+1}`} <span class="camera-count">${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></h1><div class="shots">${step>=shots.length?`<p class="shot is-now"><span>Now</span><strong>Extra angles welcome</strong></p>`:''}${prompts}${done}</div><div class="camera-rooms">${rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(item.name)||`${esc(w.noun)} ${index+1}`}</strong><span>${item.photos.length}</span></button>`).join('')}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here. Tap another ${esc(w.noun)} to send them there.</small></p>`}</div></section>`;
+  const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?entryLabel(item,index):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
+  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>${esc(entries?entryLabel(room,cameraRoom):(room.name||`${w.noun} ${cameraRoom+1}`))} <span class="camera-count">${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></h1><div class="hud-note${talking?' is-live':''}">${note?esc(note):`<span class="muted">${talking?'Listening…':'Say what you are looking at, then photograph it.'}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${native?`<button type="button" id="hud-talk" class="${talking?'danger-button':''} wide">${talking?'Stop':'Hold to talk'}</button>`:''}<button type="button" id="hud-next" class="secondary wide">Next ${esc(entries?'finding':w.noun)}</button></div><div class="camera-rooms">${subjects}</div></section>`;
+  if($('hud-talk'))$('hud-talk').onclick=hudTalk;
+  $('hud-next').onclick=()=>{
+    if(rooms.length>=30)return notice(`Maximum 30 ${entries?'findings':w.nounPlural}.`);
+    if(hudDictation)hudTalk();
+    rooms.push({name:entries?'':nextRoomName(rooms),observation:'',issue:false,photos:[]});
+    cameraRoom=rooms.length-1;
+    remember();persist().catch(()=>{});
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:entries?entryLabel(rooms[cameraRoom],cameraRoom):(rooms[cameraRoom]?.name||'')});
+    haptic();cameraCompanion();
+  };
   document.querySelectorAll('[data-camera-room]').forEach(button=>button.onclick=()=>{
     const index=Number(button.dataset.cameraRoom);
     if(index===cameraRoom)return;
+    if(hudDictation)hudTalk();
     cameraRoom=index;haptic();
-    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:draft.document.rooms[index]?.name||''});
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:entries?entryLabel(draft.document.rooms[index],index):(draft.document.rooms[index]?.name||'')});
     cameraCompanion();
-  });
-  document.querySelectorAll('[data-shot]').forEach(button=>button.onclick=()=>{
-    cameraShots.set(cameraRoom,Number(button.dataset.shot));
-    haptic();cameraCompanion();
   });
   // A blurred shot is worth catching here, in front of the thing, rather than
   // at the reveal. The cross rather than the photo itself: one hand is holding
@@ -1884,7 +1956,6 @@ function cameraCompanion(){
     photos.splice(at,1);
     const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}
     draft.files=draft.files.filter(file=>file.id!==id);
-    cameraShots.set(cameraRoom,Math.max(0,shotStep(cameraRoom)-1));
     haptic();remember();persist().catch(()=>{});cameraCompanion();
   });
 }
@@ -1910,7 +1981,6 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   const id=uid();
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`});
   draft.document.rooms[i].photos.push(id);
-  if(cameraRoom!==null&&i===cameraRoom)cameraShots.set(i,shotStep(i)+1);
   remember();await persist();
   if(cameraRoom!==null)cameraCompanion();
   else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
