@@ -1276,7 +1276,7 @@ test('the AI is the path, and the note is never hidden once written', () => {
     // The recording event has to clear the auth boundary, because the owners it
     // exists to count are exactly the ones who have not signed in yet.
     const anon = server.slice(server.indexOf('const ANON_EVENTS'), server.indexOf('router.use((req, res, next) => {\n    const raw'));
-    assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded', \.\.\.LADDER_EVENTS\]\)/);
+    assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded', \.\.\.LADDER_EVENTS/);
     assert.match(anon, /record\(null, req\.body\.name, undefined, eventExtra\(req\.body\)\)/);
     assert.match(anon, /rate\(`inspect-anon-events:/);
     assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in to Inspect.'),
@@ -1626,4 +1626,124 @@ test('Inspect email-code requests acquire a Prisma-safe advisory lock', async ()
   assert.equal(challengeCreated, true);
   assert.equal(emailSent, true);
   registration.close();
+});
+
+// ——— The simulation funnel ————————————————————————————————————————
+test('the simulation sells before anyone has an account, and Stripe collects the email', async () => {
+  const updates = [];
+  const h = moneyHarness({
+    stripe: {
+      prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) },
+      subscriptions: { update: async (id, params) => { updates.push({ id, params }); return { id }; } },
+    },
+  });
+  try {
+    // No Authorization header: this is the whole point of the route.
+    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interval: 'month', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` }) });
+    assert.equal(response.status, 200);
+    const { params } = h.calls.sessions[0];
+    assert.equal(params.mode, 'subscription');
+    // No customer, so Stripe asks for the email itself and Apple Pay fills it.
+    assert.ok(!('customer' in params));
+    assert.equal(params.metadata.sim, '1');
+    assert.equal(params.metadata.product, 'marketel-inspect');
+    assert.equal(params.metadata.tool, 'claims');
+    assert.deepEqual(params.subscription_data.metadata, params.metadata);
+    assert.equal(params.success_url, 'https://bookmarketel.com/claims?sim=1&checkout=success');
+    assert.equal(params.cancel_url, 'https://bookmarketel.com/claims?sim=1&checkout=cancelled');
+    assert.ok(h.calls.events.some(event => event.name === 'SimCheckoutStarted' && event.tool === 'claims'));
+  } finally { h.registration.close(); }
+});
+
+test('a simulation purchase creates the account from the email Stripe collected', async () => {
+  const updates = [];
+  const h = moneyHarness({
+    account: { stripeCustomerId: null, email: 'newbuyer@example.com' },
+    stripe: {
+      subscriptions: {
+        update: async (id, params) => { updates.push({ id, params }); return { id }; },
+        retrieve: async id => ({ id, metadata: { product: 'not-marketel-inspect' } }),
+      },
+    },
+  });
+  const event = { type: 'checkout.session.completed', created: 1760000000, data: { object: {
+    id: 'cs_sim', mode: 'subscription', subscription: 'sub_sim', customer: 'cus_sim',
+    customer_details: { email: 'NewBuyer@Example.com ' },
+    metadata: { product: 'marketel-inspect', sim: '1', interval: 'month', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` } } } };
+  try {
+    const response = await request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
+    assert.equal(response.status, 200);
+    // The Stripe customer is adopted, because this account had none.
+    assert.ok(h.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+    // And the subscription is stamped, which is what syncSubscription reads.
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].id, 'sub_sim');
+    assert.equal(updates[0].params.metadata.inspectAccountId, 'acct_1');
+    assert.equal(updates[0].params.metadata.product, 'marketel-inspect');
+    assert.equal(updates[0].params.metadata.tool, 'claims');
+    assert.ok(h.calls.events.some(event => event.name === 'SimPurchased'));
+  } finally { h.registration.close(); }
+
+  // An account that already has a Stripe customer keeps it: the subscription
+  // still finds its way home through the metadata, and overwriting the link
+  // would strand the billing portal on a customer it never used.
+  const linked = moneyHarness({
+    account: { stripeCustomerId: 'cus_existing' },
+    stripe: { subscriptions: { update: async () => ({}), retrieve: async id => ({ id, metadata: {} }) } },
+  });
+  try {
+    await request(linked.app, '/api/inspect-stripe-webhook', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
+    assert.ok(!linked.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+  } finally { linked.registration.close(); }
+});
+
+test('the simulation ladder is measurable and closed to anything else', async () => {
+  const h = moneyHarness();
+  try {
+    for (const name of ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed']) {
+      const response = await request(h.app, '/api/inspect/events/anon', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, tool: 'claims', detail: 'carpet' }) });
+      assert.equal(response.status, 200, name);
+    }
+    assert.ok(h.calls.events.some(event => event.name === 'SimFindingPicked' && event.detail === 'carpet'));
+    // Which finding they picked is the only detail carried, and it is a slug.
+    const dirty = await request(h.app, '/api/inspect/events/anon', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'SimPhotoTaken', tool: 'claims', detail: '<script>' }) });
+    assert.equal(dirty.status, 200);
+    assert.ok(h.calls.events.some(event => event.name === 'SimPhotoTaken' && event.detail === null));
+    const unknown = await request(h.app, '/api/inspect/events/anon', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'SimWhatever', tool: 'claims' }) });
+    assert.equal(unknown.status, 400);
+  } finally { h.registration.close(); }
+});
+
+test('every sample photo the simulation offers actually exists', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const root = path.join(__dirname, '..', 'public', 'inspect');
+  const src = fs.readFileSync(path.join(root, 'inspect.js'), 'utf8');
+  const block = src.slice(src.indexOf('const SIMS = {'), src.indexOf('const simTool ='));
+  assert.ok(block.length > 500, 'the simulation registry should be in the bundle');
+  for (const tool of ['inspect', 'claims']) {
+    const arm = block.slice(block.indexOf(`  ${tool}: {`));
+    const photos = [...arm.slice(0, arm.indexOf('\n  },')).matchAll(/photo: '([a-z-]+)'/g)].map(m => m[1]);
+    assert.equal(photos.length, 3, `${tool} should offer three things to document`);
+    assert.ok(photos.every(photo => photo.startsWith(`${tool}-`)), `${tool} photos: ${photos.join(', ')}`);
+    for (const photo of photos) {
+      for (const variant of [`${photo}.jpg`, `${photo}-thumb.jpg`]) {
+        const file = path.join(root, 'sample', variant);
+        assert.ok(fs.existsSync(file), `missing sample image ${variant}`);
+        // The page promises twenty seconds; a full-size shot over 500KB and
+        // three thumbnails over 40KB each stop it keeping that promise.
+        const bytes = fs.statSync(file).size;
+        assert.ok(bytes < (variant.includes('-thumb') ? 40_000 : 500_000), `${variant} is ${bytes} bytes`);
+      }
+    }
+  }
+  // The simulation must never write into the real pipeline.
+  const sim = src.slice(src.indexOf('const SIMS = {'), src.indexOf('function landing() {'));
+  assert.ok(!/persist\(|stored\('put'|api\('\/reports/.test(sim), 'the simulation must not touch drafts or reports');
 });

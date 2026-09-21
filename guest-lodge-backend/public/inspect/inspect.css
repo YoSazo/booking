@@ -449,3 +449,91 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .camera-room span { color: var(--muted); font-size: 13px; font-weight: 450; }
 .camera-room.is-active { background: var(--green); border-color: var(--green); color: #fff; }
 .camera-room.is-active span { color: #ffffffc2; }
+
+/* ——— The simulation funnel (?sim=1) ————————————————————————————————
+   Four taps on a phone: pick, shutter, hold, pay. Everything here exists to
+   make two of those taps feel like the app they are being sold — the shutter
+   has to feel like taking a photo and the hold has to feel like speaking,
+   because that feeling is the argument. */
+.sim { padding-bottom: 28px; }
+.sim-intro h1 { font-size: clamp(25px, 7vw, 33px); line-height: 1.12; letter-spacing: -.8px; margin: 6px 0 10px; }
+.sim-intro .green { color: var(--green); }
+.sim-fields { display: flex; gap: 10px; margin: 16px 0 22px; }
+.sim-fields div { flex: 1 1 0; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; }
+.sim-fields small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.sim-fields strong { font-weight: 650; font-size: 15px; }
+.sim-prompt { font-size: 19px; margin: 0 0 12px; }
+.sim-picks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.sim-pick { display: block; padding: 0; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; text-align: center; color: inherit; }
+.sim-pick img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+.sim-pick span { display: block; padding: 8px 5px; font-size: 12px; font-weight: 600; line-height: 1.25; }
+.sim-pick:active { transform: scale(.97); border-color: var(--green); }
+.sim-foot { color: var(--muted); margin-top: 14px; }
+
+/* The viewfinder. A static JPEG reads as a frozen camera, so it drifts, it
+   grains, and the reticle hunts once before it locks. */
+.sim-view { position: relative; aspect-ratio: 3 / 4; max-height: 62vh; margin: 4px 0 14px; border-radius: 22px; overflow: hidden; background: #0d120f; transition: transform .1s ease; }
+.sim-view.is-capturing { transform: scale(.965); }
+.sim-feed { width: 100%; height: 100%; object-fit: cover; animation: sim-drift 11s ease-in-out infinite alternate; }
+.sim-grain { position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.sim-reticle { position: absolute; top: 50%; left: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border: 1.5px solid #ffffffe0; border-radius: 6px; opacity: 0; animation: sim-lock 1.9s ease .35s forwards; }
+.sim-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.sim-flash.is-on { animation: sim-flash .22s ease; }
+.sim-hint { position: absolute; left: 0; right: 0; bottom: 12px; margin: 0; text-align: center; color: #fff; font-size: 13px; font-weight: 600; text-shadow: 0 1px 4px #000000a8; }
+.sim-bar { text-align: center; }
+.sim-bar .muted { margin-top: 10px; }
+.sim-shutter { width: 72px; height: 72px; padding: 0; border-radius: 50%; background: #fff; border: 4px solid #ffffff66; box-shadow: 0 0 0 2px var(--green-dark) inset, 0 6px 18px #173b2333; }
+.sim-shutter:active { transform: scale(.92); }
+.sim-strip { display: flex; gap: 8px; justify-content: center; min-height: 52px; align-items: center; }
+.sim-shot { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; opacity: 0; transform: scale(2.6) translateY(-44px); transition: opacity .34s ease, transform .34s cubic-bezier(.2,.7,.3,1); }
+.sim-shot.is-in { opacity: 1; transform: none; }
+
+/* Their words arriving under their own finger. The raw line and the written
+   one share the box so one replaces the other in place — that swap is the
+   whole product, and it should happen where they are already looking. */
+.sim-talk h1 { font-size: 21px; margin: 2px 0 10px; letter-spacing: -.6px; }
+.sim-eyebrow { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.sim-count { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+/* The hint, the raw line and the written note share one grid cell, so the box
+   is always as tall as the tallest of them: the swap happens with nothing
+   moving on the screen, and a faded-out hint cannot shove the transcript
+   sideways the way an invisible inline span does. */
+.sim-note { display: grid; padding: 13px 15px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; font-size: 17px; line-height: 1.38; transition: background-color .4s ease, border-color .4s ease; }
+.sim-note > * { grid-area: 1 / 1; align-self: start; transition: opacity .34s ease; }
+.sim-hint-line { color: var(--muted); }
+.sim-hint-line.is-gone { opacity: 0; }
+.sim-written { opacity: 0; }
+.sim-written p { margin: 0 0 6px; }
+.sim-written small { color: var(--green); font-weight: 650; }
+.sim-note.is-written { border-color: var(--green); background: var(--green-pale); }
+.sim-note.is-written .sim-said, .sim-note.is-written .sim-hint-line { opacity: 0; }
+.sim-note.is-written .sim-written { opacity: 1; }
+/* Bar heights come from the sentence's own syllables, so this reads as a
+   recording rather than an animation looping over a sine wave. */
+.sim-wave { display: flex; align-items: center; justify-content: space-between; gap: 2px; height: 44px; margin: 12px 0 8px; transition: opacity .3s ease; }
+.sim-wave i { flex: 1 1 0; height: 100%; background: var(--border); border-radius: 2px; transform: scaleY(.08); transform-origin: center; transition: transform .08s linear, background-color .12s ease; }
+.sim-wave i.is-live { background: var(--green); }
+.sim-wave.is-done { opacity: .35; }
+.sim-talk .sim-strip { justify-content: flex-start; }
+.sim-actions { margin-top: 14px; }
+.sim-talk-button { width: 100%; min-height: 56px; font-size: 17px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sim-talk-button.is-live { background: var(--green-dark); box-shadow: 0 0 0 6px #2e7d5b26; }
+.sim-talk-button:disabled { opacity: 1; }
+
+/* The sample document, then the price directly beneath it — the report is the
+   argument and it should still be on screen while the ask is read. */
+.sim-doc { position: relative; overflow: hidden; }
+.sim-stamp { position: absolute; top: 34px; right: -42px; width: 190px; padding: 5px 0; transform: rotate(38deg); background: #2e7d5b1f; color: var(--green-dark); text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .22em; }
+.sim-offer { margin-top: 16px; }
+.sim-offer h2 { margin-top: 0; }
+
+@keyframes sim-drift { from { transform: scale(1.02); } to { transform: scale(1.05) translate3d(-1%, .8%, 0); } }
+@keyframes sim-flash { from { opacity: .92; } to { opacity: 0; } }
+@keyframes sim-lock { 0% { opacity: 0; transform: scale(1.5); } 40% { opacity: .95; transform: scale(1); } 70% { opacity: .95; transform: scale(.92); } 100% { opacity: .4; transform: scale(.92); } }
+/* The JS already skips its own timings under reduced motion; this covers the
+   decoration it does not control. */
+@media (prefers-reduced-motion: reduce) {
+  .sim-feed { animation: none; }
+  .sim-reticle { animation: none; opacity: .4; }
+  .sim-shot { transition: none; opacity: 1; transform: none; }
+}

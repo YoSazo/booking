@@ -712,11 +712,17 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The funnel ladder a cold visitor climbs before they ever sign in. Each step
   // carries the tool and an anonymous visitor id, never content.
   const LADDER_EVENTS = ['LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined'];
-  const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS]);
+  // The simulation's own ladder. It is a different funnel with different
+  // joints, so it is measured separately rather than folded into the one
+  // above — comparing them is the entire reason both exist.
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed'];
+  const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
+  const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({
     tool: toolOf(body?.tool),
     visitorId: visitorOf(body?.visitorId),
-    detail: body?.name === 'OfferDeclined' && DECLINE_REASONS.includes(body?.detail) ? body.detail : null,
+    detail: body?.name === 'OfferDeclined' && DECLINE_REASONS.includes(body?.detail) ? body.detail
+      : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail) : null,
   });
   router.post('/events/anon', guarded(async (req, res) => {
     if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown Inspect event.');
@@ -747,6 +753,34 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         .catch(error => console.error('Inspect Lead CAPI queue failed:', error.message));
     }
     res.json({ success: true });
+  }));
+
+  // The simulation sells before anyone has an account. Standing an email, a
+  // six-digit code and a sign-in between the sample report and the card would
+  // cost more than the subscription is worth at this price, so Stripe collects
+  // the email on its own page — one tap with Apple Pay — and the account is
+  // created from it when the webhook comes back.
+  router.post('/checkout/sim', guarded(async (req, res) => {
+    requireBilling();
+    rate(`inspect-sim-checkout:${req.ip}`, 12, 3600000);
+    const tool = toolOf(req.body?.tool);
+    const interval = req.body?.interval === 'year' ? 'year' : 'month';
+    const plan = inspectPlan(interval);
+    const priceId = env[plan.priceEnv];
+    if (!priceId) throw fail(503, 'That Inspect plan is not configured yet.');
+    const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
+    const visitor = visitorOf(req.body?.visitorId);
+    const metadata = { product: 'marketel-inspect', sim: '1', interval, tool, visitorId: visitor || '' };
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: price.id, quantity: 1 }],
+      metadata,
+      subscription_data: { metadata },
+      success_url: toolReturn(tool, 'sim=1&checkout=success'),
+      cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
+    });
+    await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
+    res.json({ url: session.url });
   }));
 
   router.use((req, res, next) => {
@@ -1486,6 +1520,39 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       contentName: `${TOOLS[tool].label} report`, eventTime: Number(event.created) || undefined,
     }).catch(error => console.error('Inspect report Purchase CAPI queue failed:', error.message));
   }
+  // A simulation buyer pays before they have an account — Stripe collected the
+  // email on its own page — so the account is created here, on the way back,
+  // and the subscription is stamped with its id. syncSubscription reads that
+  // id, so this has to run before it does.
+  //
+  // An email that already has an account keeps it, and keeps whichever Stripe
+  // customer it was already linked to: the subscription still finds its way
+  // home through the metadata, and overwriting the link would strand the
+  // billing portal on a customer the account never used.
+  const adoptSimCheckout = async (session, req) => {
+    if (!session?.subscription) return null;
+    let email;
+    try { email = emailOf(session.customer_details?.email || session.customer_email); }
+    catch { return null; }
+    const tool = toolOf(session.metadata?.tool);
+    const account = await prisma.$transaction(async tx => {
+      const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
+      const row = await tx.inspectAccount.upsert({ where: { email },
+        create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
+      if (row.stripeCustomerId) return row;
+      return tx.inspectAccount.update({ where: { id: row.id }, data: { stripeCustomerId: String(session.customer) } });
+    });
+    await stripe.subscriptions.update(String(session.subscription), {
+      metadata: {
+        product: 'marketel-inspect',
+        inspectAccountId: account.id,
+        interval: session.metadata?.interval === 'year' ? 'year' : 'month',
+        tool,
+      },
+    });
+    await recordBestEffort(account.id, 'SimPurchased', `inspect-sim-purchase:${session.id}`, { tool, visitorId: visitorOf(session.metadata?.visitorId) });
+    return account;
+  };
   app.post('/api/inspect-stripe-webhook', guarded(async (req, res) => {
     if (!enabled || !stripe || !env.STRIPE_INSPECT_WEBHOOK_SECRET) return res.sendStatus(503);
     let event;
@@ -1494,6 +1561,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.product === 'marketel-inspect-report') {
       await grantReportPurchase(event, req);
       return res.json({ received: true });
+    }
+    if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.sim === '1') {
+      await adoptSimCheckout(event.data.object, req);
     }
     let subscriptionId;
     if (event.type.startsWith('customer.subscription.')) subscriptionId = event.data.object.id;

@@ -614,6 +614,221 @@ function track(name, detail, once = true) {
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
 // A document carries its own brand, whichever tool it was opened through.
 const documentLabelFor = type => type === 'damage' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
+// ——— The simulation funnel (?sim=1) ———————————————————————————————
+// A cold click off an ad cannot photograph anything: they are in bed, at work,
+// in a car. Every funnel that asks them to build a real report fails at step
+// one. So this one builds a report in front of them instead — our photos,
+// their taps, and the single thing about this product that a screenshot cannot
+// show, which is speech turning into written prose.
+//
+// It never touches draft, IndexedDB or /reports. It paints, it sells, and it
+// dies when the tab closes.
+const SIMS = {
+  inspect: {
+    heading: 'Create your inspection report',
+    property: '123 Main Street', unit: 'Unit 4B',
+    findings: [
+      { id: 'wall', label: 'Wall scuff', room: 'Living Room', photo: 'inspect-wall',
+        said: 'living room wall beside the door has a scuff and some of the paint has come away',
+        note: 'Scuffing and localised paint loss on the lower wall beside the door frame, approximately 30cm across. Photographed for record.' },
+      { id: 'carpet', label: 'Carpet wear', room: 'Bedroom', photo: 'inspect-carpet',
+        said: 'bedroom carpet is worn flat along the walkway through to the hall',
+        note: 'Flattened pile and visible wear along the traffic path between the bedroom and hallway. No staining or tearing observed.' },
+      { id: 'grout', label: 'Grout and sealant', room: 'Bathroom', photo: 'inspect-grout',
+        said: 'bathroom grout along the bottom of the tiles is going black in the corner',
+        note: 'Discoloured grout and early mildew along the base of the tiled wall in the corner. Cleaning or resealing recommended.' },
+    ],
+  },
+  claims: {
+    heading: 'Create your damage report',
+    property: '123 Main Street', unit: 'Unit 4B',
+    findings: [
+      { id: 'wall', label: 'Wall damage', room: 'Living Room', photo: 'claims-wall',
+        said: 'there is a hole punched right through the wall by the bedroom door, the plasterboard is broken through',
+        note: 'Impact damage to the wall beside the bedroom door: plasterboard punctured through, approximately 15cm across, with cracked paint around the opening.' },
+      { id: 'carpet', label: 'Carpet stain', room: 'Bedroom', photo: 'claims-carpet',
+        said: 'big red wine stain soaked into the bedroom carpet next to the drawers',
+        note: 'Large red wine stain soaked into the bedroom carpet beside the chest of drawers, approximately 50cm across. Photographed before any cleaning.' },
+      { id: 'cabinet', label: 'Broken cabinet', room: 'Kitchen', photo: 'claims-cabinet',
+        said: 'kitchen cabinet door is hanging off, the hinge has torn straight out of the wood',
+        note: 'Kitchen cabinet door detached at the hinge, with the screw fixings torn out of the door frame and the surrounding timber split.' },
+    ],
+  },
+};
+const simTool = () => SIMS[toolId()] || null;
+// Phone-shaped only. A fake iOS camera sheet in a desktop browser reads as
+// broken, and the traffic this exists for is almost entirely mobile.
+function simActive(){
+  if(native||!simTool())return false;
+  if(new URLSearchParams(location.search).get('sim')!=='1')return false;
+  return window.matchMedia?.('(max-width: 760px)')?.matches ?? window.innerWidth<=760;
+}
+const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+const simPhoto = (name,thumb=false) => `/inspect/sample/${name}${thumb?'-thumb':''}.jpg`;
+let simPicked = null;
+// Real speech is bursts at syllable rate with pauses at punctuation, so the
+// bar heights come from the sentence itself. An even wave reads as fake on
+// sight, and this has to pass for a recording of the line being spoken.
+function speechEnvelope(text,bars=40){
+  const chars=[...String(text||'')];
+  if(!chars.length)return new Array(bars).fill(0.1);
+  const weight=c=>/[aeiouy]/i.test(c)?1:/[.,;!?]/.test(c)?0.05:/\s/.test(c)?0.1:0.5;
+  const out=[];
+  for(let i=0;i<bars;i++){
+    const from=Math.floor(i*chars.length/bars),to=Math.max(from+1,Math.floor((i+1)*chars.length/bars));
+    let sum=0;for(let j=from;j<to&&j<chars.length;j++)sum+=weight(chars[j]);
+    out.push(Math.min(1,0.16+(sum/(to-from))*0.95));
+  }
+  return out;
+}
+// They paid from the simulation, so there is no session to come back to: the
+// account was created from the email Stripe collected. The one thing worth
+// saying here is how to get into it, and where the app is.
+function simThanks(){
+  enterScreen('sim');
+  const sk=skin();
+  document.documentElement.classList.add('sim-mode');
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">Your account is set up under the email you paid with. Sign in with that address and your first real ${esc(sk.doc)} is ready to start.</p><button type="button" id="sim-signin" class="wide">Sign in and start →</button><a class="button secondary wide" href="${esc(appStoreUrl)}">Get the iPhone app</a><p><small>The app is where you talk through a ${esc(sk.doc)} while you are standing in the property.</small></p></section>`;
+  $('sim-signin').onclick=()=>{
+    document.documentElement.classList.remove('sim-mode');
+    history.replaceState(null,'',location.pathname);
+    ensureAuth(()=>run(()=>openAccountHome()),'signin');
+  };
+}
+function simResume(){
+  const state=new URLSearchParams(location.search).get('checkout');
+  if(state==='success'){simThanks();return;}
+  const s=simTool();
+  let picked=null;
+  try{picked=sessionStorage.getItem('inspect.sim.pick');}catch{}
+  simPicked=s.findings.find(f=>f.id===picked)||null;
+  if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simReport();return;}
+  simIntro();
+}
+function simIntro(){
+  enterScreen('sim');
+  const s=simTool();
+  document.documentElement.classList.add('sim-mode');
+  track('SimStarted');
+  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">We have filled in the details and picked the sample photos for you. We just want to show you what you get.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p></section>`;
+  for(const button of $('app').querySelectorAll('[data-sim-pick]'))
+    button.onclick=()=>simCamera(s.findings.find(f=>f.id===button.dataset.simPick)||s.findings[0]);
+}
+function simCamera(finding){
+  enterScreen('sim');
+  simPicked=finding;
+  try{sessionStorage.setItem('inspect.sim.pick',finding.id);}catch{}
+  track('SimFindingPicked',finding.id);
+  $('app').innerHTML=`<section class="sim sim-camera"><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(finding.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div><p class="sim-hint">${esc(finding.room)} · ${esc(finding.label)}</p></div><div class="sim-bar"><div class="sim-strip" id="sim-strip"></div><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"></button><p class="muted"><small>Tap to photograph it.</small></p></div></section>`;
+  let taken=false;
+  $('sim-shutter').onclick=()=>{
+    if(taken)return;taken=true;
+    track('SimPhotoTaken',finding.id);
+    const quick=simReduced();
+    if(!quick){
+      $('sim-view').classList.add('is-capturing');
+      $('sim-flash').classList.add('is-on');
+      setTimeout(()=>{$('sim-view')?.classList.remove('is-capturing');$('sim-flash')?.classList.remove('is-on');},220);
+    }
+    const tile=document.createElement('img');
+    tile.className='sim-shot';tile.src=simPhoto(finding.photo,true);tile.alt='';
+    $('sim-strip').appendChild(tile);
+    requestAnimationFrame(()=>tile.classList.add('is-in'));
+    setTimeout(()=>simTalk(finding),quick?0:540);
+  };
+}
+// The hold is the speaking. No microphone and no permission prompt: a
+// permission dialog on cold traffic is a hard stop, and the words appearing
+// under their own finger is what makes this feel like theirs rather than a
+// video they are stuck in.
+function simTalk(finding){
+  enterScreen('sim');
+  const s=simTool(),levels=speechEnvelope(finding.said),words=finding.said.split(/\s+/).filter(Boolean);
+  $('app').innerHTML=`<section class="sim sim-talk"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(finding.room)} <span class="sim-count">1 photo</span></h1><div class="sim-note" id="sim-note"><span class="sim-hint-line" id="sim-hint-line">Hold the button and say what you are looking at.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(finding.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-strip"><img class="sim-shot is-in" src="${esc(simPhoto(finding.photo,true))}" alt=""></div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button">Hold to talk</button><p class="muted"><small>In the real app this is your voice.</small></p></div></section>`;
+  const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),button=$('sim-talk-button');
+  const ticks=[...wave.querySelectorAll('i')];
+  const perWord=220,span=Math.max(900,words.length*perWord);
+  let holding=false,elapsed=0,last=0,frame=0,settled=false;
+  const paint=progress=>{
+    const shown=Math.max(1,Math.round(words.length*Math.min(1,progress)));
+    said.textContent=words.slice(0,shown).join(' ');
+    hint.classList.add('is-gone');
+    const head=Math.min(1,progress)*ticks.length;
+    ticks.forEach((bar,i)=>{
+      bar.style.transform=`scaleY(${(i<head?levels[i]:0.08).toFixed(3)})`;
+      bar.classList.toggle('is-live',i<head);
+    });
+  };
+  const settle=()=>{
+    if(settled)return;settled=true;
+    cancelAnimationFrame(frame);
+    holding=false;button.classList.remove('is-live');button.textContent='Hold to talk';
+    button.disabled=true;
+    paint(1);
+    track('SimNoteWritten',finding.id);
+    const reveal=()=>{
+      note.classList.add('is-written');
+      wave.classList.add('is-done');
+      const next=document.createElement('button');
+      next.type='button';next.id='sim-see';next.className='wide';next.textContent=`See the ${skin().doc} →`;
+      next.onclick=()=>simReport();
+      $('app').querySelector('.sim-actions').replaceChildren(next);
+      if(!simReduced())setTimeout(()=>{if($('sim-see'))simReport();},2200);
+    };
+    simReduced()?reveal():setTimeout(reveal,420);
+  };
+  const tick=now=>{
+    if(!holding)return;
+    elapsed+=Math.min(64,now-(last||now));last=now;
+    const progress=elapsed/span;
+    paint(progress);
+    if(progress>=1){settle();return;}
+    frame=requestAnimationFrame(tick);
+  };
+  const start=event=>{
+    event.preventDefault();
+    if(settled||holding)return;
+    holding=true;last=0;
+    button.classList.add('is-live');button.textContent='Listening…';
+    frame=requestAnimationFrame(tick);
+  };
+  // Letting go early finishes the line rather than truncating it: the written
+  // note is the whole point of the screen, and a half sentence would sell it short.
+  const stop=()=>{ if(!holding||settled)return; holding=false; cancelAnimationFrame(frame); settle(); };
+  button.addEventListener('pointerdown',start);
+  button.addEventListener('pointerup',stop);
+  button.addEventListener('pointercancel',stop);
+  button.addEventListener('pointerleave',stop);
+  // A plain click (assistive tech, or a browser that sends no pointer events)
+  // still has to reach the note.
+  button.addEventListener('click',event=>{event.preventDefault();if(!settled&&!holding)settle();});
+}
+function simReport(){
+  enterScreen('sim');
+  const s=simTool(),sk=skin();
+  track('SimReportShown');
+  const ordered=[simPicked,...s.findings.filter(f=>f!==simPicked)].filter(Boolean);
+  const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
+  const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
+  const plan=PLANS[planInterval]||PLANS.month;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-sim-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-sim-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:'Cancel anytime.'}</p><ul class="offer-points"><li>Unlimited ${esc(sk.docPlural)}</li><li>No per-property or per-room fees</li><li>Talk through it and ${esc(sk.writesLabel||'it writes')} the notes</li><li>PDF export on every ${esc(sk.doc)}</li></ul><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section>`;
+  for(const button of $('app').querySelectorAll('[data-sim-plan]'))
+    button.onclick=()=>{planInterval=button.dataset.simPlan==='year'?'year':'month';simReport();};
+  $('sim-buy').onclick=event=>run(async()=>{
+    haptic();
+    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId}});
+    openExternal(r.url);
+  },event.currentTarget);
+  // "Viewed" should mean seen, not merely rendered — the offer sits below a
+  // full page of report.
+  const offer=$('sim-offer');
+  if(typeof IntersectionObserver==='function'){
+    const watch=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){track('SimOfferViewed');watch.disconnect();}
+    },{threshold:0.35});
+    watch.observe(offer);
+  }else track('SimOfferViewed');
+}
 function landing() {
   enterScreen('landing');
   const arm = landingArm();
@@ -1466,8 +1681,8 @@ function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
-function reportRoom(r,label='',index=0){
-  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(photoURL(id))}" alt="Recorded photo"><small>${draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo'}</small>`).join('')}</section>`;
+function reportRoom(r,label='',index=0,sample=null){
+  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small>${sample?esc(sample.sourceLabel):(draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo')}</small>`).join('')}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -2103,7 +2318,8 @@ function renderRecovery(){
   if($('recovery-tools'))$('recovery-tools').onclick=()=>location.replace('../index.html?choose=1');
 }
 const bootWatchdog=setTimeout(()=>{if(!booted)renderRecovery();},12000);
-try{
+if(simActive()){clearTimeout(bootWatchdog);booted=true;simResume();}
+else try{
   $('app').innerHTML=`<section class="loading">Opening Marketel ${esc(skin().product)}…</section>`;
   // Storage gets one bounded chance. If it does not answer, open without the
   // local draft rather than wait on it a second time.
