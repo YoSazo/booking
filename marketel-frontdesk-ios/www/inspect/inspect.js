@@ -629,13 +629,13 @@ const SIMS = {
     property: '123 Main Street', unit: 'Unit 4B',
     findings: [
       { id: 'wall', label: 'Wall scuff', room: 'Living Room', photo: 'inspect-wall',
-        said: 'wall beside the door has a scuff and some paint has come off',
+        said: 'scuff on the wall beside the door, paint has come off',
         note: 'Scuffing and paint loss on the lower wall beside the door frame, approx. 30cm across. Photographed for record.' },
       { id: 'carpet', label: 'Carpet wear', room: 'Bedroom', photo: 'inspect-carpet',
-        said: 'carpet is worn flat along the walkway through to the hall',
+        said: 'carpet is worn flat along the walkway to the hall',
         note: 'Flattened pile and wear along the traffic path between the bedroom and hallway. No staining or tearing.' },
       { id: 'grout', label: 'Grout and sealant', room: 'Bathroom', photo: 'inspect-grout',
-        said: 'grout at the bottom of the tiles is going black in the corner',
+        said: 'grout at the bottom of the tiles is going black',
         note: 'Discoloured grout and early mildew along the base of the tiled wall. Cleaning or resealing recommended.' },
     ],
   },
@@ -644,13 +644,13 @@ const SIMS = {
     property: '123 Main Street', unit: 'Unit 4B',
     findings: [
       { id: 'wall', label: 'Wall damage', room: 'Living Room', photo: 'claims-wall',
-        said: 'there is a hole punched right through the wall by the bedroom door',
+        said: 'hole punched right through the wall by the door',
         note: 'Plasterboard punctured through beside the bedroom door, approx. 15cm across, paint cracked around it.' },
       { id: 'carpet', label: 'Carpet stain', room: 'Bedroom', photo: 'claims-carpet',
-        said: 'big red wine stain soaked into the carpet next to the drawers',
+        said: 'big red wine stain soaked into the carpet by the drawers',
         note: 'Large red wine stain soaked into the carpet beside the drawers, approx. 50cm, photographed before cleaning.' },
       { id: 'cabinet', label: 'Broken cabinet', room: 'Kitchen', photo: 'claims-cabinet',
-        said: 'cabinet door is hanging off, the hinge tore straight out of the wood',
+        said: 'cabinet door is hanging off, the hinge tore out',
         note: 'Cabinet door detached at the hinge, screw fixings torn out and the surrounding timber split.' },
     ],
   },
@@ -732,7 +732,7 @@ let simRun = null;
 function dictationSchedule(text){
   let at=0;
   return String(text||'').split(/\s+/).filter(Boolean).map(word=>{
-    at+=250+word.replace(/[^A-Za-z']/g,'').length*22+(/[,.;:]$/.test(word)?280:0);
+    at+=420+word.replace(/[^A-Za-z']/g,'').length*26+(/[,.;:]$/.test(word)?380:0);
     return {word,at};
   });
 }
@@ -745,7 +745,7 @@ function simStage(index=0){
   const levels=speechEnvelope(f.said),schedule=dictationSchedule(f.said);
   const shot=simRun.filter(r=>r.photo).length;
   const done=simRun.some(r=>r.photo&&r.note);
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">Say what you are looking at, then photograph it.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button"${row.note?' disabled':''}>${row.note?'Noted':'Hold to talk'}</button><button type="button" id="sim-next" class="secondary">Next finding</button></div><div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo?'1 photo':'—'}</span></button>`).join('')}</div><p class="muted sim-foot"><small>In the real app this is your voice, and your camera.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"${row.photo?' disabled':''}></button><p class="sim-sheet-note">${shot?`${shot} ${shot===1?'photo':'photos'} in this ${esc(skin().doc)}.`:`Photographing ${esc(f.room).toLowerCase()}.`}</p></div></aside>`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)}</p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">Say what you are looking at, then photograph it.</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(skin().product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-talk-button" class="sim-talk-button"${row.note?' disabled':''}>${row.note?'Noted':'Hold to talk'}</button><button type="button" id="sim-next" class="secondary">Next finding</button></div><div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo?'1 photo':'—'}</span></button>`).join('')}</div><p class="muted sim-foot"><small>In the real app this is your voice, and your camera.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note">${shot?`${shot} ${shot===1?'photo':'photos'} in this ${esc(skin().doc)}.`:`Photographing ${esc(f.room).toLowerCase()}.`}</p><button type="button" id="sim-shutter" class="sim-shutter" aria-label="Take photo"${row.photo?' disabled':''}></button></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-next').onclick=()=>simStage(at+1<simRun.length?at+1:0);
   $('sim-done').onclick=()=>simReport();
@@ -788,7 +788,7 @@ function simListen(at,levels,schedule){
   const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),button=$('sim-talk-button');
   const ticks=[...wave.querySelectorAll('i')];
   const span=schedule[schedule.length-1]?.at||1200;
-  let holding=false,elapsed=0,last=0,frame=0,settled=false;
+  let holding=false,catching=false,pointered=false,elapsed=0,last=0,frame=0,settled=false;
   const paint=progress=>{
     const now=progress*span;
     const shown=schedule.filter(step=>step.at<=now).length;
@@ -802,9 +802,10 @@ function simListen(at,levels,schedule){
   };
   const settle=()=>{
     if(settled)return;settled=true;
+    holding=false;catching=false;
     cancelAnimationFrame(frame);
-    holding=false;button.classList.remove('is-live');button.textContent='Noted';button.disabled=true;
     paint(1);
+    button.classList.remove('is-live');button.textContent='Noted';button.disabled=true;
     row.note=row.finding.note;
     track('SimNoteWritten',row.finding.id);
     const reveal=()=>{
@@ -812,33 +813,47 @@ function simListen(at,levels,schedule){
       wave.classList.add('is-done');
       if(simRun.some(r=>r.photo&&r.note))$('sim-done').hidden=false;
     };
-    simReduced()?reveal():setTimeout(reveal,380);
+    // A beat long enough to read the line they just said, before it is
+    // rewritten. The rewrite is the product; swapping it out from under them
+    // is the one thing that would waste it.
+    simReduced()?reveal():setTimeout(reveal,700);
   };
-  const tick=now=>{
-    if(!holding)return;
-    elapsed+=Math.min(64,now-(last||now));last=now;
+  const run=now=>{
+    if(!holding&&!catching)return;
+    const step=Math.min(64,now-(last||now));last=now;
+    // Letting go ends the listening, not the transcription. The rest of the
+    // line keeps arriving, a little quicker — dumping it all at once is what
+    // made this read as a canned animation instead of someone talking.
+    elapsed+=step*(holding?1:1.8);
     const progress=elapsed/span;
     paint(progress);
     if(progress>=1){settle();return;}
-    frame=requestAnimationFrame(tick);
+    frame=requestAnimationFrame(run);
   };
-  const start=event=>{
+  const begin=event=>{
     event.preventDefault();
-    if(settled||holding)return;
+    pointered=true;
+    if(settled||holding||catching)return;
     holding=true;last=0;
     button.classList.add('is-live');button.textContent='Listening…';
-    frame=requestAnimationFrame(tick);
+    frame=requestAnimationFrame(run);
   };
-  // Letting go early finishes the line rather than truncating it: the written
-  // note is the point of the screen, and half a sentence would sell it short.
-  const stop=()=>{ if(!holding||settled)return; holding=false; cancelAnimationFrame(frame); settle(); };
-  button.addEventListener('pointerdown',start);
-  button.addEventListener('pointerup',stop);
-  button.addEventListener('pointercancel',stop);
-  button.addEventListener('pointerleave',stop);
+  const release=()=>{
+    if(!holding||settled)return;
+    holding=false;catching=true;last=0;
+    button.textContent='Writing it up…';
+  };
+  button.addEventListener('pointerdown',begin);
+  button.addEventListener('pointerup',release);
+  button.addEventListener('pointercancel',release);
+  button.addEventListener('pointerleave',release);
   // A plain click — assistive tech, or a browser sending no pointer events —
-  // still has to reach the note.
-  button.addEventListener('click',event=>{event.preventDefault();if(!settled&&!holding)settle();});
+  // still has to reach the note. It must not fire on the click that follows a
+  // real pointerup, or letting go would dump the line after all.
+  button.addEventListener('click',event=>{
+    event.preventDefault();
+    if(!pointered&&!settled)settle();
+  });
 }
 function simReport(){
   enterScreen('sim');
