@@ -134,6 +134,9 @@ const INSPECT_PLANS = Object.freeze({
   year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
 });
 const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
+// Stripe needs a trial to end on a date, so one exists — but the first
+// finalized report ends it early, which is what the offer actually promises.
+const SIM_TRIAL_DAYS = 30;
 function validateInspectPrice(price, interval = 'month') {
   const plan = inspectPlan(interval);
   if (price?.unit_amount !== plan.amount || price.currency !== 'usd'
@@ -209,7 +212,7 @@ function accountPlan(account) {
 }
 
 function entitlement(account, now = Date.now()) {
-  const active = account.subscriptionStatus === 'active' && new Date(account.periodEnd).getTime() > now;
+  const active = ['active', 'trialing'].includes(account.subscriptionStatus) && new Date(account.periodEnd).getTime() > now;
   const plan = accountPlan(account);
   return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
     credits: Math.max(0, Number(account.reportCredits) || 0), businessName: account.businessName || '', hasLogo: !!account.logoKey,
@@ -797,7 +800,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       line_items: [{ price: price.id, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
       metadata,
-      subscription_data: { metadata },
+      // Thirty days is a backstop, not the mechanism: it is roughly one
+      // turnover cycle, so billing is triggered by the first report rather
+      // than by a clock running on someone who has not been to a property yet.
+      subscription_data: { metadata, trial_period_days: SIM_TRIAL_DAYS },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
@@ -1274,8 +1280,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }
   }));
   router.post('/reports/:id/finalize', guarded(async (req, res) => {
+    // Set inside the transaction, acted on after it commits: the offer says
+    // billing starts with the first report, and this is that moment.
+    let endTrialFor = null;
     const result = await prisma.$transaction(async tx => {
       const a = await lockAccount(tx, req.inspect.id);
+      endTrialFor = a.subscriptionStatus === 'trialing' ? a.stripeSubscriptionId : null;
       const r = await owned(tx, a.id, req.params.id);
       if (r.finalizedAt) return r;
       const document = validateDocument(r.document);
@@ -1318,6 +1328,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       eventId: `inspect-registration.${req.inspect.id}`,
       contentName: 'Marketel Inspect first report finalized',
     }).catch(error => console.error('Inspect registration CAPI queue failed:', error.message));
+    // Outside the transaction and best-effort, both on purpose: a Stripe
+    // hiccup must never roll back a finalized report or hold up an export
+    // someone is waiting on, and ending an already-ended trial is a no-op, so
+    // a retry costs nothing.
+    if (endTrialFor && stripe) {
+      await stripe.subscriptions.update(endTrialFor, { trial_end: 'now' })
+        .then(() => recordBestEffort(req.inspect.id, 'TrialConverted', `inspect-trial-converted:${req.inspect.id}`, {}))
+        .catch(error => console.error('Inspect trial conversion failed:', error.message));
+    }
     res.json(serialize(result));
   }));
   router.get('/reports/:id/pdf', guarded(async (req, res) => {
@@ -1634,6 +1653,29 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }
     res.json({ received: true });
   }));
+  // Nobody should meet a charge for something they never opened. Anyone still
+  // on trial with the cap in sight and no report to their name hears from us
+  // once, while there is still time to use it — which is also a re-engagement
+  // note at the only moment it could land.
+  const remindTrials = async () => {
+    if (!mail) return;
+    const soon = new Date(Date.now() + 3 * 86400000);
+    const waiting = await prisma.inspectAccount.findMany({
+      where: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: { lt: soon, gt: new Date() } },
+      take: 200,
+    });
+    for (const account of waiting) {
+      const sourceId = `inspect-trial-reminder:${account.id}`;
+      if (await prisma.inspectEvent.findUnique({ where: { sourceId } })) continue;
+      const ends = new Date(account.periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+      try {
+        await mail.sendMail({ from: '"Marketel Inspect" <support@bookmarketel.com>', to: account.email,
+          subject: 'You have not been charged yet',
+          text: `Your Marketel subscription has not been charged, because you have not made a report yet.\n\nIt starts with your first one, or on ${ends}, whichever comes first. Open the app or bookmarketel.com/inspect and talk through a single room — it takes about a minute.\n\nIf you would rather not continue, cancel before ${ends} and you will not be charged at all.` });
+        await recordBestEffort(account.id, 'TrialReminderSent', sourceId, {});
+      } catch (error) { console.error('Inspect trial reminder failed:', error.message); }
+    }
+  };
   let running = false;
   const sweep = async () => {
     if (!enabled || running) return; running = true;
@@ -1643,6 +1685,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       await prisma.inspectHandoff.deleteMany({ where: { expiresAt: { lt: new Date() } } });
       await removeObjects();
     } catch (error) { console.error('Inspect cleanup failed:', error.name); }
+    // Its own guard: a failed cleanup must not silently stop the warning that
+    // keeps someone from being charged for a report they never made.
+    try { await remindTrials(); }
+    catch (error) { console.error('Inspect trial reminders failed:', error.name); }
     finally { running = false; }
   };
   const timer = setInterval(sweep, 3600000); timer.unref();

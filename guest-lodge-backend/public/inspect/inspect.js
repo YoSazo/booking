@@ -698,7 +698,7 @@ function simThanks(){
       const where=$('sim-paid-email');
       if(where)where.textContent=r.email;
     }).catch(()=>{});
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're set up, and not charged yet.</h1><p class="muted">Billing starts with your first real ${esc(sk.doc)}. The app is where you actually make one — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
   track('SimSubscribed');
   $('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
@@ -882,6 +882,11 @@ function simListen(at,levels,schedule){
   });
 }
 // Every place a price is shown, moved in step and in place.
+// Billing begins when the product does something, so the terms have to name
+// both the trigger and the date that backs it up.
+function simTerms(plan,sk){
+  return `No charge today. $${plan.price}${plan.per} begins with your first ${sk.doc}, or in 30 days, whichever comes first.`;
+}
 function simPrices(){
   const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year';
   const set=(selector,text)=>{const el=$('app').querySelector(selector);if(el)el.textContent=text;};
@@ -891,10 +896,8 @@ function simPrices(){
     const price=$('app').querySelector('.sim-offer .price');
     if(price)price.insertAdjacentHTML('beforeend',`<small>${esc(plan.per)}</small>`);
   }
-  set('.sim-offer .price-save',year?`${PLANS.year.save} · $16.58/month`:`Unlimited ${sk.docPlural} · Cancel anytime`);
-  set('.sim-offer .offer-reversal small',plan.terms);
-  set('#sim-paybar strong',`$${plan.price}`);
-  set('#sim-paybar small',plan.per);
+  set('.sim-offer .price-save',`Free until your first ${sk.doc} · ${year?PLANS.year.save:'Cancel anytime'}`);
+  set('.sim-offer .offer-reversal small',simTerms(plan,sk));
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan){
     switchPlan.dataset.simPlan=year?'month':'year';
@@ -917,7 +920,7 @@ function simBuy(trigger){
   if(known)return simCheckout(known,trigger);
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month;
   enterScreen('sim');
-  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Payment is on the next screen.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>$${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Card details on the next screen — you are not charged today.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>Free until your first ${esc(sk.doc)}, then $${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
   const field=$('sim-email-field');
   field.focus();
   field.oninput=()=>field.classList.remove('invalid');
@@ -940,7 +943,7 @@ function simReport(){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month;
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:`Unlimited ${esc(sk.docPlural)} · Cancel anytime`}</p><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$${plan.price}</strong><small>${esc(plan.per)}</small></div><button type="button" id="sim-paybar-buy">Start Marketel ${esc(sk.product)} →</button></aside>`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">Free until your first ${esc(sk.doc)} · Cancel anytime</p><button type="button" id="sim-buy" class="wide">Start free →</button><p class="offer-reversal"><small>${esc(simTerms(plan,sk))}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$0</strong><small>today</small></div><button type="button" id="sim-paybar-buy">Start free →</button></aside>`;
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);

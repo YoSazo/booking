@@ -489,7 +489,7 @@ test('the app signs in through its glass banner and never inerts a page behind a
 // Prisma and Stripe to watch what each route asks them to do.
 function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {} } = {}) {
   const express = require('express');
-  const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0 };
+  const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0, mail: [] };
   const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsed: false, reportsUsed: 0, reportCredits: 0,
     subscriptionStatus: null, periodEnd: null, stripeCustomerId: 'cus_1', businessName: 'Pine Stays', logoKey: 'inspect/logos/acct_1/a.png', ...accountOverrides };
   const report = { id: 'rep_1', accountId: 'acct_1', finalizedAt: null, baselineReport: null, attachments: [{ id: 'p1' }],
@@ -498,10 +498,21 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const seenEvents = new Set();
   const db = {
     $queryRaw: async () => [],
-    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }) },
+    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }), deleteMany: async () => ({ count: 0 }) },
+    inspectChallenge: { deleteMany: async () => ({ count: 0 }) },
+    inspectHandoff: { deleteMany: async () => ({ count: 0 }) },
     inspectAccount: {
       findUniqueOrThrow: async () => account,
       findUnique: async () => account,
+      // Enough of a filter for the sweep to be exercised honestly: the one
+      // account comes back only when it actually matches the query.
+      findMany: async ({ where = {} } = {}) => {
+        const ends = new Date(account.periodEnd || 0).getTime();
+        const matches = (where.subscriptionStatus === undefined || where.subscriptionStatus === account.subscriptionStatus)
+          && (where.reportsUsed === undefined || where.reportsUsed === account.reportsUsed)
+          && (!where.periodEnd || (ends < new Date(where.periodEnd.lt).getTime() && ends > new Date(where.periodEnd.gt).getTime()));
+        return matches ? [account] : [];
+      },
       upsert: async ({ create }) => ({ ...account, email: create.email }),
       update: async ({ data }) => {
         calls.accountUpdates.push(data);
@@ -533,7 +544,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const app = express();
   app.use(express.json());
   const registration = registerInspect(app, {
-    prisma, mail: { sendMail: async () => {} }, stripe,
+    prisma, mail: { sendMail: async message => { calls.mail.push(message); } }, stripe,
     capiConfigured: true,
     queueCapi: async (name, payload) => { calls.capi.push({ name, value: payload.value, contentName: payload.contentName, eventId: payload.eventId }); },
     isCapiExcludedEmail: (email) => String(email || '').includes('+qa@'),
@@ -1815,4 +1826,129 @@ test('the address that paid can be recovered, and only by whoever holds the chec
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'whatever' }) });
     assert.equal(junk.status, 400);
   } finally { h.registration.close(); }
+});
+
+// ——— Free until your first report ————————————————————————————————
+test('a trial grants the product it is a trial of', () => {
+  const soon = new Date(Date.now() + 20 * 86400000).toISOString();
+  const past = new Date(Date.now() - 86400000).toISOString();
+  const trialing = entitlement({ subscriptionStatus: 'trialing', periodEnd: soon, periodStart: new Date().toISOString(), reportsUsed: 0, reportCredits: 0, freeReportUsed: true });
+  // Without this a trialer hands over a card and is locked out of the very
+  // thing they are trialing, then charged for it.
+  assert.equal(trialing.active, true);
+  assert.ok(trialing.remaining > 0);
+  // The period guard still applies: an expired trial is not access.
+  assert.equal(entitlement({ subscriptionStatus: 'trialing', periodEnd: past, reportsUsed: 0, reportCredits: 0, freeReportUsed: true }).active, false);
+  // And nothing else was widened.
+  for (const status of ['past_due', 'canceled', 'incomplete', 'unpaid', null]) {
+    assert.equal(entitlement({ subscriptionStatus: status, periodEnd: soon, reportsUsed: 0, reportCredits: 0, freeReportUsed: true }).active, false, String(status));
+  }
+});
+
+test('the simulation takes a card and charges nothing until the first report', async () => {
+  const h = moneyHarness({
+    stripe: { prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) } },
+  });
+  try {
+    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims' }) });
+    assert.equal(response.status, 200);
+    assert.equal(h.calls.sessions[0].params.subscription_data.trial_period_days, 30);
+    assert.equal(h.calls.sessions[0].params.subscription_data.metadata.sim, '1');
+  } finally { h.registration.close(); }
+
+  // The authed checkout is a different offer and keeps charging today.
+  const paid = moneyHarness({
+    stripe: {
+      prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) },
+      subscriptions: { list: async () => ({ data: [] }) },
+      checkout: { sessions: {
+        create: async (params, options) => { paid.calls.sessions.push({ params, options }); return { id: 'cs_2', url: 'https://checkout.stripe.test/cs_2' }; },
+        list: async () => ({ data: [] }),
+      } },
+    },
+  });
+  try {
+    const response = await request(paid.app, '/api/inspect/checkout', { method: 'POST', headers: paid.headers, body: JSON.stringify({ interval: 'month' }) });
+    assert.equal(response.status, 200);
+    assert.ok(!('trial_period_days' in paid.calls.sessions[0].params.subscription_data));
+  } finally { paid.registration.close(); }
+});
+
+test('finalizing the first report is what starts the billing', async () => {
+  const updates = [];
+  const trialStripe = () => ({ subscriptions: { update: async (id, params) => { updates.push({ id, params }); return { id }; } } });
+  const document = { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-21', eventTime: 'unknown', author: 'Sam',
+    rooms: [{ name: 'Kitchen', observation: 'Chipped counter.', issue: true, photos: ['p1'] }], signatures: [] };
+
+  const trial = moneyHarness({
+    account: { subscriptionStatus: 'trialing', stripeSubscriptionId: 'sub_trial', periodStart: new Date().toISOString(), periodEnd: new Date(Date.now() + 20 * 86400000).toISOString(), freeReportUsed: true },
+    report: { document },
+    stripe: trialStripe(),
+  });
+  try {
+    const response = await request(trial.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: trial.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(updates, [{ id: 'sub_trial', params: { trial_end: 'now' } }]);
+    assert.ok(trial.calls.events.some(event => event.name === 'TrialConverted'));
+  } finally { trial.registration.close(); }
+
+  // An account already paying is left alone.
+  updates.length = 0;
+  const active = moneyHarness({
+    account: { subscriptionStatus: 'active', stripeSubscriptionId: 'sub_live', periodStart: new Date().toISOString(), periodEnd: new Date(Date.now() + 20 * 86400000).toISOString(), freeReportUsed: true },
+    report: { document },
+    stripe: trialStripe(),
+  });
+  try {
+    const response = await request(active.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: active.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(updates, []);
+  } finally { active.registration.close(); }
+
+  // And a Stripe failure must never cost someone the report they just made.
+  const broken = moneyHarness({
+    account: { subscriptionStatus: 'trialing', stripeSubscriptionId: 'sub_trial', periodStart: new Date().toISOString(), periodEnd: new Date(Date.now() + 20 * 86400000).toISOString(), freeReportUsed: true },
+    report: { document },
+    stripe: { subscriptions: { update: async () => { throw new Error('stripe is down'); } } },
+  });
+  try {
+    const response = await request(broken.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: broken.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.ok((await response.json()).finalizedAt);
+  } finally { broken.registration.close(); }
+});
+
+test('a trial about to bill for nothing gets a warning, once', async () => {
+  const soon = new Date(Date.now() + 2 * 86400000);
+  const h = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: soon.toISOString(), email: 'owner@example.com' } });
+  try {
+    await h.registration.sweep();
+    assert.equal(h.calls.mail.length, 1);
+    const sent = h.calls.mail[0];
+    assert.equal(sent.to, 'owner@example.com');
+    // It has to say the thing that stops a dispute: nothing has been taken.
+    assert.match(sent.subject, /not been charged/i);
+    assert.match(sent.text, /has not been charged/i);
+    assert.match(sent.text, /cancel before/i);
+    // And never twice, however often the sweep runs.
+    await h.registration.sweep();
+    await h.registration.sweep();
+    assert.equal(h.calls.mail.length, 1);
+    assert.ok(h.calls.events.some(event => event.name === 'TrialReminderSent'));
+  } finally { h.registration.close(); }
+
+  // Someone who has actually used it is converting on their own terms.
+  const using = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 2, periodEnd: soon.toISOString() } });
+  try {
+    await using.registration.sweep();
+    assert.equal(using.calls.mail.length, 0);
+  } finally { using.registration.close(); }
+
+  // And a trial with weeks left is not chased.
+  const early = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: new Date(Date.now() + 20 * 86400000).toISOString() } });
+  try {
+    await early.registration.sweep();
+    assert.equal(early.calls.mail.length, 0);
+  } finally { early.registration.close(); }
 });
