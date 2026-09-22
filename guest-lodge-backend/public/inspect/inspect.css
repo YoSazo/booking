@@ -545,11 +545,15 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 /* Centred and tapped by them, with the worry answered underneath rather than
    a gesture to learn. */
 .sim-actions { display: flex; justify-content: center; margin-top: 12px; }
-.sim-mic { width: 62px; height: 62px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--green-dark); border: 1.5px solid var(--border); box-shadow: none; }
-.sim-mic:active { transform: scale(.94); }
-.sim-mic.is-live { background: var(--green); border-color: var(--green); color: #fff; animation: sim-pulse 1.6s ease-in-out infinite; }
-.sim-mic.is-done { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); opacity: 1; }
-.sim-mic-hint { margin: 8px 0 14px; text-align: center; color: var(--muted); font-size: 13px; }
+/* Filled and pulsing, because a white circle reads as decoration and this is
+   the one thing on the screen waiting to be pressed. */
+.sim-mic { width: 66px; height: 66px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #fff; border: none; }
+.sim-mic:active { transform: scale(.93); }
+.sim-mic:not(.is-live):not(.is-done) { animation: sim-pulse 1.9s ease-in-out infinite; }
+.sim-mic.is-live { background: var(--green-dark); color: #fff; animation: sim-pulse 1.1s ease-in-out infinite; }
+.sim-mic.is-done { background: var(--green-pale); color: var(--green-dark); box-shadow: none; animation: none; opacity: 1; }
+.sim-mic-hint { margin: 10px 0 14px; text-align: center; color: var(--green-dark); font-size: 14px; font-weight: 600; }
+.sim-mic-hint.is-quiet { color: var(--muted); font-weight: 450; }
 #sim-see { margin-top: 4px; }
 .sim-talk-button.is-live { background: var(--green-dark); box-shadow: 0 0 0 6px #2e7d5b26; }
 .sim-talk-button:disabled { opacity: 1; }
