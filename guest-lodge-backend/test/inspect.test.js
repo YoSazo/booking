@@ -808,7 +808,10 @@ test('a damage report is findings, and the capture screen is the recording', () 
   assert.doesNotMatch(client, /shots:|shotStep|data-shot/);
   assert.match(companion, /hud-note/);
   assert.match(companion, /id="hud-talk"/);
-  assert.match(companion, /Next \$\{esc\(entries\?'finding'/);
+  // Adding one is a chip beside the rooms now, not a wide button, and nothing
+  // in the capture screen invents a "Finding 2" to label it with.
+  assert.match(companion, /id="hud-next" class="camera-room is-add">\+ another room/);
+  assert.doesNotMatch(companion, /Next \$\{esc\(entries/);
   // Dictation writes the speaker's own words, with nothing uploaded from here.
   assert.match(client, /if\(hudDictation&&draft\?\.document\?\.rooms\[hudDictation\.index\]/);
   assert.match(client, /if\(hudDictation\)\{hudDictation=null;/);

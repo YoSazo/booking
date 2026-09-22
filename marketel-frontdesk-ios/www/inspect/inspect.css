@@ -434,8 +434,7 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 /* The recording is the point of this screen, so it is the biggest thing on it. */
 .hud-note { min-height: 56px; padding: 10px 13px; margin: 0 0 6px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
 .hud-note.is-live { border-color: var(--green); background: var(--green-pale); }
-.hud-actions { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-.hud-actions button { flex: 1 1 0; }
+.hud-actions { display: flex; justify-content: center; margin: 6px 0; }
 /* Web: the photo you just added, then what it is. */
 .entry-screen .screen-bar { margin-bottom: 8px; }
 .entry-photos { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 14px; }
@@ -449,6 +448,7 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .camera-room span { color: var(--muted); font-size: 13px; font-weight: 450; }
 .camera-room.is-active { background: var(--green); border-color: var(--green); color: #fff; }
 .camera-room.is-active span { color: #ffffffc2; }
+.camera-room.is-add { color: var(--green-dark); font-weight: 650; border-style: dashed; }
 
 /* ——— The simulation funnel (?sim=1) ————————————————————————————————
    Four taps on a phone: pick, shutter, hold, pay. Everything here exists to
@@ -542,13 +542,15 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .sim-wave i { flex: 1 1 0; height: 100%; background: var(--border); border-radius: 2px; transform: scaleY(.08); transform-origin: center; transition: transform .08s linear, background-color .12s ease; }
 .sim-wave i.is-live { background: var(--green); }
 .sim-wave.is-done { opacity: .35; }
-.sim-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.sim-actions button { flex: 1 1 0; }
-/* Depicted, not demanded: this is the app's own control playing itself, so it
-   is never a call to action and there is no gesture to learn. */
-.sim-mic { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: var(--surface); border: 1.5px solid var(--border); }
-.sim-mic.is-live { background: var(--green); border-color: var(--green); animation: sim-pulse 1.6s ease-in-out infinite; }
-.sim-mic.is-done { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); }
+/* Centred and tapped by them, with the worry answered underneath rather than
+   a gesture to learn. */
+.sim-actions { display: flex; justify-content: center; margin-top: 12px; }
+.sim-mic { width: 62px; height: 62px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--green-dark); border: 1.5px solid var(--border); box-shadow: none; }
+.sim-mic:active { transform: scale(.94); }
+.sim-mic.is-live { background: var(--green); border-color: var(--green); color: #fff; animation: sim-pulse 1.6s ease-in-out infinite; }
+.sim-mic.is-done { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); opacity: 1; }
+.sim-mic-hint { margin: 8px 0 14px; text-align: center; color: var(--muted); font-size: 13px; }
+#sim-see { margin-top: 4px; }
 .sim-talk-button.is-live { background: var(--green-dark); box-shadow: 0 0 0 6px #2e7d5b26; }
 .sim-talk-button:disabled { opacity: 1; }
 
@@ -635,16 +637,14 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 
 /* The card the camera hands over to. It rises and settles rather than the page
    blinking, because the sheet below it never moved. */
-.camera-companion { transition: opacity .26s ease, transform .26s cubic-bezier(.2,.7,.3,1); }
-.camera-companion.is-entering { opacity: 0; transform: translateY(14px); }
+.camera-companion.is-entering { animation: hud-in .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes hud-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 /* The button was always a tap-to-toggle calling itself "Hold to talk". It is a
    microphone, so it looks like one, and it says what it is doing while it is on. */
 .hud-mic { flex: 0 0 auto; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 23px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .hud-mic.is-live { background: #b3261e; animation: hud-mic-live 1.5s ease-in-out infinite; }
-.hud-actions #hud-next { flex: 1 1 auto; }
 @keyframes hud-mic-live { 0%, 100% { box-shadow: 0 0 0 0 #b3261e52; } 60% { box-shadow: 0 0 0 12px #b3261e00; } }
 @media (prefers-reduced-motion: reduce) {
-  .camera-companion { transition: none; }
-  .camera-companion.is-entering { opacity: 1; transform: none; }
+  .camera-companion.is-entering { animation: none; }
   .hud-mic.is-live { animation: none; }
 }

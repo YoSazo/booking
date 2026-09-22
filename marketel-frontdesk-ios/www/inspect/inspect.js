@@ -774,14 +774,20 @@ function simStage(index=0){
   const step=!row.note?'say':!row.photo?'shoot':'done';
   const complete=simRun.filter(r=>r.photo&&r.note).length;
   const last=complete>=simRun.length;
-  const hint=step==='say'?'Listening…':'Now photograph it.';
+  const hint=step==='say'?'Your words appear here.':'Now photograph it.';
   const caption=step==='shoot'?`Tap to photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?`${esc(f.room)} · ${esc(f.label)}`:`${esc(f.room)} documented.`;
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions">${last?'':`<div class="sim-mic${step==='say'?' is-live':''}${row.note?' is-done':''}" aria-hidden="true"><span>${row.note?'✓':'&#127908;'}</span></div>`}${complete?`<button type="button" id="sim-see" class="${last?'is-live-step':'secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}</div>${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${last?'':`<div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic${row.note?' is-done':''}"${row.note?' disabled':''} aria-label="${row.note?'Written up':'Play the dictation'}">${icon(row.note?'check':'mic',24)}</button></div><p class="sim-mic-hint">${row.note?'That is what it writes.':'Tap the mic &mdash; you will not have to say anything.'}</p>`}${complete?`<button type="button" id="sim-see" class="wide${last?'':' secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-done').onclick=()=>simReport();
   if($('sim-see'))$('sim-see').onclick=()=>simReport();
   for(const chip of $('app').querySelectorAll('[data-sim-chip]'))chip.onclick=()=>simStage(Number(chip.dataset.simChip));
-  if(step==='say')simListen(at,levels,schedule);
+  if(step==='say'&&$('sim-mic-button'))$('sim-mic-button').onclick=()=>{
+    const button=$('sim-mic-button');
+    button.disabled=true;button.classList.add('is-live');
+    const line=$('app').querySelector('.sim-mic-hint');
+    if(line)line.textContent='Listening…';
+    simListen(at,levels,schedule);
+  };
   // The halo and its label arrive a beat late, so someone who already knew
   // what to do never sees them, and someone who hesitated is told.
   if(step==='shoot'&&!simReduced()){
@@ -832,7 +838,7 @@ function simShoot(at){
 // is press a shutter, and that is the only thing asked for.
 function simListen(at,levels,schedule){
   const row=simRun[at];
-  const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),mic=$('app').querySelector('.sim-mic');
+  const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),mic=$('sim-mic-button');
   const ticks=[...wave.querySelectorAll('i')];
   const span=schedule[schedule.length-1]?.at||1200;
   let elapsed=0,last=0,frame=0,settled=false;
@@ -2261,6 +2267,12 @@ let hudDictation=null;
 // of the card is worth more than "Finding 1" and costs one sentence to get.
 const hudAsk = room => (entryTool() && !(room?.name || '').trim() ? 'name' : 'observation');
 const hudShell = () => !!window.webkit?.messageHandlers?.marketelShell;
+const LUCIDE = {
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+};
+const icon = (name,size=22) => `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[name]}</svg>`;
 function hudTalk(){
   const shell=window.webkit?.messageHandlers?.marketelShell;
   if(!shell||cameraRoom===null||!draft)return;
@@ -2282,15 +2294,15 @@ function cameraCompanion(entering=false){
   const talking=!!hudDictation;
   const note=(room.observation||'').trim();
   const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
-  const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?entryLabel(item,index):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
+  const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?((item.name||'').trim()||'New'):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
   const asking=hudAsk(room);
   const heading=asking==='name'?'Where is this?':esc(entries?entryLabel(room,cameraRoom):(room.name||`${w.noun} ${cameraRoom+1}`));
   const prompt=asking==='name'
     ? (talking?'Listening…':'Tap the mic and say the room.')
     : (talking?'Listening…':'Tap the mic and say what you are looking at.');
   const body=asking==='name'?'':note;
-  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><h1>${heading}</h1><div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}"><span aria-hidden="true">${talking?'■':'&#127908;'}</span></button>`:''}<button type="button" id="hud-next" class="secondary">Next ${esc(entries?'finding':w.noun)}</button></div><div class="camera-rooms">${subjects}</div></section>`;
-  if(entering)requestAnimationFrame(()=>$('app').querySelector('.camera-companion')?.classList.remove('is-entering'));
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><h1>${heading}</h1><div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic')}</button>`:''}</div><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div></section>`;
+
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   $('hud-next').onclick=()=>{
     if(rooms.length>=30)return notice(`Maximum 30 ${entries?'findings':w.nounPlural}.`);
@@ -2298,7 +2310,7 @@ function cameraCompanion(entering=false){
     rooms.push({name:entries?'':nextRoomName(rooms),observation:'',issue:false,photos:[]});
     cameraRoom=rooms.length-1;
     remember();persist().catch(()=>{});
-    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:entries?entryLabel(rooms[cameraRoom],cameraRoom):(rooms[cameraRoom]?.name||'')});
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:(rooms[cameraRoom]?.name||'').trim()});
     haptic();cameraCompanion();
   };
   document.querySelectorAll('[data-camera-room]').forEach(button=>button.onclick=()=>{
@@ -2306,7 +2318,7 @@ function cameraCompanion(entering=false){
     if(index===cameraRoom)return;
     if(hudDictation)hudTalk();
     cameraRoom=index;haptic();
-    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:entries?entryLabel(draft.document.rooms[index],index):(draft.document.rooms[index]?.name||'')});
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:(draft.document.rooms[index]?.name||'').trim()});
     cameraCompanion();
   });
   // A blurred shot is worth catching here, in front of the thing, rather than
