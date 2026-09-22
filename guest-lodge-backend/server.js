@@ -1284,7 +1284,16 @@ app.use('/inspect/', inspectGate, (req, res, next) => {
     const slug = req.path.replace(/^\/|\/$/g, '');
     res.type('html').send(inspectSkinned('index.html', slug));
 });
-app.use('/inspect', express.static(INSPECT_PUBLIC_ROOT, { index: false, maxAge: 0 }));
+// The gate marks everything no-store, which is right for the bundle but made
+// the sample photos refetch on every repaint of the simulation, so a slow
+// response left one blank. They never change, so they may be kept.
+app.use('/inspect', express.static(INSPECT_PUBLIC_ROOT, {
+    index: false,
+    maxAge: 0,
+    setHeaders: (res, file) => {
+        if (file.startsWith(path.join(INSPECT_PUBLIC_ROOT, 'sample') + path.sep)) res.setHeader('Cache-Control', 'public, max-age=604800');
+    }
+}));
 
 app.use('/uploads', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');

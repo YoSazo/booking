@@ -674,6 +674,21 @@ function simActive(){
 }
 const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 const simPhoto = (name,thumb=false) => `/inspect/sample/${name}${thumb?'-thumb':''}.jpg`;
+// Every full-size photo the demo can show, fetched while they read the intro.
+// Holding the decoded images keeps them ready for the camera and the report,
+// so neither waits on the network.
+const simWarm = new Map();
+function simPreload(s){
+  for(const f of s?.findings||[]){
+    const src=simPhoto(f.photo);
+    if(simWarm.has(src))continue;
+    const img=new Image();
+    img.decoding='async';
+    img.src=src;
+    img.decode?.().catch(()=>{});
+    simWarm.set(src,img);
+  }
+}
 let simPicked = null;
 // Real speech is bursts at syllable rate with pauses at punctuation, so the
 // bar heights come from the sentence itself. An even wave reads as fake on
@@ -729,6 +744,7 @@ function simResume(){
 function simIntro(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
+  simPreload(s);
   document.documentElement.classList.add('sim-mode');
   track('SimStarted');
   $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
@@ -768,6 +784,7 @@ function dictationSchedule(text){
 function simStage(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
+  simPreload(s);
   if(!simRun)simRun=[{finding:simPicked||s.findings[0],note:'',photo:false}];
   const at=0,row=simRun[at],f=row.finding;
   const levels=speechEnvelope(f.said),schedule=dictationSchedule(f.said);
@@ -936,6 +953,7 @@ function simBuy(trigger){
 function simReport(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
+  simPreload(s);
   track('SimReportShown');
   const documented=(simRun||[]).filter(row=>row.photo||row.note).map(row=>row.finding);
   const lead=documented.length?documented:[simPicked].filter(Boolean);
