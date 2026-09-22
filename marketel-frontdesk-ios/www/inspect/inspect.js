@@ -743,7 +743,7 @@ function simIntro(){
       simPicked=s.findings[chosen];
       try{sessionStorage.setItem('inspect.sim.pick',simPicked.id);}catch{}
       track('SimFindingPicked',simPicked.id);
-      simStage(chosen);
+      simStage();
     };
 }
 // One screen, laid out the way the app actually is: the camera is a sheet
@@ -757,30 +757,31 @@ let simRun = null;
 function dictationSchedule(text){
   let at=0;
   return String(text||'').split(/\s+/).filter(Boolean).map(word=>{
-    at+=420+word.replace(/[^A-Za-z']/g,'').length*26+(/[,.;:]$/.test(word)?380:0);
+    at+=294+word.replace(/[^A-Za-z']/g,'').length*18+(/[,.;:]$/.test(word)?266:0);
     return {word,at};
   });
 }
-function simStage(index=0){
+// One finding. The sale happens on the first — the mumble becoming written
+// prose — and a second or third only repeated the trick, added a place to
+// leave before the price, and moved the way out from under a thumb reaching
+// for it. The report still shows three, with theirs first.
+function simStage(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
-  if(!simRun)simRun=s.findings.map(f=>({finding:f,note:'',photo:false}));
-  const at=Math.max(0,Math.min(simRun.length-1,index));
-  const row=simRun[at],f=row.finding;
+  if(!simRun)simRun=[{finding:simPicked||s.findings[0],note:'',photo:false}];
+  const at=0,row=simRun[at],f=row.finding;
   const levels=speechEnvelope(f.said),schedule=dictationSchedule(f.said);
-  // Photograph it, then say what it is. One control is live at a time and the
-  // other is visibly out of play, because two live buttons and no stated order
-  // is the same as no instruction at all.
+  // Say it, then photograph it. One control is live at a time and the other
+  // is visibly out of play, because two live buttons and no stated order is
+  // the same as no instruction at all.
   const step=!row.note?'say':!row.photo?'shoot':'done';
-  const complete=simRun.filter(r=>r.photo&&r.note).length;
-  const last=complete>=simRun.length;
+  const done=step==='done';
   const hint=step==='say'?'Your words appear here.':'Now photograph it.';
   const caption=step==='shoot'?`Tap to photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?`${esc(f.room)} · ${esc(f.label)}`:`${esc(f.room)} documented.`;
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${complete?`<button type="button" id="sim-see" class="wide${last?'':' secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}${row.note?'':`<div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic" aria-label="Play the dictation">${icon('mic',24)}</button></div><p class="sim-mic-hint">Tap the mic &mdash; you will not have to say anything.</p>`}${(last||complete)?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${done?`<button type="button" id="sim-see" class="wide is-live-step">See your ${esc(sk.doc)} →</button>`:''}${row.note?'':`<div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic" aria-label="Play the dictation">${icon('mic',24)}</button></div><p class="sim-mic-hint">Tap the mic &mdash; you will not have to say anything.</p>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${row.photo?`<img src="${esc(simPhoto(f.photo,true))}" alt="">`:''}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-done').onclick=()=>simReport();
   if($('sim-see'))$('sim-see').onclick=()=>simReport();
-  for(const chip of $('app').querySelectorAll('[data-sim-chip]'))chip.onclick=()=>simStage(Number(chip.dataset.simChip));
   if(step==='say'&&$('sim-mic-button'))$('sim-mic-button').onclick=()=>{
     const button=$('sim-mic-button');
     button.disabled=true;button.classList.add('is-live');
@@ -801,16 +802,6 @@ function simStage(index=0){
     $('sim-coach-ring')?.classList.add('is-on');
   }
 }
-// A finding is done when it has both a photo and a note, and then there is
-// only one sensible next thing — so it happens by itself rather than being
-// offered as a decision.
-function simAdvance(at){
-  // On the last one it repaints where it is instead, which is what turns the
-  // exit into a full-width call to action rather than leaving them to find
-  // Done in the corner of the camera.
-  const next=at+1<simRun.length?at+1:at;
-  setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(next); },900);
-}
 function simShoot(at){
   const row=simRun[at];
   if(row.photo)return;
@@ -829,10 +820,8 @@ function simShoot(at){
     sheetStrip.appendChild(tile);
     requestAnimationFrame(()=>tile.classList.add('is-in'));
   }
-  // Repaint first so the finished finding — and the way out — are on screen,
-  // then let the loop move on.
-  setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(at); },quick?0:520);
-  setTimeout(()=>{ if(simRun)simAdvance(at); },quick?0:1500);
+  // Once, and then nothing moves: the way out stays exactly where it lands.
+  setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(); },quick?0:520);
 }
 // Nobody can really speak into this, so it is not asked of them: the mic plays
 // itself and the words arrive. The one thing a visitor can genuinely do here
@@ -865,7 +854,7 @@ function simListen(at,levels,schedule){
       wave.classList.add('is-done');
       mic?.classList.remove('is-live');
       // A beat to read the written note, then the shutter takes over.
-      setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(at); },simReduced()?0:1500);
+      setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(); },simReduced()?0:1500);
     };
     // Long enough to read the line they "spoke" before it is rewritten. The
     // rewrite is the product; swapping it out from under them wastes it.

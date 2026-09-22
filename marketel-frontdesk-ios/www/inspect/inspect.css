@@ -508,13 +508,6 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .sim-strip p { margin: 0; }
 .sim-shot { width: 46px; height: 46px; object-fit: cover; border-radius: 10px; opacity: 0; transform: scale(2.4) translateY(38px); transition: opacity .34s ease, transform .34s cubic-bezier(.2,.7,.3,1); }
 .sim-shot.is-in { opacity: 1; transform: none; }
-/* The findings, as chips, exactly as the app shows its rooms above the sheet. */
-.sim-chips { display: flex; gap: 8px; overflow-x: auto; margin-top: 8px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
-.sim-chip { display: flex; align-items: baseline; gap: 7px; flex: 0 0 auto; min-height: 40px; padding: 9px 14px; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
-.sim-chip strong { font-weight: 650; font-size: 14px; }
-.sim-chip span { color: var(--muted); font-size: 12px; }
-.sim-chip.is-active { background: var(--green); border-color: var(--green); color: #fff; }
-.sim-chip.is-active span { color: #ffffffc2; }
 
 /* Their words arriving under their own finger. The raw line and the written
    one share the box so one replaces the other in place — that swap is the
@@ -576,12 +569,12 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 
 /* A short phone has no room for the finding chips above the sheet. "Next
    finding" still walks the loop, which is the part that matters. */
-/* An SE-sized phone has about 320px above the sheet, and the fullest card —
-   the second finding, with the way out, the waveform and the mic all showing —
-   needed 402. The camera gives some height back, the note is capped lower,
-   and the footnote goes: the line under the mic already says the same thing. */
+/* An SE-sized phone has about 320px above the sheet, and the card waiting for
+   the mic — note, waveform, mic and the line under it — ran under it. The
+   camera gives some height back, the note is capped lower while it waits, and
+   the footnote goes: the line under the mic already says the same thing. */
 @media (max-height: 720px) {
-  .sim-chips, .sim-stage .sim-foot { display: none; }
+  .sim-stage .sim-foot { display: none; }
   .sim-sheet { height: 46vh; height: 46svh; }
   .sim-stage { padding-bottom: calc(46vh + 14px); padding-bottom: calc(46svh + 14px); }
   /* Only while it is waiting for words: once written, the mic and waveform are
