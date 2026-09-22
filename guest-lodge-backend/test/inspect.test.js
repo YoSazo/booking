@@ -1137,7 +1137,7 @@ test('the camera sheet leaves the room list usable above it', () => {
     const companion=client.slice(client.indexOf('let cameraRoom=null'), client.indexOf('window.marketelInspectPhotoCaptured'));
     assert.match(companion, /type:'inspectCameraRoom',room:index/);
     assert.match(companion, /data-camera-room/);
-    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(\);/);
+    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(true\);/);
     // Closing restores whatever screen the operator was actually on.
     assert.match(companion, /cameraRoom=null;\s*if\(draft&&!preview&&!draft\.finalizedAt\)editor\('rooms'\)/);
 });
@@ -1957,4 +1957,30 @@ test('a trial about to bill for nothing gets a warning, once', async () => {
     await early.registration.sweep();
     assert.equal(early.calls.mail.length, 0);
   } finally { early.registration.close(); }
+});
+
+test('the app stops quoting a price to someone who already paid, and a business is not a signature', () => {
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+
+  // The reveal used to name $12 whatever the account held. canSend() already
+  // knows about plans, credits and the free report.
+  assert.match(client, /\$\{canSend\(\)\?`<p class="muted">Sending finalizes this version\. Included in your plan\.<\/p>`/);
+  // And the export itself has always respected it, so the copy was the only lie.
+  assert.match(client, /if\(canSend\(\)\)return finishExport\(action\);/);
+
+  // A signature is a person. `author` can be filled from the business name,
+  // which is how someone's signature came to read as their company.
+  assert.match(client, /let name=existing\?\.name \|\| \(role==='manager'\|\|role==='owner' \? rememberedAuthor\(\) : ''\);/);
+  assert.doesNotMatch(client, /role==='owner' \? \(draft\.document\.author\|\|rememberedAuthor\(\)\)/);
+
+  // Where the phone stood proves nothing about damage found at checkout.
+  const damage = client.slice(client.indexOf('  damage: {'), client.indexOf('  default: {'));
+  assert.match(damage, /location: false/);
+  assert.match(client, /if\(wedge\(draft\.document\?\.type\)\.location===false\)return Promise\.resolve\(\);/);
+  assert.match(client, /\$\{wedge\(d\.type\)\.location===false\?'':locationPreview\(d\)\}/);
+
+  // The capture control is a microphone that needs the shell bridge, not a URL
+  // scheme, and it never tells anyone to hold anything.
+  assert.match(client, /const hudShell = \(\) => !!window\.webkit\?\.messageHandlers\?\.marketelShell;/);
+  assert.doesNotMatch(client, /Hold to talk/);
 });

@@ -87,6 +87,10 @@ const WEDGES = {
     // A damage report is a list of findings, not a walk through rooms, so
     // nothing has to be named before the first photograph.
     unit: 'entry',
+    // Where the phone was standing proves nothing about damage found at
+    // checkout, and a pair of coordinates on the page is noise on a document
+    // whose job is the photographs.
+    location: false,
     signers: { manager: 'owner', other: 'guest' },
     disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
   },
@@ -150,6 +154,7 @@ function captureFix(){
 // best-effort and neither delays the screen.
 function markLocation(which){
   if(!draft||draft.finalizedAt)return Promise.resolve();
+  if(wedge(draft.document?.type).location===false)return Promise.resolve();
   return captureFix().then(fix=>{
     if(!fix||!draft||draft.finalizedAt)return;
     draft.document.location={...(draft.document.location||{}),[which]:fix};
@@ -660,7 +665,11 @@ const simTool = () => SIMS[toolId()] || null;
 // broken, and the traffic this exists for is almost entirely mobile.
 function simActive(){
   if(native||!simTool()||session)return false;
-  if(new URLSearchParams(location.search).get('sim')==='0')return false;
+  const params=new URLSearchParams(location.search);
+  if(params.get('sim')==='0')return false;
+  // `arm` is only ever set by the app's own tool chooser, so its presence
+  // means this page was opened as the product rather than as an ad landing.
+  if(params.has('arm'))return false;
   return window.matchMedia?.('(max-width: 760px)')?.matches ?? window.innerWidth<=760;
 }
 const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -762,17 +771,29 @@ function simStage(index=0){
   // Photograph it, then say what it is. One control is live at a time and the
   // other is visibly out of play, because two live buttons and no stated order
   // is the same as no instruction at all.
-  const step=!row.photo?'shoot':!row.note?'say':'done';
+  const step=!row.note?'say':!row.photo?'shoot':'done';
   const complete=simRun.filter(r=>r.photo&&r.note).length;
   const last=complete>=simRun.length;
-  const hint=step==='say'?'Hold the button and say what you are looking at.':'Photograph it, then say what you are looking at.';
-  const caption=step==='shoot'?`Photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?'Now say what it is.':`${esc(f.room)} documented.`;
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions">${last?'':`<button type="button" id="sim-talk-button" class="sim-talk-button${step==='say'?' is-live-step':''}"${step==='say'?'':' disabled'}>${row.note?'Noted ✓':'Hold to talk'}</button>`}${complete?`<button type="button" id="sim-see" class="${last?'is-live-step':'secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}</div>${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>Simulated — your microphone is never used. In the app these are your own words.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></aside>`;
+  const hint=step==='say'?'Listening…':'Now photograph it.';
+  const caption=step==='shoot'?`Tap to photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?`${esc(f.room)} · ${esc(f.label)}`:`${esc(f.room)} documented.`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div><div class="sim-wave${row.note?' is-done':''}" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions">${last?'':`<div class="sim-mic${step==='say'?' is-live':''}${row.note?' is-done':''}" aria-hidden="true"><span>${row.note?'✓':'&#127908;'}</span></div>`}${complete?`<button type="button" id="sim-see" class="${last?'is-live-step':'secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}</div>${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-done').onclick=()=>simReport();
   if($('sim-see'))$('sim-see').onclick=()=>simReport();
   for(const chip of $('app').querySelectorAll('[data-sim-chip]'))chip.onclick=()=>simStage(Number(chip.dataset.simChip));
   if(step==='say')simListen(at,levels,schedule);
+  // The halo and its label arrive a beat late, so someone who already knew
+  // what to do never sees them, and someone who hesitated is told.
+  if(step==='shoot'&&!simReduced()){
+    const coach=setTimeout(()=>{
+      $('sim-coach')?.classList.add('is-on');
+      $('sim-coach-ring')?.classList.add('is-on');
+    },2500);
+    $('sim-shutter').addEventListener('pointerdown',()=>clearTimeout(coach),{once:true});
+  }else if(step==='shoot'){
+    $('sim-coach')?.classList.add('is-on');
+    $('sim-coach-ring')?.classList.add('is-on');
+  }
 }
 // A finding is done when it has both a photo and a note, and then there is
 // only one sensible next thing — so it happens by itself rather than being
@@ -802,18 +823,19 @@ function simShoot(at){
     sheetStrip.appendChild(tile);
     requestAnimationFrame(()=>tile.classList.add('is-in'));
   }
-  // Repaint into the talking step once the capture has been seen.
-  setTimeout(()=>{ if(simRun)simStage(at); },quick?0:620);
+  // The finding is complete once it has been said and shot, so this is what
+  // walks the loop on.
+  setTimeout(()=>{ if(simRun)simAdvance(at); },quick?0:700);
 }
-// The hold is the speaking. No microphone and no permission prompt: a
-// permission dialog on cold traffic is a hard stop, and the words arriving
-// under their own finger is what separates this from a video.
+// Nobody can really speak into this, so it is not asked of them: the mic plays
+// itself and the words arrive. The one thing a visitor can genuinely do here
+// is press a shutter, and that is the only thing asked for.
 function simListen(at,levels,schedule){
   const row=simRun[at];
-  const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),button=$('sim-talk-button');
+  const note=$('sim-note'),said=$('sim-said'),hint=$('sim-hint-line'),wave=$('sim-wave'),mic=$('app').querySelector('.sim-mic');
   const ticks=[...wave.querySelectorAll('i')];
   const span=schedule[schedule.length-1]?.at||1200;
-  let holding=false,catching=false,pointered=false,elapsed=0,last=0,frame=0,settled=false;
+  let elapsed=0,last=0,frame=0,settled=false;
   const paint=progress=>{
     const now=progress*span;
     const shown=schedule.filter(step=>step.at<=now).length;
@@ -827,61 +849,31 @@ function simListen(at,levels,schedule){
   };
   const settle=()=>{
     if(settled)return;settled=true;
-    holding=false;catching=false;
     cancelAnimationFrame(frame);
     paint(1);
-    button.classList.remove('is-live');button.textContent='Noted';button.disabled=true;
     row.note=row.finding.note;
     track('SimNoteWritten',row.finding.id);
     const reveal=()=>{
       note.classList.add('is-written');
       wave.classList.add('is-done');
-      $('sim-done').hidden=false;
-      simAdvance(at);
+      mic?.classList.remove('is-live');
+      // A beat to read the written note, then the shutter takes over.
+      setTimeout(()=>{ if(simRun&&$('sim-note'))simStage(at); },simReduced()?0:1500);
     };
-    // A beat long enough to read the line they just said, before it is
-    // rewritten. The rewrite is the product; swapping it out from under them
-    // is the one thing that would waste it.
+    // Long enough to read the line they "spoke" before it is rewritten. The
+    // rewrite is the product; swapping it out from under them wastes it.
     simReduced()?reveal():setTimeout(reveal,700);
   };
   const run=now=>{
-    if(!holding&&!catching)return;
-    const step=Math.min(64,now-(last||now));last=now;
-    // Letting go ends the listening, not the transcription. The rest of the
-    // line keeps arriving, a little quicker — dumping it all at once is what
-    // made this read as a canned animation instead of someone talking.
-    elapsed+=step*(holding?1:1.8);
+    elapsed+=Math.min(64,now-(last||now));last=now;
     const progress=elapsed/span;
     paint(progress);
     if(progress>=1){settle();return;}
     frame=requestAnimationFrame(run);
   };
-  const begin=event=>{
-    event.preventDefault();
-    pointered=true;
-    if(settled||holding||catching)return;
-    holding=true;last=0;
-    button.classList.add('is-live');button.textContent='Listening…';
-    frame=requestAnimationFrame(run);
-  };
-  const release=()=>{
-    if(!holding||settled)return;
-    holding=false;catching=true;last=0;
-    button.textContent='Writing it up…';
-  };
-  button.addEventListener('pointerdown',begin);
-  button.addEventListener('pointerup',release);
-  button.addEventListener('pointercancel',release);
-  button.addEventListener('pointerleave',release);
-  // A plain click — assistive tech, or a browser sending no pointer events —
-  // still has to reach the note. It must not fire on the click that follows a
-  // real pointerup, or letting go would dump the line after all.
-  button.addEventListener('click',event=>{
-    event.preventDefault();
-    if(!pointered&&!settled)settle();
-  });
+  if(simReduced()){settle();return;}
+  frame=requestAnimationFrame(run);
 }
-// Every place a price is shown, moved in step and in place.
 function simPrices(){
   const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year';
   const set=(selector,text)=>{const el=$('app').querySelector(selector);if(el)el.textContent=text;};
@@ -1728,10 +1720,19 @@ window.marketelInspectDictationText=raw=>{
     const spoken=data.text.trim();
     if(spoken){
       const room=draft.document.rooms[hudDictation.index];
-      room.observation=hudDictation.base?`${hudDictation.base}\n${spoken}`:spoken;
-      remember();
-      const box=$('app').querySelector('.hud-note');
-      if(box)box.textContent=room.observation;
+      if(hudDictation.field==='name'){
+        // One word, not a paragraph: this is a heading, and the document
+        // validator caps it at a hundred characters anyway.
+        room.name=spoken.replace(/[.,;:\s]+$/,'').slice(0,100);
+        remember();
+        const heading=$('app').querySelector('.camera-companion h1');
+        if(heading)heading.textContent=room.name;
+      }else{
+        room.observation=hudDictation.base?`${hudDictation.base}\n${spoken}`:spoken;
+        remember();
+        const box=$('app').querySelector('.hud-note');
+        if(box)box.textContent=room.observation;
+      }
     }
     return;
   }
@@ -1830,9 +1831,9 @@ function reportPreview(){
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report',index):''}${reportRoom(room,before?'Current report':'',index)}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${locationPreview(d)}${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
-    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div><p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
+    : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div>${canSend()?`<p class="muted">Sending finalizes this version. Included in your plan.</p>`:`<p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`}`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
   paintBusinessLogo();
   if(!draft.finalizedAt&&payAtExport()){
@@ -1883,7 +1884,7 @@ function reportPreview(){
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
   const title=roleLabel(role);
-  let name=existing?.name || (role==='manager'||role==='owner' ? (draft.document.author||rememberedAuthor()) : '');
+  let name=existing?.name || (role==='manager'||role==='owner' ? rememberedAuthor() : '');
   const strokes=existing?structuredClone(existing.strokes):[];
 
   const nameStep=()=>{
@@ -2255,16 +2256,24 @@ let cameraRoom=null;
 // into the finding. It is the device's own engine, so there is no upload, no
 // account and no AI allowance between someone and their note.
 let hudDictation=null;
+// Which question the finding is answering. A finding with nowhere attached to
+// it gets asked where it is first, in one word, because "Kitchen" at the top
+// of the card is worth more than "Finding 1" and costs one sentence to get.
+const hudAsk = room => (entryTool() && !(room?.name || '').trim() ? 'name' : 'observation');
+const hudShell = () => !!window.webkit?.messageHandlers?.marketelShell;
 function hudTalk(){
   const shell=window.webkit?.messageHandlers?.marketelShell;
   if(!shell||cameraRoom===null||!draft)return;
   if(hudDictation){shell.postMessage({type:'inspectDictateStop'});hudDictation=null;cameraCompanion();return;}
   const room=draft.document.rooms[cameraRoom];
-  hudDictation={index:cameraRoom,base:(room.observation||'').trim()};
+  const field=hudAsk(room);
+  hudDictation={index:cameraRoom,field,base:field==='observation'?(room.observation||'').trim():''};
   shell.postMessage({type:'inspectDictate',room:cameraRoom});
   haptic();cameraCompanion();
 }
-function cameraCompanion(){
+// `entering` is set by the shot that opened this card, so the swap reads as
+// the sheet handing over rather than the page blinking.
+function cameraCompanion(entering=false){
   if(cameraRoom===null||!draft)return;
   document.documentElement.classList.add('camera-open');
   const rooms=draft.document.rooms,w=wedge(draft.document.type),entries=entryTool();
@@ -2274,7 +2283,14 @@ function cameraCompanion(){
   const note=(room.observation||'').trim();
   const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
   const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?entryLabel(item,index):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
-  $('app').innerHTML=`<section class="camera-companion"><small class="eyebrow">${esc(draft.document.propertyName)||esc(skin().product)}</small><h1>${esc(entries?entryLabel(room,cameraRoom):(room.name||`${w.noun} ${cameraRoom+1}`))} <span class="camera-count">${room.photos.length} ${room.photos.length===1?'photo':'photos'}</span></h1><div class="hud-note${talking?' is-live':''}">${note?esc(note):`<span class="muted">${talking?'Listening…':'Say what you are looking at, then photograph it.'}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${native?`<button type="button" id="hud-talk" class="${talking?'danger-button':''} wide">${talking?'Stop':'Hold to talk'}</button>`:''}<button type="button" id="hud-next" class="secondary wide">Next ${esc(entries?'finding':w.noun)}</button></div><div class="camera-rooms">${subjects}</div></section>`;
+  const asking=hudAsk(room);
+  const heading=asking==='name'?'Where is this?':esc(entries?entryLabel(room,cameraRoom):(room.name||`${w.noun} ${cameraRoom+1}`));
+  const prompt=asking==='name'
+    ? (talking?'Listening…':'Tap the mic and say the room.')
+    : (talking?'Listening…':'Tap the mic and say what you are looking at.');
+  const body=asking==='name'?'':note;
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><h1>${heading}</h1><div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}"><span aria-hidden="true">${talking?'■':'&#127908;'}</span></button>`:''}<button type="button" id="hud-next" class="secondary">Next ${esc(entries?'finding':w.noun)}</button></div><div class="camera-rooms">${subjects}</div></section>`;
+  if(entering)requestAnimationFrame(()=>$('app').querySelector('.camera-companion')?.classList.remove('is-entering'));
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   $('hud-next').onclick=()=>{
     if(rooms.length>=30)return notice(`Maximum 30 ${entries?'findings':w.nounPlural}.`);
@@ -2328,7 +2344,7 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`});
   draft.document.rooms[i].photos.push(id);
   remember();await persist();
-  if(cameraRoom!==null)cameraCompanion();
+  if(cameraRoom!==null)cameraCompanion(true);
   else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
 },null);
 window.marketelInspectNativeSelectTab=page=>{

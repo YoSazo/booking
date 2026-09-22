@@ -419,22 +419,22 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .camera-companion { padding-top: 4px; }
 /* Everything here has to read at arm's length, in sunlight, in the half of the
    screen the camera sheet leaves — and answer a thumb without being aimed at. */
-.camera-companion h1 { font-size: 21px; margin: 2px 0 8px; letter-spacing: -.6px; }
+.camera-companion h1 { font-size: 21px; margin: 0 0 6px; letter-spacing: -.6px; }
 .camera-count { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
 /* The shell steps aside while the camera is open, so its band is not reserved. */
 .native-inspect-shell.camera-open body { padding-top: calc(env(safe-area-inset-top) + 6px); padding-bottom: 6px; }
 .camera-open main { padding-top: 0; }
 /* Rooms become chips so the prompts and the strip have room above the sheet. */
-.camera-rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
-.camera-strip { display: flex; gap: 8px; overflow-x: auto; margin: 10px 0 6px; min-height: 8px; -webkit-overflow-scrolling: touch; }
-.camera-strip figure { position: relative; flex: 0 0 auto; width: 56px; height: 56px; margin: 0; }
+.camera-rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.camera-strip { display: flex; gap: 8px; overflow-x: auto; margin: 6px 0 4px; min-height: 8px; -webkit-overflow-scrolling: touch; }
+.camera-strip figure { position: relative; flex: 0 0 auto; width: 46px; height: 46px; margin: 0; }
 .camera-strip img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .camera-strip .photo-x { top: -4px; right: -4px; }
 .camera-strip p { margin: 0; }
 /* The recording is the point of this screen, so it is the biggest thing on it. */
-.hud-note { min-height: 62px; padding: 12px 14px; margin: 2px 0 10px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
+.hud-note { min-height: 56px; padding: 10px 13px; margin: 0 0 6px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
 .hud-note.is-live { border-color: var(--green); background: var(--green-pale); }
-.hud-actions { display: flex; gap: 8px; margin: 10px 0; }
+.hud-actions { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .hud-actions button { flex: 1 1 0; }
 /* Web: the photo you just added, then what it is. */
 .entry-screen .screen-bar { margin-bottom: 8px; }
@@ -444,7 +444,7 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .entry-note { display: block; margin-bottom: 12px; }
 .entry-actions { margin-top: 4px; }
 .finding-heading { font-size: 18px; margin: 0 0 10px; }
-.camera-room { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex: 0 0 auto; width: auto; min-height: 44px; border-radius: 999px; padding: 12px 16px; text-align: left; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
+.camera-room { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex: 0 0 auto; width: auto; min-height: 40px; border-radius: 999px; padding: 9px 14px; text-align: left; background: var(--surface); color: inherit; border: 1px solid var(--border); border-radius: 14px; font-weight: 500; }
 .camera-room strong { font-weight: 650; }
 .camera-room span { color: var(--muted); font-size: 13px; font-weight: 450; }
 .camera-room.is-active { background: var(--green); border-color: var(--green); color: #fff; }
@@ -542,10 +542,13 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .sim-wave i { flex: 1 1 0; height: 100%; background: var(--border); border-radius: 2px; transform: scaleY(.08); transform-origin: center; transition: transform .08s linear, background-color .12s ease; }
 .sim-wave i.is-live { background: var(--green); }
 .sim-wave.is-done { opacity: .35; }
-.sim-actions { display: flex; gap: 8px; margin-top: 12px; }
+.sim-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .sim-actions button { flex: 1 1 0; }
-.sim-talk-button { min-height: 52px; font-size: 16px; touch-action: none; user-select: none; -webkit-user-select: none; }
-.sim-talk-button:disabled { opacity: .55; }
+/* Depicted, not demanded: this is the app's own control playing itself, so it
+   is never a call to action and there is no gesture to learn. */
+.sim-mic { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: var(--surface); border: 1.5px solid var(--border); }
+.sim-mic.is-live { background: var(--green); border-color: var(--green); animation: sim-pulse 1.6s ease-in-out infinite; }
+.sim-mic.is-done { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); }
 .sim-talk-button.is-live { background: var(--green-dark); box-shadow: 0 0 0 6px #2e7d5b26; }
 .sim-talk-button:disabled { opacity: 1; }
 
@@ -606,6 +609,15 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
    report and is noise on a sample. */
 .sim-doc .report-photo + small { display: none; }
 
+/* The one thing actually asked for, said out loud a beat after they hesitate.
+   A halo alone still leaves someone guessing; the words remove the guess. */
+.sim-shutter-wrap { position: relative; display: grid; place-items: center; }
+.sim-coach { position: absolute; bottom: calc(100% + 12px); margin: 0; padding: 6px 12px; border-radius: 999px; background: #0b100dd9; color: #fff; font-size: 13px; font-weight: 650; white-space: nowrap; opacity: 0; transform: translateY(6px); transition: opacity .3s ease, transform .3s ease; }
+.sim-coach.is-on { opacity: 1; transform: none; }
+.sim-coach::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border: 5px solid transparent; border-top-color: #0b100dd9; }
+.sim-coach-ring { position: absolute; width: 68px; height: 68px; border-radius: 50%; border: 2px solid #ffffffcc; opacity: 0; pointer-events: none; }
+.sim-coach-ring.is-on { opacity: 1; animation: sim-coach-tap 1.6s ease-in-out infinite; }
+@keyframes sim-coach-tap { 0%, 100% { transform: scale(1.18); opacity: .9; } 45% { transform: scale(.9); opacity: .35; } }
 @keyframes sim-pulse { 0%, 100% { box-shadow: 0 0 0 0 #2e7d5b5c; } 55% { box-shadow: 0 0 0 11px #2e7d5b00; } }
 
 @keyframes sim-drift { from { transform: scale(1.02); } to { transform: scale(1.05) translate3d(-1%, .8%, 0); } }
@@ -617,4 +629,22 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
   .sim-feed { animation: none; }
   .sim-reticle { animation: none; opacity: .4; }
   .sim-shot { transition: none; opacity: 1; transform: none; }
+  .sim-coach-ring.is-on { animation: none; }
+  .sim-mic.is-live { animation: none; }
+}
+
+/* The card the camera hands over to. It rises and settles rather than the page
+   blinking, because the sheet below it never moved. */
+.camera-companion { transition: opacity .26s ease, transform .26s cubic-bezier(.2,.7,.3,1); }
+.camera-companion.is-entering { opacity: 0; transform: translateY(14px); }
+/* The button was always a tap-to-toggle calling itself "Hold to talk". It is a
+   microphone, so it looks like one, and it says what it is doing while it is on. */
+.hud-mic { flex: 0 0 auto; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 23px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.hud-mic.is-live { background: #b3261e; animation: hud-mic-live 1.5s ease-in-out infinite; }
+.hud-actions #hud-next { flex: 1 1 auto; }
+@keyframes hud-mic-live { 0%, 100% { box-shadow: 0 0 0 0 #b3261e52; } 60% { box-shadow: 0 0 0 12px #b3261e00; } }
+@media (prefers-reduced-motion: reduce) {
+  .camera-companion { transition: none; }
+  .camera-companion.is-entering { opacity: 1; transform: none; }
+  .hud-mic.is-live { animation: none; }
 }
