@@ -13,7 +13,10 @@ const token = () => crypto.randomBytes(32).toString('base64url');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const safe = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LIMITS = Object.freeze({
-  reports: 30,
+  // Plans are sold as unlimited. This is the fair-use ceiling per monthly
+  // billing period, stated in the terms, and high enough that no one sending
+  // their own properties' reports reaches it.
+  reports: 300,
   photos: 100,
   drafts: 5,
   properties: 1000,
@@ -127,9 +130,9 @@ function validateSignatures(value, type) {
   });
 }
 
-// Two allowed shapes, both exact. The annual report allowance is the monthly one
-// multiplied by twelve, because the quota resets per *billing* period — leaving
-// it at 30 would sell a yearly plan one twelfth of the monthly plan's work.
+// Two allowed shapes, both exact. The annual fair-use ceiling is the monthly one
+// multiplied by twelve, because it resets per *billing* period — leaving it at
+// the monthly figure would give a yearly plan one twelfth of the monthly one.
 const INSPECT_PLANS = Object.freeze({
   month: Object.freeze({ interval: 'month', amount: 2500, reports: LIMITS.reports, priceEnv: 'STRIPE_INSPECT_PRICE_ID', contentName: 'Marketel Inspect monthly plan' }),
   year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
@@ -309,7 +312,7 @@ function inspectEnvReadiness(env = process.env) {
       // product can otherwise pass every check while the workflow it is
       // advertised on answers 503 to every owner who tries it.
       item('inspect-ai-key', 'Inspect voice notes and wording help', present('OPENAI_API_KEY'), 'Set OPENAI_API_KEY. Without it "Talk through this room" and "Polish typed note" return 503 — the rest of Inspect still works, but do not advertise the AI write-up until this is set.', false),
-      item('inspect-stripe-price', 'Inspect $29/mo Stripe price id', priceIdOk, 'Create a USD 29 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
+      item('inspect-stripe-price', 'Inspect $25/mo Stripe price id', priceIdOk, 'Create a USD 25 monthly Price and set STRIPE_INSPECT_PRICE_ID.', requireWhenEnabled),
       // Deliberately not critical: a missing annual price must never take the
       // whole product dark, it just leaves monthly as the only plan on offer.
       item('inspect-stripe-yearly-price', 'Inspect $199/yr Stripe price id', yearlyPriceIdOk, 'Create a USD 199 yearly Price and set STRIPE_INSPECT_YEARLY_PRICE_ID. Until then the paywall can only sell monthly.', false),
@@ -1390,6 +1393,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         : access.active && access.remaining ? { reportsUsed: { increment: 1 } }
         : access.credits > 0 ? { reportCredits: { decrement: 1 } }
         : null;
+      // A subscriber is never shown a paywall: at the fair-use ceiling they are
+      // told how to have it lifted.
+      if (!spend && access.active) throw fail(402, 'You have reached this plan\'s fair-use limit for this billing period. Email support@bookmarketel.com and we will lift it.');
       if (!spend) throw fail(402, tool.offerMode === 'pay-at-export' ? 'Choose a plan or buy this report to send it.' : 'Subscribe for additional reports, or wait for your next billing period.');
       if (spend.freeReportUsed) await tx.inspectFreeClaim.create({ data: { emailHash: freeClaimHash(a.email) } });
       await tx.inspectAccount.update({ where: { id: a.id }, data: spend });
@@ -1604,10 +1610,27 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   }));
   router.post('/billing', guarded(async (req, res) => {
     requireBilling();
-    if (!req.inspect.stripeCustomerId || !env.STRIPE_INSPECT_PORTAL_CONFIGURATION_ID) throw fail(503, 'Billing management is not configured.');
-    const session = await stripe.billingPortal.sessions.create({ customer: req.inspect.stripeCustomerId,
-      configuration: env.STRIPE_INSPECT_PORTAL_CONFIGURATION_ID,
-      return_url: req.body.native === true ? `${origin}/inspect/checkout-return.html?status=billing` : `${origin}/inspect/` });
+    if (!req.inspect.stripeCustomerId) throw fail(409, 'There is no subscription on this account to manage.');
+    const base = { customer: req.inspect.stripeCustomerId,
+      return_url: req.body.native === true ? `${origin}/inspect/checkout-return.html?status=billing` : `${origin}/inspect/` };
+    // A configuration this Stripe account does not have (a placeholder, or one
+    // from the other mode) failed as a generic error. The account's default
+    // portal manages the same subscription, so that opens instead.
+    const configured = env.STRIPE_INSPECT_PORTAL_CONFIGURATION_ID;
+    let session = null;
+    if (configured) {
+      session = await stripe.billingPortal.sessions.create({ ...base, configuration: configured }).catch(error => {
+        if (error?.param !== 'configuration' && !/configuration/i.test(error?.message || '')) throw error;
+        console.error('Inspect portal configuration rejected; using the default:', error.code || 'unknown');
+        return null;
+      });
+    }
+    if (!session) {
+      session = await stripe.billingPortal.sessions.create(base).catch(error => {
+        console.error('Inspect default portal unavailable:', error.code || 'unknown');
+        throw fail(503, 'Subscription management is unavailable right now. Email support@bookmarketel.com and we will change it for you.');
+      });
+    }
     res.json({ url: session.url });
   }));
   router.post('/billing/refresh', guarded(async (req, res) => {

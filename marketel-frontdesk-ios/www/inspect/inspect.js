@@ -13,8 +13,8 @@ let appStoreUrl = DEFAULT_APP_STORE_URL;
 // $25 x 12 = $300, so the annual plan saves $101 — and its report allowance is
 // the monthly one times twelve, because the quota resets per billing period.
 const PLANS = Object.freeze({
-  year: Object.freeze({ price: 199, per: '/year', save: 'Save $101', reports: 360, terms: '$199 charged today, then yearly until cancelled.' }),
-  month: Object.freeze({ price: 25, per: '/month', save: '', reports: 30, terms: '$25 charged today, then monthly until cancelled.' }),
+  year: Object.freeze({ price: 199, per: '/year', save: 'Save $101', terms: '$199 charged today, then yearly until cancelled.' }),
+  month: Object.freeze({ price: 25, per: '/month', save: '', terms: '$25 charged today, then monthly until cancelled.' }),
 });
 // Monthly leads everywhere a price is shown. A year is not a decision cold
 // traffic makes, and defaulting to it is what made the sheet read as a trap.
@@ -606,6 +606,8 @@ const TOOL_OFFERS = Object.freeze({
 const toolOffer = () => TOOL_OFFERS[toolId()] || TOOL_OFFERS.inspect;
 const payAtExport = () => toolOffer().mode === 'pay-at-export';
 const reportPrice = () => toolOffer().reportPrice || 0;
+// Plans are unlimited; this is only ever seen at the fair-use ceiling.
+const FAIR_USE_REACHED = 'You have reached this plan\'s fair-use limit for this billing period. Email support@bookmarketel.com and we will lift it.';
 const canSend = () => !!account && ((account.active && account.remaining > 0) || account.credits > 0 || (!payAtExport() && account.freeAvailable));
 const storedEmail = () => { try { return localStorage.getItem('inspect.email') || ''; } catch { return ''; } };
 // Each step a visitor takes, per tool, before and after sign-in. Never content:
@@ -1885,7 +1887,7 @@ function reportPreview(){
   };
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
-    await refresh();if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
+    await refresh();if(account.active&&!account.remaining&&!(account.credits>0))return notice(FAIR_USE_REACHED,'error');if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
     if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
     await markLocation('end');
     await save();
@@ -2024,6 +2026,8 @@ function requestExport(action,trigger){
       await save();await refresh();
     } finally { veil.done(); }
     if(canSend())return finishExport(action);
+    // A subscriber is never shown a paywall, even at the fair-use ceiling.
+    if(account?.active)return notice(FAIR_USE_REACHED,'error');
     await exportOffer(action);
   },trigger),'send');
 }
@@ -2093,8 +2097,8 @@ async function exportOffer(action){
     ...(!single.length&&!available.includes('month')&&available.includes('year')?['year']:[])];
   const perReport=reportPrice()?Math.max(1,Math.round(PLANS.year.price/reportPrice())):0;
   const label={
-    year:[`$${PLANS.year.price}/year`,perReport?`About ${perReport} ${sk.docPlural} at the single price`:`${PLANS.year.reports} ${sk.docPlural} a year · best value`],
-    month:[`$${PLANS.month.price}/month`,`${PLANS.month.reports} ${sk.docPlural} a month`],
+    year:[`$${PLANS.year.price}/year`,perReport?`Unlimited ${sk.docPlural} · the price of ${perReport} single ones`:`Unlimited ${sk.docPlural} · best value`],
+    month:[`$${PLANS.month.price}/month`,`Unlimited ${sk.docPlural}`],
     report:[`$${reportPrice()}`,`Just this ${sk.doc}`],
   };
   let choice=options[0],settled=false;
@@ -2240,7 +2244,7 @@ async function deleteProperty(property,button){
 function renderReports(){
   enterScreen('reports');
   const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
-  const status=account.freeAvailable?`Your first complete ${skin().doc} is free.`:account.active?`${account.remaining} ${skin().docPlural} remaining this billing period.`:`Your saved ${skin().docPlural} remain available.`;
+  const status=account.freeAvailable?`Your first complete ${skin().doc} is free.`:account.active?(account.remaining>0?`Unlimited ${skin().docPlural} on your plan.`:FAIR_USE_REACHED):`Your saved ${skin().docPlural} remain available.`;
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(draft.document.date)} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
@@ -2337,7 +2341,7 @@ $('account-button').onclick=async()=>{
   // free report, so promising one there was false — and a review account
   // holding credits was being told the same.
   const standing=account.active
-    ? `${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`
+    ? `${account.remaining>0?`Unlimited ${esc(sk.docPlural)}.`:esc(FAIR_USE_REACHED)}${account.periodEnd&&!Number.isNaN(new Date(account.periodEnd).getTime())?` ${account.cancellationScheduled?'Access ends':'Renews'} ${new Date(account.periodEnd).toLocaleDateString()}.`:''}`
     : account.credits>0 ? `${account.credits} ${esc(account.credits===1?sk.doc:sk.docPlural)} ready to send.`
     : payAtExport() ? `No plan yet. Building a ${esc(sk.doc)} is always free, and your ${esc(sk.docPlural)} stay here.`
     : `One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`;

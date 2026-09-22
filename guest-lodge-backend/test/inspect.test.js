@@ -21,7 +21,8 @@ test('Inspect document validation preserves observations without inventing field
     { name: 'A', observation: '', photos: ['same'] },
     { name: 'B', observation: '', photos: ['same'] },
   ] }), /duplicate photo/);
-  assert.equal(LIMITS.reports, 30);
+  // Plans are sold as unlimited; this is the fair-use ceiling the terms state.
+  assert.equal(LIMITS.reports, 300);
   assert.equal(LIMITS.photos, 100);
 });
 
@@ -611,6 +612,74 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   return { app, registration, calls, account, report, headers };
 }
 
+test('Manage subscription opens the default portal when the configured one is rejected', async () => {
+  const portal = (reject) => {
+    const seen = [];
+    return { seen, billingPortal: { sessions: { create: async params => {
+      seen.push(params);
+      const error = reject(params);
+      if (error) throw error;
+      return { url: `https://billing.stripe.test/${params.configuration || 'default'}` };
+    } } } };
+  };
+  const call = async h => {
+    const response = await request(h.app, '/api/inspect/billing', { method: 'POST', headers: h.headers, body: JSON.stringify({ native: true }) });
+    return { status: response.status, body: await response.json() };
+  };
+  const missing = Object.assign(new Error("No such configuration: 'bpc_replace_me'"), { type: 'StripeInvalidRequestError', code: 'resource_missing', param: 'configuration' });
+
+  // The configured portal, when Stripe has it, and the app's way back.
+  let stripe = portal(() => null);
+  let h = moneyHarness({ stripe });
+  try {
+    const { status, body } = await call(h);
+    assert.equal(status, 200);
+    assert.equal(body.url, 'https://billing.stripe.test/bpc_test');
+    assert.equal(stripe.seen[0].return_url, 'https://bookmarketel.com/inspect/checkout-return.html?status=billing');
+  } finally { h.registration.close(); }
+
+  // A placeholder or other-mode id used to surface as a generic failure.
+  stripe = portal(params => (params.configuration ? missing : null));
+  h = moneyHarness({ stripe });
+  try {
+    const { status, body } = await call(h);
+    assert.equal(status, 200);
+    assert.equal(body.url, 'https://billing.stripe.test/default');
+    assert.equal(stripe.seen.length, 2);
+    assert.equal(stripe.seen[1].customer, 'cus_1');
+  } finally { h.registration.close(); }
+
+  // If Stripe has no portal at all, they are told what to do instead.
+  stripe = portal(params => (params.configuration ? missing : new Error('No configuration provided')));
+  h = moneyHarness({ stripe });
+  try {
+    const { status, body } = await call(h);
+    assert.equal(status, 503);
+    assert.match(body.error, /support@bookmarketel\.com/);
+  } finally { h.registration.close(); }
+
+  // Any other Stripe failure is not papered over with the default.
+  stripe = portal(() => Object.assign(new Error('No such customer'), { type: 'StripeInvalidRequestError', param: 'customer' }));
+  h = moneyHarness({ stripe });
+  try {
+    assert.equal((await call(h)).status, 500);
+    assert.equal(stripe.seen.length, 1);
+  } finally { h.registration.close(); }
+});
+
+test('plans are unlimited everywhere they are described', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '../public/inspect/inspect.js'), 'utf8');
+  assert.doesNotMatch(client, /remaining this billing period|\$\{account\.remaining\} \$\{esc\(sk\.docPlural\)\} left|reports a month|PLANS\.(?:month|year)\.reports/);
+  assert.match(client, /month:\[`\$\$\{PLANS\.month\.price\}\/month`,`Unlimited \$\{sk\.docPlural\}`\]/);
+  // The export gate never sends a subscriber to the paywall.
+  assert.match(client, /if\(canSend\(\)\)return finishExport\(action\);\s*\/\/[^\n]*\n\s*if\(account\?\.active\)return notice\(FAIR_USE_REACHED,'error'\);/);
+  const terms = fs.readFileSync(path.join(__dirname, '../public/inspect/terms.html'), 'utf8');
+  assert.match(terms, /\$25 USD per month or \$199 USD per year\. Both include unlimited finalized reports/);
+  assert.match(terms, /fair use of 300 finalized reports per monthly billing period \(3,600 per yearly period\)/);
+  assert.doesNotMatch(terms, /\$29/);
+});
+
 test('a property can be added on its own, and deleted with its reports', async () => {
   const h = moneyHarness();
   const call = async (method, body) => {
@@ -807,6 +876,22 @@ test('finalizing spends the right allowance for each tool and snapshots the busi
     const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
     assert.equal(response.status, 200);
     assert.deepEqual(h.calls.accountUpdates.at(-1), { reportsUsed: { increment: 1 } });
+  } finally { h.registration.close(); }
+
+  // A subscriber at the fair-use ceiling is told how to have it lifted, never
+  // sold anything; a credit they bought is still spent before that.
+  const ceiling = { subscriptionStatus: 'active', periodEnd: new Date(Date.now() + 86400000), freeReportUsed: true, reportsUsed: 300 };
+  h = moneyHarness({ account: ceiling });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 402);
+    assert.match((await response.json()).error, /fair-use limit[\s\S]*support@bookmarketel\.com/);
+  } finally { h.registration.close(); }
+  h = moneyHarness({ account: { ...ceiling, reportCredits: 1 } });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.calls.accountUpdates.at(-1), { reportCredits: { decrement: 1 } });
   } finally { h.registration.close(); }
 
   // Inspect keeps its lifetime free report.
@@ -1032,7 +1117,7 @@ test('the cold offer leads with the single report and hides the year until it me
         const sk = { doc: 'report', docPlural: 'reports' };
         ${body}
         return { options, label };`);
-    const PLANS = { year: { price: 199, reports: 360 }, month: { price: 25, reports: 30 } };
+    const PLANS = { year: { price: 199 }, month: { price: 25 } };
 
     // Claims, cold: the single report first and selected, no year anywhere.
     const cold = build(['year', 'month'], 0, 12, PLANS);
@@ -1040,12 +1125,14 @@ test('the cold offer leads with the single report and hides the year until it me
     assert.equal(cold.options[0], 'report', 'the default is options[0]');
     assert.equal(cold.label.report[0], '$12');
     assert.equal(cold.label.month[0], '$25/month');
+    // A plan is unlimited, so it is never sold as a number of reports.
+    assert.equal(cold.label.month[1], 'Unlimited reports');
 
     // Finishing one is the first evidence the need recurs, and only then is a
     // year a real offer — framed by the arithmetic, not a percentage.
     const repeat = build(['year', 'month'], 1, 12, PLANS);
     assert.deepEqual(repeat.options, ['report', 'month', 'year']);
-    assert.match(repeat.label.year[1], /About 17 reports at the single price/);
+    assert.match(repeat.label.year[1], /^Unlimited reports · the price of 17 single ones$/);
 
     // A first-free tool sells no single report, and still offers its plans.
     assert.deepEqual(build(['year', 'month'], 1, 0, PLANS).options, ['month', 'year']);
@@ -1496,16 +1583,16 @@ test('Inspect entitlement is separate, period-bound, and keeps the lifetime free
   });
   const paid = entitlement({ subscriptionStatus: 'active', periodEnd: future, freeReportUsed: true, reportsUsed: 7, cancelAtPeriodEnd: true });
   assert.equal(paid.active, true);
-  assert.equal(paid.remaining, 23);
+  assert.equal(paid.remaining, 293);
   assert.equal(paid.cancellationScheduled, true);
-  // An annual period must carry twelve months of report allowance, or the
-  // yearly plan would sell one twelfth of the monthly plan's work.
+  // An annual period carries twelve months of fair use, or the yearly plan
+  // would get one twelfth of the monthly plan's ceiling.
   const yearly = entitlement({ subscriptionStatus: 'active', periodStart: new Date('2026-01-01'),
     periodEnd: new Date('2027-01-01'), freeReportUsed: true, reportsUsed: 12 });
   assert.equal(yearly.interval, 'year');
   assert.equal(yearly.price, 199);
-  assert.equal(yearly.remaining, 348);
-  assert.equal(yearly.limits.reports, 360);
+  assert.equal(yearly.remaining, 3588);
+  assert.equal(yearly.limits.reports, 3600);
   assert.equal(hash('session').length, 64);
 });
 
@@ -1737,7 +1824,7 @@ test('Inspect API is dark behind its flag and requires a bearer session', async 
   });
   const config = await request(on, '/api/inspect/config');
   assert.equal(config.status, 200);
-  assert.deepEqual(await config.json(), { enabled: true, appStoreUrl: 'https://apps.apple.com/us/app/marketel/id6801005750', limits: { reports: 30, photos: 100 } });
+  assert.deepEqual(await config.json(), { enabled: true, appStoreUrl: 'https://apps.apple.com/us/app/marketel/id6801005750', limits: { reports: 300, photos: 100 } });
   assert.equal((await request(on, '/api/inspect/account')).status, 401);
   onRegistration.close();
 });
