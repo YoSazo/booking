@@ -585,6 +585,17 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .sim-paybar small { color: var(--muted); font-weight: 600; }
 .sim-paybar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; }
 .sim-report { padding-bottom: 96px; }
+/* Annual is a text switch in the small print rather than a segmented control:
+   the sticky bar is the offer, and a second full choice under it is a fifth
+   decision on a screen that has already made its case. */
+.sim-plan-switch { display: inline; padding: 0; min-height: 0; font-size: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
+.sim-plan-switch:active { background: transparent; }
+/* One field, on our page rather than Stripe's, so their page opens prefilled. */
+.sim-email h1 { font-size: clamp(23px, 6.4vw, 30px); line-height: 1.15; letter-spacing: -.7px; margin: 6px 0 10px; }
+.sim-email input { width: 100%; min-height: 54px; margin: 16px 0 12px; padding: 14px 16px; font-family: inherit; font-size: 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; }
+.sim-email input:focus { outline: none; border-color: var(--green); }
+.sim-email input.invalid { border-color: #b3261e; }
+.sim-email .quiet { margin-top: 8px; }
 /* Three full-bleed photos are what made the report card 2266px tall. The
    sample only has to read as the document; the real renderer is untouched. */
 .sim-doc .report-photo { max-height: 200px; object-fit: cover; }

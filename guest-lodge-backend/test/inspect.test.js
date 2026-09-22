@@ -1651,7 +1651,7 @@ test('the simulation sells before anyone has an account, and Stripe collects the
     assert.equal(params.metadata.product, 'marketel-inspect');
     assert.equal(params.metadata.tool, 'claims');
     assert.deepEqual(params.subscription_data.metadata, params.metadata);
-    assert.equal(params.success_url, 'https://bookmarketel.com/claims?sim=1&checkout=success');
+    assert.equal(params.success_url, 'https://bookmarketel.com/claims?sim=1&checkout=success&session={CHECKOUT_SESSION_ID}');
     assert.equal(params.cancel_url, 'https://bookmarketel.com/claims?sim=1&checkout=cancelled');
     assert.ok(h.calls.events.some(event => event.name === 'SimCheckoutStarted' && event.tool === 'claims'));
   } finally { h.registration.close(); }
@@ -1746,4 +1746,73 @@ test('every sample photo the simulation offers actually exists', () => {
   // The simulation must never write into the real pipeline.
   const sim = src.slice(src.indexOf('const SIMS = {'), src.indexOf('function landing() {'));
   assert.ok(!/persist\(|stored\('put'|api\('\/reports/.test(sim), 'the simulation must not touch drafts or reports');
+});
+
+test('the simulation keeps the address even when the card is never reached', async () => {
+  const h = moneyHarness({
+    stripe: {
+      prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) },
+    },
+  });
+  try {
+    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interval: 'month', tool: 'claims', email: 'Buyer@Example.com ' }) });
+    assert.equal(response.status, 200);
+    // Prefilled, so Stripe's own email field is answered and Apple Pay is the
+    // only tap left on their page.
+    assert.equal(h.calls.sessions[0].params.customer_email, 'buyer@example.com');
+    // And the lead exists from this moment, not from the payment.
+    assert.ok(h.calls.events.some(event => event.name === 'LeadCaptured' && event.tool === 'claims'));
+    assert.ok(h.calls.capi.some(event => event.name === 'Lead'));
+  } finally { h.registration.close(); }
+
+  // No address is still allowed: Stripe collects it and the webhook adopts it.
+  const anon = moneyHarness({ stripe: { prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) } } });
+  try {
+    const response = await request(anon.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims' }) });
+    assert.equal(response.status, 200);
+    assert.ok(!('customer_email' in anon.calls.sessions[0].params));
+    assert.ok(!anon.calls.events.some(event => event.name === 'LeadCaptured'));
+  } finally { anon.registration.close(); }
+
+  // A malformed address is refused rather than passed to Stripe.
+  const bad = moneyHarness({ stripe: { prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) } } });
+  try {
+    const response = await request(bad.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims', email: 'nope' }) });
+    assert.equal(response.status, 400);
+    assert.equal(bad.calls.sessions.length, 0);
+  } finally { bad.registration.close(); }
+});
+
+test('the address that paid can be recovered, and only by whoever holds the checkout id', async () => {
+  const sessions = {
+    cs_test_a1GoodSessionIdentifier000001: { id: 'cs_test_a1GoodSessionIdentifier000001', status: 'complete', metadata: { sim: '1' }, customer_details: { email: 'payer@example.com' } },
+    cs_test_a1OpenSessionIdentifier000002: { id: 'cs_test_a1OpenSessionIdentifier000002', status: 'open', metadata: { sim: '1' }, customer_details: { email: 'payer@example.com' } },
+    cs_test_a1OtherSessionIdentifier00003: { id: 'cs_test_a1OtherSessionIdentifier00003', status: 'complete', metadata: {}, customer_details: { email: 'someone@example.com' } },
+  };
+  const h = moneyHarness({ stripe: { checkout: { sessions: {
+    create: async () => ({ id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }),
+    retrieve: async id => sessions[id] || null,
+  } } } });
+  try {
+    const ok = await request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'cs_test_a1GoodSessionIdentifier000001' }) });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { email: 'payer@example.com' });
+
+    // An unfinished checkout, or one that is not the simulation's, gives up
+    // nothing — and says nothing about which of the two it was.
+    for (const id of ['cs_test_a1OpenSessionIdentifier000002', 'cs_test_a1OtherSessionIdentifier00003']) {
+      const response = await request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: id }) });
+      assert.equal(response.status, 200, id);
+      assert.deepEqual(await response.json(), { email: '' }, id);
+    }
+    const junk = await request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'whatever' }) });
+    assert.equal(junk.status, 400);
+  } finally { h.registration.close(); }
 });

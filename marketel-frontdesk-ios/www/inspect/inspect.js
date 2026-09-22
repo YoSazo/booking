@@ -688,11 +688,21 @@ function simThanks(){
   enterScreen('sim');
   const sk=skin();
   document.documentElement.classList.add('sim-mode');
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">Your account is set up under the email you paid with. Sign in with that address and your first real ${esc(sk.doc)} is ready to start.</p><button type="button" id="sim-signin" class="wide">Sign in and start →</button><a class="button secondary wide" href="${esc(appStoreUrl)}">Get the iPhone app</a><p><small>The app is where you talk through a ${esc(sk.doc)} while you are standing in the property.</small></p></section>`;
+  // Usually we already know the address, because it was taken before Stripe.
+  // This is for the one who changed it on Stripe's page.
+  const paid=new URLSearchParams(location.search).get('session')||'';
+  if(/^cs_[A-Za-z0-9_]{8,200}$/.test(paid))api('/checkout/sim/email',{method:'POST',body:{sessionId:paid}})
+    .then(r=>{
+      if(!r?.email)return;
+      try{localStorage.setItem('inspect.email',r.email);}catch{}
+      const where=$('sim-paid-email');
+      if(where)where.textContent=r.email;
+    }).catch(()=>{});
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">Your account is under <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong>. Sign in with it and your first real ${esc(sk.doc)} is ready to start.</p><button type="button" id="sim-signin" class="wide">Sign in and start →</button><a class="button secondary wide" href="${esc(appStoreUrl)}">Get the iPhone app</a><p><small>The app is where you talk through a ${esc(sk.doc)} while you are standing in the property.</small></p></section>`;
   $('sim-signin').onclick=()=>{
     document.documentElement.classList.remove('sim-mode');
     history.replaceState(null,'',location.pathname);
-    ensureAuth(()=>run(()=>openAccountHome()),'signin');
+    ensureAuth(()=>run(()=>openAccountHome()),'paid');
   };
 }
 function simResume(){
@@ -710,7 +720,7 @@ function simIntro(){
   const s=simTool();
   document.documentElement.classList.add('sim-mode');
   track('SimStarted');
-  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">We have filled in the details and picked the sample photos for you. We just want to show you what you get.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p></section>`;
+  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p></section>`;
   simRun=null;
   for(const button of $('app').querySelectorAll('[data-sim-pick]'))
     button.onclick=()=>{
@@ -865,12 +875,54 @@ function simListen(at,levels,schedule){
     if(!pointered&&!settled)settle();
   });
 }
-function simBuy(trigger){
+// Every place a price is shown, moved in step and in place.
+function simPrices(){
+  const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year';
+  const set=(selector,text)=>{const el=$('app').querySelector(selector);if(el)el.textContent=text;};
+  set('.sim-offer .price',`$${plan.price} `);
+  const per=$('app').querySelector('.sim-offer .price small');
+  if(per)per.textContent=plan.per; else {
+    const price=$('app').querySelector('.sim-offer .price');
+    if(price)price.insertAdjacentHTML('beforeend',`<small>${esc(plan.per)}</small>`);
+  }
+  set('.sim-offer .price-save',year?`${PLANS.year.save} · $16.58/month`:`Unlimited ${sk.docPlural} · Cancel anytime`);
+  set('.sim-offer .offer-reversal small',plan.terms);
+  set('#sim-paybar strong',`$${plan.price}`);
+  set('#sim-paybar small',plan.per);
+  const switchPlan=$('app').querySelector('[data-sim-plan]');
+  if(switchPlan){
+    switchPlan.dataset.simPlan=year?'month':'year';
+    switchPlan.textContent=year?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${PLANS.year.save}`;
+  }
+}
+function simCheckout(email,trigger){
   return run(async()=>{
     haptic();
-    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId}});
+    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+    if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
     openExternal(r.url);
   },trigger);
+}
+// Hosted Checkout wants an email whatever the wallet, so the only question is
+// whose page it is typed on. Here it prefills Stripe's field, leaving Apple
+// Pay as the one remaining tap — and it is kept even if the card never is.
+function simBuy(trigger){
+  const known=storedEmail();
+  if(known)return simCheckout(known,trigger);
+  const sk=skin(),plan=PLANS[planInterval]||PLANS.month;
+  enterScreen('sim');
+  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Payment is on the next screen.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>$${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  const field=$('sim-email-field');
+  field.focus();
+  field.oninput=()=>field.classList.remove('invalid');
+  $('sim-email-back').onclick=()=>simReport();
+  $('sim-email-form').onsubmit=event=>{
+    event.preventDefault();
+    const value=field.value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)){field.classList.add('invalid');notice('Enter your email to continue.','error');return;}
+    track('SimEmailGiven');
+    simCheckout(value,$('sim-email-go'));
+  };
 }
 function simReport(){
   enterScreen('sim');
@@ -882,9 +934,9 @@ function simReport(){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month;
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-sim-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-sim-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:'Cancel anytime.'}</p><ul class="offer-points"><li>Unlimited ${esc(sk.docPlural)}</li><li>No per-property or per-room fees</li><li>Talk through it and ${esc(sk.writesLabel||'it writes')} the notes</li><li>PDF export on every ${esc(sk.doc)}</li></ul><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$${plan.price}</strong><small>${esc(plan.per)}</small></div><button type="button" id="sim-paybar-buy">Start Marketel ${esc(sk.product)} →</button></aside>`;
-  for(const button of $('app').querySelectorAll('[data-sim-plan]'))
-    button.onclick=()=>{planInterval=button.dataset.simPlan==='year'?'year':'month';simReport();};
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${planInterval==='year'?`${esc(PLANS.year.save)} · $16.58/month`:`Unlimited ${esc(sk.docPlural)} · Cancel anytime`}</p><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$${plan.price}</strong><small>${esc(plan.per)}</small></div><button type="button" id="sim-paybar-buy">Start Marketel ${esc(sk.product)} →</button></aside>`;
+  const switchPlan=$('app').querySelector('[data-sim-plan]');
+  if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
   $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
   // The price is on screen from the moment the report is, so the offer really
@@ -1419,6 +1471,10 @@ function confirmAction({title,message,confirmLabel='Continue',danger=false}){
 function authCopy(intent){
   const sk=skin();
   if(intent==='send')return {title:`Send your ${sk.doc}.`,message:'Confirm your email to send it and keep a copy. We will send you a 6-digit code.'};
+  // Someone who came through the simulation never signed up for anything:
+  // the address was taken at checkout, and with Apple Pay they may not know
+  // which one that was.
+  if(intent==='paid')return {title:`Sign in to Marketel ${sk.product}`,message:`Use the email you paid with${storedEmail()?` (${storedEmail()})`:''}. We will send you a 6-digit code.`};
   return intent==='signin'
     ?{title:`Sign in to Marketel ${sk.product}`,message:'Use the email you signed up with. We will send you a 6-digit code.'}
     :{title:`Keep your ${sk.doc}.`,message:`Verify your email to save, export and recover your work on another device. Your first complete ${sk.doc} is free.`};

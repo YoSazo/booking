@@ -715,7 +715,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({
@@ -770,17 +770,56 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (!priceId) throw fail(503, 'That Inspect plan is not configured yet.');
     const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
     const visitor = visitorOf(req.body?.visitorId);
+    // Hosted Checkout requires an email whatever the wallet, so the only
+    // question is whose page it is typed on. Taken here it prefills Stripe's
+    // field — leaving Apple Pay as the single remaining tap — and it is kept
+    // even when the card is never reached, which Stripe's own page would not
+    // have given us.
+    const email = req.body?.email ? emailOf(req.body.email) : '';
+    if (email) {
+      const account = await prisma.$transaction(async tx => {
+        const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
+        const row = await tx.inspectAccount.upsert({ where: { email },
+          create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
+        return saveAttribution(row, req.body?.attribution, req, tx);
+      });
+      const firstLead = !(await prisma.inspectEvent.findUnique({ where: { sourceId: `inspect-lead:${account.id}` } }));
+      await recordBestEffort(account.id, 'LeadCaptured', `inspect-lead:${account.id}:${tool}`, { tool, visitorId: visitor });
+      if (firstLead) {
+        await recordBestEffort(account.id, 'LeadFirst', `inspect-lead:${account.id}`, { tool, visitorId: visitor });
+        await queueInspectCapi('Lead', { account, req, eventId: `inspect-lead.${account.id}`, contentName: `${TOOLS[tool].label} lead` })
+          .catch(error => console.error('Inspect Lead CAPI queue failed:', error.message));
+      }
+    }
     const metadata = { product: 'marketel-inspect', sim: '1', interval, tool, visitorId: visitor || '' };
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: price.id, quantity: 1 }],
+      ...(email ? { customer_email: email } : {}),
       metadata,
       subscription_data: { metadata },
-      success_url: toolReturn(tool, 'sim=1&checkout=success'),
+      success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
     await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
     res.json({ url: session.url });
+  }));
+
+  // The buyer never typed an email here — Stripe collected it, and with Apple
+  // Pay they may not know which address it used. The checkout id is the one
+  // secret only they hold, so it is what unlocks the address for the sign-in
+  // field they land on next.
+  router.post('/checkout/sim/email', guarded(async (req, res) => {
+    requireStripe();
+    rate(`inspect-sim-email:${req.ip}`, 20, 3600000);
+    const id = String(req.body?.sessionId || '');
+    if (!/^cs_[A-Za-z0-9_]{8,200}$/.test(id)) throw fail(400, 'Unknown checkout session.');
+    const session = await stripe.checkout.sessions.retrieve(id).catch(() => null);
+    // Only a completed simulation checkout, and only ever the address that
+    // paid for it. Anything else answers with nothing rather than an error,
+    // because the screen behind this reads fine without it.
+    if (!session || session.metadata?.sim !== '1' || session.status !== 'complete') return res.json({ email: '' });
+    res.json({ email: String(session.customer_details?.email || '') });
   }));
 
   router.use((req, res, next) => {
