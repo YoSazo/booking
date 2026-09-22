@@ -37,9 +37,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Marketel records where a report was started and finished, so the finished document can show the location it was made. Reports still work if you decline.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Marketel Inspect uses the microphone only while you choose to dictate a room observation.</string>
+	<string>Marketel uses the microphone only while you tap the mic to describe what you are photographing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Marketel Inspect turns what you say into on-screen text while you dictate a room observation.</string>
+	<string>Marketel turns what you say into text on your report while you describe what you are photographing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Marketel uses your photo library only when you choose a report, property, or room photo.</string>
 	<key>UILaunchStoryboardName</key>

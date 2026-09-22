@@ -360,6 +360,16 @@ function registerInspect(app, {
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(400, 'Enter a valid email.');
     return email;
   };
+  // App Review cannot receive an emailed code, so exactly one account signs in
+  // with a fixed one. Both halves come from the environment and it is off
+  // unless both are set; the account it opens holds only what a reviewer makes.
+  const reviewEmail = (() => { try { return env.INSPECT_REVIEW_EMAIL ? emailOf(env.INSPECT_REVIEW_EMAIL) : ''; } catch { return ''; } })();
+  const reviewCode = /^\d{6}$/.test(String(env.INSPECT_REVIEW_CODE || '')) ? String(env.INSPECT_REVIEW_CODE) : '';
+  const isReviewAccount = email => !!reviewEmail && !!reviewCode && email === reviewEmail;
+  const sameSecret = (a, b) => crypto.timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
+  // A Stripe call must never hold up signing in or checking out. The work
+  // carries on if it outlives the wait; the request just stops waiting for it.
+  const within = (ms, promise) => Promise.race([promise, new Promise(resolve => { const t = setTimeout(() => resolve(false), ms); t.unref?.(); })]);
   const record = async (accountId, name, sourceId, extra = {}) => {
     const fields = { tool: extra.tool || null, visitorId: extra.visitorId || null, detail: extra.detail || null };
     if (sourceId) await prisma.inspectEvent.upsert({ where: { sourceId }, create: { accountId, name, sourceId, ...fields }, update: {} });
@@ -383,12 +393,23 @@ function registerInspect(app, {
     contentName,
     eventTime,
   }) => {
-    if (!capiConfigured || typeof queueCapi !== 'function' || !account || isCapiExcludedEmail(account.email)) {
-      return { queued: false, excluded: !!account && isCapiExcludedEmail(account.email) };
-    }
-    const attribution = account.metaAttribution && typeof account.metaAttribution === 'object'
+    // The review account is Apple testing the app, not a customer the ads found.
+    const excluded = !!account && (isCapiExcludedEmail(account.email) || isReviewAccount(account.email));
+    const attribution = account?.metaAttribution && typeof account.metaAttribution === 'object'
       ? account.metaAttribution
       : {};
+    // Nothing done inside the iOS app goes to Meta. Pairing app activity with
+    // Meta's identifiers for ad measurement is tracking under Apple's rules,
+    // which would mean an App Tracking Transparency prompt and a tracking
+    // label — and the ads land on the website, which is all that needs
+    // measuring. A payment Stripe reports for someone who never came through
+    // the website has no ad to attribute, so it is not sent either.
+    const fromApp = /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
+    const fromStripe = !!req?.headers?.['stripe-signature'];
+    const unattributed = fromStripe && !(attribution.fbp || attribution.fbc);
+    if (!capiConfigured || typeof queueCapi !== 'function' || !account || excluded || fromApp || unattributed) {
+      return { queued: false, excluded, fromApp };
+    }
     return queueCapi(eventName, {
       product: 'marketel-inspect',
       hotelId: `inspect:${account.id}`,
@@ -511,6 +532,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   router.post('/auth/request', guarded(async (req, res) => {
     const email = emailOf(req.body.email);
     rate(`mail-ip:${req.ip}`, 8, 3600000);
+    // The review account never receives mail; its code is fixed.
+    if (isReviewAccount(email)) return res.json({ success: true });
     if (!mail) throw fail(503, 'Email is temporarily unavailable.');
     const code = String(crypto.randomInt(100000, 1000000));
     await prisma.$transaction(async tx => {
@@ -524,8 +547,11 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       await tx.inspectChallenge.upsert({ where: { email }, create: { email, ...data }, update: data });
     });
     try {
-      await mail.sendMail({ from: '"Marketel Inspect" <support@bookmarketel.com>', to: email,
-        subject: `${code} is your Inspect sign-in code`, text: `Your Marketel Inspect code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.` });
+      // One account covers every tool, so the code is Marketel's rather than
+      // whichever tool it happens to be — a Claims buyer was being told their
+      // Inspect code had arrived.
+      await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: email,
+        subject: `${code} is your Marketel sign-in code`, text: `Your Marketel sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.` });
     } catch (error) {
       // A code that was never delivered must not lock the owner out for a minute.
       await prisma.inspectChallenge.deleteMany({ where: { email, codeHash: codeHash(email, code) } });
@@ -537,19 +563,27 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     rate(`verify:${req.ip}`, 20, 600000);
     const email = emailOf(req.body.email);
     const supplied = codeHash(email, String(req.body.code || ''));
+    const review = isReviewAccount(email) && sameSecret(String(req.body.code || ''), reviewCode);
     const sessionToken = token();
     const result = await prisma.$transaction(async tx => {
-      await tx.$queryRaw`SELECT "email" FROM "InspectChallenge" WHERE "email" = ${email} FOR UPDATE`;
-      const challenge = await tx.inspectChallenge.findUnique({ where: { email } });
-      if (!challenge || challenge.expiresAt < new Date() || challenge.attempts >= 5) return null;
-      await tx.inspectChallenge.update({ where: { email }, data: { attempts: { increment: 1 } } });
-      if (!crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(challenge.codeHash))) return null;
-      await tx.inspectChallenge.delete({ where: { email } });
+      if (!review) {
+        await tx.$queryRaw`SELECT "email" FROM "InspectChallenge" WHERE "email" = ${email} FOR UPDATE`;
+        const challenge = await tx.inspectChallenge.findUnique({ where: { email } });
+        if (!challenge || challenge.expiresAt < new Date() || challenge.attempts >= 5) return null;
+        await tx.inspectChallenge.update({ where: { email }, data: { attempts: { increment: 1 } } });
+        if (!crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(challenge.codeHash))) return null;
+        await tx.inspectChallenge.delete({ where: { email } });
+      }
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
       let account = await tx.inspectAccount.upsert({ where: { email },
         create: { email, freeReportUsed: !!priorFreeClaim },
         update: priorFreeClaim ? { freeReportUsed: true } : {} });
       account = await saveAttribution(account, req.body.attribution, req, tx);
+      // A reviewer who deletes the account and signs straight back in finds it
+      // able to send again, so the whole flow can be repeated without paying.
+      if (review && (Number(account.reportCredits) || 0) < 25) {
+        account = await tx.inspectAccount.update({ where: { id: account.id }, data: { reportCredits: 25 } });
+      }
       const oldSessions = await tx.inspectSession.findMany({ where: { accountId: account.id }, orderBy: { expiresAt: 'desc' }, skip: 9, select: { tokenHash: true } });
       if (oldSessions.length) await tx.inspectSession.deleteMany({ where: { tokenHash: { in: oldSessions.map(s => s.tokenHash) } } });
       await tx.inspectSession.create({ data: { tokenHash: hash(sessionToken), accountId: account.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
@@ -557,7 +591,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     });
     if (!result) throw fail(401, 'Invalid or expired code. Request another code.');
     await recordBestEffort(result.id, 'AccountVerified');
-    res.json({ token: sessionToken, email, ...entitlement(result), plans: purchasablePlans(), priorReports: await priorReports(result.id) });
+    // Signing in is the first moment a buyer who paid from the simulation
+    // proves the email the subscription was bought with. If the webhook has
+    // not linked it yet — slow, or failing mid key-switch — do it now, or they
+    // would sign in to find nothing they paid for.
+    const claimed = review ? false : await within(4000, claimSimSubscriptions(result))
+      .catch(error => { console.error('Inspect subscription claim failed:', error.message); return false; });
+    const account = claimed ? await prisma.inspectAccount.findUnique({ where: { id: result.id } }) || result : result;
+    res.json({ token: sessionToken, email, ...entitlement(account), plans: purchasablePlans(), priorReports: await priorReports(result.id) });
   }));
 
   // A handoff is deliberately separate from the normal bearer session. The
@@ -788,6 +829,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
           create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
         return saveAttribution(row, req.body?.attribution, req, tx);
       });
+      // Someone who already pays — back from a second ad, or on another
+      // device with no session — has to be sent to sign in, not charged twice.
+      // Claiming first means a payment the webhook has not linked yet counts.
+      if (!entitlement(account).active) {
+        await within(4000, claimSimSubscriptions(account)).catch(() => false);
+      }
+      const current = await prisma.inspectAccount.findUnique({ where: { id: account.id } }) || account;
+      if (entitlement(current).active) throw fail(409, 'You already have Marketel. Sign in with this email to use it.');
       const firstLead = !(await prisma.inspectEvent.findUnique({ where: { sourceId: `inspect-lead:${account.id}` } }));
       await recordBestEffort(account.id, 'LeadCaptured', `inspect-lead:${account.id}:${tool}`, { tool, visitorId: visitor });
       if (firstLead) {
@@ -1521,9 +1570,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   }));
   router.post('/billing/refresh', guarded(async (req, res) => {
     requireBilling(); rate(`refresh:${req.inspect.id}`, 12, 60000);
-    if (req.inspect.stripeCustomerId) {
-      const list = await stripe.subscriptions.list({ customer: req.inspect.stripeCustomerId, status: 'all', limit: 10 });
-      const matches = list.data.filter(s => s.metadata?.product === 'marketel-inspect' && s.metadata.inspectAccountId === req.inspect.id);
+    // Also the app's foreground refresh, so a payment the webhook never linked
+    // is found the next time the app comes back, on any device.
+    let a = req.inspect;
+    if (await within(4000, claimSimSubscriptions(a)).catch(() => false)) {
+      a = await prisma.inspectAccount.findUniqueOrThrow({ where: { id: a.id } });
+    }
+    if (a.stripeCustomerId) {
+      const list = await stripe.subscriptions.list({ customer: a.stripeCustomerId, status: 'all', limit: 10 });
+      const matches = list.data.filter(s => s.metadata?.product === 'marketel-inspect' && s.metadata.inspectAccountId === a.id);
       const s = matches.find(s => !['canceled', 'incomplete_expired'].includes(s.status)) || matches[0];
       if (s) await syncSubscription(s);
     }
@@ -1586,6 +1641,50 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // customer it was already linked to: the subscription still finds its way
   // home through the metadata, and overwriting the link would strand the
   // billing portal on a customer the account never used.
+  // Points an account at the Stripe customer its simulation subscription lives
+  // on, stamps the subscription with the account, and syncs it. syncSubscription
+  // insists the two customers match, so an account that already had a customer
+  // — from an earlier single report, say — has to move to the one that is
+  // actually paying. Keeping the old link made the sync refuse, the webhook fail
+  // on every retry, and the buyer sit paid-for and locked out.
+  const linkSimSubscription = async (account, subscription, meta = {}) => {
+    const live = account.stripeSubscriptionId && account.stripeSubscriptionId !== subscription.id
+      && ['active', 'trialing', 'past_due'].includes(account.subscriptionStatus || '');
+    // A second subscription alongside a live one is a double charge to sort out
+    // by hand, never something to silently switch billing onto.
+    if (live) { console.error('Inspect sim subscription for an account already subscribed:', account.id); return false; }
+    const customer = String(subscription.customer);
+    if (account.stripeCustomerId !== customer) {
+      await prisma.inspectAccount.update({ where: { id: account.id }, data: { stripeCustomerId: customer } });
+    }
+    const stamped = await stripe.subscriptions.update(subscription.id, {
+      metadata: {
+        product: 'marketel-inspect',
+        inspectAccountId: account.id,
+        interval: (meta.interval || subscription.metadata?.interval) === 'year' ? 'year' : 'month',
+        tool: toolOf(meta.tool || subscription.metadata?.tool),
+      },
+    });
+    return syncSubscription(stamped);
+  };
+  // The webhook is what normally links a simulation purchase. Signing in and
+  // refreshing billing also look, for the verified email, so a slow or failing
+  // webhook never leaves someone who paid without what they paid for.
+  const claimSimSubscriptions = async account => {
+    if (!stripe || !account || entitlement(account).active) return false;
+    const customers = await stripe.customers.list({ email: account.email, limit: 10 });
+    for (const customer of customers.data || []) {
+      const subscriptions = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 10 });
+      const mine = (subscriptions.data || []).find(s => s.metadata?.product === 'marketel-inspect' && s.metadata?.sim === '1'
+        && !['canceled', 'incomplete_expired'].includes(s.status)
+        && (!s.metadata.inspectAccountId || s.metadata.inspectAccountId === account.id));
+      if (mine) return linkSimSubscription(account, mine);
+    }
+    return false;
+  };
+  // A simulation buyer pays before they have an account — Stripe collected the
+  // email on its own page, or we did just before — so the account is found or
+  // created here, on the way back, and the subscription linked to it.
   const adoptSimCheckout = async (session, req) => {
     if (!session?.subscription) return null;
     let email;
@@ -1594,19 +1693,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const tool = toolOf(session.metadata?.tool);
     const account = await prisma.$transaction(async tx => {
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
-      const row = await tx.inspectAccount.upsert({ where: { email },
+      return tx.inspectAccount.upsert({ where: { email },
         create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
-      if (row.stripeCustomerId) return row;
-      return tx.inspectAccount.update({ where: { id: row.id }, data: { stripeCustomerId: String(session.customer) } });
     });
-    await stripe.subscriptions.update(String(session.subscription), {
-      metadata: {
-        product: 'marketel-inspect',
-        inspectAccountId: account.id,
-        interval: session.metadata?.interval === 'year' ? 'year' : 'month',
-        tool,
-      },
-    });
+    await linkSimSubscription(account,
+      { id: String(session.subscription), customer: String(session.customer), metadata: session.metadata || {} },
+      { interval: session.metadata?.interval, tool });
     await recordBestEffort(account.id, 'SimPurchased', `inspect-sim-purchase:${session.id}`, { tool, visitorId: visitorOf(session.metadata?.visitorId) });
     return account;
   };
@@ -1629,7 +1721,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (subscriptionId) {
       // Retrieve current state rather than applying stale webhook snapshots.
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      if (subscription.metadata?.product === 'marketel-inspect') {
+      // A subscription nobody has been linked to yet — a simulation purchase
+      // whose email could not be read — has no account to sync into. Syncing it
+      // anyway threw on every retry; it waits for sign-in to claim it instead.
+      if (subscription.metadata?.product === 'marketel-inspect' && subscription.metadata?.inspectAccountId) {
         const synced = await syncSubscription(subscription);
         const invoice = event.data.object;
         if (synced && event.type === 'invoice.paid' && invoice.amount_paid > 0) {

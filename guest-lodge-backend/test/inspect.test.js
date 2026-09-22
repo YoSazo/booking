@@ -496,7 +496,7 @@ test('the app signs in through its glass banner and never inerts a page behind a
 
 // A small harness for the money path: a signed-in session, and just enough of
 // Prisma and Stripe to watch what each route asks them to do.
-function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {} } = {}) {
+function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {}, env: envOverrides = {} } = {}) {
   const express = require('express');
   const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0, mail: [] };
   const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsed: false, reportsUsed: 0, reportCredits: 0,
@@ -507,8 +507,11 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const seenEvents = new Set();
   const db = {
     $queryRaw: async () => [],
-    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }), deleteMany: async () => ({ count: 0 }) },
-    inspectChallenge: { deleteMany: async () => ({ count: 0 }) },
+    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }), deleteMany: async () => ({ count: 0 }),
+      findMany: async () => [], create: async ({ data }) => { calls.sessionsCreated = (calls.sessionsCreated || 0) + 1; return data; } },
+    // No outstanding codes: only the review path can verify here.
+    inspectChallenge: { deleteMany: async () => ({ count: 0 }), findUnique: async () => null,
+      update: async () => ({}), delete: async () => ({}), upsert: async () => ({}) },
     inspectHandoff: { deleteMany: async () => ({ count: 0 }) },
     inspectAccount: {
       findUniqueOrThrow: async () => account,
@@ -526,6 +529,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       update: async ({ data }) => {
         calls.accountUpdates.push(data);
         if ('stripeCustomerId' in data) account.stripeCustomerId = data.stripeCustomerId;
+        if (typeof data.reportCredits === 'number') account.reportCredits = data.reportCredits;
         if (data.reportCredits?.increment) account.reportCredits += data.reportCredits.increment;
         if (data.reportCredits?.decrement) account.reportCredits -= data.reportCredits.decrement;
         return { ...account };
@@ -534,6 +538,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
     inspectReport: {
       findFirst: async () => report,
       update: async ({ data }) => ({ ...report, ...data }),
+      count: async () => 0,
     },
     inspectFreeClaim: { findUnique: async () => null, create: async () => { calls.freeClaims += 1; } },
     inspectEvent: {
@@ -564,6 +569,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
       STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
       STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
+      ...envOverrides,
     },
   });
   const headers = { Authorization: `Bearer ${'b'.repeat(43)}`, 'Content-Type': 'application/json' };
@@ -1718,18 +1724,131 @@ test('a simulation purchase creates the account from the email Stripe collected'
     assert.ok(h.calls.events.some(event => event.name === 'SimPurchased'));
   } finally { h.registration.close(); }
 
-  // An account that already has a Stripe customer keeps it: the subscription
-  // still finds its way home through the metadata, and overwriting the link
-  // would strand the billing portal on a customer it never used.
+  // An account that already had a customer — from an earlier single report —
+  // moves to the one that is paying. syncSubscription refuses mismatched
+  // customers, so keeping the old link left the buyer paid-for and locked out.
   const linked = moneyHarness({
-    account: { stripeCustomerId: 'cus_existing' },
+    account: { stripeCustomerId: 'cus_earlier_report' },
     stripe: { subscriptions: { update: async () => ({}), retrieve: async id => ({ id, metadata: {} }) } },
   });
   try {
     await request(linked.app, '/api/inspect-stripe-webhook', { method: 'POST',
       headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
-    assert.ok(!linked.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+    assert.ok(linked.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
   } finally { linked.registration.close(); }
+
+  // But never onto a second subscription beside a live one: that is a double
+  // charge to sort out by hand, not a switch of who is billed.
+  const already = moneyHarness({
+    account: { stripeCustomerId: 'cus_live', stripeSubscriptionId: 'sub_live', subscriptionStatus: 'active' },
+    stripe: { subscriptions: { update: async () => { throw new Error('must not restamp'); }, retrieve: async id => ({ id, metadata: {} }) } },
+  });
+  try {
+    const response = await request(already.app, '/api/inspect-stripe-webhook', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
+    assert.equal(response.status, 200);
+    assert.ok(!already.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+  } finally { already.registration.close(); }
+});
+
+test('someone who paid is never locked out by a webhook that did not arrive', async () => {
+  const simSub = { id: 'sub_sim', customer: 'cus_sim', status: 'active',
+    metadata: { product: 'marketel-inspect', sim: '1', interval: 'month', tool: 'claims' } };
+  const stamps = [];
+  const stripeStub = {
+    customers: { list: async ({ email }) => ({ data: email === 'owner@example.com' ? [{ id: 'cus_sim' }] : [] }), create: async () => ({ id: 'cus_new' }), retrieve: async id => ({ id }) },
+    subscriptions: {
+      list: async ({ customer }) => ({ data: customer === 'cus_sim' ? [simSub] : [] }),
+      update: async (id, params) => { stamps.push({ id, params }); return { ...simSub, metadata: { ...simSub.metadata, ...params.metadata } }; },
+    },
+    prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) },
+  };
+
+  // Refreshing billing finds the unlinked subscription for the verified email
+  // and links it to this account.
+  const h = moneyHarness({ account: { stripeCustomerId: null, email: 'owner@example.com' }, stripe: stripeStub });
+  try {
+    const response = await request(h.app, '/api/inspect/billing/refresh', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.equal(stamps.length, 1);
+    assert.equal(stamps[0].id, 'sub_sim');
+    assert.equal(stamps[0].params.metadata.inspectAccountId, 'acct_1');
+    assert.ok(h.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+  } finally { h.registration.close(); }
+
+  // A subscription already claimed by another account is not taken.
+  stamps.length = 0;
+  simSub.metadata.inspectAccountId = 'acct_someone_else';
+  const other = moneyHarness({ account: { stripeCustomerId: null, email: 'owner@example.com' }, stripe: stripeStub });
+  try {
+    await request(other.app, '/api/inspect/billing/refresh', { method: 'POST', headers: other.headers, body: '{}' });
+    assert.equal(stamps.length, 0);
+  } finally { other.registration.close(); delete simSub.metadata.inspectAccountId; }
+
+  // And the simulation's checkout refuses to charge an email that already pays.
+  const paying = moneyHarness({
+    account: { email: 'owner@example.com', subscriptionStatus: 'active', periodStart: new Date().toISOString(), periodEnd: new Date(Date.now() + 20 * 86400000).toISOString() },
+    stripe: stripeStub,
+  });
+  try {
+    const response = await request(paying.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims', email: 'owner@example.com' }) });
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /already have Marketel/);
+    assert.equal(paying.calls.sessions.length, 0);
+  } finally { paying.registration.close(); }
+});
+
+test('App Review signs in with a fixed code, and nobody else can', async () => {
+  const REVIEW = { INSPECT_REVIEW_EMAIL: 'Review@BookMarketel.com', INSPECT_REVIEW_CODE: '482915' };
+  const post = (app, path, body) => request(app, `/api/inspect${path}`, { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  const h = moneyHarness({ account: { email: 'review@bookmarketel.com', stripeCustomerId: null }, env: REVIEW });
+  try {
+    // Asking for a code sends nothing; there is no inbox to read it from.
+    const asked = await post(h.app, '/auth/request', { email: 'review@bookmarketel.com' });
+    assert.equal(asked.status, 200);
+    assert.equal(h.calls.mail.length, 0);
+    // The fixed code opens it, matched case-insensitively on the email.
+    const ok = await post(h.app, '/auth/verify', { email: 'REVIEW@bookmarketel.com', code: '482915' });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.match(body.token, /^[A-Za-z0-9_-]{43}$/);
+    // And it can send without paying, so review never meets a real charge.
+    assert.ok(h.calls.accountUpdates.some(update => update.reportCredits === 25));
+    assert.equal(body.credits, 25);
+    // A wrong code is refused like any other.
+    assert.equal((await post(h.app, '/auth/verify', { email: 'review@bookmarketel.com', code: '000000' })).status, 401);
+  } finally { h.registration.close(); }
+
+  // The same code for any other email opens nothing.
+  const other = moneyHarness({ env: REVIEW });
+  try {
+    assert.equal((await post(other.app, '/auth/verify', { email: 'owner@example.com', code: '482915' })).status, 401);
+  } finally { other.registration.close(); }
+
+  // Off entirely unless the code is six digits: a half-configured environment
+  // must not open a door with an empty code.
+  for (const bad of [{ INSPECT_REVIEW_EMAIL: 'review@bookmarketel.com' }, { ...REVIEW, INSPECT_REVIEW_CODE: '12345' }]) {
+    const off = moneyHarness({ account: { email: 'review@bookmarketel.com' }, env: bad });
+    try {
+      assert.equal((await post(off.app, '/auth/verify', { email: 'review@bookmarketel.com', code: bad.INSPECT_REVIEW_CODE || '' })).status, 401);
+    } finally { off.registration.close(); }
+  }
+
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  // Off unless both halves are configured, and the code must be six digits so
+  // it can be typed into the same field as a real one.
+  assert.match(src, /const reviewCode = \/\^\\d\{6\}\$\/\.test\(String\(env\.INSPECT_REVIEW_CODE \|\| ''\)\)/);
+  assert.match(src, /const isReviewAccount = email => !!reviewEmail && !!reviewCode && email === reviewEmail;/);
+  // Compared in constant time, and only for that one email.
+  assert.match(src, /const review = isReviewAccount\(email\) && sameSecret\(String\(req\.body\.code \|\| ''\), reviewCode\);/);
+  // It never emails, is kept out of Meta's data, and is topped back up so a
+  // reviewer who deletes it can repeat the whole flow.
+  assert.match(src, /if \(isReviewAccount\(email\)\) return res\.json\(\{ success: true \}\);/);
+  assert.match(src, /isCapiExcludedEmail\(account\.email\) \|\| isReviewAccount\(account\.email\)/);
+  assert.match(src, /if \(review && \(Number\(account\.reportCredits\) \|\| 0\) < 25\)/);
 });
 
 test('the simulation ladder is measurable and closed to anything else', async () => {
@@ -2022,4 +2141,42 @@ test('the room is asked before the camera, and changing your mind leaves nothing
   assert.match(client, /if\(entryTool\(\)&&!\(room\?\.name\|\|''\)\.trim\(\)\)\{ cameraAsk='name'; cameraCompanion\(true\); return; \}/);
   // A dismissal we asked for is not the owner leaving the camera.
   assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraAsk\)return;/);
+});
+
+test('Meta hears about the website, never about what happens inside the app', async () => {
+  const price = { id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } };
+  const lead = (h, headers = {}) => request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ interval: 'month', tool: 'claims', email: 'new@example.com' }) });
+
+  // The same lead from the website is sent; from the iOS app it is not, because
+  // pairing app activity with Meta's identifiers is tracking under Apple's rules.
+  const web = moneyHarness({ stripe: { prices: { retrieve: async () => price }, customers: { list: async () => ({ data: [] }) } } });
+  try {
+    assert.equal((await lead(web, { Origin: 'https://bookmarketel.com' })).status, 200);
+    assert.ok(web.calls.capi.some(event => event.name === 'Lead'));
+  } finally { web.registration.close(); }
+  const app = moneyHarness({ stripe: { prices: { retrieve: async () => price }, customers: { list: async () => ({ data: [] }) } } });
+  try {
+    assert.equal((await lead(app, { Origin: 'capacitor://localhost' })).status, 200);
+    assert.equal(app.calls.capi.length, 0);
+    // The lead is still ours; only Meta is left out.
+    assert.ok(app.calls.events.some(event => event.name === 'LeadCaptured'));
+  } finally { app.registration.close(); }
+
+  // A payment Stripe reports is sent only for someone the website brought in.
+  const paid = { type: 'checkout.session.completed', created: 1760000000, data: { object: {
+    id: 'cs_paid_meta', mode: 'payment', payment_status: 'paid', amount_total: 1200, currency: 'usd',
+    metadata: { product: 'marketel-inspect-report', inspectAccountId: 'acct_1', reportId: 'rep_1', tool: 'claims' } } } };
+  const webhook = h => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(paid) });
+  const organic = moneyHarness();
+  try {
+    assert.equal((await webhook(organic)).status, 200);
+    assert.ok(!organic.calls.capi.some(event => event.name === 'Purchase'));
+  } finally { organic.registration.close(); }
+  const fromAd = moneyHarness({ account: { metaAttribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' } } });
+  try {
+    assert.equal((await webhook(fromAd)).status, 200);
+    assert.ok(fromAd.calls.capi.some(event => event.name === 'Purchase'));
+  } finally { fromAd.registration.close(); }
 });

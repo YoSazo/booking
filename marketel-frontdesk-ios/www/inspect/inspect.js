@@ -903,7 +903,19 @@ function simPrices(){
 function simCheckout(email,trigger){
   return run(async()=>{
     haptic();
-    const r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+    let r;
+    try{
+      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+    }catch(error){
+      // Already paying, from a second ad or another device: charging them
+      // again is the one thing that must not happen, and getting them into
+      // what they already have is the one useful thing left.
+      if(error.status!==409)throw error;
+      try{localStorage.setItem('inspect.email',email);}catch{}
+      document.documentElement.classList.remove('sim-mode');
+      notice(error.message,'success');
+      return ensureAuth(()=>run(()=>openAccountHome()),'paid');
+    }
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
     openExternal(r.url);
   },trigger);
@@ -911,14 +923,17 @@ function simCheckout(email,trigger){
 // Hosted Checkout wants an email whatever the wallet, so the only question is
 // whose page it is typed on. Here it prefills Stripe's field, leaving Apple
 // Pay as the one remaining tap — and it is kept even if the card never is.
+//
+// It is always shown, even when an address is remembered: Stripe shows a
+// prefilled email read-only, so a typo remembered once would otherwise send
+// every later checkout off with an address the buyer can never sign in with.
 function simBuy(trigger){
-  const known=storedEmail();
-  if(known)return simCheckout(known,trigger);
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month;
   enterScreen('sim');
-  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Payment is on the next screen.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Your email"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>$${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Payment is on the next screen.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>$${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
   const field=$('sim-email-field');
-  field.focus();
+  // Not focused on arrival: the keyboard would cover the price and the button
+  // before they have read what this screen is for. One tap brings it up.
   field.oninput=()=>field.classList.remove('invalid');
   $('sim-email-back').onclick=()=>simReport();
   $('sim-email-form').onsubmit=event=>{
@@ -2041,9 +2056,14 @@ async function exportOffer(action){
   await requestStorefront();
   track('ExportOfferViewed',undefined,false);
   const sk=skin();
+  // Outside the US storefront an app may not point anyone at a way to pay
+  // other than in-app purchase, so this says what is true — the report is
+  // safe, and sending needs an account with an allowance — and links nowhere.
+  // The US storefront permits the link, which is the path below.
   if(native&&storefront!=='USA'){
-    modal(`<h2>Send it from the web.</h2><p>Single ${esc(sk.docPlural)} and plans are sold on bookmarketel.com. Open ${esc(sk.product)} in Safari, sign in with the same email, and send this ${esc(sk.doc)} from there.</p><button id="offer-web" class="wide">Open ${esc(sk.product)} on the web</button>`);
-    $('offer-web').onclick=()=>openExternal(`https://bookmarketel.com${sk.home||'/inspect/'}`);return;
+    modal(`<h2>Your ${esc(sk.doc)} is saved.</h2><p>Sending needs a Marketel account with ${esc(sk.docPlural)} available. If you already have one, refresh your access.</p><button id="refresh-access" class="wide">Refresh access</button>`);
+    $('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();if(canSend())finishExport(action);});
+    return;
   }
   const available=(Array.isArray(account?.plans)&&account.plans.length?account.plans:['month']).filter(value=>PLANS[value]);
   // A cold click is an impulse, and an impulse does not sign up for a year.
@@ -2227,10 +2247,21 @@ $('account-button').onclick=async()=>{
   if(!account)return ensureAuth(()=>run(()=>openAccountHome()),'signin');
   await requestStorefront();
   const sk = skin();
-  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${account.active?`${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`:`One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`}</p><div class="stack">${(!native||storefront==='USA')?'<button id="manage">Manage subscription</button>':''}<button id="switch" class="secondary">Open booking Front Desk</button><button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
+  // What this account can actually do, in the order it matters. Claims has no
+  // free report, so promising one there was false — and a review account
+  // holding credits was being told the same.
+  const standing=account.active
+    ? `${account.remaining} ${esc(sk.docPlural)} left. ${account.cancellationScheduled?'Access ends':'Next billing period'} ${new Date(account.periodEnd).toLocaleDateString()}.`
+    : account.credits>0 ? `${account.credits} ${esc(account.credits===1?sk.doc:sk.docPlural)} ready to send.`
+    : payAtExport() ? `No plan yet. Building a ${esc(sk.doc)} is always free, and your ${esc(sk.docPlural)} stay here.`
+    : `One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`;
+  // Managing a subscription needs one to exist; offering it to an account
+  // without one opened an error. Front Desk is not part of this product, so
+  // it is no longer a button here — its own customers still open straight in.
+  const manageable=(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
+  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
-  $('switch').onclick=()=>{localStorage.setItem('marketel.product','bookings');if(native)location.replace('../frontdesk/index.html?native=ios');else location.assign('/frontdesk');};
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
   $('delete-account').onclick=async()=>{
     $('dialog').close();
