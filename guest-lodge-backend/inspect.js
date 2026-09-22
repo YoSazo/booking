@@ -715,7 +715,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({

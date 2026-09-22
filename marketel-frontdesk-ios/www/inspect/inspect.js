@@ -659,8 +659,8 @@ const simTool = () => SIMS[toolId()] || null;
 // Phone-shaped only. A fake iOS camera sheet in a desktop browser reads as
 // broken, and the traffic this exists for is almost entirely mobile.
 function simActive(){
-  if(native||!simTool())return false;
-  if(new URLSearchParams(location.search).get('sim')!=='1')return false;
+  if(native||!simTool()||session)return false;
+  if(new URLSearchParams(location.search).get('sim')==='0')return false;
   return window.matchMedia?.('(max-width: 760px)')?.matches ?? window.innerWidth<=760;
 }
 const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -698,7 +698,9 @@ function simThanks(){
       const where=$('sim-paid-email');
       if(where)where.textContent=r.email;
     }).catch(()=>{});
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">Your account is under <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong>. Sign in with it and your first real ${esc(sk.doc)} is ready to start.</p><button type="button" id="sim-signin" class="wide">Sign in and start →</button><a class="button secondary wide" href="${esc(appStoreUrl)}">Get the iPhone app</a><p><small>The app is where you talk through a ${esc(sk.doc)} while you are standing in the property.</small></p></section>`;
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
+  track('SimSubscribed');
+  $('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
     document.documentElement.classList.remove('sim-mode');
     history.replaceState(null,'',location.pathname);
@@ -717,11 +719,15 @@ function simResume(){
 }
 function simIntro(){
   enterScreen('sim');
-  const s=simTool();
+  const s=simTool(),sk=skin();
   document.documentElement.classList.add('sim-mode');
   track('SimStarted');
-  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p></section>`;
+  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
   simRun=null;
+  $('sim-signin-link').onclick=()=>{
+    document.documentElement.classList.remove('sim-mode');
+    ensureAuth(()=>run(()=>openAccountHome()),'signin');
+  };
   for(const button of $('app').querySelectorAll('[data-sim-pick]'))
     button.onclick=()=>{
       const chosen=Math.max(0,s.findings.findIndex(f=>f.id===button.dataset.simPick));
