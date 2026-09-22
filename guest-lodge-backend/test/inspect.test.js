@@ -1845,7 +1845,7 @@ test('a trial grants the product it is a trial of', () => {
   }
 });
 
-test('the simulation takes a card and charges nothing until the first report', async () => {
+test('the simulation charges on the spot, and the trial machinery stays off', async () => {
   const h = moneyHarness({
     stripe: { prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) } },
   });
@@ -1853,8 +1853,14 @@ test('the simulation takes a card and charges nothing until the first report', a
     const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims' }) });
     assert.equal(response.status, 200);
-    assert.equal(h.calls.sessions[0].params.subscription_data.trial_period_days, 30);
+    // SIM_TRIAL_DAYS is 0, so no trial is attached and the card is charged
+    // today. Flipping that constant back is the whole switch — the rest of
+    // the trial path is still here and still tested below.
+    assert.ok(!('trial_period_days' in h.calls.sessions[0].params.subscription_data));
     assert.equal(h.calls.sessions[0].params.subscription_data.metadata.sim, '1');
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+    assert.match(src, /const SIM_TRIAL_DAYS = 0;/);
+    assert.match(src, /SIM_TRIAL_DAYS > 0 \? \{ trial_period_days: SIM_TRIAL_DAYS \}/);
   } finally { h.registration.close(); }
 
   // The authed checkout is a different offer and keeps charging today.

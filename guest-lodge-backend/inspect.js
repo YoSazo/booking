@@ -134,9 +134,11 @@ const INSPECT_PLANS = Object.freeze({
   year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
 });
 const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
-// Stripe needs a trial to end on a date, so one exists — but the first
-// finalized report ends it early, which is what the offer actually promises.
-const SIM_TRIAL_DAYS = 30;
+// Zero means the simulation charges on the spot. The machinery for a trial is
+// intact either way — entitlement admits `trialing`, finalize ends a trial
+// early, and the sweep warns before a cap — so this is one number to move.
+// The copy in public/inspect/inspect.js has to move with it.
+const SIM_TRIAL_DAYS = 0;
 function validateInspectPrice(price, interval = 'month') {
   const plan = inspectPlan(interval);
   if (price?.unit_amount !== plan.amount || price.currency !== 'usd'
@@ -800,10 +802,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       line_items: [{ price: price.id, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
       metadata,
-      // Thirty days is a backstop, not the mechanism: it is roughly one
-      // turnover cycle, so billing is triggered by the first report rather
-      // than by a clock running on someone who has not been to a property yet.
-      subscription_data: { metadata, trial_period_days: SIM_TRIAL_DAYS },
+      subscription_data: { metadata, ...(SIM_TRIAL_DAYS > 0 ? { trial_period_days: SIM_TRIAL_DAYS } : {}) },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
