@@ -60,6 +60,10 @@ expect(delegate, /marketelNativeContactResult/,
   'AppDelegate does not return the native contact result to Front Desk');
 expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
   'AppDelegate does not keep booking-page previews inside the app');
+// A spoken note is recorded and uploaded to be written up, so audio is data
+// the app collects, and App Store Connect's labels must say so too.
+expect(privacyManifest, /NSPrivacyCollectedDataTypeAudioData<\/string>\s*<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<true\/>\s*<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<false\/>/,
+  'Privacy manifest must declare the voice notes the app uploads as audio data');
 // Paying for Marketel opens in the default browser, not the in-app sheet, and
 // the page Stripe returns to links back in with the app's own URL scheme.
 expect(delegate, /case "openPurchase":[\s\S]{0,160}openPurchaseInDefaultBrowser/,
@@ -213,6 +217,16 @@ for (const relativePath of [
   const absolutePath = path.resolve(root, relativePath);
   if (!fs.existsSync(absolutePath)) failures.push(`Missing ${relativePath}`);
 }
+
+// The policy must describe what the app actually does with voice, and keep
+// the promise the "No tracking" label rests on.
+const privacyPolicy = read('../guest-lodge-backend/privacy.html');
+expect(privacyPolicy, /Voice notes: when you tap the microphone/,
+  'Privacy policy must say voice notes are recorded and uploaded');
+expect(privacyPolicy, /OpenAI<\/strong> — to transcribe voice notes/,
+  'Privacy policy must name OpenAI for voice notes');
+expect(privacyPolicy, /Meta advertising measurement is disabled inside the Marketel app \(including purchases started from it\)/,
+  'Privacy policy must keep Meta out of the app, including app-started purchases');
 
 if (failures.length) {
   console.error('Marketel iOS release-readiness checks failed:');

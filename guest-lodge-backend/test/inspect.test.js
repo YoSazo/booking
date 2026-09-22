@@ -2382,4 +2382,30 @@ test('Meta hears about the website, never about what happens inside the app', as
     assert.equal((await webhook(fromAd)).status, 200);
     assert.ok(fromAd.calls.capi.some(event => event.name === 'Purchase'));
   } finally { fromAd.registration.close(); }
+
+  // Someone the ads once brought in who then pays from inside the app: Stripe
+  // reports it, not the app, but it is still app activity and is not sent.
+  const inApp = moneyHarness({ account: { metaAttribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' } } });
+  try {
+    paid.data.object.id = 'cs_paid_in_app';
+    paid.data.object.metadata = { ...paid.data.object.metadata, source: 'app' };
+    assert.equal((await webhook(inApp)).status, 200);
+    assert.equal(inApp.calls.capi.length, 0);
+    assert.ok(inApp.calls.events.some(event => event.name === 'PaymentSucceeded'), 'the purchase itself still counts');
+  } finally { inApp.registration.close(); }
+
+  // Which is why every checkout the app starts says so, and one from the
+  // website does not.
+  const marks = moneyHarness();
+  try {
+    const checkout = native => request(marks.app, '/api/inspect/checkout', { method: 'POST', headers: marks.headers, body: JSON.stringify({ interval: 'report', reportId: 'rep_1', native }) });
+    assert.equal((await checkout(true)).status, 200);
+    assert.equal(marks.calls.sessions.at(-1).params.metadata.source, 'app');
+    assert.equal(marks.calls.sessions.at(-1).params.payment_intent_data.metadata.source, 'app');
+    assert.equal((await checkout(false)).status, 200);
+    assert.equal(marks.calls.sessions.at(-1).params.metadata.source, undefined);
+  } finally { marks.registration.close(); }
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '../inspect.js'), 'utf8');
+  assert.match(client, /const metadata = \{ product: 'marketel-inspect', inspectAccountId: a\.id, interval, tool, \.\.\.\(nativeReturn \? \{ source: 'app' \} : \{\}\) \};[\s\S]{0,260}metadata,\s*subscription_data: \{ metadata \}/);
+  assert.match(client, /appPurchase: subscription\.metadata\?\.source === 'app'/);
 });

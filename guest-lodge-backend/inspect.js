@@ -396,6 +396,7 @@ function registerInspect(app, {
     currency = 'USD',
     contentName,
     eventTime,
+    appPurchase = false,
   }) => {
     // The review account is Apple testing the app, not a customer the ads found.
     const excluded = !!account && (isCapiExcludedEmail(account.email) || isReviewAccount(account.email));
@@ -408,7 +409,9 @@ function registerInspect(app, {
     // label — and the ads land on the website, which is all that needs
     // measuring. A payment Stripe reports for someone who never came through
     // the website has no ad to attribute, so it is not sent either.
-    const fromApp = /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
+    // A checkout started in the app is app activity even though Stripe, not
+    // the app, reports the payment, and so are that subscription's renewals.
+    const fromApp = appPurchase || /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
     const fromStripe = !!req?.headers?.['stripe-signature'];
     const unattributed = fromStripe && !(attribution.fbp || attribution.fbc);
     if (!capiConfigured || typeof queueCapi !== 'function' || !account || excluded || fromApp || unattributed) {
@@ -1527,7 +1530,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const nativeReturn = req.body.native === true;
     const checkout = await prisma.$transaction(async tx => {
       const a = await ensureCustomer(tx, await lockAccount(tx, req.inspect.id));
-      const metadata = { product: 'marketel-inspect-report', inspectAccountId: a.id, reportId, tool };
+      const metadata = { product: 'marketel-inspect-report', inspectAccountId: a.id, reportId, tool, ...(nativeReturn ? { source: 'app' } : {}) };
       const session = await stripe.checkout.sessions.create({ mode: 'payment', customer: a.stripeCustomerId,
         line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount, product_data: { name: `${TOOLS[tool].label} report` } } }],
         metadata, payment_intent_data: { metadata },
@@ -1572,12 +1575,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const open = await stripe.checkout.sessions.list({ customer: a.stripeCustomerId, status: 'open', limit: 10 });
       // An open session for the other billing period must not be handed back,
       // or choosing Annual would silently reopen a Monthly checkout.
-      const existing = open.data.find(s => s.metadata?.product === 'marketel-inspect' && (s.metadata?.interval || 'month') === interval);
-      if (existing) return { url: existing.url, sessionId: existing.id };
       const nativeReturn = req.body.native === true;
+      // An open session is reused only from the same place it was started: an
+      // app one returns to the app, and an app purchase is never sent to Meta.
+      const existing = open.data.find(s => s.metadata?.product === 'marketel-inspect' && (s.metadata?.interval || 'month') === interval
+        && (s.metadata?.source === 'app') === nativeReturn);
+      if (existing) return { url: existing.url, sessionId: existing.id };
+      const metadata = { product: 'marketel-inspect', inspectAccountId: a.id, interval, tool, ...(nativeReturn ? { source: 'app' } : {}) };
       const session = await stripe.checkout.sessions.create({ mode: 'subscription', customer: a.stripeCustomerId,
-        line_items: [{ price: price.id, quantity: 1 }], metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval, tool },
-        subscription_data: { metadata: { product: 'marketel-inspect', inspectAccountId: a.id, interval, tool } },
+        line_items: [{ price: price.id, quantity: 1 }], metadata,
+        subscription_data: { metadata },
         success_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=success` : toolReturn(tool, `checkout=success${/^[A-Za-z0-9_-]{1,64}$/.test(String(req.body.reportId || '')) ? `&report=${req.body.reportId}` : ''}`),
         cancel_url: nativeReturn ? `${origin}/inspect/checkout-return.html?status=cancelled` : toolReturn(tool, 'checkout=cancelled') },
         { idempotencyKey: `inspect-checkout:${a.id}:${interval}:${nativeReturn ? 'native' : 'web'}:${Math.floor(Date.now() / 1800000)}` });
@@ -1692,7 +1699,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     });
     if (!granted) return;
     await queueInspectCapi('Purchase', {
-      account: granted, req, eventId: `inspect-purchase.${session.id}`,
+      account: granted, req, eventId: `inspect-purchase.${session.id}`, appPurchase: session.metadata?.source === 'app',
       value: Number(session.amount_total) / 100, currency: String(session.currency || 'usd').toUpperCase(),
       contentName: `${TOOLS[tool].label} report`, eventTime: Number(event.created) || undefined,
     }).catch(error => console.error('Inspect report Purchase CAPI queue failed:', error.message));
@@ -1801,6 +1808,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
               account,
               req,
               eventId: `inspect-purchase.${invoice.id}`,
+              appPurchase: subscription.metadata?.source === 'app',
               value: Number(invoice.amount_paid) / 100,
               currency: String(invoice.currency || 'usd').toUpperCase(),
               contentName: 'Marketel Inspect subscription',
