@@ -498,13 +498,18 @@ test('the app signs in through its glass banner and never inerts a page behind a
 // Prisma and Stripe to watch what each route asks them to do.
 function moneyHarness({ account: accountOverrides = {}, report: reportOverrides = {}, stripe: stripeOverrides = {}, env: envOverrides = {} } = {}) {
   const express = require('express');
-  const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0, mail: [] };
+  const calls = { accountUpdates: [], sessions: [], events: [], capi: [], freeClaims: 0, mail: [], garbage: [], reportDeletes: [] };
   const account = { id: 'acct_1', email: 'owner@example.com', freeReportUsed: false, reportsUsed: 0, reportCredits: 0,
     subscriptionStatus: null, periodEnd: null, stripeCustomerId: 'cus_1', businessName: 'Pine Stays', logoKey: 'inspect/logos/acct_1/a.png', ...accountOverrides };
   const report = { id: 'rep_1', accountId: 'acct_1', finalizedAt: null, baselineReport: null, attachments: [{ id: 'p1' }],
     document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-19', eventTime: 'unknown', author: 'Sam',
       rooms: [{ name: 'Kitchen', observation: 'Chipped counter.', issue: true, photos: ['p1'] }], signatures: [] }, ...reportOverrides };
   const seenEvents = new Set();
+  // Enough of a store for the property routes to be exercised honestly: what is
+  // added, counted and deleted is really kept, scoped to the account.
+  const properties = [];
+  let reports = [report];
+  const mine = where => row => row.accountId === where.accountId;
   const db = {
     $queryRaw: async () => [],
     inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }), deleteMany: async () => ({ count: 0 }),
@@ -539,7 +544,37 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       findFirst: async () => report,
       update: async ({ data }) => ({ ...report, ...data }),
       count: async () => 0,
+      groupBy: async ({ where }) => {
+        const counts = new Map();
+        for (const row of reports.filter(mine(where))) counts.set(row.document.propertyName, (counts.get(row.document.propertyName) || 0) + 1);
+        return [...counts].map(([propertyName, all]) => ({ propertyName, _count: { _all: all } }));
+      },
+      findMany: async ({ where }) => reports.filter(mine(where))
+        .filter(row => where.propertyName === undefined || row.document.propertyName === where.propertyName)
+        .filter(row => !where.finalizedAt || row.finalizedAt)
+        .map(row => ({ ...row, propertyName: row.document.propertyName,
+          attachments: row.attachments.map(a => ({ objectKey: `photos/${a.id}`, originalKey: `originals/${a.id}` })) })),
+      deleteMany: async ({ where }) => {
+        calls.reportDeletes.push(where);
+        const before = reports.length;
+        reports = reports.filter(row => !(mine(where)(row) && where.id.in.includes(row.id)));
+        return { count: before - reports.length };
+      },
     },
+    inspectProperty: {
+      findMany: async ({ where }) => properties.filter(mine(where)).map(row => ({ name: row.name })),
+      count: async ({ where }) => properties.filter(mine(where)).length,
+      upsert: async ({ where, create }) => {
+        const key = where.accountId_name;
+        if (!properties.some(row => row.accountId === key.accountId && row.name === key.name)) properties.push({ ...create });
+      },
+      deleteMany: async ({ where }) => {
+        const before = properties.length;
+        for (let i = properties.length - 1; i >= 0; i--) if (mine(where)(properties[i]) && properties[i].name === where.name) properties.splice(i, 1);
+        return { count: before - properties.length };
+      },
+    },
+    inspectGarbage: { createMany: async ({ data }) => { calls.garbage.push(...data); } },
     inspectFreeClaim: { findUnique: async () => null, create: async () => { calls.freeClaims += 1; } },
     inspectEvent: {
       findUnique: async ({ where }) => (seenEvents.has(where.sourceId) ? { id: where.sourceId } : null),
@@ -575,6 +610,87 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const headers = { Authorization: `Bearer ${'b'.repeat(43)}`, 'Content-Type': 'application/json' };
   return { app, registration, calls, account, report, headers };
 }
+
+test('a property can be added on its own, and deleted with its reports', async () => {
+  const h = moneyHarness();
+  const call = async (method, body) => {
+    const response = await request(h.app, '/api/inspect/properties', { method, headers: h.headers, body: body && JSON.stringify(body) });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  };
+  try {
+    let response = await call('GET');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.propertyDetails.map(p => [p.name, p.reportCount]), [['Pine Ave', 1]]);
+
+    // Added without starting a report, trimmed, sorted in, and never doubled.
+    response = await call('POST', { name: '  Oak Street · Unit 2 ' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.properties, ['Oak Street · Unit 2', 'Pine Ave']);
+    response = await call('POST', { name: 'Oak Street · Unit 2' });
+    assert.deepEqual(response.body.properties, ['Oak Street · Unit 2', 'Pine Ave']);
+    assert.equal((await call('POST', { name: '   ' })).status, 400);
+    assert.equal((await call('POST', { name: 'x'.repeat(161) })).status, 400);
+
+    // A property with no reports goes on its own.
+    response = await call('DELETE', { name: 'Oak Street · Unit 2' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.deletedReportIds, []);
+    assert.deepEqual(response.body.properties, ['Pine Ave']);
+    assert.deepEqual(h.calls.garbage, []);
+
+    // One a report names takes the report with it, photos queued for removal,
+    // and only this account's reports are touched.
+    response = await call('DELETE', { name: 'Pine Ave' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.deletedReportIds, ['rep_1']);
+    assert.deepEqual(response.body.properties, []);
+    assert.deepEqual(h.calls.garbage, [{ objectKey: 'photos/p1' }, { objectKey: 'originals/p1' }]);
+    assert.equal(h.calls.reportDeletes[0].accountId, 'acct_1');
+  } finally { h.registration.close(); }
+});
+
+test('the Properties page adds and deletes a property itself, and names it properly', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '../public/inspect/inspect.js'), 'utf8');
+  // "+ New propertie" came from stripping an s off the heading.
+  assert.doesNotMatch(client, /placesHeading\.replace\(/);
+  assert.match(client, /\+ New \$\{esc\(sk\.placeSingular\)\}/);
+  for (const skinName of ["placeSingular: 'property'", "placeSingular: 'location'"]) assert.ok(client.includes(skinName), skinName);
+  // Adding one opens its own sheet; it no longer starts a damage report.
+  assert.match(client, /\$\('new-property'\)\.onclick=\(\)=>\{haptic\(\);newProperty\(\);\}/);
+  assert.match(client, /function newProperty\(\)[\s\S]{0,1400}api\('\/properties',\{method:'POST'/);
+  assert.match(client, /async function deleteProperty[\s\S]{0,900}confirmAction[\s\S]{0,300}api\('\/properties',\{method:'DELETE'/);
+});
+
+test('a new report asks where, not for a photo, and stays on the New Report tab', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '../public/inspect/inspect.js'), 'utf8');
+  assert.doesNotMatch(client, /setup-photo|photoLabel/);
+  assert.match(client, /flowScreen\('','setup-screen',\{page:'current'\}\)/);
+  assert.match(client, /function flowScreen\(content,kind='',\{page\}=\{\}\)[\s\S]{0,200}setActiveNav\(page\)/);
+});
+
+test('signing in replaces the landing at once and waits on the one reports request', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '../public/inspect/inspect.js'), 'utf8');
+  const home = client.slice(client.indexOf('async function openAccountHome(){'), client.indexOf('$(\'account-button\').onclick'));
+  assert.ok(home.indexOf('is-arriving') > -1 && home.indexOf('is-arriving') < home.indexOf('await'), 'the loading state is painted before anything is awaited');
+  assert.match(home, /reportsLoading/);
+  assert.equal((client.match(/signedInAt=Date\.now\(\)/g) || []).length, 2, 'both sign-in paths stamp the moment');
+});
+
+test('checkout and billing leave the app for the browser, and the return is always re-read', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const client = fs.readFileSync(path.join(__dirname, '../public/inspect/inspect.js'), 'utf8');
+  assert.doesNotMatch(client, /openExternal\((?:r\.url|\(await api\('\/billing')/);
+  assert.equal((client.match(/openPurchase\((?:r\.url|\(await api\('\/billing')/g) || []).length, 4);
+  assert.match(client, /const back=purchaseAway;purchaseAway=false;\s*if\(!back&&Date\.now\(\)-lastForegroundSync<60000\)return;/);
+  const page = fs.readFileSync(path.join(__dirname, '../public/inspect/checkout-return.html'), 'utf8');
+  assert.match(page, /href="com\.bookmarketel\.frontdesk:\/\/return"/);
+  assert.match(page, /<script src="\/inspect\/checkout-return\.js"><\/script>/);
+  const script = fs.readFileSync(path.join(__dirname, '../public/inspect/checkout-return.js'), 'utf8');
+  for (const status of ['success', 'cancelled', 'billing']) assert.match(script, new RegExp(`${status}: \\[`));
+});
 
 test('a single Claims report is sold once, at the price the page shows, and returns to Claims', async () => {
   const h = moneyHarness();

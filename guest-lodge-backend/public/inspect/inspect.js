@@ -6,6 +6,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 let session = localStorage.getItem('inspect.session') || '';
 let account = null, draft = null, reports = [], nextReportCursor = null, preview = false, storefront = null, storefrontWaiters = [];
 let currentPage = 'current';
+let signedInAt = 0;
 let reportsCache = null, propertiesCache = null, listRequest = 0;
 const DEFAULT_APP_STORE_URL = 'https://apps.apple.com/us/app/marketel/id6801005750';
 let appStoreUrl = DEFAULT_APP_STORE_URL;
@@ -463,9 +464,9 @@ const SKIN = {
   termsLabel: 'Inspect terms',
   navList: 'Reports', navCreate: '+ New report', navPlaces: 'Properties',
   listHeading: 'Your reports',
-  placesHeading: 'Properties',
+  placesHeading: 'Properties', placeSingular: 'property',
   placesLede: 'Start a fresh report, or compare a move-out with the last finalized condition report.',
-  placesEmpty: 'Properties appear here after you save a report.',
+  placesEmpty: 'No properties yet. Add one, or it appears here when you save a report.',
   propertyPrompt: 'Which property?',
   demoBadge: 'EXAMPLE \u00b7 NOT A REAL INSPECTION',
   documentLabel: 'MARKETEL INSPECT',
@@ -496,9 +497,9 @@ const LANDING_ARMS = {
       termsLabel: 'Incident terms',
       navList: 'Records', navCreate: '+ New record', navPlaces: 'Locations',
       listHeading: 'Your records',
-      placesHeading: 'Locations',
+      placesHeading: 'Locations', placeSingular: 'location',
       placesLede: 'Start a fresh record for a site you have logged before.',
-      placesEmpty: 'Locations appear here after you save a record.',
+      placesEmpty: 'No locations yet. Add one, or it appears here when you save a record.',
       propertyPrompt: 'Which location?',
       demoBadge: 'EXAMPLE \u00b7 NOT A REAL INCIDENT',
       documentLabel: 'MARKETEL INCIDENT',
@@ -530,7 +531,6 @@ const LANDING_ARMS = {
       jobTitle: 'Which rental had the damage?',
       jobLabel: 'Rental property / unit',
       jobPlaceholder: 'Pine Ave · Unit 2',
-      photoLabel: 'Add a photo of the damage',
       building: 'Building your damage report',
       reveal: 'Here is what your guest or the platform receives.',
     },
@@ -541,8 +541,9 @@ const LANDING_ARMS = {
       comparisons: false,
       navList: 'Reports', navCreate: '+ New damage report', navPlaces: 'Properties',
       propertyPrompt: 'Which rental property?',
-      placesHeading: 'Properties',
-      placesEmpty: 'Properties appear here after you save a damage report.',
+      placesHeading: 'Properties', placeSingular: 'property',
+      placesLede: 'The rentals you manage. Start a damage report from any of them.',
+      placesEmpty: 'No properties yet. Add one, or it appears here when you save a damage report.',
       home: '/claims',
       terms: 'https://bookmarketel.com/claims/terms',
       termsLabel: 'Claims terms',
@@ -923,7 +924,7 @@ function simCheckout(email,trigger){
       return ensureAuth(()=>run(()=>openAccountHome()),'paid');
     }
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
-    openExternal(r.url);
+    openPurchase(r.url);
   },trigger);
 }
 // Hosted Checkout wants an email whatever the wallet, so the only question is
@@ -1032,7 +1033,9 @@ function setupFlow(){
   let business=account?.businessName||'';
   try{business||=localStorage.getItem('inspect.business')||'';}catch{}
   let logo=null,logoURL='';
-  const flow=flowScreen('','setup-screen');
+  // Opened from the New Report tab, so that is the tab it shows as selected.
+  // It overlaid the list while the bar still said Reports, and bounced back.
+  const flow=flowScreen('','setup-screen',{page:'current'});
   const one=()=>{
     flow.paint(`<p class="setup-step">Step 1 of 2</p><h2>What's your business called?</h2><p class="muted">Your ${esc(sk.doc)} is sent under this name.</p><label>Business name<input id="setup-business" maxlength="120" autocomplete="organization" placeholder="Pine Street Stays" value="${esc(business)}"></label>${logoURL?`<div class="logo-preview"><img src="${esc(logoURL)}" alt="Your logo"></div>`:''}<label class="button secondary logo-pick">${logo?'Change logo':'Add your logo'} <small>(optional)</small><input type="file" id="setup-logo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><button type="button" id="setup-next" class="wide">Continue →</button><p class="muted"><small>We'll save your progress as you go.</small></p>`);
     $('setup-logo').onchange=event=>{
@@ -1048,14 +1051,12 @@ function setupFlow(){
     };
   };
   const two=()=>{
-    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p><label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><label class="button secondary">${esc(g.photoLabel||'Add a first photo')} <small>(optional)</small><input type="file" id="setup-photo" data-files="0" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><p id="setup-photo-name" class="muted"></p><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
-    $('setup-photo').onchange=event=>{$('setup-photo-name').textContent=event.target.files?.[0]?'Photo added.':'';};
+    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p><label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
     if($('setup-back'))$('setup-back').onclick=one;
     $('setup-build').onclick=event=>run(async()=>{
       const property=$('setup-property').value.trim();
       if(!property)throw new Error(`Enter the ${(g.jobLabel||'property').toLowerCase()} first.`);
       const date=$('setup-date').value||localDate();
-      const photo=$('setup-photo');
       flow.paint(`<div class="building"><section class="loading">${esc(g.building||`Building your ${sk.doc}`)}…</section><p class="muted">${esc(property)}${business?` · ${esc(business)}`:''}</p></div>`);
       clearURLs();
       draft={document:newDocument(property,arm?.type||'routine'),files:[],serverId:null,finalizedAt:null,branding:{name:business,logo}};
@@ -1065,8 +1066,9 @@ function setupFlow(){
       preview=false;await persist();
       track('SetupCompleted');
       await new Promise(resolve=>setTimeout(resolve,900));
-      flow.restore();
-      if(photo?.files?.length)await addPhotos(photo);else editor('rooms');
+      // Straight into the report: restoring the list first flashed it, and the
+      // tab bar with it, on the way.
+      editor('rooms');
     },event.currentTarget);
   };
   if(account?.businessName)two();else one();
@@ -1419,8 +1421,10 @@ function dismissFlow(){
   activeFlow=null;
   if(flow)flow.abandon();
 }
-function flowScreen(content,kind=''){
+function flowScreen(content,kind='',{page}={}){
   dismissFlow();
+  const originPage=currentPage;
+  if(page&&page!==currentPage)setActiveNav(page);
   const app=$('app'),origin=document.createDocumentFragment(),originScroll=window.scrollY||0;
   const originHeight=Math.max(window.innerHeight,document.documentElement.scrollHeight-app.offsetTop);
   while(app.firstChild)origin.appendChild(app.firstChild);
@@ -1433,6 +1437,7 @@ function flowScreen(content,kind=''){
     if(settled||activeFlow!==handle)return;
     release();
     app.replaceChildren(origin);
+    if(currentPage!==originPage)setActiveNav(originPage);
     requestAnimationFrame(()=>{window.scrollTo(0,originScroll);if($('demo'))playDemo();});
     syncNativeInspectState(currentPage,true);
   };
@@ -1532,7 +1537,7 @@ function ensureAuth(after, intent='keep') {
       verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
-        session=result.token;localStorage.setItem('inspect.session',session);account=result;updateHeader();prefetchLists();drawer.restore();
+        session=result.token;localStorage.setItem('inspect.session',session);account=result;signedInAt=Date.now();updateHeader();prefetchLists();drawer.restore();
       },null).then(()=>{
         verifying=false;
         if(account)return after();
@@ -1585,7 +1590,7 @@ window.marketelInspectAuthVerify=raw=>{
     .then(result=>{
       if(nativeAuth!==pending)return;
       nativeAuth=null;
-      session=result.token;localStorage.setItem('inspect.session',session);account=result;
+      session=result.token;localStorage.setItem('inspect.session',session);account=result;signedInAt=Date.now();
       postAuthResult({step:'verified'});
       updateHeader();prefetchLists();
       pending.after();
@@ -2104,7 +2109,7 @@ async function exportOffer(action){
       const r=await api('/checkout',{method:'POST',body});
       settled=true;
       try{localStorage.setItem('inspect.pendingExport',JSON.stringify({reportId:draft.serverId,action,tool:toolId(),at:Date.now()}));}catch{}
-      openExternal(r.url);
+      openPurchase(r.url);
     },event.currentTarget);
     $('offer-later').onclick=()=>{
       $('dialog-body').innerHTML=`<h2>What stopped you?</h2><p class="muted">One tap. It helps us price this fairly. Your ${esc(sk.doc)} stays saved.</p><div class="stack">${DECLINE_REASONS.map(([key,text])=>`<button type="button" class="secondary" data-reason="${key}">${esc(text)}</button>`).join('')}</div>`;
@@ -2160,19 +2165,77 @@ async function offer(){
     const html=`<h2>${esc(sk.offerHeading)}</h2><p class="offer-anchor">${esc(sk.offerAnchor)}</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points">${points.map(point=>`<li>${esc(point)}</li>`).join('')}</ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The ${esc(sk.doc)} you just finished is saved and waiting, and existing finalized ${esc(sk.docPlural)} stay available. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
     if(first)modal(html,{fullscreen:true});else{$('dialog-body').innerHTML=html;settleSheet();}
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
-    $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openExternal(r.url);});
+    $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openPurchase(r.url);});
   };
   paint(true);
 }
 function openExternal(url){if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openBrowser',url});else location.assign(url);}
+// Paying happens in the default browser, not in a sheet over the app: the US
+// storefront allows the link, and a browser the app does not own is the reading
+// of that allowance nobody can dispute. The app is backgrounded while they pay,
+// so coming back to the foreground is what re-reads their access.
+let purchaseAway=false;
+function openPurchase(url){
+  if(!native)return location.assign(url);
+  purchaseAway=true;
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'openPurchase',url});
+}
+// Once they have paid, the plans sheet they paid from is stale, and so is the
+// status line beneath it. A report waiting to be sent is resumePendingExport's.
+function purchaseSettled(){
+  if(resumingExport||!account)return;
+  const dialog=$('dialog');
+  if(dialog.open&&$('buy')&&canSend()){dialog.close();notice(account.active?'Your plan is active.':'Payment received.','success');}
+  else if(dialog.open&&$('manage'))dialog.close();
+  if(!dialog.open&&currentPage==='reports'&&!hasUnfinishedDraft())renderReports();
+}
 function renderProperties(data){
   enterScreen('properties');
+  const sk=skin();
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
-  $('app').innerHTML=`<h1>${esc(skin().placesHeading)}</h1><p class="muted">${esc(skin().placesLede)}</p><button id="new-property">+ New ${esc(skin().placesHeading.replace(/s$/,'').toLowerCase())}</button>${details.length?'':`<section class="card">${esc(skin().placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${skin().comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}</div></section>`).join('')}`;
-  if(skin().doc!=='report')for(const button of $('app').querySelectorAll('[data-property]'))button.textContent=`New ${skin().doc}`;
-  $('new-property').onclick=()=>{haptic();run(()=>start());};
+  $('app').innerHTML=`<h1>${esc(sk.placesHeading)}</h1><p class="muted">${esc(sk.placesLede)}</p><button id="new-property">+ New ${esc(sk.placeSingular)}</button>${details.length?'':`<section class="card">${esc(sk.placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${sk.comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}<button type="button" class="quiet danger" data-delete-property="${index}">Delete</button></div></section>`).join('')}`;
+  if(sk.doc!=='report')for(const button of $('app').querySelectorAll('[data-property]'))button.textContent=`New ${sk.doc}`;
+  $('new-property').onclick=()=>{haptic();newProperty();};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
+  document.querySelectorAll('[data-delete-property]').forEach(button=>button.onclick=()=>deleteProperty(details[Number(button.dataset.deleteProperty)],button));
+}
+// A property on its own, before any report names it. Starting a whole damage
+// report used to be the only way to add one.
+function newProperty(){
+  if(!account)return ensureAuth(()=>newProperty(),'keep');
+  const sk=skin(),placeholder=landingArm()?.golden?.jobPlaceholder||'Oak Street · Unit 2';
+  modal(`<h2>New ${esc(sk.placeSingular)}</h2><form id="property-form" class="stack"><label>Name<input id="new-property-name" maxlength="160" autocomplete="off" placeholder="${esc(placeholder)}"></label><button type="submit" id="property-save" class="wide">Add ${esc(sk.placeSingular)}</button></form>`);
+  const field=$('new-property-name');
+  // Inside the tap that opened it, so iOS brings the keyboard up with it.
+  field.focus();
+  $('property-form').onsubmit=event=>{
+    event.preventDefault();
+    const name=field.value.trim();
+    if(!name)return notice(`Enter the ${sk.placeSingular} name.`,'error');
+    run(async()=>{
+      const result=await api('/properties',{method:'POST',body:{name}});
+      propertiesCache=result;
+      $('dialog').close();
+      notice(`${name} added.`,'success');
+      if(currentPage==='properties')renderProperties(result);
+    },$('property-save'));
+  };
+}
+async function deleteProperty(property,button){
+  if(!property)return;
+  const sk=skin(),count=Number(property.reportCount)||0;
+  const message=count
+    ?`Its ${count===1?`${sk.doc} is`:`${count} ${sk.docPlural} are`} also deleted, with their photos and shared links. Your ${sk.doc} allowance will not be restored.`
+    :`It has no ${sk.docPlural}.`;
+  if(!await confirmAction({title:`Delete ${property.name}?`,message,confirmLabel:count?'Delete permanently':`Delete ${sk.placeSingular}`,danger:true}))return;
+  run(async()=>{
+    const result=await api('/properties',{method:'DELETE',body:{name:property.name}});
+    if(draft?.serverId&&(result.deletedReportIds||[]).includes(draft.serverId)){draft=null;await stored('delete');clearURLs();}
+    propertiesCache=result;reportsCache=null;
+    notice(`${property.name} deleted.`,'success');
+    if(currentPage==='properties')renderProperties(result);
+  },button);
 }
 function renderReports(){
   enterScreen('reports');
@@ -2244,12 +2307,28 @@ async function openAccountHome(){
   if(!account)return landing();
   if(hasUnfinishedDraft())return editor();
   updateHeader();setActiveNav('reports');
-  const result=reportsCache||await api(`/reports?take=50&${toolTypesQuery()}`);
+  // Whatever was on screen, usually the landing they signed in from, must not
+  // sit there looking as if nothing happened while the list is fetched.
+  if(!reportsCache){
+    enterScreen('reports');
+    $('app').innerHTML=`<section class="loading is-arriving">${Date.now()-signedInAt<15000?'Signing you in':`Opening your ${esc(skin().docPlural)}`}…</section>`;
+  }
+  const fetchReports=()=>api(`/reports?take=50&${toolTypesQuery()}`);
+  const result=reportsCache||await (reportsLoading?reportsLoading.catch(fetchReports):fetchReports());
   reports=result.reports||[];nextReportCursor=result.nextCursor||null;reportsCache={reports:[...reports],nextCursor:nextReportCursor};
   if(!reports.length)return start();
   renderReports();
 }
-function prefetchLists(){if(!account)return;api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});api(`/reports?take=50&${toolTypesQuery()}`).then(result=>{reportsCache=result;}).catch(()=>{});}
+// The reports request made at sign-in is the one the list then waits on, rather
+// than a second copy of it.
+let reportsLoading=null;
+function prefetchLists(){
+  if(!account)return;
+  api('/properties').then(result=>{propertiesCache=result;}).catch(()=>{});
+  const loading=api(`/reports?take=50&${toolTypesQuery()}`).then(result=>{reportsCache=result;return result;});
+  reportsLoading=loading;
+  loading.catch(()=>{}).finally(()=>{if(reportsLoading===loading)reportsLoading=null;});
+}
 $('account-button').onclick=async()=>{
   if(!account)return ensureAuth(()=>run(()=>openAccountHome()),'signin');
   await requestStorefront();
@@ -2268,7 +2347,7 @@ $('account-button').onclick=async()=>{
   const manageable=(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
   modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
-  if($('manage'))$('manage').onclick=()=>run(async()=>openExternal((await api('/billing',{method:'POST',body:{native}})).url));
+  if($('manage'))$('manage').onclick=()=>run(async()=>openPurchase((await api('/billing',{method:'POST',body:{native}})).url));
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
   $('delete-account').onclick=async()=>{
     $('dialog').close();
@@ -2568,9 +2647,11 @@ window.addEventListener('pageshow',event=>{
 let lastForegroundSync=0;
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState!=='visible'||!session)return;
-  if(Date.now()-lastForegroundSync<60000)return;
+  // Back from paying is never throttled: it is the one return worth a read.
+  const back=purchaseAway;purchaseAway=false;
+  if(!back&&Date.now()-lastForegroundSync<60000)return;
   lastForegroundSync=Date.now();
-  run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});},null);
+  run(async()=>{await api('/billing/refresh',{method:'POST'}).catch(()=>{});await refresh().catch(()=>{});if(back)purchaseSettled();},null);
 });
 if(native){beginWedgeEntrance();const chosen=new URLSearchParams(location.search).get('arm');if(LANDING_ARMS[chosen])localStorage.setItem('marketel.product',chosen);else if(!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');showNativeKeyboardDoneButton();syncNativeInspectState('current',true);window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});}
 // A cold start often runs before the network is ready. That is not a failure

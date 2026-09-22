@@ -272,6 +272,11 @@ dialog:focus, dialog:focus-visible { outline: none; }
    already ships, so nothing new is downloaded. */
 .loading { display: grid; place-items: center; gap: 13px; padding: 46px 0; color: var(--muted); font-size: 13px; }
 .loading::before { content: ""; width: 38px; height: 38px; border-radius: 11px; background: url('/marketel-frontdesk-icon.png') center / cover no-repeat; box-shadow: 0 6px 18px rgba(30, 106, 76, .2); animation: frontdeskLogoBreathe 1.15s ease-in-out infinite; }
+/* Signing in replaces the landing at once, so the wait reads as progress: the
+   same logo, larger, in the middle of the screen. */
+.loading.is-arriving { min-height: 56vh; gap: 16px; font-size: 15px; }
+.loading.is-arriving::before { width: 60px; height: 60px; border-radius: 17px; }
+@media (prefers-reduced-motion: reduce) { .loading::before { animation: none; } }
 @keyframes frontdeskLogoBreathe { 0%, 100% { transform: translateY(0) scale(.96); opacity: .82; } 50% { transform: translateY(-2px) scale(1); opacity: 1; } }
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 6px; }
 .status-line .quiet { flex: 0 0 auto; padding: 7px 11px; font-size: 13px; min-height: 38px; }

@@ -33,6 +33,20 @@ model InspectAccount {
   reports              InspectReport[]
   sessions             InspectSession[]
   handoffs             InspectHandoff[]
+  properties           InspectProperty[]
+}
+
+// A property added on its own, before any report names it. Reports still
+// contribute their property names to the list; this is what lets one exist
+// without them, and be removed.
+model InspectProperty {
+  id        String         @id @default(cuid())
+  accountId String
+  name      String
+  createdAt DateTime       @default(now())
+  account   InspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, name])
 }
 
 model InspectChallenge {

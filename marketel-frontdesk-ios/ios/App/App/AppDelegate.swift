@@ -1805,6 +1805,17 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         present(browser, animated: true)
     }
 
+    /// Paying for Marketel happens outside the app, so checkout and billing
+    /// open in the default browser rather than the in-app sheet. The page
+    /// Stripe returns to links back with the app's own URL scheme, and the web
+    /// layer re-reads access when the app comes back to the foreground.
+    private func openPurchaseInDefaultBrowser(_ rawURL: String) {
+        guard let url = URL(string: rawURL), url.scheme?.lowercased() == "https" else {
+            return
+        }
+        UIApplication.shared.open(url)
+    }
+
     private func sendInspectStorefront() {
         Task { @MainActor [weak self] in
             let country = await Storefront.current?.countryCode ?? ""
@@ -2054,6 +2065,8 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             presentMarketelContact(phone: payload["phone"] as? String ?? "")
         case "openBrowser":
             presentInAppBrowser(payload["url"] as? String ?? "")
+        case "openPurchase":
+            openPurchaseInDefaultBrowser(payload["url"] as? String ?? "")
         case "inspectStorefront":
             sendInspectStorefront()
         case "inspectExportPDF":
@@ -2423,6 +2436,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // The "Return to Marketel" link on the page after checkout. Opening the
+        // app is all it has to do; coming to the foreground refreshes access.
+        if url.scheme?.lowercased() == "com.bookmarketel.frontdesk" {
+            return true
+        }
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)

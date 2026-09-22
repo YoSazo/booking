@@ -16,6 +16,7 @@ const LIMITS = Object.freeze({
   reports: 30,
   photos: 100,
   drafts: 5,
+  properties: 1000,
   rewrites: 10,
   fileBytes: 12 * 1024 * 1024,
   audioBytes: 10 * 1024 * 1024,
@@ -1000,25 +1001,66 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (more) reports.pop();
     res.json({ reports: reports.map(serialize), nextCursor: more ? reports[reports.length - 1].id : null });
   }));
-  router.get('/properties', guarded(async (req, res) => {
-    const rows = await prisma.inspectReport.findMany({ where: { accountId: req.inspect.id },
-      distinct: ['propertyName'], orderBy: { propertyName: 'asc' }, select: { propertyName: true }, take: 1000 });
-    const finalized = await prisma.inspectReport.findMany({
-      where: { accountId: req.inspect.id, finalizedAt: { not: null } },
-      orderBy: [{ finalizedAt: 'desc' }, { id: 'desc' }],
-      select: { id: true, propertyName: true, document: true, finalizedAt: true },
-      take: 1000,
-    });
+  // A property is one someone added on its own, or one a report names. Reports
+  // alone used to be the whole list, so a property could neither be added
+  // before its first report nor removed.
+  async function propertyList(accountId) {
+    const [saved, counts, finalized] = await Promise.all([
+      prisma.inspectProperty.findMany({ where: { accountId }, select: { name: true }, take: 1000 }),
+      prisma.inspectReport.groupBy({ by: ['propertyName'], where: { accountId }, _count: { _all: true } }),
+      prisma.inspectReport.findMany({
+        where: { accountId, finalizedAt: { not: null } },
+        orderBy: [{ finalizedAt: 'desc' }, { id: 'desc' }],
+        select: { id: true, propertyName: true, document: true, finalizedAt: true },
+        take: 1000,
+      }),
+    ]);
     const latest = new Map();
     for (const report of finalized) if (!latest.has(report.propertyName)) latest.set(report.propertyName, report);
-    res.json({
-      properties: rows.map(row => row.propertyName),
-      propertyDetails: rows.map(row => {
-        const report = latest.get(row.propertyName);
-        return { name: row.propertyName, latestFinalizedReportId: report?.id || null,
+    const reportCount = new Map(counts.map(row => [row.propertyName, row._count._all]));
+    const names = [...new Set([...saved.map(row => row.name), ...reportCount.keys()])]
+      .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+    return {
+      properties: names,
+      propertyDetails: names.map(name => {
+        const report = latest.get(name);
+        return { name, reportCount: reportCount.get(name) || 0, latestFinalizedReportId: report?.id || null,
           latestType: report?.document?.type || null, latestDate: report?.document?.date || null };
       }),
+    };
+  }
+  const propertyName = body => {
+    const raw = body?.name;
+    const name = typeof raw === 'string' ? raw.trim() : '';
+    if (!name || raw.length > 160) throw fail(400, 'Enter a property name of up to 160 characters.');
+    return name;
+  };
+  router.get('/properties', guarded(async (req, res) => res.json(await propertyList(req.inspect.id))));
+  router.post('/properties', guarded(async (req, res) => {
+    const name = propertyName(req.body);
+    await prisma.$transaction(async tx => {
+      await lockAccount(tx, req.inspect.id);
+      if (await tx.inspectProperty.count({ where: { accountId: req.inspect.id } }) >= LIMITS.properties) throw fail(409, 'You have reached the limit of saved properties.');
+      await tx.inspectProperty.upsert({ where: { accountId_name: { accountId: req.inspect.id, name } },
+        create: { accountId: req.inspect.id, name }, update: {} });
     });
+    res.json(await propertyList(req.inspect.id));
+  }));
+  // Its reports go with it, as the confirmation says. Leaving them would put
+  // the property straight back on the list, since a report names it.
+  router.delete('/properties', guarded(async (req, res) => {
+    const name = propertyName(req.body);
+    const deletedReportIds = await prisma.$transaction(async tx => {
+      await lockAccount(tx, req.inspect.id);
+      const reports = await tx.inspectReport.findMany({ where: { accountId: req.inspect.id, propertyName: name },
+        select: { id: true, attachments: { select: { objectKey: true, originalKey: true } } } });
+      const keys = reports.flatMap(r => r.attachments.flatMap(a => [{ objectKey: a.objectKey }, { objectKey: a.originalKey }]));
+      if (keys.length) await tx.inspectGarbage.createMany({ data: keys, skipDuplicates: true });
+      if (reports.length) await tx.inspectReport.deleteMany({ where: { accountId: req.inspect.id, id: { in: reports.map(r => r.id) } } });
+      await tx.inspectProperty.deleteMany({ where: { accountId: req.inspect.id, name } });
+      return reports.map(r => r.id);
+    });
+    res.json({ ...(await propertyList(req.inspect.id)), deletedReportIds });
   }));
   router.post('/reports', guarded(async (req, res) => {
     const document = validateDocument(req.body);

@@ -60,6 +60,25 @@ expect(delegate, /marketelNativeContactResult/,
   'AppDelegate does not return the native contact result to Front Desk');
 expect(delegate, /case "openBrowser":[\s\S]{0,180}presentInAppBrowser/,
   'AppDelegate does not keep booking-page previews inside the app');
+// Paying for Marketel opens in the default browser, not the in-app sheet, and
+// the page Stripe returns to links back in with the app's own URL scheme.
+expect(delegate, /case "openPurchase":[\s\S]{0,160}openPurchaseInDefaultBrowser/,
+  'AppDelegate does not send purchases to the default browser');
+expect(delegate, /func openPurchaseInDefaultBrowser[\s\S]{0,500}UIApplication\.shared\.open\(url\)/,
+  'Purchases must open with UIApplication.shared.open, not an in-app browser');
+expect(info, /<key>CFBundleURLSchemes<\/key>\s*<array>\s*<string>com\.bookmarketel\.frontdesk<\/string>/,
+  'Info.plist does not register the return-to-app URL scheme');
+expect(delegate, /open url: URL[\s\S]{0,400}"com\.bookmarketel\.frontdesk"/,
+  'AppDelegate does not answer the return-to-app URL scheme');
+expect(read('www/inspect/inspect.js'), /type:'openPurchase'/,
+  'Inspect does not ask the shell to open purchases in the default browser');
+if (/openExternal\((?:r\.url|\(await api\('\/billing')/.test(read('www/inspect/inspect.js'))) {
+  failures.push('A checkout or billing link still opens in the in-app browser');
+}
+for (const page of ['www/inspect/checkout-return.html', '../guest-lodge-backend/public/inspect/checkout-return.html']) {
+  expect(read(page), /href="com\.bookmarketel\.frontdesk:\/\/return"/,
+    `${page} does not link back into the app`);
+}
 expect(delegate, /case "inspectStorefront":[\s\S]{0,100}sendInspectStorefront/,
   'AppDelegate does not provide the App Store storefront to Inspect');
 expect(delegate, /case "inspectExportPDF":[\s\S]{0,220}exportInspectPDF/,
