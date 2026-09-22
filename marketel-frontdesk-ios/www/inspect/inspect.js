@@ -776,7 +776,7 @@ function simStage(index=0){
   const last=complete>=simRun.length;
   const hint=step==='say'?'Your words appear here.':'Now photograph it.';
   const caption=step==='shoot'?`Tap to photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?`${esc(f.room)} · ${esc(f.label)}`:`${esc(f.room)} documented.`;
-  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${row.note?'':`<div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic" aria-label="Play the dictation">${icon('mic',24)}</button></div><p class="sim-mic-hint">Tap the mic &mdash; you will not have to say anything.</p>`}${complete?`<button type="button" id="sim-see" class="wide${last?'':' secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}${last?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
+  $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${complete?`<button type="button" id="sim-see" class="wide${last?'':' secondary'}">See ${last?`your ${esc(sk.doc)}`:esc(sk.doc)} →</button>`:''}${row.note?'':`<div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic" aria-label="Play the dictation">${icon('mic',24)}</button></div><p class="sim-mic-hint">Tap the mic &mdash; you will not have to say anything.</p>`}${(last||complete)?'':`<div class="sim-chips">${simRun.map((r,i)=>`<button type="button" class="sim-chip${i===at?' is-active':''}" data-sim-chip="${i}"><strong>${esc(r.finding.room)}</strong><span>${r.photo&&r.note?'done':r.photo?'1 photo':'—'}</span></button>`).join('')}</div>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${complete?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${simRun.filter(r=>r.photo).map(r=>`<img src="${esc(simPhoto(r.finding.photo,true))}" alt="">`).join('')}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-done').onclick=()=>simReport();
   if($('sim-see'))$('sim-see').onclick=()=>simReport();
@@ -1119,7 +1119,7 @@ function editor(step) {
       if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice(`Keep at least one ${w.noun}.`); if (await confirmAction({title:`Remove this ${w.noun}?`,message:'Its photos and notes will be removed from this report.',confirmLabel:`Remove ${w.noun}`,danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
       if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
-      if (b.dataset.nativeCamera !== undefined) { haptic(); window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:Number(b.dataset.nativeCamera)}); }
+      if (b.dataset.nativeCamera !== undefined) openNativeCamera(Number(b.dataset.nativeCamera));
       if (b.dataset.ai !== undefined) rewrite(Number(b.dataset.ai));
       if (b.dataset.voice !== undefined) run(()=>recordRoom(Number(b.dataset.voice)),b);
     };
@@ -2259,6 +2259,62 @@ window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF expor
 // That space becomes the room list instead. Tapping a room retargets the open
 // camera, so a whole property is one session.
 let cameraRoom=null;
+// The room is typed before the sheet opens. Opening the camera first put a
+// viewfinder over a question nobody had answered yet, and left the handover
+// with nothing to animate.
+// 'name' is naming the finding at cameraRoom. 'new' is a finding that does not
+// exist yet: it is only created once it has somewhere to be, so changing your
+// mind on this screen leaves no empty finding behind in the report.
+let cameraAsk=false;
+function openNativeCamera(i){
+  if(!draft)return;
+  haptic();
+  cameraRoom=i;
+  const room=draft.document.rooms[i];
+  if(entryTool()&&!(room?.name||'').trim()){ cameraAsk='name'; cameraCompanion(true); return; }
+  cameraAsk=false;
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:i});
+}
+function leaveCameraAsk(){
+  cameraAsk=false;cameraRoom=null;
+  document.documentElement.classList.remove('camera-open');
+  if(draft&&!preview&&!draft.finalizedAt)editor('rooms');else if(draft)reportPreview();else landing();
+}
+function cameraAskScreen(entering){
+  document.documentElement.classList.remove('camera-open');
+  const rooms=draft.document.rooms,adding=cameraAsk==='new';
+  // Only rooms that already have somewhere to be, never the one being named.
+  // Tapping one goes back to photographing it, which is also how you change
+  // your mind about adding another.
+  const others=rooms.map((item,index)=>({item,index})).filter(({item,index})=>(item.name||'').trim()&&(adding||index!==cameraRoom));
+  $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}</div>`:''}<h1>Which room are you in?</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="Kitchen"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
+  const field=$('hud-room');
+  // Synchronous focus inside the gesture that opened this, so the keyboard
+  // comes up with the screen rather than after it.
+  field.focus();
+  const openOn=index=>{
+    cameraAsk=false;cameraRoom=index;haptic();
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCamera',room:index});
+  };
+  document.querySelectorAll('[data-ask-room]').forEach(button=>button.onclick=()=>openOn(Number(button.dataset.askRoom)));
+  // A mistaken tap on the camera must not leave inventing a room name as the
+  // only way out.
+  $('hud-room-back').onclick=()=>{haptic();leaveCameraAsk();};
+  $('hud-room-form').onsubmit=event=>{
+    event.preventDefault();
+    const value=field.value.trim().slice(0,100);
+    if(!value)return notice('Type which room this is.','error');
+    if(adding){
+      if(rooms.length>=30)return notice('Maximum 30 findings.');
+      rooms.push({name:value,observation:'',issue:false,photos:[]});
+      remember();persist().catch(()=>{});
+      return openOn(rooms.length-1);
+    }
+    rooms[cameraRoom].name=value;
+    remember();persist().catch(()=>{});
+    openOn(cameraRoom);
+  };
+}
 // Dictation while the camera is open writes the speaker's own words straight
 // into the finding. It is the device's own engine, so there is no upload, no
 // account and no AI allowance between someone and their note.
@@ -2288,31 +2344,46 @@ function hudTalk(){
 // the sheet handing over rather than the page blinking.
 function cameraCompanion(entering=false){
   if(cameraRoom===null||!draft)return;
-  document.documentElement.classList.add('camera-open');
   const rooms=draft.document.rooms,w=wedge(draft.document.type),entries=entryTool();
   const room=rooms[cameraRoom];
   if(!room)return;
+  if(cameraAsk)return cameraAskScreen(entering);
+  document.documentElement.classList.add('camera-open');
   const talking=!!hudDictation;
   const note=(room.observation||'').trim();
   const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
   const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?((item.name||'').trim()||'New'):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
+  // Rooms are typed before the camera opens now, so this only asks by voice
+  // for a finding from an older draft that was never given one.
   const asking=hudAsk(room);
-  const heading=asking==='name'?'Where is this?':esc(entries?entryLabel(room,cameraRoom):(room.name||`${w.noun} ${cameraRoom+1}`));
+  const heading='Where is this?';
   const prompt=asking==='name'
     ? (talking?'Listening…':'Tap the mic and say the room.')
     : (talking?'Listening…':'Tap the mic and say what you are looking at.');
   const body=asking==='name'?'':note;
-  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><h1>${heading}</h1><div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic')}</button>`:''}</div><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div></section>`;
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div>${asking==='name'?`<h1>${heading}</h1>`:''}<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
 
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   $('hud-next').onclick=()=>{
     if(rooms.length>=30)return notice(`Maximum 30 ${entries?'findings':w.nounPlural}.`);
     if(hudDictation)hudTalk();
-    rooms.push({name:entries?'':nextRoomName(rooms),observation:'',issue:false,photos:[]});
+    haptic();
+    if(entries){
+      // Nothing is added until it has a name: abandoning this screen used to
+      // leave an empty finding in the report reading "No observation recorded".
+      cameraAsk='new';
+      window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraClose'});
+      cameraCompanion(true);
+      // The field is focused inside the tap, while the sheet is still leaving.
+      // Once it has gone, make sure the focus is still there to be had.
+      setTimeout(()=>{ const field=$('hud-room'); if(field&&document.activeElement!==field)field.focus(); },450);
+      return;
+    }
+    rooms.push({name:nextRoomName(rooms),observation:'',issue:false,photos:[]});
     cameraRoom=rooms.length-1;
     remember();persist().catch(()=>{});
     window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:(rooms[cameraRoom]?.name||'').trim()});
-    haptic();cameraCompanion();
+    cameraCompanion();
   };
   document.querySelectorAll('[data-camera-room]').forEach(button=>button.onclick=()=>{
     const index=Number(button.dataset.cameraRoom);
@@ -2336,6 +2407,7 @@ function cameraCompanion(entering=false){
 }
 window.marketelInspectCameraOpened=raw=>{
   if(!draft)return;
+  cameraAsk=false;
   cameraRoom=Number(raw)||0;
   // Name the room the shell opened on, so its caption is right before any tap.
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:draft.document.rooms[cameraRoom]?.name||''});
@@ -2343,6 +2415,7 @@ window.marketelInspectCameraOpened=raw=>{
 };
 window.marketelInspectCameraClosed=()=>{
   document.documentElement.classList.remove('camera-open');
+  if(cameraAsk)return;
   if(cameraRoom===null)return;
   cameraRoom=null;
   if(draft&&!preview&&!draft.finalizedAt)editor('rooms');else if(draft)reportPreview();else landing();

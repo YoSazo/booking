@@ -68,9 +68,18 @@ test('damage voice notes and artifacts use the Claims guardrails and identity', 
   assert.match(client, /const documentFileName = type => type === 'incident'.*?'damage-report\.pdf'/);
   assert.match(web, /Claims produces documentation; it does not file, submit or manage claims/);
   assert.match(terms, /it does not file, submit or manage claims/);
-  for (const arm of ['inspect', 'claims', 'incident']) {
-    assert.match(chooser, new RegExp(`data-product="${arm}"`));
+  // Claims is the only wedge running ads, so it is the only one on the menu.
+  // The others still open if something links straight to them.
+  assert.match(chooser, /data-product="claims"/);
+  for (const hidden of ['inspect', 'incident']) {
+    assert.doesNotMatch(chooser, new RegExp(`data-product="${hidden}"`), hidden);
   }
+  assert.match(chooser, /More tools coming soon/);
+  assert.doesNotMatch(chooser, /All three use the same account/);
+  assert.match(chooser, /const products = \['inspect', 'claims', 'incident'\]/);
+  // Only what is offered reopens by itself; a hidden tool someone last used
+  // must not skip the menu and land them straight back in it.
+  assert.match(chooser, /if \(!choosing && offered\.includes\(selected\)\) return open\(selected\);/);
   assert.match(chooser, /inspect\/index\.html\?arm=\$\{product\}/);
   assert.doesNotMatch(chooser, /data-product="bookings"/);
   assert.match(client, /if\(LANDING_ARMS\[chosen\]\)localStorage\.setItem\('marketel\.product',chosen\)/);
@@ -977,7 +986,11 @@ function rawInterpolations(src) {
     if(c==="'")stack.push('sq');
     else if(c==='"')stack.push('dq');
     else if(c==='`')stack.push('tpl');
-    else if(c==='}'&&top()==='expr')stack.pop();
+    // Braces inside an interpolation — destructuring, object literals — must
+    // nest, or the first `}` closes the expression early and desyncs the rest
+    // of the file. Tracked only there, so top-level scanning is unchanged.
+    else if(c==='{'&&(top()==='expr'||top()==='brace'))stack.push('brace');
+    else if(c==='}'&&(top()==='expr'||top()==='brace'))stack.pop();
     prev=c;
   }
   return bad;
@@ -1158,6 +1171,10 @@ test('no template expression ships to the screen as literal text', () => {
         'an apostrophe in prose is not a string');
     assert.equal(rawInterpolations('const t=`<img src="${esc(u)}">`;').length, 0,
         'an attribute inside a template literal interpolates normally');
+    assert.equal(rawInterpolations("const t=`a${xs.map(({a,b})=>`<i>${a}</i>`).join('')}b`; const u=`<b w=\"${w}\">`;").length, 0,
+        'braces inside an interpolation must not close it early');
+    assert.equal(rawInterpolations("const t=`a${f({k:1})}b`; const s='no ${x} here';").length, 1,
+        'and the scan is still in step afterwards, catching the real one');
 
     // Three of these shipped: the reports empty state rendered the source of
     // its own interpolation, because the language pass put ${} into branches
@@ -1986,4 +2003,23 @@ test('the app stops quoting a price to someone who already paid, and a business 
   // scheme, and it never tells anyone to hold anything.
   assert.match(client, /const hudShell = \(\) => !!window\.webkit\?\.messageHandlers\?\.marketelShell;/);
   assert.doesNotMatch(client, /Hold to talk/);
+});
+
+test('the room is asked before the camera, and changing your mind leaves nothing behind', () => {
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const add = client.slice(client.indexOf("$('hud-next').onclick="), client.indexOf("document.querySelectorAll('[data-camera-room]')"));
+  // For findings, "+ another room" only asks. Nothing is pushed until Done,
+  // which is what used to leave "No observation recorded" in the report.
+  const entryBranch = add.slice(add.indexOf('if(entries){'), add.indexOf('return;', add.indexOf('if(entries){')));
+  assert.match(entryBranch, /cameraAsk='new'/);
+  assert.doesNotMatch(entryBranch, /rooms\.push/);
+  assert.match(entryBranch, /type:'inspectCameraClose'/);
+  // The question has a way back, so a mistaken tap is never answered by
+  // inventing a room name.
+  assert.match(client, /id="hud-room-back"/);
+  assert.match(client, /\$\('hud-room-back'\)\.onclick=\(\)=>\{haptic\(\);leaveCameraAsk\(\);\};/);
+  // The camera sheet only opens once the room has a name or one is picked.
+  assert.match(client, /if\(entryTool\(\)&&!\(room\?\.name\|\|''\)\.trim\(\)\)\{ cameraAsk='name'; cameraCompanion\(true\); return; \}/);
+  // A dismissal we asked for is not the owner leaving the camera.
+  assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraAsk\)return;/);
 });

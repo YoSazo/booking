@@ -2067,6 +2067,12 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             dictation.stop()
         case "inspectCamera":
             presentInspectCamera(room: payload["room"] as? Int ?? 0)
+        case "inspectCameraClose":
+            // Asking which room comes next needs the screen and the keyboard,
+            // so the sheet stands down rather than sitting over the question.
+            if let camera = presentedViewController as? MarketelInspectCameraViewController {
+                camera.dismiss(animated: true)
+            }
         case "inspectCameraRoom":
             // Retarget the open camera from the room list showing above it.
             if let camera = presentedViewController as? MarketelInspectCameraViewController {

@@ -425,14 +425,14 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .native-inspect-shell.camera-open body { padding-top: calc(env(safe-area-inset-top) + 6px); padding-bottom: 6px; }
 .camera-open main { padding-top: 0; }
 /* Rooms become chips so the prompts and the strip have room above the sheet. */
-.camera-rooms { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+.camera-rooms { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .camera-strip { display: flex; gap: 8px; overflow-x: auto; margin: 6px 0 4px; min-height: 8px; -webkit-overflow-scrolling: touch; }
 .camera-strip figure { position: relative; flex: 0 0 auto; width: 46px; height: 46px; margin: 0; }
 .camera-strip img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .camera-strip .photo-x { top: -4px; right: -4px; }
 .camera-strip p { margin: 0; }
 /* The recording is the point of this screen, so it is the biggest thing on it. */
-.hud-note { min-height: 56px; padding: 10px 13px; margin: 0 0 6px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
+.hud-note { min-height: 64px; padding: 12px 14px; margin: 0 0 8px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
 .hud-note.is-live { border-color: var(--green); background: var(--green-pale); }
 .hud-actions { display: flex; justify-content: center; margin: 6px 0; }
 /* Web: the photo you just added, then what it is. */
@@ -576,7 +576,19 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 
 /* A short phone has no room for the finding chips above the sheet. "Next
    finding" still walks the loop, which is the part that matters. */
-@media (max-height: 720px) { .sim-chips { display: none; } }
+/* An SE-sized phone has about 320px above the sheet, and the fullest card —
+   the second finding, with the way out, the waveform and the mic all showing —
+   needed 402. The camera gives some height back, the note is capped lower,
+   and the footnote goes: the line under the mic already says the same thing. */
+@media (max-height: 720px) {
+  .sim-chips, .sim-stage .sim-foot { display: none; }
+  .sim-sheet { height: 46vh; height: 46svh; }
+  .sim-stage { padding-bottom: calc(46vh + 14px); padding-bottom: calc(46svh + 14px); }
+  /* Only while it is waiting for words: once written, the mic and waveform are
+     gone and the finding gets its full height rather than a scroll bar. */
+  .sim-note:not(.is-written) { max-height: 80px; }
+  .sim-mic-hint { margin: 8px 0 6px; }
+}
 
 /* Whichever control is live wears the ring; the other is visibly out of play.
    Two live buttons with no stated order is the same as no instruction. */
@@ -645,10 +657,15 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 @keyframes hud-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 /* The button was always a tap-to-toggle calling itself "Hold to talk". It is a
    microphone, so it looks like one, and it says what it is doing while it is on. */
-.hud-mic { flex: 0 0 auto; width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 23px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.hud-mic { flex: 0 0 auto; width: 66px; height: 66px; padding: 0; border-radius: 50%; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 .hud-mic.is-live { background: #b3261e; animation: hud-mic-live 1.5s ease-in-out infinite; }
 @keyframes hud-mic-live { 0%, 100% { box-shadow: 0 0 0 0 #b3261e52; } 60% { box-shadow: 0 0 0 12px #b3261e00; } }
 @media (prefers-reduced-motion: reduce) {
   .camera-companion.is-entering { animation: none; }
   .hud-mic.is-live { animation: none; }
 }
+
+/* Which room, typed, before the camera arrives. */
+.camera-ask h1 { font-size: 24px; margin: 4px 0 12px; letter-spacing: -.6px; }
+.camera-ask input { width: 100%; min-height: 54px; margin-bottom: 12px; padding: 14px 16px; font-family: inherit; font-size: 17px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; }
+.camera-ask input:focus { outline: none; border-color: var(--green); }

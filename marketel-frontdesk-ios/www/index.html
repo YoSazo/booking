@@ -58,21 +58,26 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
     }
+    .soon { margin: 16px 0 0; text-align: center; color: #6b7d72; font-size: 13px; }
   </style>
 </head>
 <body>
   <main>
     <h1>What are you working on?</h1>
-    <p id="intro">Choose what you need today. All three use the same account.</p>
+    <p id="intro">Document guest damage and send a dated report.</p>
     <div id="choices" class="choices hidden">
-      <button class="choice" data-product="inspect"><span><strong>Inspect</strong><small>Walk through a property and finish a condition report.</small></span><span class="arrow" aria-hidden="true">→</span></button>
       <button class="choice" data-product="claims"><span><strong>Claims</strong><small>Record damage and keep the original uploaded photos.</small></span><span class="arrow" aria-hidden="true">→</span></button>
-      <button class="choice" data-product="incident"><span><strong>Incident</strong><small>Record what happened and export a signed incident record.</small></span><span class="arrow" aria-hidden="true">→</span></button>
+      <p class="soon">More tools coming soon.</p>
     </div>
   </main>
   <script>
     (() => {
+      // The others still open if something links straight to them; they are
+      // only off the menu.
       const products = ['inspect', 'claims', 'incident'];
+      // Only what is on the menu reopens by itself. Otherwise anyone who last
+      // used a hidden tool would skip the menu and land straight back in it.
+      const offered = [...document.querySelectorAll('[data-product]')].map(button => button.dataset.product);
       const names = { inspect: 'Inspect', claims: 'Claims', incident: 'Incident' };
       const shell = message => window.webkit?.messageHandlers?.marketelShell?.postMessage(message);
       const open = product => {
@@ -81,7 +86,7 @@
       };
       const selected = localStorage.getItem('marketel.product');
       const choosing = new URLSearchParams(location.search).get('choose') === '1';
-      if (!choosing && products.includes(selected)) return open(selected);
+      if (!choosing && offered.includes(selected)) return open(selected);
       if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
       // Only now is this page staying on screen, so only now does the shell
       // show its floating glass bar over it.

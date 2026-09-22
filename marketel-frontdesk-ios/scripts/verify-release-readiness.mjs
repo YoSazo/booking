@@ -99,8 +99,18 @@ if (/<script[^>]+src=["']https?:/i.test(bundledInspect)) {
 }
 expect(read('www/inspect/inspect.js'), /type:'inspectState'[\s\S]{0,180}selectedTab/,
   'Bundled Inspect does not synchronize its native tab selection');
-expect(bundledRoot, /data-product="inspect"[\s\S]*data-product="claims"[\s\S]*data-product="incident"/,
-  'The native app entry must offer all three report jobs');
+// Claims is the only job on the menu while it is the one running ads. The other
+// two stay routable, and a hidden one that someone last used must not skip the
+// menu and land them straight back in it.
+expect(bundledRoot, /data-product="claims"/,
+  'The native app entry must offer Claims');
+if (/data-product="(inspect|incident)"/.test(bundledRoot)) {
+  failures.push('The native app entry offers a tool that is meant to be hidden for now');
+}
+expect(bundledRoot, /const products = \['inspect', 'claims', 'incident'\]/,
+  'The native app entry must still be able to open all three report jobs');
+expect(bundledRoot, /if \(!choosing && offered\.includes\(selected\)\) return open\(selected\);/,
+  'The native app entry reopens a tool that is not on its menu');
 expect(bundledRoot, /marketel\.product[\s\S]*inspect\/index\.html\?arm=\$\{product\}/,
   'The native app entry does not preserve the selected report job');
 expect(bundledRoot, /localStorage\.getItem\('crmToken'\)/,
