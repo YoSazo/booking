@@ -2630,7 +2630,7 @@ async function offer(){
     const html=`<h2>${esc(sk.offerHeading)}</h2><p class="offer-anchor">${esc(sk.offerAnchor)}</p>${toggle}<div class="price">$${plan.price} <small>${plan.per}</small></div>${sub?`<p class="price-save">${sub}</p>`:''}<ul class="offer-points">${points.map(point=>`<li>${esc(point)}</li>`).join('')}</ul><p class="offer-reversal">Cancel renewal anytime.</p><button id="buy" class="wide">Subscribe — $${plan.price}${plan.per}</button><p><small>${plan.terms} The ${esc(sk.doc)} you just finished is saved and waiting, and existing finalized ${esc(sk.docPlural)} stay available. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p>`;
     if(first)modal(html,{fullscreen:true});else{$('dialog-body').innerHTML=html;settleSheet();}
     document.querySelectorAll('[data-plan]').forEach(button=>{button.onclick=()=>{const next=button.dataset.plan==='year'?'year':'month';if(next===planInterval)return;haptic();planInterval=next;paint(false);};});
-    $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval}});openPurchase(r.url);});
+    $('buy').onclick=()=>run(async()=>{haptic();const r=await api('/checkout',{method:'POST',body:{native,interval:planInterval,tool:toolId()}});openPurchase(r.url);});
   };
   paint(true);
 }
@@ -2731,10 +2731,20 @@ function deleteReportRow(id,row){
     setTimeout(()=>{if(currentPage==='reports'&&!$('dialog').open)renderReports();},230);
   },null);
 }
+// Who can buy a plan from here. Claims has no free report, so anyone without
+// a plan or credits can; the link to pay exists only in the US storefront.
+const mayBuy=()=>!!account&&!account.active&&!(account.credits>0)&&(payAtExport()||!account.freeAvailable)&&(!native||storefront==='USA');
+let storefrontAsked=false;
 function renderReports(){
   enterScreen('reports');
-  const canUpgrade=!account.active&&!account.freeAvailable&&(!native||storefront==='USA');
-  const status=account.freeAvailable?`Your first complete ${skin().doc} is free.`:account.active?(account.remaining>0?`Unlimited ${skin().docPlural} on your plan.`:FAIR_USE_REACHED):`Your saved ${skin().docPlural} remain available.`;
+  const canUpgrade=mayBuy(),sk=skin();
+  const status=account.active?(account.remaining>0?`Unlimited ${sk.docPlural} on your plan.`:FAIR_USE_REACHED)
+    :account.credits>0?`${account.credits} ${account.credits===1?sk.doc:sk.docPlural} ready to send.`
+    :payAtExport()?(canUpgrade?`Building a ${sk.doc} is free. Sending one needs a plan.`:`Building a ${sk.doc} is free.`)
+    :account.freeAvailable?`Your first complete ${sk.doc} is free.`:`Your saved ${sk.docPlural} remain available.`;
+  // The phone says which App Store country it is in only when asked, so the
+  // first visit asks, then shows the plans link once the answer allows it.
+  if(native&&storefront===null&&!storefrontAsked){storefrontAsked=true;requestStorefront().then(()=>{if(storefront&&currentScreen==='reports'&&!$('dialog').open)renderReports();});}
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(docDateText(draft.document.date))} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
@@ -2859,9 +2869,10 @@ $('account-button').onclick=async()=>{
   // without one opened an error. Front Desk is not part of this product, so
   // it is no longer a button here — its own customers still open straight in.
   const manageable=(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
-  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
+  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}${mayBuy()?'<button id="see-plans">See plans</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openPurchase((await api('/billing',{method:'POST',body:{native}})).url));
+  if($('see-plans'))$('see-plans').onclick=()=>{haptic();offer();};
   $('logout').onclick=event=>run(async()=>{await api('/auth/logout',{method:'POST'});await logout();notice('Signed out.','success');},event.currentTarget);
   $('delete-account').onclick=async()=>{
     $('dialog').close();
