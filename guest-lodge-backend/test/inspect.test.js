@@ -581,6 +581,8 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       findUnique: async ({ where }) => (seenEvents.has(where.sourceId) ? { id: where.sourceId } : null),
       create: async ({ data }) => { if (data.sourceId) seenEvents.add(data.sourceId); calls.events.push(data); },
       upsert: async ({ where, create }) => { if (!seenEvents.has(where.sourceId)) { seenEvents.add(where.sourceId); calls.events.push(create); } },
+      findFirst: async ({ where }) => [...calls.events].reverse().find(event => event.name === where.name
+        && (!where.accountId || event.accountId === where.accountId)) || null,
     },
   };
   const prisma = { ...db, $transaction: async callback => callback(db) };
@@ -1897,6 +1899,70 @@ test('the simulation sells before anyone has an account, and Stripe collects the
   } finally { h.registration.close(); }
 });
 
+test('a demo checkout tells Meta a trial started, or the sale, under one id', async () => {
+  const fromAd = { metaAttribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' } };
+  const stripe = { subscriptions: { update: async id => ({ id }), retrieve: async id => ({ id, metadata: {} }) } };
+  const completed = object => ({ type: 'checkout.session.completed', created: 1760000000, data: { object: {
+    id: 'cs_demo', mode: 'subscription', subscription: 'sub_demo', customer: 'cus_demo', invoice: 'in_first', currency: 'usd',
+    customer_details: { email: 'buyer@example.com' },
+    metadata: { product: 'marketel-inspect', sim: '1', interval: 'month', tool: 'claims' }, ...object } } });
+  const send = (h, event) => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
+
+  // $0 today is a trial: Meta hears StartTrial now, and we record which plan.
+  let h = moneyHarness({ account: fromAd, stripe });
+  try {
+    assert.equal((await send(h, completed({ amount_total: 0 }))).status, 200);
+    assert.deepEqual(h.calls.capi.map(e => [e.name, e.eventId]), [['StartTrial', 'inspect-trial.cs_demo']]);
+    const started = h.calls.events.find(e => e.name === 'TrialStarted');
+    assert.equal(started.tool, 'claims');
+    assert.equal(started.detail, 'month');
+  } finally { h.registration.close(); }
+
+  // Paid today: the sale, under the id invoice.paid uses, so Meta counts one.
+  h = moneyHarness({ account: fromAd, stripe });
+  try {
+    assert.equal((await send(h, completed({ amount_total: 2500 }))).status, 200);
+    assert.deepEqual(h.calls.capi.map(e => [e.name, e.eventId, e.value]), [['Purchase', 'inspect-purchase.in_first', 25]]);
+  } finally { h.registration.close(); }
+
+  // Someone no ad brought in is nobody's to attribute.
+  h = moneyHarness({ stripe });
+  try {
+    assert.equal((await send(h, completed({ amount_total: 0 }))).status, 200);
+    assert.equal(h.calls.capi.length, 0);
+    assert.ok(h.calls.events.some(e => e.name === 'TrialStarted'), 'the trial itself still counts');
+  } finally { h.registration.close(); }
+});
+
+test('"keep it free" emails the link once, and only when asked', async () => {
+  const h = moneyHarness();
+  const lead = body => request(h.app, '/api/inspect/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'maybe@example.com', tool: 'claims', ...body }) });
+  try {
+    assert.equal((await lead({})).status, 200);
+    assert.equal(h.calls.mail.length, 0, 'a plain lead sends nothing');
+    assert.equal((await lead({ keep: true })).status, 200);
+    assert.equal(h.calls.mail.length, 1);
+    const sent = h.calls.mail[0];
+    assert.equal(sent.subject, 'Marketel, for when you need it');
+    assert.match(sent.text, /https:\/\/bookmarketel\.com\/claims\?sim=0/);
+    assert.match(sent.text, /Building one is always free\. Sending it is \$12, or \$25 a month/);
+    assert.ok(h.calls.events.some(e => e.name === 'KeptFree'));
+    assert.equal((await lead({ keep: true })).status, 200);
+    assert.equal(h.calls.mail.length, 1, 'never twice');
+  } finally { h.registration.close(); }
+
+  // The page: a quiet way out under the offer, prominent after a cancelled
+  // checkout, and the trial's words come from one place.
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  assert.match(client, /api\('\/leads',\{method:'POST',body:\{email,tool:toolId\(\),visitorId,attribution:inspectAttribution,keep:true\}\}\)/);
+  assert.match(client, /id="sim-keep" class="\$\{declined\?'secondary wide':'quiet'\}"/);
+  assert.match(client, /state==='cancelled'&&simPicked\)\{[\s\S]{0,120}simReport\(\{declined:true\}\)/);
+  assert.match(client, /cta:`Start \$\{SIM_TRIAL_DAYS\} days free →`/);
+  assert.match(client, /terms:`\$0 today\. \$\$\{plan\.price\}\$\{plan\.per\} from \$\{from\}, or from your first \$\{sk\.doc\} if sooner\./);
+});
+
 test('a simulation purchase creates the account from the email Stripe collected', async () => {
   const updates = [];
   const h = moneyHarness({
@@ -2187,23 +2253,48 @@ test('a trial grants the product it is a trial of', () => {
   }
 });
 
-test('the simulation charges on the spot, and the trial machinery stays off', async () => {
-  const h = moneyHarness({
-    stripe: { prices: { retrieve: async () => ({ id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }) } },
-  });
+test('the demo starts with three free days, card upfront, once per person', async () => {
+  const price = { id: 'price_test', unit_amount: 2500, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } };
+  const sim = (h, body) => request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims', ...body }) });
+  const stripe = { prices: { retrieve: async () => price }, customers: { list: async () => ({ data: [] }) } };
+
+  // Someone who has never subscribed: $0 today, and the card is taken now.
+  let h = moneyHarness({ stripe });
   try {
-    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval: 'month', tool: 'claims' }) });
+    const response = await sim(h, { email: 'new@example.com' });
     assert.equal(response.status, 200);
-    // SIM_TRIAL_DAYS is 0, so no trial is attached and the card is charged
-    // today. Flipping that constant back is the whole switch — the rest of
-    // the trial path is still here and still tested below.
-    assert.ok(!('trial_period_days' in h.calls.sessions[0].params.subscription_data));
-    assert.equal(h.calls.sessions[0].params.subscription_data.metadata.sim, '1');
-    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
-    assert.match(src, /const SIM_TRIAL_DAYS = 0;/);
-    assert.match(src, /SIM_TRIAL_DAYS > 0 \? \{ trial_period_days: SIM_TRIAL_DAYS \}/);
+    assert.equal((await response.json()).trialDays, 3);
+    const params = h.calls.sessions[0].params;
+    assert.equal(params.subscription_data.trial_period_days, 3);
+    assert.equal(params.payment_method_collection, 'always');
+    assert.equal(params.subscription_data.metadata.sim, '1');
   } finally { h.registration.close(); }
+
+  // Someone who has had a plan before pays today: a trial is not repeatable.
+  h = moneyHarness({ stripe, account: { subscriptionStatus: 'canceled', stripeSubscriptionId: 'sub_old', periodEnd: new Date(Date.now() - 86400000) } });
+  try {
+    const response = await sim(h, { email: 'back@example.com' });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).trialDays, 0);
+    assert.ok(!('trial_period_days' in h.calls.sessions[0].params.subscription_data));
+    assert.ok(!('payment_method_collection' in h.calls.sessions[0].params));
+  } finally { h.registration.close(); }
+
+  // No address, no trial: there is nobody to hold to "once".
+  h = moneyHarness({ stripe });
+  try {
+    assert.equal((await (await sim(h, {})).json()).trialDays, 0);
+    assert.ok(!('trial_period_days' in h.calls.sessions[0].params.subscription_data));
+  } finally { h.registration.close(); }
+
+  // The page's copy and the server's trial are one number.
+  const fs = require('node:fs'), path = require('node:path');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'inspect.js'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const days = source => Number(/const SIM_TRIAL_DAYS = (\d+);/.exec(source)?.[1]);
+  assert.equal(days(server), 3);
+  assert.equal(days(client), days(server));
 
   // The authed checkout is a different offer and keeps charging today.
   const paid = moneyHarness({
@@ -2268,7 +2359,7 @@ test('finalizing the first report is what starts the billing', async () => {
 });
 
 test('a trial about to bill for nothing gets a warning, once', async () => {
-  const soon = new Date(Date.now() + 2 * 86400000);
+  const soon = new Date(Date.now() + 20 * 3600000);
   const h = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: soon.toISOString(), email: 'owner@example.com' } });
   try {
     await h.registration.sweep();
@@ -2277,14 +2368,32 @@ test('a trial about to bill for nothing gets a warning, once', async () => {
     assert.equal(sent.to, 'owner@example.com');
     // It has to say the thing that stops a dispute: nothing has been taken.
     assert.match(sent.subject, /not been charged/i);
-    assert.match(sent.text, /has not been charged/i);
-    assert.match(sent.text, /cancel before/i);
+    assert.match(sent.text, /you have not been charged anything/i);
+    assert.match(sent.text, /\$25 a month, or when you send your first report/);
+    assert.match(sent.text, /https:\/\/bookmarketel\.com\/claims\?sim=0[\s\S]*Manage subscription[\s\S]*Cancel before/);
+    assert.doesNotMatch(`${sent.from} ${sent.text}`, /Inspect/);
     // And never twice, however often the sweep runs.
     await h.registration.sweep();
     await h.registration.sweep();
     assert.equal(h.calls.mail.length, 1);
     assert.ok(h.calls.events.some(event => event.name === 'TrialReminderSent'));
   } finally { h.registration.close(); }
+
+  // It names the tool and the plan the trial was for.
+  const yearly = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: soon.toISOString() } });
+  try {
+    yearly.calls.events.push({ accountId: 'acct_1', name: 'TrialStarted', tool: 'inspect', detail: 'year' });
+    await yearly.registration.sweep();
+    assert.match(yearly.calls.mail[0].text, /\$199 a year/);
+    assert.match(yearly.calls.mail[0].text, /bookmarketel\.com\/inspect\/\?sim=0/);
+  } finally { yearly.registration.close(); }
+
+  // Two days left of three is too early: that would land the day they signed up.
+  const fresh = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: new Date(Date.now() + 2 * 86400000).toISOString() } });
+  try {
+    await fresh.registration.sweep();
+    assert.equal(fresh.calls.mail.length, 0);
+  } finally { fresh.registration.close(); }
 
   // Someone who has actually used it is converting on their own terms.
   const using = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 2, periodEnd: soon.toISOString() } });

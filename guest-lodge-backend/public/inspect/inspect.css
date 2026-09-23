@@ -562,6 +562,12 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .sim-stamp { position: absolute; top: 34px; right: -42px; width: 190px; padding: 5px 0; transform: rotate(38deg); background: #2e7d5b1f; color: var(--green-dark); text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .22em; }
 .sim-offer { margin-top: 16px; }
 .sim-offer h2 { margin-top: 0; }
+/* Declining is not the end of it: the note that nothing was charged, and the
+   free way to keep Marketel for the day it is needed. */
+.sim-offer .sim-declined { margin: 0 0 6px; font-size: 14px; font-weight: 750; color: var(--green-dark); }
+.sim-offer .sim-keep { margin: 6px 0 0; text-align: center; }
+.sim-offer .sim-keep .quiet { font-size: 13px; white-space: normal; }
+.sim-trial-note { margin: -4px 0 12px; color: var(--muted); }
 
 /* Nobody arriving from an ad needs the banner: they did not navigate here and
    they have no account to open. Taking it out is ~50px back at the top of

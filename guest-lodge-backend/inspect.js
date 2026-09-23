@@ -138,11 +138,13 @@ const INSPECT_PLANS = Object.freeze({
   year: Object.freeze({ interval: 'year', amount: 19900, reports: LIMITS.reports * 12, priceEnv: 'STRIPE_INSPECT_YEARLY_PRICE_ID', contentName: 'Marketel Inspect annual plan' }),
 });
 const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
-// Zero means the simulation charges on the spot. The machinery for a trial is
-// intact either way — entitlement admits `trialing`, finalize ends a trial
-// early, and the sweep warns before a cap — so this is one number to move.
-// The copy in public/inspect/inspect.js has to move with it.
-const SIM_TRIAL_DAYS = 0;
+// The demo's checkout starts with three free days, card taken upfront: cold
+// traffic has no damage in front of it, so "$0 today" is what the trial is for.
+// The plan starts when the days run out or at the first report sent, whichever
+// is first — finalize ends a trial early — and the sweep emails the day before.
+// Zero turns it off. The copy in public/inspect/inspect.js moves with it; a
+// test keeps the two equal.
+const SIM_TRIAL_DAYS = 3;
 function validateInspectPrice(price, interval = 'month') {
   const plan = inspectPlan(interval);
   if (price?.unit_amount !== plan.amount || price.currency !== 'usd'
@@ -768,7 +770,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({
@@ -805,6 +807,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       await queueInspectCapi('Lead', { account, req, eventId: `inspect-lead.${account.id}`, contentName: `${TOOLS[extra.tool].label} lead` })
         .catch(error => console.error('Inspect Lead CAPI queue failed:', error.message));
     }
+    // "Keep it free" from the demo: the one thing they asked for is the link,
+    // for the day a guest leaves damage behind. Sent once per account.
+    const keepSource = `inspect-keep:${account.id}`;
+    if (req.body?.keep === true && mail && !(await prisma.inspectEvent.findUnique({ where: { sourceId: keepSource } }))) {
+      await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: account.email,
+        subject: 'Marketel, for when you need it',
+        text: `When a guest leaves damage behind, open this on your phone:\n\n${toolReturn(extra.tool, 'sim=0')}\n\nPhotograph it, say what happened, and Marketel writes it up as a dated report. Building one is always free. Sending it is $12, or $25 a month for unlimited reports.\n\nYou asked us to keep this for you. Questions? Reply to this email.` })
+        .then(() => recordBestEffort(account.id, 'KeptFree', keepSource, extra))
+        .catch(error => console.error('Inspect keep-free email failed:', error.message));
+    }
     res.json({ success: true });
   }));
 
@@ -829,6 +841,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // even when the card is never reached, which Stripe's own page would not
     // have given us.
     const email = req.body?.email ? emailOf(req.body.email) : '';
+    // Only a first subscription starts free, so the same address cannot take a
+    // new trial every time. No address, no trial.
+    let trialDays = 0;
     if (email) {
       const account = await prisma.$transaction(async tx => {
         const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
@@ -844,6 +859,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       }
       const current = await prisma.inspectAccount.findUnique({ where: { id: account.id } }) || account;
       if (entitlement(current).active) throw fail(409, 'You already have Marketel. Sign in with this email to use it.');
+      if (!current.stripeSubscriptionId && !current.subscriptionStatus) trialDays = SIM_TRIAL_DAYS;
       const firstLead = !(await prisma.inspectEvent.findUnique({ where: { sourceId: `inspect-lead:${account.id}` } }));
       await recordBestEffort(account.id, 'LeadCaptured', `inspect-lead:${account.id}:${tool}`, { tool, visitorId: visitor });
       if (firstLead) {
@@ -857,13 +873,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       mode: 'subscription',
       line_items: [{ price: price.id, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
+      ...(trialDays > 0 ? { payment_method_collection: 'always' } : {}),
       metadata,
-      subscription_data: { metadata, ...(SIM_TRIAL_DAYS > 0 ? { trial_period_days: SIM_TRIAL_DAYS } : {}) },
+      subscription_data: { metadata, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
     await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
-    res.json({ url: session.url });
+    res.json({ url: session.url, trialDays });
   }));
 
   // The buyer never typed an email here — Stripe collected it, and with Apple
@@ -1772,6 +1789,22 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       { id: String(session.subscription), customer: String(session.customer), metadata: session.metadata || {} },
       { interval: session.metadata?.interval, tool });
     await recordBestEffort(account.id, 'SimPurchased', `inspect-sim-purchase:${session.id}`, { tool, visitorId: visitorOf(session.metadata?.visitorId) });
+    // A trial's first invoice is $0, so without this Meta would hear nothing
+    // until the plan starts. A paid start is sent here too, under the id the
+    // invoice.paid path uses: that path skips a subscription not linked yet,
+    // and Stripe does not promise which of the two notices arrives first.
+    const interval = session.metadata?.interval === 'year' ? 'year' : 'month';
+    if (Number(session.amount_total) === 0) {
+      await recordBestEffort(account.id, 'TrialStarted', `inspect-trial:${session.id}`, { tool, detail: interval });
+      await queueInspectCapi('StartTrial', { account, req, eventId: `inspect-trial.${session.id}`, contentName: `${TOOLS[tool].label} trial` })
+        .catch(error => console.error('Inspect StartTrial CAPI queue failed:', error.message));
+    } else if (session.invoice) {
+      await queueInspectCapi('Purchase', {
+        account, req, eventId: `inspect-purchase.${session.invoice}`,
+        value: Number(session.amount_total) / 100, currency: String(session.currency || 'usd').toUpperCase(),
+        contentName: 'Marketel Inspect subscription',
+      }).catch(error => console.error('Inspect sim Purchase CAPI queue failed:', error.message));
+    }
     return account;
   };
   app.post('/api/inspect-stripe-webhook', guarded(async (req, res) => {
@@ -1826,7 +1859,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // note at the only moment it could land.
   const remindTrials = async () => {
     if (!mail) return;
-    const soon = new Date(Date.now() + 3 * 86400000);
+    // The day before a short trial ends; three days before a long one.
+    const soon = new Date(Date.now() + (SIM_TRIAL_DAYS <= 7 ? 1 : 3) * 86400000);
     const waiting = await prisma.inspectAccount.findMany({
       where: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: { lt: soon, gt: new Date() } },
       take: 200,
@@ -1835,10 +1869,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const sourceId = `inspect-trial-reminder:${account.id}`;
       if (await prisma.inspectEvent.findUnique({ where: { sourceId } })) continue;
       const ends = new Date(account.periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+      const started = await prisma.inspectEvent.findFirst({ where: { accountId: account.id, name: 'TrialStarted' }, orderBy: { createdAt: 'desc' } }).catch(() => null);
+      // Claims is what a new trial is for; a record from before the event existed
+      // gets its link.
+      const tool = toolOf(started?.tool || 'claims');
+      const plan = inspectPlan(started?.detail === 'year' ? 'year' : 'month');
+      const price = `$${plan.amount / 100} a ${plan.interval}`;
       try {
-        await mail.sendMail({ from: '"Marketel Inspect" <support@bookmarketel.com>', to: account.email,
+        await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: account.email,
           subject: 'You have not been charged yet',
-          text: `Your Marketel subscription has not been charged, because you have not made a report yet.\n\nIt starts with your first one, or on ${ends}, whichever comes first. Open the app or bookmarketel.com/inspect and talk through a single room — it takes about a minute.\n\nIf you would rather not continue, cancel before ${ends} and you will not be charged at all.` });
+          text: `Your free days with Marketel end on ${ends}, and you have not been charged anything.\n\nYour plan starts on ${ends} at ${price}, or when you send your first report if that comes first. There is nothing to do to keep it.\n\nTo cancel before then, open ${toolReturn(tool, 'sim=0')}, sign in with this email, open your account and tap Manage subscription. Cancel before ${ends} and you pay nothing.\n\nQuestions? Reply to this email.` });
         await recordBestEffort(account.id, 'TrialReminderSent', sourceId, {});
       } catch (error) { console.error('Inspect trial reminder failed:', error.message); }
     }

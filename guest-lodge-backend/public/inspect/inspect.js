@@ -725,7 +725,8 @@ function simThanks(){
       const where=$('sim-paid-email');
       if(where)where.textContent=r.email;
     }).catch(()=>{});
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>You're subscribed to Marketel ${esc(sk.product)}.</h1><p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
+  let trial=0;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;}catch{}
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end or you send your first ${esc(sk.doc)}. We'll email you the day before.</small></p>`:''}<p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
   track('SimSubscribed');
   $('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
@@ -741,7 +742,7 @@ function simResume(){
   let picked=null;
   try{picked=sessionStorage.getItem('inspect.sim.pick');}catch{}
   simPicked=s.findings.find(f=>f.id===picked)||null;
-  if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simReport();return;}
+  if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simReport({declined:true});return;}
   simIntro();
 }
 function simIntro(){
@@ -890,8 +891,30 @@ function simListen(at,levels,schedule){
   if(simReduced()){settle();return;}
   frame=requestAnimationFrame(run);
 }
+// The demo's checkout starts with free days, card upfront. Equal to the
+// server's SIM_TRIAL_DAYS (a test holds them together); zero turns it off.
+const SIM_TRIAL_DAYS = 3;
+// What the offer says, in one place for the card, the pay bar and the email
+// step. With a trial the first thing it says is "$0 today", and the date the
+// plan starts is the real one.
+function simOffer(plan=PLANS[planInterval]||PLANS.month){
+  const sk=skin();
+  const save=plan===PLANS.year?`${PLANS.year.save} · $16.58/month`:`Unlimited ${sk.docPlural} · Cancel anytime`;
+  if(!SIM_TRIAL_DAYS)return {save,terms:plan.terms,cta:`Start Marketel ${sk.product} →`,bar:`$${plan.price}`,barSmall:plan.per,barCta:`Start Marketel ${sk.product} →`,
+    lede:'One address for your receipt and for signing in. Payment is on the next screen.',go:'Continue to payment →',small:`$${plan.price}${plan.per}. Apple Pay or card on the next screen.`};
+  const from=new Date(Date.now()+SIM_TRIAL_DAYS*86400000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  return {
+    // One line on a phone: the terms below already say how cancelling works.
+    save:`Free for ${SIM_TRIAL_DAYS} days · ${plan===PLANS.year?PLANS.year.save:`Unlimited ${sk.docPlural}`}`,
+    terms:`$0 today. $${plan.price}${plan.per} from ${from}, or from your first ${sk.doc} if sooner. Cancel before then and you pay nothing.`,
+    cta:`Start ${SIM_TRIAL_DAYS} days free →`,
+    bar:'$0 today',barSmall:`then $${plan.price}${plan.per}`,barCta:'Start free →',
+    lede:'One address for your receipt and for signing in. Nothing is charged today.',go:'Continue →',
+    small:`$0 today, then $${plan.price}${plan.per} from ${from}. Apple Pay or card on the next screen.`,
+  };
+}
 function simPrices(){
-  const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year';
+  const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year',copy=simOffer(plan);
   const set=(selector,text)=>{const el=$('app').querySelector(selector);if(el)el.textContent=text;};
   set('.sim-offer .price',`$${plan.price} `);
   const per=$('app').querySelector('.sim-offer .price small');
@@ -899,10 +922,10 @@ function simPrices(){
     const price=$('app').querySelector('.sim-offer .price');
     if(price)price.insertAdjacentHTML('beforeend',`<small>${esc(plan.per)}</small>`);
   }
-  set('.sim-offer .price-save',year?`${PLANS.year.save} · $16.58/month`:`Unlimited ${sk.docPlural} · Cancel anytime`);
-  set('.sim-offer .offer-reversal small',plan.terms);
-  set('#sim-paybar strong',`$${plan.price}`);
-  set('#sim-paybar small',plan.per);
+  set('.sim-offer .price-save',copy.save);
+  set('.sim-offer .offer-reversal small',copy.terms);
+  set('#sim-paybar strong',copy.bar);
+  set('#sim-paybar small',copy.barSmall);
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan){
     switchPlan.dataset.simPlan=year?'month':'year';
@@ -926,6 +949,7 @@ function simCheckout(email,trigger){
       return ensureAuth(()=>run(()=>openAccountHome()),'paid');
     }
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
+    try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));}catch{}
     openPurchase(r.url);
   },trigger);
 }
@@ -937,9 +961,9 @@ function simCheckout(email,trigger){
 // prefilled email read-only, so a typo remembered once would otherwise send
 // every later checkout off with an address the buyer can never sign in with.
 function simBuy(trigger){
-  const sk=skin(),plan=PLANS[planInterval]||PLANS.month;
+  const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
   enterScreen('sim');
-  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">One address for your receipt and for signing in. Payment is on the next screen.</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">Continue to payment →</button></form><p class="muted"><small>$${plan.price}${esc(plan.per)}. Apple Pay or card on the next screen.</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">${esc(copy.lede)}</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">${esc(copy.go)}</button></form><p class="muted"><small>${esc(copy.small)}</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
   const field=$('sim-email-field');
   // Not focused on arrival: the keyboard would cover the price and the button
   // before they have read what this screen is for. One tap brings it up.
@@ -953,7 +977,38 @@ function simBuy(trigger){
     simCheckout(value,$('sim-email-go'));
   };
 }
-function simReport(){
+// "Keep it free": not ready to start a plan today, but the next bad guest is
+// coming. Building is always free; what they keep is the link, by email.
+function simKeepLabel(){
+  return payAtExport()?`Not ready? Keep it free — $${reportPrice()} when you send one.`:`Not ready? Keep it free — your first ${skin().doc} is on us.`;
+}
+function simKeep(){
+  const sk=skin();
+  enterScreen('sim');
+  track('SimKeepFreeOpened');
+  const send=payAtExport()?`When you need to send one, it's $${reportPrice()}, or $${PLANS.month.price}/month for unlimited.`:`Your first finished ${sk.doc} is free.`;
+  $('app').innerHTML=`<section class="sim sim-email sim-keep-screen"><h1>Keep Marketel for when you need it.</h1><p class="muted">Building a ${esc(sk.doc)} is always free. ${esc(send)} We'll email you the link.</p><form id="sim-keep-form" novalidate><input id="sim-keep-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-keep-go" class="wide">Email me the link →</button></form><button type="button" id="sim-keep-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  const field=$('sim-keep-field');
+  field.oninput=()=>field.classList.remove('invalid');
+  $('sim-keep-back').onclick=()=>simReport();
+  $('sim-keep-form').onsubmit=event=>{
+    event.preventDefault();
+    const email=field.value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){field.classList.add('invalid');notice('Enter your email to continue.','error');return;}
+    run(async()=>{
+      await api('/leads',{method:'POST',body:{email,tool:toolId(),visitorId,attribution:inspectAttribution,keep:true}});
+      try{localStorage.setItem('inspect.email',email);}catch{}
+      track('SimKeptFree');
+      simKept(email);
+    },$('sim-keep-go'));
+  };
+}
+function simKept(email){
+  const sk=skin();
+  enterScreen('sim');
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>Saved.</h1><p class="muted">We've emailed the link to <strong>${esc(email)}</strong>. When you need a ${esc(sk.doc)}, open it on your phone. Building one is always free.</p><a class="button wide" id="sim-start-real" href="${esc(location.pathname)}?sim=0">Start one now →</a></section>`;
+}
+function simReport({declined=false}={}){
   enterScreen('sim');
   const s=simTool(),sk=skin();
   simPreload(s);
@@ -963,11 +1018,12 @@ function simReport(){
   const ordered=[...lead,...s.findings.filter(f=>!lead.includes(f))];
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
-  const plan=PLANS[planInterval]||PLANS.month;
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer"><h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">Unlimited ${esc(sk.docPlural)} · Cancel anytime</p><button type="button" id="sim-buy" class="wide">Start Marketel ${esc(sk.product)} →</button><p class="offer-reversal"><small>${esc(plan.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>$${plan.price}</strong><small>${esc(plan.per)}</small></div><button type="button" id="sim-paybar-buy">Start Marketel ${esc(sk.product)} →</button></aside>`;
+  const plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
+  $('sim-keep').onclick=()=>{haptic();simKeep();};
   $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
   // The price is on screen from the moment the report is, so the offer really
   // has been seen by now — it is no longer something they scroll down to find.
