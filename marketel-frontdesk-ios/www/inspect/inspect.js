@@ -301,7 +301,7 @@ function enterScreen(key){
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({
-    type:'inspectState',visible,selectedTab:page,authenticated:!!account,hasUnfinishedDraft:hasUnfinishedDraft(),product:skin().product,
+    type:'inspectState',visible,selectedTab:page,authenticated:!!(account||session),hasUnfinishedDraft:hasUnfinishedDraft(),product:skin().product,
     labels:{list:skin().navList,places:skin().navPlaces},
   });
 }
@@ -398,9 +398,12 @@ function updateHeader() {
     const button = document.querySelector(`#nav [data-page="${page}"]`);
     if (button && button.textContent !== label) button.textContent = label;
   }
-  $('account-button').textContent = account ? 'Account' : 'Sign in';
-  $('nav').hidden = !account;
-  document.documentElement.classList.toggle('inspect-authenticated',!!account);
+  // A saved session is signed in from the first frame; the account behind it
+  // arrives a moment later. Only a real 401 turns this back into "Sign in".
+  const signedIn = !!(account || session);
+  $('account-button').textContent = signedIn ? 'Account' : 'Sign in';
+  $('nav').hidden = !signedIn;
+  document.documentElement.classList.toggle('inspect-authenticated',signedIn);
   const current=$('current-report');
   if(current){const unfinished=hasUnfinishedDraft();current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'In Progress':'+ New Report';}
   syncNativeInspectState(currentPage,true);
@@ -412,7 +415,9 @@ const PHONE_ZONE = (() => { try { return Intl.DateTimeFormat().resolvedOptions()
 const photoDayText = when => when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const photoClockText = when => when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 const docDateText = value => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : String(value || ''); };
-const photoFile = id => draft?.files?.find(file => file.id === id);
+const photoFile = id => draft?.files?.find(file => file.id === id || file.remoteId === id);
+const timeText = value => { const m = /^(\d{2}):(\d{2})$/.exec(String(value || '')); if (!m) return value === 'unknown' ? 'time unknown' : String(value || ''); const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`; };
+const clockHHMM = when => `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`;
 function photoTaken(id){
   const file = photoFile(id);
   if (!file || file.source !== 'camera') return null;
@@ -431,7 +436,9 @@ function photoCaptionText(id){
 }
 function photoURL(id) {
   if (urls.has(id)) return urls.get(id);
-  const file = draft.files.find(f => f.id === id);
+  // A report just sent lists its photos by server id; the phone knew them by
+  // its own. Either finds the file, so the sent report never shows a hole.
+  const file = draft.files.find(f => f.id === id || f.remoteId === id);
   if (!file?.blob) return '';
   const url = URL.createObjectURL(file.blob); urls.set(id, url); return url;
 }
@@ -1130,6 +1137,11 @@ function goldenLanding(arm){
 // Two small steps before anything is asked of anyone, like the booking setup:
 // the business the report is sent under, then the first job. A returning owner
 // whose business is already on file goes straight to the job.
+// The rentals already saved, one tap each.
+function savedPropertyChips(){
+  const names=(propertiesCache?.propertyDetails||[]).map(property=>property.name).slice(0,8);
+  return names.length?`<div class="property-chips">${names.map(name=>`<button type="button" class="chip" data-pick-property="${esc(name)}">${esc(name)}</button>`).join('')}</div>`:'';
+}
 function setupFlow(){
   track('SetupStarted');
   const arm=landingArm(),g=arm?.golden||{},w=wedge(arm?.type),sk=skin();
@@ -1140,7 +1152,7 @@ function setupFlow(){
   // It overlaid the list while the bar still said Reports, and bounced back.
   const flow=flowScreen('','setup-screen',{page:'current'});
   const one=()=>{
-    flow.paint(`<p class="setup-step">Step 1 of 2</p><h2>What's your business called?</h2><p class="muted">Your ${esc(sk.doc)} is sent under this name.</p><label>Business name<input id="setup-business" maxlength="120" autocomplete="organization" placeholder="Pine Street Stays" value="${esc(business)}"></label>${logoURL?`<div class="logo-preview"><img src="${esc(logoURL)}" alt="Your logo"></div>`:''}<label class="button secondary logo-pick">${logo?'Change logo':'Add your logo'} <small>(optional)</small><input type="file" id="setup-logo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><button type="button" id="setup-next" class="wide">Continue →</button><p class="muted"><small>We'll save your progress as you go.</small></p>`);
+    flow.paint(`<p class="setup-step">Step 1 of 2</p><h2>What's your business called?</h2><p class="muted">Your ${esc(sk.doc)} is sent under this name.</p><label>Business name<input id="setup-business" maxlength="120" autocomplete="organization" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="Pine Street Stays" value="${esc(business)}"></label>${logoURL?`<div class="logo-preview"><img src="${esc(logoURL)}" alt="Your logo"></div>`:''}<label class="button secondary logo-pick">${logo?'Change logo':'Add your logo'} <small>(optional)</small><input type="file" id="setup-logo" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label><button type="button" id="setup-next" class="wide">Continue →</button><p class="muted"><small>We'll save your progress as you go.</small></p>`);
     $('setup-logo').onchange=event=>{
       const file=event.target.files?.[0];if(!file)return;
       if(file.size>12*1024*1024)return notice('That logo is too large. Maximum 12 MB.','error');
@@ -1154,8 +1166,11 @@ function setupFlow(){
     };
   };
   const two=()=>{
-    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p><label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
+    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p>${savedPropertyChips()}<label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
     if($('setup-back'))$('setup-back').onclick=one;
+    document.querySelectorAll('[data-pick-property]').forEach(button=>button.onclick=()=>{haptic();$('setup-property').value=button.dataset.pickProperty;$('setup-build').click();});
+    // Saved properties arrive a moment later on a cold start; show them when they do.
+    if(account&&!propertiesCache)api('/properties').then(result=>{propertiesCache=result;if($('setup-property')&&!$('setup-property').value&&!document.querySelector('[data-pick-property]'))two();}).catch(()=>{});
     $('setup-build').onclick=event=>run(async()=>{
       const property=$('setup-property').value.trim();
       if(!property)throw new Error(`Enter the ${(g.jobLabel||'property').toLowerCase()} first.`);
@@ -1192,9 +1207,22 @@ function previewPlans(){
   };
   flow=flowScreen('','plans-screen');paint();
 }
+// Starting something new keeps what is already open: signed in, the current
+// draft is saved online (it stays under Reports) instead of asking. The
+// question is only for a draft that genuinely cannot be kept.
+async function keepCurrentDraft(title,confirmLabel){
+  if(!draftUnsaved())return true;
+  if(session&&account&&draft.document.propertyName.trim()){
+    try{await save();draft.dirty=false;await persist();reportsCache=null;return true;}catch{}
+  }
+  return confirmAction({title,message:`Your current ${skin().doc} is not saved online yet.`,confirmLabel,danger:true});
+}
 async function start(propertyName = '', type) {
+  // Tapped during startup: what to ask depends on the account (a business
+  // already named skips that step), so it is waited for, briefly.
+  if (session && !account) await withTimeout(refresh(), 10000).catch(() => {});
   dismissFlow();
-  if (draftUnsaved() && !await confirmAction({title:`Start a new ${skin().doc}?`,message:'Your current draft is not saved online yet.',confirmLabel:`Start new ${skin().doc}`,danger:true})) return;
+  if (!await keepCurrentDraft(`Start a new ${skin().doc}?`,`Start new ${skin().doc}`)) return;
   if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
@@ -1204,7 +1232,7 @@ async function start(propertyName = '', type) {
 // ——— Check-ins ——————————————————————————————————————————————————————————
 async function startCheckIn(propertyName){
   if(!account)return ensureAuth(()=>run(()=>startCheckIn(propertyName)),'keep');
-  if(draftUnsaved()&&!await confirmAction({title:'Start a check-in?',message:`Your current ${skin().doc} is not saved online yet.`,confirmLabel:'Start check-in',danger:true}))return;
+  if(!await keepCurrentDraft('Start a check-in?','Start check-in'))return;
   dismissFlow();clearURLs();
   draft={document:newDocument(propertyName,'check-in'),files:[],serverId:null,finalizedAt:null};preview=false;
   await persist();
@@ -1270,6 +1298,18 @@ async function ensureBeforeFiles(ids){
     return true;
   }finally{missing.forEach(id=>beforeLoading.delete(id));}
 }
+// The platform's window to file: 14 days after the guest checks out, or
+// before the next guest checks in, whichever is first. The host sees it; the
+// report they send does not.
+function fileByText(d){
+  if(d?.type!=='damage')return '';
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d.checkoutDate||d.date||''));
+  if(!m)return '';
+  const day=new Date(+m[1],+m[2]-1,+m[3]+14),today=new Date();today.setHours(0,0,0,0);
+  return day<today?'':`File by ${day.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+}
+// Some things are worth saying once.
+const dragHintSeen = () => { try { return localStorage.getItem('inspect.dragHint') === '1'; } catch { return false; } };
 function editor(step) {
   if (!draft) return landing();
   dismissFlow();
@@ -1288,15 +1328,16 @@ function editor(step) {
     ? `<button type="button" id="editor-back" class="quiet">← All ${esc(skin().docPlural)}</button>`
     : `<button type="button" id="editor-signin" class="quiet">Already have ${esc(skin().docPlural)}? Sign in</button>`}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
   if (editorStep === 'details') {
-    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label>Your name<input id="author" maxlength="120" value="${esc(d.author)}" placeholder="Report prepared by"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
       // The report's date and the finalized timestamp both say when it was
       // written down. Neither says when it happened, which is the field an
       // insurer looks for first. Unknown is a real answer.
-      ? `<label class="date-field">${d.type === 'damage' ? 'Time you found it' : 'Time it happened'}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label><label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
+      ? `<label class="date-field">${d.type === 'damage' ? 'Time you found it' : 'Time it happened'}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label>${d.type === 'damage' ? `<label class="date-field">Guest checked out<input type="date" id="checkout-date" value="${esc(d.checkoutDate || d.date)}"></label>` : ''}<label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
       : `<label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
     if(d.type==='incident')$('property').parentElement.firstChild.textContent='Location / site name';
     if(d.type==='damage')$('property').parentElement.firstChild.textContent='Rental property / unit name';
     for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) if($(id)) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
+    if($('checkout-date'))$('checkout-date').oninput = event => { d.checkoutDate = event.target.value; remember(); };
     if($('event-time'))$('event-time').oninput = event => { d.eventTime = event.target.value; if($('event-time-unknown'))$('event-time-unknown').checked = false; remember(); };
     if($('event-time-unknown'))$('event-time-unknown').onchange = event => { d.eventTime = event.target.checked ? 'unknown' : ($('event-time')?.value || ''); remember(); };
     if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
@@ -1307,7 +1348,7 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1&&!dragHintSeen()?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Saved' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div>${d.type==='damage'?`<div class="receipts">${(r.receipts||[]).length?`<div class="receipt-grid">${r.receipts.map(id=>`<figure><img src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>`:''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>`:''}<div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' || d.type === 'damage' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -1316,6 +1357,7 @@ function editor(step) {
       if (figure && Date.now()-photoDropAt > 400 && !event.target.closest('button') && !event.target.closest('details')) return viewPhoto(figure.dataset.photoId);
       const b = event.target.closest('button'); if (!b) return;
       if (b.dataset.removeRoom !== undefined) { if (d.rooms.length === 1) return notice(`Keep at least one ${w.noun}.`); if (await confirmAction({title:`Remove this ${w.noun}?`,message:'Its photos and notes will be removed from this report.',confirmLabel:`Remove ${w.noun}`,danger:true})) { d.rooms.splice(Number(b.dataset.removeRoom),1); remember(); editor('rooms'); } }
+      if (b.dataset.receiptRemove) { const [roomIndex,id] = b.dataset.receiptRemove.split(','); const room=d.rooms[Number(roomIndex)]; room.receipts=(room.receipts||[]).filter(item=>item!==id); draft.files=draft.files.filter(file=>file.id!==id); haptic(); remember(); await persist(); return editor('rooms'); }
       if (b.dataset.deleteId) { const [roomIndex,id] = b.dataset.deleteId.split(','); const i=Number(roomIndex),pos=d.rooms[i].photos.indexOf(id); if(pos>=0){d.rooms[i].photos.splice(pos,1);const url=urls.get(id);if(url){URL.revokeObjectURL(url);urls.delete(id);}draft.files=draft.files.filter(file=>file.id!==id);remember();editor('rooms');} }
       if (b.dataset.moveId) { const [roomIndex,id,offsetValue] = b.dataset.moveId.split(','); const a=d.rooms[Number(roomIndex)].photos,pos=a.indexOf(id),offset=Number(offsetValue); if (pos>=0&&pos+offset>=0&&pos+offset<a.length) { a.splice(pos,1); a.splice(pos+offset,0,id); remember(); editor('rooms'); } }
       if (b.dataset.nativeCamera !== undefined) openNativeCamera(Number(b.dataset.nativeCamera));
@@ -1331,7 +1373,7 @@ function editor(step) {
     if(d.type==='incident')for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent='Detail heading';
     if(d.type==='incident'||d.type==='damage')$('app').querySelector('.screen-bar + .row .eyebrow').textContent=d.propertyName||w.eyebrow;
     if(d.type==='incident')for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
-    if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel} the note.`;
+    if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel.replace(/^./,c=>c.toUpperCase())} the note.`;
     bindPhotoDrag();
     // A finding is numbered, not named: the room name field has nothing to ask.
     if(entryTool()){
@@ -1350,6 +1392,8 @@ function editor(step) {
       if($('add-room'))$('add-room').textContent='+ Add finding';
     }
     if(payAtExport()&&$('preview'))$('preview').textContent=`Build my ${skin().doc} →`;
+    if($('app').querySelector('.drag-hint'))try{localStorage.setItem('inspect.dragHint','1');}catch{}
+    syncPhotosSoon();
     // A check-in is photos, room by room, and a save. Nothing to write, sign
     // or send, so none of it is shown.
     if(d.type==='check-in'){
@@ -1510,6 +1554,17 @@ function bindPhotoDrag(){
   });
 }
 async function addPhotos(input) {
+  // A receipt or quote: kept apart from the photos of the damage, never dated.
+  if(input.dataset.receipt!==undefined){
+    const room=draft.document.rooms[Number(input.dataset.receipt)];
+    for(const file of input.files){
+      if(file.size>12*1024*1024){notice(`${file.name} is too large. Maximum 12 MB.`);continue;}
+      const id=uid();
+      draft.files.push({id,blob:file,source:'import',kind:'receipt',name:file.name,zone:PHONE_ZONE});
+      (room.receipts||=[]).push(id);
+    }
+    await persist();syncPhotosSoon();return editor('rooms');
+  }
   const i=Number(input.dataset.files ?? input.dataset.camera);
   const source=input.dataset.camera !== undefined ? 'camera' : 'import';
   for(const file of input.files) {
@@ -1527,7 +1582,9 @@ async function addPhotos(input) {
     } catch { notice(`${file.name} could not be opened. Export it as JPEG or take a photo.`); }
     finally {URL.revokeObjectURL(objectURL);}
   }
+  if(source==='camera'&&draft.document.type==='damage'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
   await persist();
+  syncPhotosSoon();
   if(entryTool()&&!native&&cameraRoom===null)return entryScreen(i);
   editor();
 }
@@ -1628,6 +1685,13 @@ function flowScreen(content,kind='',{page}={}){
     release();
     app.replaceChildren(origin);
     if(currentPage!==originPage)setActiveNav(originPage);
+    // What was underneath may have been a page still loading when the card
+    // opened. Put the real page there instead of leaving it waiting forever.
+    if(app.querySelector('.loading,.skeleton-row')){
+      if(currentPage==='properties'&&account)list('properties').catch(()=>{});
+      else if(account)openAccountHome().catch(()=>{});
+      else landing();
+    }
     requestAnimationFrame(()=>{window.scrollTo(0,originScroll);if($('demo'))playDemo();});
     syncNativeInspectState(currentPage,true);
   };
@@ -1703,6 +1767,16 @@ function authCopy(intent){
 }
 function ensureAuth(after, intent='keep') {
   if(session && account) return after();
+  // Signed in, with the account still on its way (a tap during startup, now
+  // that the page is there at once). Wait for it rather than asking to sign
+  // in again; only a session the server turned down leads to signing in.
+  if(session && !account){
+    return withTimeout(refresh(),10000).catch(()=>{}).then(()=>{
+      if(account)return after();
+      if(session)return notice('Could not reach Marketel. Check your connection and try again.','error');
+      return ensureAuth(after,intent);
+    });
+  }
   const copy=authCopy(intent);
   if(native){
     nativeAuth={after,email:''};
@@ -1796,7 +1870,8 @@ function remoteDocument(){
   // When each photo was taken travels with the report, under its server id.
   const times={...(draft.document.photoTimes||{})};
   for(const file of draft.files)if(file.remoteId&&(file.takenAt||file.zone))times[file.remoteId]={...(file.takenAt?{takenAt:file.takenAt}:{}),zone:file.zone||PHONE_ZONE};
-  return {...draft.document,photoTimes:times,rooms:draft.document.rooms.map(room=>({...room,photos:room.photos.map(id=>draft.files.find(file=>file.id===id)?.remoteId).filter(Boolean)}))};
+  const remote=ids=>ids.map(id=>draft.files.find(file=>file.id===id)?.remoteId).filter(Boolean);
+  return {...draft.document,photoTimes:times,rooms:draft.document.rooms.map(room=>({...room,photos:remote(room.photos),...(room.receipts?{receipts:remote(room.receipts)}:{})}))};
 }
 async function ensureServerDraft(){
   if(!draft.document.propertyName.trim())throw new Error('Enter a property name first.');
@@ -1813,29 +1888,70 @@ async function ensureServerDraft(){
       result=await api('/reports',{method:'POST',body});
     }
     draft.serverId=result.id;reportsCache=null;propertiesCache=null;await persist();
-  }else await api(`/reports/${draft.serverId}`,{method:'PUT',body:remoteDocument()});
+  }else{
+    if(photoSync)await photoSync.catch(()=>{});
+    await api(`/reports/${draft.serverId}`,{method:'PUT',body:remoteDocument()});
+  }
 }
+// One photo (or receipt) to the server, remembered as uploaded.
+async function uploadFile(f){
+  const form=new FormData();form.append('photo',f.blob,f.name||'photo.jpg');form.append('source',f.source);
+  if(f.kind==='receipt')form.append('kind','receipt');
+  if(f.takenAt)form.append('takenAt',f.takenAt);
+  form.append('zone',f.zone||PHONE_ZONE);
+  const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});
+  f.remoteId=a.id;f.receivedAt=a.createdAt;await persist();
+}
+const heldIds = room => [...room.photos, ...(room.receipts || [])];
+// Photos go up while you work, so Send never waits on them. Signed in only,
+// one at a time, quietly: a failure simply waits for the next chance (back
+// online, back in the app, the next photo). Offline capture is unchanged.
+let photoSync=null,photoSyncAgain=false;
+function syncPhotosSoon(){
+  if(!session||!account||!draft||draft.finalizedAt||navigator.onLine===false)return;
+  if(photoSync){photoSyncAgain=true;return;}
+  const current=draft;
+  photoSync=(async()=>{
+    try{
+      if(!current.document.propertyName.trim())return;
+      if(!current.serverId)await ensureServerDraft();
+      for(const room of current.document.rooms)for(const id of heldIds(room)){
+        if(draft!==current||current.finalizedAt)return;
+        const file=current.files.find(f=>f.id===id);
+        if(!file||file.remoteId||file.before)continue;
+        await uploadFile(file);
+        markUploaded(id);
+      }
+    }catch{}finally{photoSync=null;if(photoSyncAgain){photoSyncAgain=false;syncPhotosSoon();}}
+  })();
+}
+// The editor's tile for a photo says so as soon as it is safe.
+function markUploaded(id){
+  const caption=[...document.querySelectorAll('[data-photo-id] figcaption')].find(el=>el.closest('[data-photo-id]').dataset.photoId===id);
+  if(caption)caption.textContent=`${photoTaken(id)?`${photoClockText(photoTaken(id))} · `:''}Saved`;
+}
+window.addEventListener('online',()=>syncPhotosSoon());
 async function save() {
   if(!draft.document.propertyName.trim())throw new Error('Enter a property name.');
-  const referenced=draft.document.rooms.flatMap(room=>room.photos);
+  // A background upload finishing mid-save could be taken for a removed
+  // photo, so the save waits for it.
+  if(photoSync)await photoSync.catch(()=>{});
+  const referenced=draft.document.rooms.flatMap(heldIds);
   if(referenced.some(id=>!draft.files.some(file=>file.id===id)))throw new Error('A report photo is missing from this device. Remove it or add it again.');
   await ensureServerDraft();
   // Remove remotely uploaded photos the operator took out of the report before
   // adding replacements. This keeps the 100-photo quota truthful.
   const existingDoc=remoteDocument();
   await api(`/reports/${draft.serverId}`,{method:'PUT',body:existingDoc});
-  const pending=draft.document.rooms.flatMap(room=>room.photos).filter(id=>{
+  const pending=draft.document.rooms.flatMap(heldIds).filter(id=>{
     const file=draft.files.find(f=>f.id===id);return file&&!file.remoteId;
   });
   const veil=pending.length?busyVeil(`Uploading ${pending.length===1?'your photo':`${pending.length} photos`}`,'Keep this page open.',0):null;
   let done=0;
   try{
-    for(const room of draft.document.rooms) for(const id of room.photos){
+    for(const room of draft.document.rooms) for(const id of heldIds(room)){
       const f=draft.files.find(f=>f.id===id);if(!f)throw new Error('A report photo is missing from this device. Remove it or add it again.');if(f.remoteId)continue;
-      const form=new FormData();form.append('photo',f.blob,f.name||'photo.jpg');form.append('source',f.source);
-      if(f.takenAt)form.append('takenAt',f.takenAt);
-      form.append('zone',f.zone||PHONE_ZONE);
-      const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});f.remoteId=a.id;f.receivedAt=a.createdAt;await persist();
+      await uploadFile(f);
       done++;
       veil?.update(`Uploading ${pending.length===1?'your photo':`${pending.length} photos`}`,
         pending.length>1?`${done} of ${pending.length} uploaded. Keep this page open.`:'Keep this page open.',
@@ -2053,7 +2169,7 @@ function signaturePreview(signature){
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label='',index=0,sample=null,photosOnly=false){
-  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}</section>`;
+  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&draft?.document?.type!=='damage'?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -2078,7 +2194,10 @@ function reportPreview(){
   }
   const beforeLabel=base?`Before · check-in ${docDateText(baseline.date)}`:'Previous finalized report';
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||(base?null:baseline?.rooms?.[index]);return `<div class="comparison-pair">${before?reportRoom(before,beforeLabel,index,null,!!base):''}${reportRoom(room,before?(base?'After':'Current report'):'',index)}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">${base?`Compared with the check-in on ${esc(docDateText(baseline.date))}.`:`Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.`}</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(timeText(d.eventTime))}`:''}${authorFor(d)?` · Prepared by ${esc(authorFor(d))}`:''}${!draft.finalizedAt?` <button type="button" class="quiet inline-action" id="change-author">${authorFor(d)?'Change':'Add your name'}</button>`:''}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">${base?`Compared with the check-in on ${esc(docDateText(baseline.date))}.`:`Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.`}</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager,signed=d.signatures.some(sig=>sig.role===role),saved=!index&&savedSignature();
+      if(saved&&!signed)return `<button class="secondary" data-sign-saved="${esc(role)}">Sign as ${esc(saved.name)}</button><button type="button" class="quiet" data-sign="${esc(role)}">Draw a new one</button>`;
+      if(index&&d.type==='damage'&&!signed)return `<button type="button" class="quiet" data-sign="${esc(role)}">Guest here? Get their signature</button>`;
+      return `<button class="secondary" data-sign="${esc(role)}">${signed?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div>${canSend()?`<p class="muted">Sending finalizes this version. Included in your plan.</p>`:`<p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`}`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
@@ -2097,9 +2216,12 @@ function reportPreview(){
     ensureAuth(()=>run(async()=>{await save();const result=await api(`/reports/${draft.serverId}/coverage`,{method:'POST'});renderCoverage(result.rooms||[]);},button));
   };
   document.querySelectorAll('[data-sign]').forEach(button=>button.onclick=()=>captureSignature(button.dataset.sign));
+  document.querySelectorAll('[data-sign-saved]').forEach(button=>button.onclick=()=>{haptic();applySavedSignature(button.dataset.signSaved);});
+  if($('change-author'))$('change-author').onclick=()=>run(async()=>{const name=await askName(true);if(name){draft.document.author=name;remember();reportPreview();}});
   if($('finalize'))$('finalize').onclick=event=>{const button=event.currentTarget;haptic();ensureAuth(()=>run(async()=>{
+    if(!draft.document.author.trim())draft.document.author=authorFor(draft.document);
+    if(!draft.document.author.trim()){const name=await askName();if(!name)return;draft.document.author=name;remember();}
     await refresh();if(account.active&&!account.remaining&&!(account.credits>0))return notice(FAIR_USE_REACHED,'error');if(!account.freeAvailable&&(!account.active||!account.remaining))return offer();
-    if(!draft.document.author.trim())throw new Error('Add your name in the editor before finalizing.');
     await markLocation('end');
     await save();
     // The same moment as the paid path, so finishing a document looks the same
@@ -2128,47 +2250,65 @@ function reportPreview(){
 // Two steps rather than one tall sheet: the name, then the pad. A sheet with a
 // text field and a signature canvas together is tall enough that opening the
 // keyboard shoved it around the screen on every focus.
+// Your own signature is drawn once and kept on this device; after that it is
+// one tap. A guest signs on the spot, their name typed beside the pad. One
+// sheet either way: the name used to be a screen of its own, every time.
+const SIGNATURE_KEY='inspect.signature';
+const savedSignature=()=>{try{const value=JSON.parse(localStorage.getItem(SIGNATURE_KEY)||'null');return value&&value.name&&Array.isArray(value.strokes)&&value.strokes.length?value:null;}catch{return null;}};
+const keepSignature=value=>{try{localStorage.setItem(SIGNATURE_KEY,JSON.stringify(value));}catch{}};
+const ownRole=role=>role==='manager'||role==='owner';
+function applySavedSignature(role){
+  const saved=savedSignature();
+  if(!saved)return captureSignature(role);
+  draft.document.signatures=(draft.document.signatures||[]).filter(signature=>signature.role!==role).concat({role,name:saved.name,strokes:structuredClone(saved.strokes)});
+  remember();reportPreview();notice(`Signed as ${saved.name}.`,'success');
+}
+// Your name, asked for at most once and never as an error at the last step.
+function askName(changing=false){
+  return new Promise(resolve=>{
+    modal(`<h2>${changing?'Your name on reports':'Who is this from?'}</h2><p class="muted">${changing?'Used on every report from now on.':`Your name goes on the ${esc(skin().doc)}. Asked once; Marketel remembers it.`}</p><form id="name-form" novalidate><label>Your name<input id="name-field" maxlength="120" autocomplete="name" autocorrect="off" spellcheck="false" autocapitalize="words" value="${esc(changing?(draft?.document?.author||rememberedAuthor()):'')}"></label><button class="wide" id="name-go">Continue →</button></form>`);
+    let settled=false;const finish=value=>{if(settled)return;settled=true;resolve(value);};
+    $('name-form').onsubmit=event=>{
+      event.preventDefault();
+      const value=$('name-field').value.trim();
+      if(!value)return notice('Add your name.','error');
+      storeAuthor(value);finish(value);$('dialog').close();
+    };
+    $('dialog').addEventListener('close',()=>finish(null),{once:true});
+  });
+}
+// Who a report is from: the name given, the one remembered, or the business.
+const authorFor = d => (d?.author||'').trim()||rememberedAuthor()||draft?.branding?.name||account?.businessName||'';
 function captureSignature(role){
   const existing=draft.document.signatures?.find(signature=>signature.role===role);
-  const title=roleLabel(role);
-  let name=existing?.name || (role==='manager'||role==='owner' ? rememberedAuthor() : '');
+  const title=roleLabel(role),own=ownRole(role);
+  const name=existing?.name||(own?(savedSignature()?.name||rememberedAuthor()):'');
   const strokes=existing?structuredClone(existing.strokes):[];
-
-  const nameStep=()=>{
-    modal(`<h2>${title}</h2><label>Signer name<input id="signer-name" maxlength="120" value="${esc(name)}"></label><div class="row"><button type="button" id="signer-next">Next →</button>${existing?'<button type="button" id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
-    $('signer-name').oninput=event=>{name=event.target.value;};
-    $('signer-next').onclick=()=>{
-      if(!name.trim())return notice('Enter the signer name.','error');
-      padStep();
-    };
-    if($('remove-signature'))$('remove-signature').onclick=()=>{
-      draft.document.signatures=draft.document.signatures.filter(signature=>signature.role!==role);
-      remember();$('dialog').close();reportPreview();
-    };
+  modal(`<h2>${title}</h2><label>Name<input id="signer-name" maxlength="120" autocomplete="${own?'name':'off'}" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="${own?'Your name':'Their name'}" value="${esc(name)}"></label><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><p class="muted"><small>${own?'Signed once, kept on this phone for your next reports.':'Sign with a finger.'}</small></p><div class="row"><button type="button" id="save-signature">Use this signature</button><button type="button" id="clear-signature" class="quiet">Clear</button>${existing?'<button type="button" id="remove-signature" class="quiet danger">Remove</button>':''}</div>`);
+  // Nothing is focused, so the keyboard stays down and the pad stays in view.
+  settleSheet();
+  const canvas=$('signature-pad'),ctx=canvas.getContext('2d');let current=null;
+  const draw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2b22';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';for(const stroke of strokes){ctx.beginPath();stroke.forEach((p,i)=>{const x=p.x*canvas.width,y=p.y*canvas.height;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();}};
+  const point=event=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};};
+  canvas.onpointerdown=event=>{current=[point(event)];strokes.push(current);canvas.setPointerCapture(event.pointerId);draw();};
+  canvas.onpointermove=event=>{if(!current)return;const next=point(event),last=current[current.length-1];if(Math.hypot(next.x-last.x,next.y-last.y)>.003&&current.length<300){current.push(next);draw();}};
+  canvas.onpointerup=canvas.onpointercancel=()=>{if(current?.length===1)current.push({...current[0],x:Math.min(1,current[0].x+.002)});current=null;};
+  $('clear-signature').onclick=()=>{strokes.splice(0);draw();};
+  if($('remove-signature'))$('remove-signature').onclick=()=>{
+    draft.document.signatures=draft.document.signatures.filter(signature=>signature.role!==role);
+    remember();$('dialog').close();reportPreview();
   };
-
-  const padStep=()=>{
-    $('dialog-body').innerHTML=`<h2>${title}</h2><p class="muted">${esc(name)}</p><canvas id="signature-pad" width="600" height="200" aria-label="Signature pad"></canvas><div class="row"><button type="button" id="save-signature">Use signature</button><button type="button" id="clear-signature" class="secondary">Clear</button><button type="button" id="signer-back" class="quiet">← Name</button></div>`;
-    // Nothing is focused here, so the keyboard stays down and the sheet stays put.
-    settleSheet();
-    const canvas=$('signature-pad'),ctx=canvas.getContext('2d');let current=null;
-    const draw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#1a2b22';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';for(const stroke of strokes){ctx.beginPath();stroke.forEach((p,i)=>{const x=p.x*canvas.width,y=p.y*canvas.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}};
-    const point=event=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))};};
-    canvas.onpointerdown=event=>{current=[point(event)];strokes.push(current);canvas.setPointerCapture(event.pointerId);draw();};
-    canvas.onpointermove=event=>{if(!current)return;const next=point(event),last=current[current.length-1];if(Math.hypot(next.x-last.x,next.y-last.y)>.003&&current.length<300){current.push(next);draw();}};
-    canvas.onpointerup=canvas.onpointercancel=()=>{if(current?.length===1)current.push({...current[0],x:Math.min(1,current[0].x+.002)});current=null;};
-    $('clear-signature').onclick=()=>{strokes.splice(0);draw();};
-    $('signer-back').onclick=()=>nameStep();
-    $('save-signature').onclick=()=>{
-      if(!strokes.length)return notice('Add a signature first.','error');
-      const signatures=(draft.document.signatures||[]).filter(signature=>signature.role!==role);
-      signatures.push({role,name:name.trim(),strokes});
-      draft.document.signatures=signatures;remember();$('dialog').close();reportPreview();
-    };
-    draw();
+  $('save-signature').onclick=()=>{
+    const signer=$('signer-name').value.trim();
+    if(!signer)return notice(own?'Add your name.':'Add their name.','error');
+    if(!strokes.length)return notice('Add a signature first.','error');
+    const signatures=(draft.document.signatures||[]).filter(signature=>signature.role!==role);
+    signatures.push({role,name:signer,strokes});
+    draft.document.signatures=signatures;
+    if(own){keepSignature({name:signer,strokes});if(!rememberedAuthor())storeAuthor(signer);}
+    remember();$('dialog').close();reportPreview();
   };
-
-  nameStep();
+  draw();
 }
 
 function rewrite(index){ensureAuth(()=>run(async()=>{
@@ -2225,14 +2365,15 @@ function requestExport(action,trigger){
   haptic();
   if(!draft.document.rooms.some(room=>room.photos.length))return notice('Add at least one photo before sending.','error');
   ensureAuth(()=>run(async()=>{
+    if(!draft.document.author.trim())draft.document.author=authorFor(draft.document);
+    if(!draft.document.author.trim()){const name=await askName();if(!name)return;draft.document.author=name;remember();}
     // save() raises its own veil for photos still to upload; this one covers
     // the branding, save and refresh round trips either side of it, so the
     // wait is never silent.
     const veil=busyVeil(`Preparing your ${skin().doc}`,'One moment.');
     try{
       await pushBranding();
-      if(!draft.document.author.trim())draft.document.author=draft.branding?.name||account?.businessName||'';
-      if(!draft.document.author.trim())throw new Error('Add your name in the editor before sending.');
+      if(!draft.document.author.trim())draft.document.author=authorFor(draft.document);
       await markLocation('end');
       await save();await refresh();
     } finally { veil.done(); }
@@ -2271,9 +2412,9 @@ function deliverySheet(preferred='share'){
   const order=[
     canShare?{id:'delivery-share',label:'Create a private link',hint:'Anyone with the link can read and download this version.',primary:preferred!=='pdf'}:null,
     {id:'delivery-pdf',label:'Download the PDF',hint:`The finished ${sk.doc}, ready to attach.`,primary:preferred==='pdf'||!canShare},
-    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:'The files as received, not the smaller copies in the PDF.',primary:false}:null,
+    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:'The unedited originals. Some platforms ask for these.',primary:false}:null,
   ].filter(Boolean).sort((a,b)=>Number(b.primary)-Number(a.primary));
-  modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p><div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
+  modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p>${fileByText(d)?`<p class="deadline">${esc(fileByText(d))} — 14 days after check-out, or before the next guest arrives.</p>`:''}<div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
   if($('delivery-share'))$('delivery-share').onclick=event=>run(()=>openShareSheetNow(),event.currentTarget);
   if($('delivery-pdf'))$('delivery-pdf').onclick=event=>run(async()=>{await downloadPdfNow();notice(`Your ${sk.doc} was downloaded.`,'success');},event.currentTarget);
   if($('delivery-originals'))$('delivery-originals').onclick=()=>originalsSheet();
@@ -2422,7 +2563,7 @@ function renderProperties(data){
 function newProperty(){
   if(!account)return ensureAuth(()=>newProperty(),'keep');
   const sk=skin(),placeholder=landingArm()?.golden?.jobPlaceholder||'Oak Street · Unit 2';
-  modal(`<h2>New ${esc(sk.placeSingular)}</h2><form id="property-form" class="stack"><label>Name<input id="new-property-name" maxlength="160" autocomplete="off" placeholder="${esc(placeholder)}"></label><button type="submit" id="property-save" class="wide">Add ${esc(sk.placeSingular)}</button></form>`);
+  modal(`<h2>New ${esc(sk.placeSingular)}</h2><form id="property-form" class="stack"><label>Name<input id="new-property-name" maxlength="160" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="${esc(placeholder)}"></label><button type="submit" id="property-save" class="wide">Add ${esc(sk.placeSingular)}</button></form>`);
   const field=$('new-property-name');
   // Inside the tap that opened it, so iOS brings the keyboard up with it.
   field.focus();
@@ -2447,13 +2588,39 @@ async function deleteProperty(property,button){
     ?`${parts.join(' and ').replace(/^i/,'I')} ${count+checkIns===1?'is':'are'} also deleted, with their photos and shared links.${count?` Your ${sk.doc} allowance will not be restored.`:''}`
     :`It has no ${sk.docPlural}.`;
   if(!await confirmAction({title:`Delete ${property.name}?`,message,confirmLabel:count?'Delete permanently':`Delete ${sk.placeSingular}`,danger:true}))return;
+  // The same fold as a report: at once on screen, back if the server refuses.
+  const row=button?.closest('.property-row'),previous=propertiesCache;
+  row?.classList.add('is-leaving');
   run(async()=>{
-    const result=await api('/properties',{method:'DELETE',body:{name:property.name}});
+    let result;
+    try{result=await api('/properties',{method:'DELETE',body:{name:property.name}});}
+    catch(error){row?.classList.remove('is-leaving');if(previous&&currentPage==='properties')renderProperties(previous);throw error;}
+    await new Promise(resolve=>setTimeout(resolve,200));
     if(draft?.serverId&&(result.deletedReportIds||[]).includes(draft.serverId)){draft=null;await stored('delete');clearURLs();}
     propertiesCache=result;reportsCache=null;
     notice(`${property.name} deleted.`,'success');
     if(currentPage==='properties')renderProperties(result);
-  },button);
+  },null);
+}
+// Gone at once: the row folds away while the server is asked, the list is
+// never thrown away and fetched again, and if the server refuses the row comes
+// back with the reason.
+function deleteReportRow(id,row){
+  const before={reports:[...reports],cursor:nextReportCursor};
+  reports=reports.filter(report=>report.id!==id);reportsCache={reports:[...reports],nextCursor:nextReportCursor};
+  row?.classList.add('is-leaving');
+  run(async()=>{
+    try{await api(`/reports/${id}`,{method:'DELETE'});}
+    catch(error){
+      reports=before.reports;nextReportCursor=before.cursor;reportsCache={reports:[...reports],nextCursor:nextReportCursor};
+      if(currentPage==='reports')renderReports();
+      throw error;
+    }
+    if(draft?.serverId===id){draft=null;await stored('delete');clearURLs();}
+    propertiesCache=null;
+    notice('Report deleted.','success');
+    setTimeout(()=>{if(currentPage==='reports'&&!$('dialog').open)renderReports();},230);
+  },null);
 }
 function renderReports(){
   enterScreen('reports');
@@ -2462,7 +2629,7 @@ function renderReports(){
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(draft.document.date)} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
-  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':`<section class="card">No saved ${esc(skin().docPlural)} yet. Start your first one.</section>`}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(report.document.date)} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?' · Comparison':''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
+  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':`<section class="card empty-state"><h2>No ${esc(skin().docPlural)} yet.</h2><p class="muted">${toolId()==='claims'?'When something is damaged, start one above. Check a unit in from Properties at turnover, and the report shows it as the before.':`Start your first one above.`}</p></section>`}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(docDateText(report.document.date))} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?(report.document.type==='damage'?' · With check-in':' · Comparison'):''}${fileByText(report.document)?` · <strong class="file-by">${esc(fileByText(report.document))}</strong>`:''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
@@ -2471,7 +2638,10 @@ function renderReports(){
     run(async()=>{clearURLs();draft=null;preview=false;await stored('delete');updateHeader();await list();});
   };
   document.querySelectorAll('[data-open]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.open),button));
-  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=async()=>{if(await confirmAction({title:'Permanently delete this report?',message:'Its photos and shared link will also be deleted. Your report allowance will not be restored.',confirmLabel:'Delete permanently',danger:true}))run(async()=>{await api(`/reports/${button.dataset.deleteReport}`,{method:'DELETE'});if(draft?.serverId===button.dataset.deleteReport){draft=null;await stored('delete');clearURLs();}reportsCache=null;propertiesCache=null;await list('reports');},button);});
+  document.querySelectorAll('[data-delete-report]').forEach(button=>button.onclick=async()=>{
+    if(!await confirmAction({title:'Permanently delete this report?',message:'Its photos and shared link will also be deleted. Your report allowance will not be restored.',confirmLabel:'Delete permanently',danger:true}))return;
+    deleteReportRow(button.dataset.deleteReport,button.closest('.report-row'));
+  });
 }
 async function loadReportFiles(report){
   const files=[];
@@ -2492,7 +2662,6 @@ async function useComparisonPayload(payload){
 async function openReport(id){
   if(draftUnsaved()&&draft.serverId!==id&&!await confirmAction({title:'Replace this draft?',message:'Your current draft is not saved online yet.',confirmLabel:'Replace draft',danger:true}))return;
   haptic();
-  $('app').innerHTML='<section class="loading">Opening your report…</section>';
   const payload=await api(`/reports/${id}/comparison`);
   // A report belongs to its own tool. Opened from elsewhere (an app hand-off,
   // say), the app moves there first so its lists and draft slot line up.
@@ -2501,7 +2670,7 @@ async function openReport(id){
   await useComparisonPayload(payload);
 }
 async function startComparison(baselineId){
-  if(draftUnsaved()&&!await confirmAction({title:'Start a comparison report?',message:'Your current draft is not saved online yet.',confirmLabel:'Start comparison',danger:true}))return;
+  if(!await keepCurrentDraft('Start a comparison report?','Start comparison'))return;
   const payload=await api(`/reports/${baselineId}/comparison-draft`,{method:'POST',body:{date:localDate()}});
   reportsCache=null;await useComparisonPayload(payload);
 }
@@ -2511,16 +2680,28 @@ async function list(page='reports',append=false){
   updateHeader();setActiveNav(page);
   const request=++listRequest;
   if(page==='properties'){
-    if(propertiesCache)renderProperties(propertiesCache);else $('app').innerHTML=`<h1>${esc(skin().placesHeading)}</h1><section class="loading">Loading saved ${esc(skin().placesHeading.toLowerCase())}…</section>`;
+    if(propertiesCache)renderProperties(propertiesCache);else propertiesSkeleton();
     const result=await api('/properties');propertiesCache=result;
     if(currentPage==='properties'&&request===listRequest)renderProperties(result);return;
   }
   if(reportsCache&&!append){reports=reportsCache.reports;nextReportCursor=reportsCache.nextCursor;renderReports();}
-  else if(!append)$('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><section class="loading">Loading saved ${esc(skin().docPlural)}…</section>`;
+  else if(!append)reportsSkeleton();
   const pageResult=await api(`/reports?take=50&${toolTypesQuery()}${append&&nextReportCursor?`&cursor=${encodeURIComponent(nextReportCursor)}`:''}`);
   reports=append?reports.concat(pageResult.reports):pageResult.reports;nextReportCursor=pageResult.nextCursor;
   reportsCache={reports:[...reports],nextCursor:nextReportCursor};
   if(currentPage==='reports'&&request===listRequest)renderReports();
+}
+// The page itself, straight away, with placeholder rows where the list will
+// be. Nothing is ever swapped for a bare "Loading…".
+const skeletonRows = count => '<section class="card skeleton-row" aria-hidden="true"><span></span><span></span></section>'.repeat(count);
+function reportsSkeleton(){
+  enterScreen('reports');
+  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted skeleton-line" aria-hidden="true"></p></div><button type="button" id="new-report">${esc(skin().navCreate)}</button>${skeletonRows(2)}`;
+  $('new-report').onclick=()=>start();
+}
+function propertiesSkeleton(){
+  enterScreen('properties');
+  $('app').innerHTML=`<h1>${esc(skin().placesHeading)}</h1><p class="muted">${esc(skin().placesLede)}</p>${skeletonRows(2)}`;
 }
 async function openAccountHome(){
   if(!account)return landing();
@@ -2529,14 +2710,19 @@ async function openAccountHome(){
   // Whatever was on screen, usually the landing they signed in from, must not
   // sit there looking as if nothing happened while the list is fetched.
   if(!reportsCache){
-    enterScreen('reports');
-    $('app').innerHTML=`<section class="loading is-arriving">${Date.now()-signedInAt<15000?'Signing you in':`Opening your ${esc(skin().docPlural)}`}…</section>`;
+    // The logo is for the moment right after signing in. Any other time the
+    // page is simply there, with its rows on the way.
+    if(Date.now()-signedInAt<15000){enterScreen('reports');$('app').innerHTML='<section class="loading is-arriving">Signing you in…</section>';}
+    else reportsSkeleton();
   }
   const fetchReports=()=>api(`/reports?take=50&${toolTypesQuery()}`);
   const result=reportsCache||await (reportsLoading?reportsLoading.catch(fetchReports):fetchReports());
   reports=result.reports||[];nextReportCursor=result.nextCursor||null;reportsCache={reports:[...reports],nextCursor:nextReportCursor};
-  if(!reports.length)return start();
-  renderReports();
+  // Whatever they opened while this was loading stays on screen.
+  if(activeFlow)return;
+  // An empty list is a page of its own with one clear way to start, not a
+  // report opened on someone's behalf that leaves nothing behind it to close to.
+  if(currentPage==='reports'&&!hasUnfinishedDraft())renderReports();
 }
 // The reports request made at sign-in is the one the list then waits on, rather
 // than a second copy of it.
@@ -2572,7 +2758,7 @@ $('account-button').onclick=async()=>{
     $('dialog').close();
     await new Promise(resolve=>requestAnimationFrame(resolve));
     if(!await confirmAction({title:`Delete your ${skin().product} account?`,message:`This permanently deletes ${skin().product} reports and photos and cancels its subscription. Booking properties are unaffected.`,confirmLabel:'Delete account permanently',danger:true}))return;
-    run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();});
+    run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();notice(`Your ${skin().product} account and its ${skin().docPlural} were deleted.`,'success');});
   };
 };
 async function logout(){session='';account=null;draft=null;reportsCache=null;propertiesCache=null;clearURLs();localStorage.removeItem('inspect.session');localStorage.removeItem('marketel.product');await stored('delete');if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectSignOut'});if($('dialog').open)$('dialog').close();landing();}
@@ -2788,7 +2974,10 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   const id=uid();
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`,takenAt:new Date().toISOString(),zone:PHONE_ZONE});
   draft.document.rooms[i].photos.push(id);
+  // The time you found it is when the first photo of it was taken.
+  if(draft.document.type==='damage'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
   remember();await persist();
+  syncPhotosSoon();
   if(cameraRoom!==null)cameraCompanion(true);
   else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
 },null);
@@ -2876,7 +3065,7 @@ function trackKeyboard(){
 }
 trackKeyboard();
 // Back from Safari after paying in the app: finish the report that was waiting.
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumePendingExport({wait:8000}).catch(()=>{});});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){resumePendingExport({wait:8000}).catch(()=>{});syncPhotosSoon();}});
 // Restored from the back/forward cache: the shell has moved on since, so tell
 // it where this page is again and redraw what was on screen.
 window.addEventListener('pageshow',event=>{
@@ -2914,7 +3103,7 @@ function renderRecovery(){
 const bootWatchdog=setTimeout(()=>{if(!booted)renderRecovery();},12000);
 if(simActive()){clearTimeout(bootWatchdog);booted=true;simResume();}
 else try{
-  $('app').innerHTML=`<section class="loading">Opening Marketel ${esc(skin().product)}…</section>`;
+  if(session)reportsSkeleton();else $('app').innerHTML=`<section class="loading">Opening Marketel ${esc(skin().product)}…</section>`;
   // Storage gets one bounded chance. If it does not answer, open without the
   // local draft rather than wait on it a second time.
   if(await withTimeout(openDb(),1500).then(()=>true,()=>false)){
@@ -2925,7 +3114,9 @@ else try{
   if(account){syncInspectAttribution().catch(()=>{});prefetchLists();}
   const opening=new URLSearchParams(location.search).get('open');
   if(account&&opening&&/^[A-Za-z0-9_-]{1,64}$/.test(opening))await openReport(opening);
-  else if(hasUnfinishedDraft())editor();else if(account)await openAccountHome();else if(draft?.finalizedAt)reportPreview();else landing();
+  // A signed-in start already shows Reports. If they have tapped into
+  // something in the meantime (a new report, another tab), that stays put.
+  else if(hasUnfinishedDraft())editor();else if(account){if(!activeFlow&&(!session||currentScreen==='reports'))await openAccountHome();}else if(draft?.finalizedAt)reportPreview();else landing();
   booted=true;
   settleWedgeEntrance();
   const returned=new URLSearchParams(location.search);

@@ -460,6 +460,34 @@ button.check-in-line { display: block; min-height: 32px; margin-top: 2px; paddin
 p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 /* When a photo was taken, and when Marketel received it. */
 .photo-caption { display: block; margin: 4px 0 14px; font-size: 12px; color: var(--muted); }
+/* Placeholder rows: the page's own layout while its list is on the way. */
+.skeleton-row { display: grid; gap: 10px; min-height: 76px; }
+.skeleton-row span, .skeleton-line { display: block; height: 14px; border-radius: 7px; background: var(--green-pale); animation: skeleton-pulse 1.1s ease-in-out infinite alternate; }
+.skeleton-row span:first-child { width: 46%; height: 16px; }
+.skeleton-row span:last-child { width: 30%; }
+.skeleton-line { width: 55%; margin: 4px 0; }
+/* A deleted row folds away at once; the list is never reloaded around it. */
+.report-row.is-leaving, .property-row.is-leaving { animation: row-leave .22s ease forwards; pointer-events: none; }
+@keyframes row-leave { to { opacity: 0; transform: translateX(-14px) scale(.98); } }
+.empty-state h2 { margin: 0 0 6px; }
+/* Receipts and quotes sit under a finding's photos, smaller, apart. */
+.receipts { margin: 6px 0 4px; }
+.receipt-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.receipt-grid figure { position: relative; width: 64px; height: 64px; margin: 0; }
+.receipt-grid img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+.add-receipt { display: inline-flex; align-items: center; min-height: 40px; padding: 0 4px; font-size: 14px; font-weight: 650; color: var(--green-dark); cursor: pointer; }
+.receipts-heading { margin: 14px 0 6px; font-size: 15px; }
+.report-photo.receipt { max-height: 320px; object-fit: contain; }
+/* Saved properties, one tap each. */
+.property-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.property-chips .chip { width: auto; min-height: 38px; padding: 7px 14px; border-radius: 999px; font-size: 14px; background: var(--green-pale); color: var(--green-dark); border: 1px solid var(--border); }
+/* The filing window, for the host only. */
+.deadline { margin: -2px 0 12px; font-size: 14px; font-weight: 650; color: var(--green-dark); }
+.file-by { font-weight: 650; color: var(--green-dark); }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-row span, .skeleton-line { animation: none; }
+  .report-row.is-leaving, .property-row.is-leaving { animation: none; opacity: 0; }
+}
 /* The recording is the point of this screen, so it is the biggest thing on it. */
 .hud-note { min-height: 64px; padding: 12px 14px; margin: 0 0 8px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; font-size: 17px; line-height: 1.35; white-space: pre-wrap; overflow-y: auto; max-height: 104px; }
 .hud-note.is-live { border-color: var(--green); background: var(--green-pale); }

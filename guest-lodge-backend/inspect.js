@@ -55,6 +55,7 @@ async function stampPhoto(bytes, details) {
   return image.composite([{ input: pill, left, top }, { input: label.data, left: left + padX, top: top + padY }])
     .jpeg({ quality: 80 }).toBuffer();
 }
+const timeText = value => { const m = /^(\d{2}):(\d{2})$/.exec(String(value || '')); if (!m) return value === 'unknown' ? 'time unknown' : String(value || ''); const h = +m[1]; return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`; };
 const usDate = value => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
   return match ? new Date(Date.UTC(+match[1], +match[2] - 1, +match[3])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : String(value || '');
@@ -74,6 +75,8 @@ function photoCaption(document, attachment) {
 const token = () => crypto.randomBytes(32).toString('base64url');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const safe = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// A session lasts this long after it was last used.
+const SESSION_DAYS = 90;
 const LIMITS = Object.freeze({
   // Plans are sold as unlimited. This is the fair-use ceiling per monthly
   // billing period, stated in the terms, and high enough that no one sending
@@ -247,20 +250,32 @@ function validateDocument(input) {
   if (!Array.isArray(input.rooms) || !input.rooms.length || input.rooms.length > 30) throw fail(400, 'Use between 1 and 30 rooms.');
   let photoCount = 0;
   const ids = new Set();
+  const idOf = id => {
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || ids.has(id)) throw fail(400, 'Invalid or duplicate photo.');
+    ids.add(id); photoCount++; return id;
+  };
   const rooms = input.rooms.map(room => {
     if (!Array.isArray(room.photos)) throw fail(400, 'Invalid photos.');
-    const photos = room.photos.map(id => {
-      if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(id) || ids.has(id)) throw fail(400, 'Invalid or duplicate photo.');
-      ids.add(id); photoCount++; return id;
-    });
-    return { name: text(room.name, 100), observation: text(room.observation || '', 4000), issue: room.issue === true, photos };
+    const photos = room.photos.map(idOf);
+    // Receipts and repair quotes: documents, kept apart from the photos of
+    // the damage itself, because a platform weighs them differently.
+    if (room.receipts != null && !Array.isArray(room.receipts)) throw fail(400, 'Invalid receipts.');
+    const receipts = (room.receipts || []).map(idOf);
+    return { name: text(room.name, 100), observation: text(room.observation || '', 4000), issue: room.issue === true, photos, ...(receipts.length ? { receipts } : {}) };
   });
   if (photoCount > LIMITS.photos) throw fail(400, 'Maximum 100 photos per report.');
   const document = { propertyName, author, type: input.type, date: input.date, rooms };
+  // When the guest checked out: the platforms count their filing window from it.
+  if (input.checkoutDate != null && input.checkoutDate !== '') {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(input.checkoutDate));
+    const day = match && new Date(Date.UTC(+match[1], +match[2] - 1, +match[3]));
+    if (!day || day.getUTCMonth() !== +match[2] - 1) throw fail(400, 'Enter a valid check-out date.');
+    document.checkoutDate = String(input.checkoutDate);
+  }
   // When each photo was taken, by the phone's clock, and in which zone. Only
   // for photos this document holds, and only values that parse.
   if (input.photoTimes && typeof input.photoTimes === 'object') {
-    const held = new Set(rooms.flatMap(room => room.photos));
+    const held = new Set(rooms.flatMap(room => [...room.photos, ...(room.receipts || [])]));
     const times = {};
     for (const [id, value] of Object.entries(input.photoTimes)) {
       if (!held.has(id) || !value || typeof value !== 'object') continue;
@@ -592,7 +607,9 @@ function locationLines(document) {
 }
 const signaturesHtml = document => (document.signatures || []).map(signature => `<section class="signature"><h3>${safe(roleLabel(signature.role))} signature</h3>${signatureSvg(signature)}<p>${safe(signature.name)} · Signed ${safe(signature.signedAt || 'when this document was finalized')}</p></section>`).join('');
   const entryHeading = (room, index) => room.name || `Finding ${index + 1}`;
-  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${room.issue ? ' · Issue noted' : ''}</h2>${!room.observation && report.document?.type === 'check-in' ? '' : `<p>${safe(room.observation || 'No observation recorded.')}</p>`}${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${safe(photoCaption(report.document, report.attachments.find(a => a.id === id)))}</figcaption></figure>`).join('')}</section>`;
+  const issueTag = (report, room) => room.issue && report.document?.type !== 'damage' ? ' · Issue noted' : '';
+  const receiptsHtml = (room, photoPrefix) => (room.receipts || []).length ? `<h3>Receipts &amp; estimates</h3>${room.receipts.map(id => `<figure><img alt="Receipt or estimate" src="${photoPrefix}/${id}"></figure>`).join('')}` : '';
+  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${issueTag(report, room)}</h2>${!room.observation && report.document?.type === 'check-in' ? '' : `<p>${safe(room.observation || 'No observation recorded.')}</p>`}${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${safe(photoCaption(report.document, report.attachments.find(a => a.id === id)))}</figcaption></figure>`).join('')}${receiptsHtml(room, photoPrefix)}</section>`;
   const claimAiUse = async (accountId, reportId) => prisma.$transaction(async tx => {
     await lockAccount(tx, accountId);
     const report = await owned(tx, accountId, reportId); mutable(report);
@@ -615,8 +632,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   }
   router.use((req, res, next) => {
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' });
-    if (!enabled) return res.status(404).json({ error: 'Inspect is not available yet.' });
-    if (!launchConfigured) return res.status(503).json({ error: 'Inspect is not fully configured yet.' });
+    if (!enabled) return res.status(404).json({ error: 'Marketel is not available yet.' });
+    if (!launchConfigured) return res.status(503).json({ error: 'Marketel is being set up. Please try again shortly.' });
     try { rate(`ip:${req.ip}`, 300, 60000); next(); } catch (e) { next(e); }
   });
 
@@ -677,7 +694,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       }
       const oldSessions = await tx.inspectSession.findMany({ where: { accountId: account.id }, orderBy: { expiresAt: 'desc' }, skip: 9, select: { tokenHash: true } });
       if (oldSessions.length) await tx.inspectSession.deleteMany({ where: { tokenHash: { in: oldSessions.map(s => s.tokenHash) } } });
-      await tx.inspectSession.create({ data: { tokenHash: hash(sessionToken), accountId: account.id, expiresAt: new Date(Date.now() + 30 * 86400000) } });
+      await tx.inspectSession.create({ data: { tokenHash: hash(sessionToken), accountId: account.id, expiresAt: new Date(Date.now() + SESSION_DAYS * 86400000) } });
       return account;
     });
     if (!result) throw fail(401, 'Invalid or expired code. Request another code.');
@@ -714,7 +731,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       });
       if (claimed.count !== 1) return null;
       await tx.inspectSession.create({
-        data: { tokenHash: hash(sessionToken), accountId: row.accountId, expiresAt: new Date(Date.now() + 30 * 86400000) },
+        data: { tokenHash: hash(sessionToken), accountId: row.accountId, expiresAt: new Date(Date.now() + SESSION_DAYS * 86400000) },
       });
       const oldSessions = await tx.inspectSession.findMany({
         where: { accountId: row.accountId }, orderBy: { expiresAt: 'desc' }, skip: 9, select: { tokenHash: true },
@@ -760,7 +777,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       ? `<header style="display:flex;align-items:center;gap:14px;margin:0 0 18px">${d.business.logoKey ? `<img src="${req.params.token}/logo" alt="" style="max-height:56px;max-width:160px">` : ''}<strong style="font-size:22px">${safe(d.business.name)}</strong></header>`
       : '';
     res.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}.location{margin:2px 0;font-size:13px;color:#587064}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(usDate(d.date))}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${checkInBase ? `the check-in on ${safe(usDate(baseline.document.date))}` : `${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}`}</p>` : ''}${locationLines(d).map(line => `<p class="location">${safe(line)}</p>`).join('')}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
+    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}.location{margin:2px 0;font-size:13px;color:#587064}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(usDate(d.date))}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(timeText(d.eventTime))}` : ''} · ${safe(d.author)}</p>${d.checkoutDate ? `<p>Guest checked out ${safe(usDate(d.checkoutDate))}</p>` : ''}${baseline ? `<p><strong>Compared with:</strong> ${checkInBase ? `the check-in on ${safe(usDate(baseline.document.date))}` : `${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}`}</p>` : ''}${locationLines(d).map(line => `<p class="location">${safe(line)}</p>`).join('')}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
   }));
   router.get('/shared/:token/logo', guarded(async (req, res) => {
     const r = await shared(req.params.token);
@@ -772,7 +789,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const r = await shared(req.params.token);
     const source = r.attachments.find(x => x.id === req.params.id) ? r : r.baselineReport;
     const a = source?.attachments.find(x => x.id === req.params.id);
-    if (!a || !source.document.rooms.some(room => room.photos.includes(a.id))) throw fail(404, 'Photo unavailable.');
+    if (!a || !source.document.rooms.some(room => room.photos.includes(a.id) || (room.receipts || []).includes(a.id))) throw fail(404, 'Photo unavailable.');
     res.type('jpeg').send(await object(a.objectKey));
   }));
   const drawPdfSignatures = (doc, document) => {
@@ -793,7 +810,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   };
   async function appendPdfRoom(doc, report, room, label, index = 0) {
     doc.addPage().fontSize(9).fillColor('#587064').text(label.toUpperCase());
-    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index)}${room.issue ? ' - Issue noted' : ''}`);
+    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index)}${room.issue && report.document?.type !== 'damage' ? ' - Issue noted' : ''}`);
     if (room.observation || report.document?.type !== 'check-in') doc.moveDown().fontSize(11).text(room.observation || 'No observation recorded.');
     for (const id of room.photos) {
       const a = report.attachments.find(item => item.id === id);
@@ -802,6 +819,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       doc.addPage().fontSize(12).text(room.name);
       doc.fontSize(9).text(photoCaption(report.document, a));
       doc.image(bytes, 44, 90, { fit: [507, 660], align: 'center', valign: 'center' });
+    }
+    for (const id of room.receipts || []) {
+      const a = report.attachments.find(item => item.id === id);
+      if (!a) continue;
+      doc.addPage().fontSize(12).text(`${room.name || entryHeading(room, index)} · Receipt or estimate`);
+      doc.image(await object(a.objectKey), 44, 90, { fit: [507, 660], align: 'center', valign: 'center' });
     }
   }
   async function pdf(report, res) {
@@ -817,7 +840,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     doc.fontSize(10).text(identity.brand);
     doc.moveDown().fontSize(24).text(report.document.propertyName);
     const legacy = report.document.type !== 'incident' && report.document.type !== 'damage';
-    doc.fontSize(11).text(`${legacy ? report.document.type : typeLabel(report.document.type)} | ${usDate(report.document.date)}${report.document.eventTime ? ` | ${report.document.type === 'damage' ? 'found' : 'occurred'} ${report.document.eventTime}` : ''} | ${report.document.author}`);
+    doc.fontSize(11).text(`${legacy ? report.document.type : typeLabel(report.document.type)} | ${usDate(report.document.date)}${report.document.eventTime ? ` | ${report.document.type === 'damage' ? 'found' : 'occurred'} ${timeText(report.document.eventTime)}` : ''} | ${report.document.author}`);
     doc.moveDown().fontSize(9).text(disclaimerFor(report.document.type));
     const located = locationLines(report.document);
     if (located.length) { doc.moveDown(.5); for (const line of located) doc.fontSize(9).text(line); }
@@ -896,7 +919,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     });
   };
   router.post('/events/anon', guarded(async (req, res) => {
-    if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown Inspect event.');
+    if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown event.');
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
     await record(null, req.body.name, undefined, eventExtra(req.body));
     if (req.body.name === 'SimCheckoutTapped') {
@@ -951,7 +974,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const interval = req.body?.interval === 'year' ? 'year' : 'month';
     const plan = inspectPlan(interval);
     const priceId = env[plan.priceEnv];
-    if (!priceId) throw fail(503, 'That Inspect plan is not configured yet.');
+    if (!priceId) throw fail(503, 'That plan is not available yet.');
     const price = validateInspectPrice(await stripe.prices.retrieve(priceId), interval);
     const visitor = visitorOf(req.body?.visitorId);
     // Hosted Checkout requires an email whatever the wallet, so the only
@@ -1021,9 +1044,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
 
   router.use((req, res, next) => {
     const raw = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization || '')?.[1];
-    if (!raw) return next(fail(401, 'Please sign in to Inspect.'));
-    prisma.inspectSession.findUnique({ where: { tokenHash: hash(raw) }, include: { account: true } }).then(session => {
+    if (!raw) return next(fail(401, 'Please sign in again.'));
+    prisma.inspectSession.findUnique({ where: { tokenHash: hash(raw) }, include: { account: true } }).then(async session => {
       if (!session || session.expiresAt < new Date()) throw fail(401, 'Please sign in again.');
+      // Rolling: someone who keeps using Marketel stays signed in. Extended at
+      // most once a day, and never in the way of the request.
+      if (session.expiresAt.getTime() < Date.now() + (SESSION_DAYS - 1) * 86400000) {
+        await Promise.resolve().then(() => prisma.inspectSession.update({ where: { tokenHash: session.tokenHash }, data: { expiresAt: new Date(Date.now() + SESSION_DAYS * 86400000) } })).catch(() => {});
+      }
       req.inspect = session.account; req.inspectSessionHash = session.tokenHash; next();
     }).catch(next);
   });
@@ -1072,7 +1100,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     ['ReportRevealed', null], ['ExportOfferViewed', null], ['OfferDeclined', null],
   ]);
   router.post('/events', guarded(async (req, res) => {
-    if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown Inspect event.');
+    if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown event.');
     const sourceId = CLIENT_EVENTS.get(req.body.name);
     if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
     await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body));
@@ -1280,11 +1308,11 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const report = await prisma.$transaction(async tx => {
       await lockAccount(tx, req.inspect.id);
       const row = await owned(tx, req.inspect.id, req.params.id); mutable(row);
-      if (document.rooms.some(r => r.photos.some(id => !row.attachments.some(a => a.id === id)))) throw fail(400, 'A photo has not finished uploading.');
+      if (document.rooms.some(r => [...r.photos, ...(r.receipts || [])].some(id => !row.attachments.some(a => a.id === id)))) throw fail(400, 'A photo has not finished uploading.');
       if (document.signatures) document.signatures = stampSignatures(document.signatures, row.document?.signatures);
       const located = stampLocation(document.location, row.document?.location);
       if (located) document.location = located; else delete document.location;
-      const kept = new Set(document.rooms.flatMap(r => r.photos));
+      const kept = new Set(document.rooms.flatMap(r => [...r.photos, ...(r.receipts || [])]));
       const removed = row.attachments.filter(a => !kept.has(a.id));
       if (removed.length) {
         await tx.inspectGarbage.createMany({ data: removed.flatMap(a => [{ objectKey: a.objectKey }, { objectKey: a.originalKey }]), skipDuplicates: true });
@@ -1304,7 +1332,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     try { bytes = await sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer(); }
     catch { throw fail(400, 'This photo format could not be read. Choose JPEG, PNG or WebP, or use your camera.'); }
     // Dated on the copy everyone reads. A stamp that fails never costs the photo.
-    bytes = await stampPhoto(bytes, { takenAt: req.body.takenAt, zone: req.body.zone,
+    if (req.body.kind !== 'receipt') bytes = await stampPhoto(bytes, { takenAt: req.body.takenAt, zone: req.body.zone,
       source: req.body.source === 'camera' ? 'camera' : 'import', receivedAt: new Date() })
       .catch(error => { console.error('Inspect photo stamp failed:', error.message); return bytes; });
     const key = `inspect/${req.inspect.id}/${report.id}/${token()}`;
@@ -1548,13 +1576,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       checkIn = document.type === 'check-in';
       if (checkIn) {
         if (!document.rooms.some(room => room.photos.length)) throw fail(400, 'Add at least one uploaded photo.');
-        if (document.rooms.some(room => room.photos.some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
+        if (document.rooms.some(room => [...room.photos, ...(room.receipts || [])].some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
         const saved = await tx.inspectReport.update({ where: { id: r.id }, data: { document, finalizedAt: new Date() }, include: { attachments: true, baselineReport: { include: { attachments: true } } } });
         await tx.inspectEvent.create({ data: { accountId: a.id, name: 'CheckInSaved', sourceId: `inspect-checkin:${r.id}`, tool: 'claims' } });
         return saved;
       }
       if (!document.author || !document.rooms.some(room => room.photos.length)) throw fail(400, 'Add your name and at least one uploaded photo.');
-      if (document.rooms.some(room => room.photos.some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
+      if (document.rooms.some(room => [...room.photos, ...(room.receipts || [])].some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(a.email) } });
       const access = entitlement({ ...a, freeReportUsed: a.freeReportUsed || !!priorFreeClaim });
       const tool = TOOLS[toolForType(document.type)];
@@ -1640,8 +1668,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     res.json({ success: true });
   }));
 
-  const requireStripe = () => { if (!stripe) throw fail(503, 'Inspect billing is not configured yet.'); };
-  const requireBilling = () => { requireStripe(); if (!env.STRIPE_INSPECT_PRICE_ID) throw fail(503, 'Inspect billing is not configured yet.'); };
+  const requireStripe = () => { if (!stripe) throw fail(503, 'Billing is not set up yet. Please try again shortly.'); };
+  const requireBilling = () => { requireStripe(); if (!env.STRIPE_INSPECT_PRICE_ID) throw fail(503, 'Billing is not set up yet. Please try again shortly.'); };
   // The paywall must only offer intervals that actually have a Stripe price,
   // so a missing annual price degrades to monthly instead of a failing tap.
   const purchasablePlans = () => ['year', 'month'].filter(interval => !!env[inspectPlan(interval).priceEnv]);
@@ -1657,7 +1685,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       if (a.stripeCustomerId !== subscription.customer) throw fail(400, 'Subscription customer mismatch.');
       const item = subscription.items?.data?.[0];
       const allowedPrices = [env.STRIPE_INSPECT_PRICE_ID, env.STRIPE_INSPECT_YEARLY_PRICE_ID].filter(Boolean);
-      if (!item?.price?.id || !allowedPrices.includes(item.price.id)) throw fail(400, 'Unexpected Inspect price.');
+      if (!item?.price?.id || !allowedPrices.includes(item.price.id)) throw fail(400, 'Unexpected price.');
       const start = new Date((item.current_period_start || subscription.current_period_start) * 1000);
       const end = new Date((item.current_period_end || subscription.current_period_end) * 1000);
       if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) throw fail(400, 'Missing billing period.');
@@ -1725,7 +1753,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const interval = req.body.interval === 'year' ? 'year' : 'month';
     const plan = inspectPlan(interval);
     const priceId = env[plan.priceEnv];
-    if (!priceId) throw fail(503, 'That Inspect plan is not configured yet.');
+    if (!priceId) throw fail(503, 'That plan is not available yet.');
     // Serialize creation and use Stripe idempotency to survive network retries.
     const checkout = await prisma.$transaction(async tx => {
       let a = await lockAccount(tx, req.inspect.id);
@@ -1848,7 +1876,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (res.headersSent) return next(error);
     const status = error.status || (error instanceof multer.MulterError ? 400 : 500);
     if (status === 500) console.error('Inspect request failed:', error.name, error.code || 'unknown');
-    res.status(status).json({ error: status === 500 ? 'Inspect could not complete that action. Your saved work is safe; please retry.' : error.message });
+    res.status(status).json({ error: status === 500 ? 'Marketel could not complete that action. Your saved work is safe; please retry.' : error.message });
   });
   app.use('/api/inspect', router);
 

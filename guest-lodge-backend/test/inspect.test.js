@@ -506,6 +506,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
     document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-19', eventTime: 'unknown', author: 'Sam',
       rooms: [{ name: 'Kitchen', observation: 'Chipped counter.', issue: true, photos: ['p1'] }], signatures: [] }, ...reportOverrides };
   const seenEvents = new Set();
+  let sessionExpiry = new Date(Date.now() + 60000);
   // Enough of a store for the property routes to be exercised honestly: what is
   // added, counted and deleted is really kept, scoped to the account.
   const properties = [];
@@ -513,7 +514,8 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const mine = where => row => row.accountId === where.accountId;
   const db = {
     $queryRaw: async () => [],
-    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: new Date(Date.now() + 60000), account }), deleteMany: async () => ({ count: 0 }),
+    inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: sessionExpiry, account }), deleteMany: async () => ({ count: 0 }),
+      update: async ({ data }) => { calls.sessionExtensions = (calls.sessionExtensions || 0) + 1; sessionExpiry = data.expiresAt; return {}; },
       findMany: async () => [], create: async ({ data }) => { calls.sessionsCreated = (calls.sessionsCreated || 0) + 1; return data; } },
     // No outstanding codes: only the review path can verify here.
     inspectChallenge: { deleteMany: async () => ({ count: 0 }), findUnique: async () => null,
@@ -818,6 +820,47 @@ test('the app dates photos, keeps check-ins with their property, and shows the b
   assert.match(client, /Shots land here, each one dated\./);
 });
 
+test('someone who keeps using Marketel stays signed in', async () => {
+  const h = moneyHarness();
+  try {
+    // The harness session was due to end in a minute; using it extends it.
+    assert.equal((await request(h.app, '/api/inspect/account', { headers: h.headers })).status, 200);
+    assert.equal(h.calls.sessionExtensions, 1);
+    // Extended at most once a day: the next request leaves it alone.
+    assert.equal((await request(h.app, '/api/inspect/account', { headers: h.headers })).status, 200);
+    assert.equal(h.calls.sessionExtensions, 1);
+  } finally { h.registration.close(); }
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  assert.match(server, /const SESSION_DAYS = 90;/);
+  // Nothing a Claims user can see says "Inspect" any more.
+  for (const stale of ['Please sign in to Inspect', 'Inspect could not complete', 'Inspect billing is not configured', 'That Inspect plan', 'Inspect is not available yet']) {
+    assert.ok(!server.includes(stale), stale);
+  }
+});
+
+test('receipts and quotes are kept with their finding, never date-stamped, and shown apart', async () => {
+  const doc = validateDocument({ propertyName: 'Pine', type: 'damage', date: '2026-09-22', author: 'Sam', checkoutDate: '2026-09-21',
+    rooms: [{ name: 'Bathroom', observation: '', photos: ['p1'], receipts: ['q1'] }] });
+  assert.deepEqual(doc.rooms[0].receipts, ['q1']);
+  assert.equal(doc.checkoutDate, '2026-09-21');
+  assert.throws(() => validateDocument({ propertyName: 'Pine', type: 'damage', date: '2026-09-22', author: 'Sam', checkoutDate: '2026-02-31', rooms: [{ name: 'B', observation: '', photos: [] }] }), /check-out date/);
+  assert.throws(() => validateDocument({ propertyName: 'Pine', type: 'damage', date: '2026-09-22', author: 'Sam', rooms: [{ name: 'B', observation: '', photos: ['p1'], receipts: ['p1'] }] }), /duplicate/);
+  const received = new Date(Date.UTC(2026, 8, 23, 1, 15));
+  const h = moneyHarness({ report: { finalizedAt: new Date(), shareHash: 'x',
+    attachments: [{ id: 'p1', source: 'camera', createdAt: received }, { id: 'q1', source: 'import', createdAt: received }],
+    document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-22', checkoutDate: '2026-09-21', author: 'Sam', signatures: [],
+      rooms: [{ name: 'Bathroom', observation: 'Holder torn off.', issue: true, photos: ['p1'], receipts: ['q1'] }] } } });
+  try {
+    const html = await (await request(h.app, `/api/inspect/shared/${'a'.repeat(43)}`, {})).text();
+    assert.match(html, /<h3>Receipts &amp; estimates<\/h3><figure><img alt="Receipt or estimate" src="[^"]*\/photos\/q1">/);
+    assert.match(html, /Guest checked out Sep 21, 2026/);
+    assert.doesNotMatch(html, /Issue noted/, 'every finding on a damage report is damage');
+  } finally { h.registration.close(); }
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  assert.match(server, /if \(req\.body\.kind !== 'receipt'\) bytes = await stampPhoto\(/, 'a receipt is a document, not a scene');
+  assert.match(server, /const kept = new Set\(document\.rooms\.flatMap\(r => \[\.\.\.r\.photos, \.\.\.\(r\.receipts \|\| \[\]\)\]\)\);/, 'saving never throws a receipt away');
+});
+
 test('a property can be added on its own, and deleted with its reports', async () => {
   const h = moneyHarness();
   const call = async (method, body) => {
@@ -866,7 +909,7 @@ test('the Properties page adds and deletes a property itself, and names it prope
   // Adding one opens its own sheet; it no longer starts a damage report.
   assert.match(client, /\$\('new-property'\)\.onclick=\(\)=>\{haptic\(\);newProperty\(\);\}/);
   assert.match(client, /function newProperty\(\)[\s\S]{0,1400}api\('\/properties',\{method:'POST'/);
-  assert.match(client, /async function deleteProperty[\s\S]{0,900}confirmAction[\s\S]{0,300}api\('\/properties',\{method:'DELETE'/);
+  assert.match(client, /async function deleteProperty[\s\S]{0,900}confirmAction[\s\S]{0,700}api\('\/properties',\{method:'DELETE'/);
 });
 
 test('a new report asks where, not for a photo, and stays on the New Report tab', () => {
@@ -1657,7 +1700,7 @@ test('the AI is the path, and the note is never hidden once written', () => {
     assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded', \.\.\.LADDER_EVENTS/);
     assert.match(anon, /record\(null, req\.body\.name, undefined, eventExtra\(req\.body\)\)/);
     assert.match(anon, /rate\(`inspect-anon-events:/);
-    assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in to Inspect.'),
+    assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in again.'),
         'the anonymous event route is below the auth boundary and can never fire');
 
     // It is sent once a usable recording exists and before the email wall.
@@ -1676,7 +1719,7 @@ test('the AI is the path, and the note is never hidden once written', () => {
     assert.doesNotMatch(client, /report writes itself/i);
     // The arm supplies the name; the claim it makes must stay the same one.
     assert.match(client, /\$\{esc\(skin\(\)\.product\)\} writes the note/);
-    assert.match(client, /\$\{skin\(\)\.writesLabel\} the note/);
+    assert.match(client, /\$\{skin\(\)\.writesLabel\.replace\(\/\^\.\/,c=>c\.toUpperCase\(\)\)\} the note/);
 });
 
 test('the AI path is observable, and cannot be advertised while it is off', () => {
@@ -2588,7 +2631,10 @@ test('the app stops quoting a price to someone who already paid, and a business 
 
   // A signature is a person. `author` can be filled from the business name,
   // which is how someone's signature came to read as their company.
-  assert.match(client, /let name=existing\?\.name \|\| \(role==='manager'\|\|role==='owner' \? rememberedAuthor\(\) : ''\);/);
+  // Your own signature starts from the one you kept, or your remembered name,
+  // never from the document's author (which can be the business).
+  assert.match(client, /const name=existing\?\.name\|\|\(own\?\(savedSignature\(\)\?\.name\|\|rememberedAuthor\(\)\):''\);/);
+  assert.doesNotMatch(client, /own\?\(draft\.document\.author/);
   assert.doesNotMatch(client, /role==='owner' \? \(draft\.document\.author\|\|rememberedAuthor\(\)\)/);
 
   // Where the phone stood proves nothing about damage found at checkout.
