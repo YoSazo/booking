@@ -95,6 +95,18 @@ const WEDGES = {
     signers: { manager: 'owner', other: 'guest' },
     disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
   },
+  // The "before": the unit room by room at turnover, photos only. Never sent
+  // and never charged; a damage report of the same property shows it back.
+  'check-in': {
+    noun: 'room', nounPlural: 'rooms',
+    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
+    eyebrow: 'Check-in', dateLabel: 'Check-in date',
+    unit: 'room',
+    location: false,
+    photosOnly: true,
+    signers: { manager: 'owner', other: 'guest' },
+    disclaimer: 'Photos of the unit\'s condition at check-in, kept for comparison.',
+  },
   default: {
     noun: 'room', nounPlural: 'rooms',
     seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
@@ -115,11 +127,11 @@ const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
 const ROLE_LABELS = { witness: 'Witness', resident: 'Resident / tenant', owner: 'Owner / host', guest: 'Guest', manager: 'Manager / inspector' };
 const roleLabel = role => ROLE_LABELS[role] || ROLE_LABELS.manager;
 // The enum is storage. This is the name the document calls itself.
-const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
+const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'check-in': 'Check-in record', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
 const typeLabel = type => TYPE_LABELS[type] || TYPE_LABELS.routine;
 // Only Inspect offers a choice of document. The other arms were chosen by the
 // door someone came through, so a dropdown there is a question with one answer.
-const TYPED_ARMS = new Set(['incident', 'damage']);
+const TYPED_ARMS = new Set(['incident', 'damage', 'check-in']);
 const COMMON_ROOMS = WEDGES.default.seeds;
 const nextRoomName = rooms => {
   const used = new Set((rooms || []).map(room => String(room.name || '').trim().toLowerCase()));
@@ -393,6 +405,30 @@ function updateHeader() {
   if(current){const unfinished=hasUnfinishedDraft();current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'In Progress':'+ New Report';}
   syncNativeInspectState(currentPage,true);
 }
+// ——— Dated photos ——————————————————————————————————————————————————————
+// Every photo carries when the phone took it and, once uploaded, when Marketel
+// received it. Always on: on a damage report the date is the evidence.
+const PHONE_ZONE = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
+const photoDayText = when => when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const photoClockText = when => when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const docDateText = value => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '')); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : String(value || ''); };
+const photoFile = id => draft?.files?.find(file => file.id === id);
+function photoTaken(id){
+  const file = photoFile(id);
+  if (!file || file.source !== 'camera') return null;
+  const value = file.takenAt || draft?.document?.photoTimes?.[file.remoteId || id]?.takenAt || draft?.baseline?.document?.photoTimes?.[id]?.takenAt;
+  const when = value ? new Date(value) : null;
+  return when && Number.isFinite(when.getTime()) ? when : null;
+}
+// One line under a photo: when the phone took it, and when Marketel got it.
+function photoCaptionText(id){
+  const file = photoFile(id);
+  if (!file) return '';
+  const taken = photoTaken(id), received = file.receivedAt ? new Date(file.receivedAt) : null;
+  const at = when => `${photoDayText(when)} at ${photoClockText(when)}`;
+  if (taken) return `Taken ${at(taken)} · ${received ? `received by Marketel ${photoDayText(received) === photoDayText(taken) ? photoClockText(received) : at(received)}` : 'not uploaded yet'}`;
+  return `${file.source === 'camera' ? 'Camera photo' : 'Imported'} · ${received ? `received by Marketel ${at(received)}` : 'not uploaded yet'}`;
+}
 function photoURL(id) {
   if (urls.has(id)) return urls.get(id);
   const file = draft.files.find(f => f.id === id);
@@ -542,13 +578,12 @@ const LANDING_ARMS = {
       navList: 'Reports', navCreate: '+ New damage report', navPlaces: 'Properties',
       propertyPrompt: 'Which rental property?',
       placesHeading: 'Properties', placeSingular: 'property',
-      placesLede: 'The rentals you manage. Start a damage report from any of them.',
+      placesLede: 'Check a unit in at each turnover. Any damage report after it shows the check-in as the before.',
       placesEmpty: 'No properties yet. Add one, or it appears here when you save a damage report.',
       home: '/claims',
       terms: 'https://bookmarketel.com/claims/terms',
       termsLabel: 'Claims terms',
       listHeading: 'Your damage reports',
-      placesLede: 'Start a fresh damage report for a property you have documented before.',
       demoBadge: 'EXAMPLE \u00b7 NOT REAL DAMAGE',
       documentLabel: 'MARKETEL CLAIMS',
       offerHeading: 'Document it while it is still there.',
@@ -587,10 +622,12 @@ const landingArm = () => {
 const skin = () => ({ ...SKIN, ...(landingArm()?.skin || {}) });
 // Which document types belong to which tool. Drafts, lists and hand-offs all
 // follow it, so switching tools never shows one tool's work under another's name.
-const TOOL_TYPES = Object.freeze({ inspect: ['routine', 'move-in', 'move-out'], claims: ['damage'], incident: ['incident'] });
+const TOOL_TYPES = Object.freeze({ inspect: ['routine', 'move-in', 'move-out'], claims: ['damage', 'check-in'], incident: ['incident'] });
+// What each tool lists under Reports. Check-ins live with their property.
+const TOOL_LIST_TYPES = Object.freeze({ inspect: TOOL_TYPES.inspect, claims: ['damage'], incident: TOOL_TYPES.incident });
 const toolId = () => { const arm = landingArm(); return Object.keys(LANDING_ARMS).find(key => LANDING_ARMS[key] === arm) || 'inspect'; };
 const toolForType = type => Object.keys(TOOL_TYPES).find(tool => TOOL_TYPES[tool].includes(type)) || 'inspect';
-const toolTypesQuery = () => `types=${TOOL_TYPES[toolId()].join(',')}`;
+const toolTypesQuery = () => `types=${TOOL_LIST_TYPES[toolId()].join(',')}`;
 // A tool is either 'first-free' (one lifetime free finalized report) or
 // 'pay-at-export' (free to build, paid when a finished report is sent). The
 // two are independent of the single-report price: a first-free tool gives the
@@ -621,7 +658,7 @@ function track(name, detail, once = true) {
 }
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
 // A document carries its own brand, whichever tool it was opened through.
-const documentLabelFor = type => type === 'damage' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
+const documentLabelFor = type => type === 'damage' || type === 'check-in' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
 // ——— The simulation funnel (?sim=1) ———————————————————————————————
 // A cold click off an ad cannot photograph anything: they are in bed, at work,
 // in a car. Every funnel that asks them to build a real report fails at step
@@ -1135,6 +1172,7 @@ function setupFlow(){
       // Straight into the report: restoring the list first flashed it, and the
       // tab bar with it, on the way.
       editor('rooms');
+      linkCheckIn().catch(()=>{});
     },event.currentTarget);
   };
   if(account?.businessName)two();else one();
@@ -1161,6 +1199,76 @@ async function start(propertyName = '', type) {
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
   await persist(); editor();
+  linkCheckIn().catch(() => {});
+}
+// ——— Check-ins ——————————————————————————————————————————————————————————
+async function startCheckIn(propertyName){
+  if(!account)return ensureAuth(()=>run(()=>startCheckIn(propertyName)),'keep');
+  if(draftUnsaved()&&!await confirmAction({title:'Start a check-in?',message:`Your current ${skin().doc} is not saved online yet.`,confirmLabel:'Start check-in',danger:true}))return;
+  dismissFlow();clearURLs();
+  draft={document:newDocument(propertyName,'check-in'),files:[],serverId:null,finalizedAt:null};preview=false;
+  await persist();
+  if(native&&hudShell())return openNativeCamera(0);
+  editor('rooms');
+}
+// Saved is final: a check-in is frozen the moment it is kept, which is what
+// makes it worth comparing against. Free, and nothing to send.
+function saveCheckIn(button){
+  ensureAuth(()=>run(async()=>{
+    await save();
+    await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});
+    const count=draft.document.rooms.reduce((total,room)=>total+room.photos.length,0);
+    clearURLs();draft=null;preview=false;await stored('delete');propertiesCache=null;reportsCache=null;
+    notice(`Check-in saved · ${count} dated ${count===1?'photo':'photos'}.`,'success');
+    await list('properties');
+  },button),'keep');
+}
+function checkInView(){
+  enterScreen('check-in');updateHeader();setActiveNav('properties');
+  const d=draft.document;
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">Check-in · ${esc(docDateText(d.date))}</small><button type="button" class="quiet" id="check-in-back">← Properties</button></div><article class="card"><small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)}</h1>${d.rooms.filter(room=>room.photos.length).map((room,index)=>reportRoom(room,'',index,null,true)).join('')}<p><small>${esc(wedge(d.type).disclaimer)}</small></p></article>`;
+  $('check-in-back').onclick=()=>run(()=>list('properties'));
+}
+// The property's latest check-in becomes this damage report's "before".
+// Quietly: without one, the report is simply a report.
+async function linkCheckIn(){
+  if(!draft||draft.document.type!=='damage'||!account||draft.baselineId)return;
+  const name=draft.document.propertyName.trim().toLowerCase();
+  if(!name)return;
+  const props=propertiesCache||await api('/properties').catch(()=>null);
+  if(props&&!propertiesCache)propertiesCache=props;
+  const match=props?.propertyDetails?.find(property=>property.name.trim().toLowerCase()===name&&property.latestCheckIn);
+  if(!match)return;
+  const payload=await api(`/reports/${match.latestCheckIn.id}/comparison`).catch(()=>null);
+  if(!payload?.report||!draft||draft.document.type!=='damage'||draft.document.propertyName.trim().toLowerCase()!==name)return;
+  draft.baseline=payload.report;draft.baselineId=payload.report.id;
+  await persist();
+}
+const checkInBaseline = () => draft?.baseline?.document?.type === 'check-in' ? draft.baseline : null;
+// The check-in photos of the room with this name; none for any other room.
+function beforeIdsFor(name){
+  const base=checkInBaseline(),key=String(name||'').trim().toLowerCase();
+  if(!base||!key)return [];
+  return base.document.rooms.find(room=>room.name.trim().toLowerCase()===key)?.photos||[];
+}
+// Only the photos that are actually matched are fetched, and only once.
+const beforeLoading=new Set();
+async function ensureBeforeFiles(ids){
+  const base=checkInBaseline();
+  const missing=ids.filter(id=>!photoFile(id)&&!beforeLoading.has(id));
+  if(!base||!missing.length)return false;
+  missing.forEach(id=>beforeLoading.add(id));
+  try{
+    for(const id of missing){
+      const attachment=base.attachments?.find(item=>item.id===id);
+      if(!attachment)continue;
+      const blob=await api(`/reports/${base.id}/photos/${id}`,{blob:true});
+      draft?.files?.push({id,remoteId:id,blob,source:attachment.source,receivedAt:attachment.createdAt,
+        takenAt:base.document.photoTimes?.[id]?.takenAt,zone:base.document.photoTimes?.[id]?.zone,before:true});
+    }
+    await persist();
+    return true;
+  }finally{missing.forEach(id=>beforeLoading.delete(id));}
 }
 function editor(step) {
   if (!draft) return landing();
@@ -1169,6 +1277,7 @@ function editor(step) {
   setActiveNav('current');
   const d = draft.document;
   d.signatures ||= [];
+  if (draft.document.type === 'check-in' && draft.finalizedAt) return checkInView();
   if (preview || draft.finalizedAt) return reportPreview();
   // The draft decides which step opens: an unnamed report needs its details, a
   // named one is ready for the work. Returning lands on the work, not the form.
@@ -1198,7 +1307,7 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Uploaded' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div><div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -1241,6 +1350,19 @@ function editor(step) {
       if($('add-room'))$('add-room').textContent='+ Add finding';
     }
     if(payAtExport()&&$('preview'))$('preview').textContent=`Build my ${skin().doc} →`;
+    // A check-in is photos, room by room, and a save. Nothing to write, sign
+    // or send, so none of it is shown.
+    if(d.type==='check-in'){
+      $('app').querySelectorAll('.note-lead,.write-own,.note-tools').forEach(el=>el.remove());
+      $('to-details')?.remove();
+      $('save')?.remove();
+      const heading=$('app').querySelector('h1'),eyebrow=$('app').querySelector('.row.spread .eyebrow');
+      if(heading)heading.textContent='Photograph each room.';
+      if(eyebrow)eyebrow.textContent=`Check-in · ${d.propertyName}`;
+      const keep=$('preview');
+      keep.textContent='Save check-in';
+      keep.onclick=event=>{haptic();saveCheckIn(event.currentTarget);};
+    }
     if(d.rooms.some(room=>room.photos.length))track('FirstPhotoAdded');
   }
   // Signed out in the app neither chrome is on screen, so these are the only exits.
@@ -1399,7 +1521,9 @@ async function addPhotos(input) {
       await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=objectURL;});
       if(img.naturalWidth*img.naturalHeight>40000000) throw new Error('Image too large');
       const id=uid();
-      draft.files.push({id,blob:file,source,name:file.name});draft.document.rooms[i].photos.push(id);
+      // A shot taken here is dated now. An import's own date is whatever the
+      // last app to touch the file made it, so it is dated on arrival instead.
+      draft.files.push({id,blob:file,source,name:file.name,...(source==='camera'?{takenAt:new Date().toISOString()}:{}),zone:PHONE_ZONE});draft.document.rooms[i].photos.push(id);
     } catch { notice(`${file.name} could not be opened. Export it as JPEG or take a photo.`); }
     finally {URL.revokeObjectURL(objectURL);}
   }
@@ -1669,12 +1793,25 @@ async function syncInspectAttribution(){
   if(session&&account&&inspectAttribution)await api('/attribution',{method:'POST',body:{attribution:inspectAttribution}});
 }
 function remoteDocument(){
-  return {...draft.document,rooms:draft.document.rooms.map(room=>({...room,photos:room.photos.map(id=>draft.files.find(file=>file.id===id)?.remoteId).filter(Boolean)}))};
+  // When each photo was taken travels with the report, under its server id.
+  const times={...(draft.document.photoTimes||{})};
+  for(const file of draft.files)if(file.remoteId&&(file.takenAt||file.zone))times[file.remoteId]={...(file.takenAt?{takenAt:file.takenAt}:{}),zone:file.zone||PHONE_ZONE};
+  return {...draft.document,photoTimes:times,rooms:draft.document.rooms.map(room=>({...room,photos:room.photos.map(id=>draft.files.find(file=>file.id===id)?.remoteId).filter(Boolean)}))};
 }
 async function ensureServerDraft(){
   if(!draft.document.propertyName.trim())throw new Error('Enter a property name first.');
   if(!draft.serverId){
-    const result=await api('/reports',{method:'POST',body:{...draft.document,rooms:draft.document.rooms.map(room=>({...room,photos:[]}))}});
+    const body={...draft.document,rooms:draft.document.rooms.map(room=>({...room,photos:[]}))};
+    // Linked to its check-in only while the property is still the same one;
+    // if the server declines the link, the report is saved without it.
+    const linked=draft.baselineId&&draft.document.type==='damage'&&checkInBaseline()?.document?.propertyName?.trim().toLowerCase()===draft.document.propertyName.trim().toLowerCase();
+    let result;
+    try{result=await api('/reports',{method:'POST',body:linked?{...body,baselineReportId:draft.baselineId}:body});}
+    catch(error){
+      if(!linked||error.status!==400)throw error;
+      delete draft.baseline;delete draft.baselineId;
+      result=await api('/reports',{method:'POST',body});
+    }
     draft.serverId=result.id;reportsCache=null;propertiesCache=null;await persist();
   }else await api(`/reports/${draft.serverId}`,{method:'PUT',body:remoteDocument()});
 }
@@ -1696,7 +1833,9 @@ async function save() {
     for(const room of draft.document.rooms) for(const id of room.photos){
       const f=draft.files.find(f=>f.id===id);if(!f)throw new Error('A report photo is missing from this device. Remove it or add it again.');if(f.remoteId)continue;
       const form=new FormData();form.append('photo',f.blob,f.name||'photo.jpg');form.append('source',f.source);
-      const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});f.remoteId=a.id;await persist();
+      if(f.takenAt)form.append('takenAt',f.takenAt);
+      form.append('zone',f.zone||PHONE_ZONE);
+      const a=await api(`/reports/${draft.serverId}/photos`,{method:'POST',body:form});f.remoteId=a.id;f.receivedAt=a.createdAt;await persist();
       done++;
       veil?.update(`Uploading ${pending.length===1?'your photo':`${pending.length} photos`}`,
         pending.length>1?`${done} of ${pending.length} uploaded. Keep this page open.`:'Keep this page open.',
@@ -1913,8 +2052,8 @@ function signaturePreview(signature){
   const paths=signature.strokes.map(stroke=>stroke.map((point,index)=>`${index?'L':'M'} ${(point.x*300).toFixed(1)} ${(point.y*100).toFixed(1)}`).join(' '));
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
-function reportRoom(r,label='',index=0,sample=null){
-  return `<section class="report-room">${label?`<p class="compare-label">${label}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2><p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small>${sample?esc(sample.sourceLabel):(draft.files.find(f=>f.id===id)?.source==='camera'?'Camera capture':'Imported photo')}</small>`).join('')}</section>`;
+function reportRoom(r,label='',index=0,sample=null,photosOnly=false){
+  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -1930,8 +2069,16 @@ function reportPreview(){
   const pw = wedge(draft?.document?.type);
   updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
-  const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||baseline?.rooms?.[index];return `<div class="comparison-pair">${before?reportRoom(before,'Previous finalized report',index):''}${reportRoom(room,before?'Current report':'',index)}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(d.date)}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
+  // Against a check-in, a finding pairs only with the room of its own name,
+  // and its photos arrive as they are fetched.
+  const base=checkInBaseline();
+  if(base){
+    const wanted=d.rooms.flatMap(room=>beforeIdsFor(room.name));
+    if(wanted.some(id=>!photoFile(id)))ensureBeforeFiles(wanted).then(loaded=>{if(loaded&&currentScreen==='preview')reportPreview();}).catch(()=>{});
+  }
+  const beforeLabel=base?`Before · check-in ${docDateText(baseline.date)}`:'Previous finalized report';
+  const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||(base?null:baseline?.rooms?.[index]);return `<div class="comparison-pair">${before?reportRoom(before,beforeLabel,index,null,!!base):''}${reportRoom(room,before?(base?'After':'Current report'):'',index)}</div>`;}).join('');
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(d.eventTime)}`:''} · ${esc(d.author)||'Author not entered'}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">${base?`Compared with the check-in on ${esc(docDateText(baseline.date))}.`:`Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(baseline.date)}.`}</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager;return `<button class="secondary" data-sign="${esc(role)}">${d.signatures.some(sig=>sig.role===role)?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
     ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div>${canSend()?`<p class="muted">Sending finalizes this version. Included in your plan.</p>`:`<p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`}`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
@@ -2261,12 +2408,14 @@ function renderProperties(data){
   enterScreen('properties');
   const sk=skin();
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
-  $('app').innerHTML=`<h1>${esc(sk.placesHeading)}</h1><p class="muted">${esc(sk.placesLede)}</p><button id="new-property">+ New ${esc(sk.placeSingular)}</button>${details.length?'':`<section class="card">${esc(sk.placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}</div><div class="row"><button class="secondary" data-property="${index}">New report</button>${sk.comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}<button type="button" class="quiet danger" data-delete-property="${index}">Delete</button></div></section>`).join('')}`;
+  $('app').innerHTML=`<h1>${esc(sk.placesHeading)}</h1><p class="muted">${esc(sk.placesLede)}</p><button id="new-property">+ New ${esc(sk.placeSingular)}</button>${details.length?'':`<section class="card">${esc(sk.placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Latest finalized: ${esc(property.latestType)} · ${esc(property.latestDate)}</p>`:''}${toolId()==='claims'?(property.latestCheckIn?`<button type="button" class="quiet check-in-line" data-view-check-in="${esc(property.latestCheckIn.id)}">Last check-in ${esc(docDateText(property.latestCheckIn.date))} · ${property.latestCheckIn.photoCount} ${property.latestCheckIn.photoCount===1?'photo':'photos'}</button>`:'<p class="muted check-in-line">No check-in yet</p>'):''}</div><div class="row">${toolId()==='claims'?`<button type="button" class="secondary" data-check-in="${index}">Check in</button>`:''}<button class="secondary" data-property="${index}">New report</button>${sk.comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}<button type="button" class="quiet danger" data-delete-property="${index}">Delete</button></div></section>`).join('')}`;
   if(sk.doc!=='report')for(const button of $('app').querySelectorAll('[data-property]'))button.textContent=`New ${sk.doc}`;
   $('new-property').onclick=()=>{haptic();newProperty();};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
   document.querySelectorAll('[data-delete-property]').forEach(button=>button.onclick=()=>deleteProperty(details[Number(button.dataset.deleteProperty)],button));
+  document.querySelectorAll('[data-check-in]').forEach(button=>button.onclick=()=>{haptic();run(()=>startCheckIn(details[Number(button.dataset.checkIn)].name),button);});
+  document.querySelectorAll('[data-view-check-in]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.viewCheckIn),button));
 }
 // A property on its own, before any report names it. Starting a whole damage
 // report used to be the only way to add one.
@@ -2292,9 +2441,10 @@ function newProperty(){
 }
 async function deleteProperty(property,button){
   if(!property)return;
-  const sk=skin(),count=Number(property.reportCount)||0;
-  const message=count
-    ?`Its ${count===1?`${sk.doc} is`:`${count} ${sk.docPlural} are`} also deleted, with their photos and shared links. Your ${sk.doc} allowance will not be restored.`
+  const sk=skin(),count=Number(property.reportCount)||0,checkIns=Number(property.checkInCount)||0;
+  const parts=[count?`${count===1?`its ${sk.doc}`:`its ${count} ${sk.docPlural}`}`:'',checkIns?`${checkIns===1?'its check-in':`its ${checkIns} check-ins`}`:''].filter(Boolean);
+  const message=parts.length
+    ?`${parts.join(' and ').replace(/^i/,'I')} ${count+checkIns===1?'is':'are'} also deleted, with their photos and shared links.${count?` Your ${sk.doc} allowance will not be restored.`:''}`
     :`It has no ${sk.docPlural}.`;
   if(!await confirmAction({title:`Delete ${property.name}?`,message,confirmLabel:count?'Delete permanently':`Delete ${sk.placeSingular}`,danger:true}))return;
   run(async()=>{
@@ -2326,7 +2476,8 @@ function renderReports(){
 async function loadReportFiles(report){
   const files=[];
   for(let i=0;i<(report.attachments||[]).length;i+=6){
-    const loaded=await Promise.all(report.attachments.slice(i,i+6).map(async attachment=>({id:attachment.id,remoteId:attachment.id,blob:await api(`/reports/${report.id}/photos/${attachment.id}`,{blob:true}),source:attachment.source})));
+    const loaded=await Promise.all(report.attachments.slice(i,i+6).map(async attachment=>({id:attachment.id,remoteId:attachment.id,blob:await api(`/reports/${report.id}/photos/${attachment.id}`,{blob:true}),source:attachment.source,
+      receivedAt:attachment.createdAt,takenAt:report.document?.photoTimes?.[attachment.id]?.takenAt,zone:report.document?.photoTimes?.[attachment.id]?.zone})));
     files.push(...loaded);
   }
   return files;
@@ -2335,7 +2486,7 @@ async function useComparisonPayload(payload){
   const report=payload.report,baseline=payload.baseline;
   const files=await loadReportFiles(report);
   if(baseline)files.push(...await loadReportFiles(baseline));
-  clearURLs();draft={document:report.document,serverId:report.id,finalizedAt:report.finalizedAt,files,baseline};
+  clearURLs();draft={document:report.document,serverId:report.id,finalizedAt:report.finalizedAt,files,baseline,...(baseline?{baselineId:baseline.id}:{})};
   await persist();preview=!!report.finalizedAt;editor();
 }
 async function openReport(id){
@@ -2451,6 +2602,8 @@ let cameraRoom=null;
 // exist yet: it is only created once it has somewhere to be, so changing your
 // mind on this screen leaves no empty finding behind in the report.
 let cameraAsk=false;
+// The check-in photo being looked at on its own page, or null.
+let cameraBefore=null;
 function openNativeCamera(i){
   if(!draft)return;
   haptic();
@@ -2472,7 +2625,11 @@ function cameraAskScreen(entering){
   // Tapping one goes back to photographing it, which is also how you change
   // your mind about adding another.
   const others=rooms.map((item,index)=>({item,index})).filter(({item,index})=>(item.name||'').trim()&&(adding||index!==cameraRoom));
-  $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}</div>`:''}<h1>Which room are you in?</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="Kitchen"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
+  // The check-in's rooms not yet in this report: one tap names the finding
+  // exactly as its "before" is named, so the two pair with nothing typed.
+  const base=checkInBaseline(),used=new Set(rooms.map(item=>(item.name||'').trim().toLowerCase()).filter(Boolean));
+  const fromCheckIn=base?[...new Set(base.document.rooms.map(item=>item.name.trim()).filter(name=>name&&!used.has(name.toLowerCase())))]:[];
+  $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length||fromCheckIn.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}${fromCheckIn.map(name=>`<button type="button" class="camera-room is-check-in" data-ask-name="${esc(name)}"><strong>${esc(name)}</strong><span>Before</span></button>`).join('')}</div>`:''}<h1>Which room are you in?</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="Kitchen"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
   const field=$('hud-room');
   // Synchronous focus inside the gesture that opened this, so the keyboard
   // comes up with the screen rather than after it.
@@ -2485,9 +2642,8 @@ function cameraAskScreen(entering){
   // A mistaken tap on the camera must not leave inventing a room name as the
   // only way out.
   $('hud-room-back').onclick=()=>{haptic();leaveCameraAsk();};
-  $('hud-room-form').onsubmit=event=>{
-    event.preventDefault();
-    const value=field.value.trim().slice(0,100);
+  const named=raw=>{
+    const value=String(raw||'').trim().slice(0,100);
     if(!value)return notice('Type which room this is.','error');
     if(adding){
       if(rooms.length>=30)return notice('Maximum 30 findings.');
@@ -2499,6 +2655,8 @@ function cameraAskScreen(entering){
     remember();persist().catch(()=>{});
     openOn(cameraRoom);
   };
+  $('hud-room-form').onsubmit=event=>{event.preventDefault();named(field.value);};
+  document.querySelectorAll('[data-ask-name]').forEach(button=>button.onclick=()=>{haptic();named(button.dataset.askName);});
 }
 // Dictation while the camera is open writes the speaker's own words straight
 // into the finding. It is the device's own engine, so there is no upload, no
@@ -2536,7 +2694,11 @@ function cameraCompanion(entering=false){
   document.documentElement.classList.add('camera-open');
   const talking=!!hudDictation;
   const note=(room.observation||'').trim();
-  const strip=room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button></figure>`).join('');
+  const photosOnly=!!w.photosOnly;
+  const beforeIds=beforeIdsFor(room.name);
+  if(beforeIds.length&&beforeIds.some(id=>!photoFile(id)))ensureBeforeFiles(beforeIds).then(loaded=>{if(loaded&&cameraRoom!==null&&!cameraAsk&&!cameraBefore)cameraCompanion();}).catch(()=>{});
+  const beforeThumb=beforeIds.find(id=>photoFile(id));
+  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at check-in"><img src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
   const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?((item.name||'').trim()||'New'):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
   // Rooms are typed before the camera opens now, so this only asks by voice
   // for a finding from an older draft that was never given one.
@@ -2546,7 +2708,7 @@ function cameraCompanion(entering=false){
     ? (talking?'Listening…':'Tap the mic and say the room.')
     : (talking?'Listening…':'Tap the mic and say what you are looking at.');
   const body=asking==='name'?'':note;
-  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div>${asking==='name'?`<h1>${heading}</h1>`:''}<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div><div class="camera-strip">${strip||`<p class="muted"><small>Shots land here as you take them.</small></p>`}</div><div class="hud-actions">${hudShell()?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div>${asking==='name'?`<h1>${heading}</h1>`:''}${photosOnly?'':`<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div>`}<div class="camera-strip">${strip||`<p class="muted"><small>Shots land here, each one dated.</small></p>`}</div><div class="hud-actions">${hudShell()&&!photosOnly?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
 
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   $('hud-next').onclick=()=>{
@@ -2581,6 +2743,7 @@ function cameraCompanion(entering=false){
   // A blurred shot is worth catching here, in front of the thing, rather than
   // at the reveal. The cross rather than the photo itself: one hand is holding
   // the phone, and a whole-thumbnail target would fire by accident.
+  document.querySelectorAll('[data-before]').forEach(button=>button.onclick=()=>{haptic();cameraBeforeScreen(button.dataset.before);});
   document.querySelectorAll('[data-strip-remove]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.stripRemove,photos=draft.document.rooms[cameraRoom].photos,at=photos.indexOf(id);
     if(at<0)return;
@@ -2590,9 +2753,20 @@ function cameraCompanion(entering=false){
     haptic();remember();persist().catch(()=>{});cameraCompanion();
   });
 }
+function cameraBeforeScreen(id){
+  if(id)cameraBefore=id;
+  if(hudDictation)hudTalk();
+  window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraClose'});
+  document.documentElement.classList.remove('camera-open');
+  const room=draft?.document?.rooms?.[cameraRoom],base=checkInBaseline(),ids=beforeIdsFor(room?.name).filter(item=>photoFile(item));
+  enterScreen('before');
+  $('app').innerHTML=`<section class="before-page"><button type="button" id="before-back" class="quiet">← Back to camera</button><small class="eyebrow">Before · check-in ${esc(docDateText(base?.document?.date))}</small><h1>${esc(room?.name||'')}</h1><img class="before-photo" src="${esc(photoURL(cameraBefore))}" alt="How ${esc(room?.name||'it')} looked at check-in"><p class="muted"><small>${esc(photoCaptionText(cameraBefore))}</small></p>${ids.length>1?`<div class="before-thumbs">${ids.map(item=>`<button type="button" class="${item===cameraBefore?'is-active':''}" data-before-pick="${esc(item)}" aria-label="Another check-in photo"><img src="${esc(photoURL(item))}" alt=""></button>`).join('')}</div>`:''}</section>`;
+  $('before-back').onclick=()=>{const at=cameraRoom;cameraBefore=null;openNativeCamera(at);};
+  document.querySelectorAll('[data-before-pick]').forEach(button=>button.onclick=()=>{haptic();cameraBefore=button.dataset.beforePick;cameraBeforeScreen();});
+}
 window.marketelInspectCameraOpened=raw=>{
   if(!draft)return;
-  cameraAsk=false;
+  cameraAsk=false;cameraBefore=null;
   cameraRoom=Number(raw)||0;
   // Name the room the shell opened on, so its caption is right before any tap.
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:draft.document.rooms[cameraRoom]?.name||''});
@@ -2600,7 +2774,7 @@ window.marketelInspectCameraOpened=raw=>{
 };
 window.marketelInspectCameraClosed=()=>{
   document.documentElement.classList.remove('camera-open');
-  if(cameraAsk)return;
+  if(cameraAsk||cameraBefore)return;
   if(cameraRoom===null)return;
   cameraRoom=null;
   if(draft&&!preview&&!draft.finalizedAt)editor('rooms');else if(draft)reportPreview();else landing();
@@ -2612,7 +2786,7 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   if(draft.document.rooms.reduce((total,room)=>total+room.photos.length,0)>=100)return notice('Maximum 100 photos per report.','error');
   const blob=await (await fetch(data.dataUrl)).blob();
   const id=uid();
-  draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`});
+  draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`,takenAt:new Date().toISOString(),zone:PHONE_ZONE});
   draft.document.rooms[i].photos.push(id);
   remember();await persist();
   if(cameraRoom!==null)cameraCompanion(true);

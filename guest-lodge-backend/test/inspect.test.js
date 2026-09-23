@@ -246,7 +246,7 @@ test('an incident record does not misstate anything to an insurer', () => {
 
     // type is the wedge discriminator and needs no migration, but the three
     // existing types must keep working.
-    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident', 'damage'\]/);
+    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in'\]/);
 
     // date is when it was written down; neither it nor finalizedAt says when
     // the thing happened. Optional, and unknown is a real answer.
@@ -545,6 +545,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       findFirst: async () => report,
       update: async ({ data }) => ({ ...report, ...data }),
       count: async () => 0,
+      create: async ({ data }) => { calls.reportsCreated = (calls.reportsCreated || []).concat(data); return { id: 'rep_new', attachments: [], ...data }; },
       groupBy: async ({ where }) => {
         const counts = new Map();
         for (const row of reports.filter(mine(where))) counts.set(row.document.propertyName, (counts.get(row.document.propertyName) || 0) + 1);
@@ -575,7 +576,8 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
         return { count: before - properties.length };
       },
     },
-    inspectGarbage: { createMany: async ({ data }) => { calls.garbage.push(...data); } },
+    inspectGarbage: { createMany: async ({ data }) => { calls.garbage.push(...data); }, deleteMany: async () => ({ count: 0 }) },
+    inspectAttachment: { create: async ({ data }) => { calls.attachments = (calls.attachments || []).concat(data); return { id: 'att_new', createdAt: new Date(), ...data }; } },
     inspectFreeClaim: { findUnique: async () => null, create: async () => { calls.freeClaims += 1; } },
     inspectEvent: {
       findUnique: async ({ where }) => (seenEvents.has(where.sourceId) ? { id: where.sourceId } : null),
@@ -680,6 +682,140 @@ test('plans are unlimited everywhere they are described', () => {
   assert.match(terms, /\$25 USD per month or \$199 USD per year\. Both include unlimited finalized reports/);
   assert.match(terms, /fair use of 300 finalized reports per monthly billing period \(3,600 per yearly period\)/);
   assert.doesNotMatch(terms, /\$29/);
+});
+
+test('photos are dated on the copy everyone reads; the original is kept byte-for-byte', async () => {
+  const sharp = require('sharp');
+  const { S3Client } = require('@aws-sdk/client-s3');
+  const puts = new Map();
+  const send = S3Client.prototype.send;
+  S3Client.prototype.send = async function (command) { if (command.input?.Body) puts.set(command.input.Key, Buffer.from(command.input.Body)); return {}; };
+  const h = moneyHarness();
+  try {
+    const photo = await sharp({ create: { width: 1200, height: 900, channels: 3, background: '#d8d2c4' } }).jpeg().toBuffer();
+    const form = new FormData();
+    form.append('photo', new Blob([photo], { type: 'image/jpeg' }), 'p.jpg');
+    form.append('source', 'camera');
+    form.append('takenAt', new Date(Date.now() - 60000).toISOString());
+    form.append('zone', 'America/Chicago');
+    const response = await request(h.app, '/api/inspect/reports/rep_1/photos', { method: 'POST', headers: { Authorization: h.headers.Authorization }, body: form });
+    assert.equal(response.status, 200);
+    const original = [...puts].find(([key]) => key.endsWith('/original'))[1];
+    assert.equal(Buffer.compare(original, photo), 0, 'the original is what was received');
+    const display = [...puts].find(([key]) => key.endsWith('/display.jpg'))[1];
+    // stats() reads the whole input, so the corner is cropped out first.
+    const corner = async bytes => (await sharp(await sharp(bytes).extract({ left: 30, top: 830, width: 120, height: 40 }).toBuffer()).stats()).channels[0].mean;
+    const meta = await sharp(display).metadata();
+    assert.deepEqual([meta.width, meta.height], [1200, 900], 'the stamp never changes the size');
+    assert.ok(await corner(display) < await corner(photo) - 40, 'the bottom-left carries the dated pill');
+  } finally { S3Client.prototype.send = send; h.registration.close(); }
+});
+
+test('the stamp and the caption say when a photo was taken, honestly', () => {
+  const { stampText, photoCaption, usDate } = require('../inspect');
+  const taken = new Date(Date.UTC(2026, 8, 23, 1, 14));
+  const received = new Date(Date.UTC(2026, 8, 23, 1, 15));
+  assert.equal(stampText({ takenAt: taken.toISOString(), zone: 'America/Chicago', source: 'camera', receivedAt: received }), 'Sep 22, 2026 · 8:14 PM');
+  // An import's own date cannot be trusted, so it carries the day it arrived.
+  assert.equal(stampText({ takenAt: taken.toISOString(), zone: 'America/Chicago', source: 'import', receivedAt: received }), 'Imported · Sep 22, 2026');
+  // A clock in the future, or a zone that does not exist, is not believed.
+  assert.equal(stampText({ takenAt: new Date(received.getTime() + 3600000).toISOString(), zone: 'America/Chicago', source: 'camera', receivedAt: received }), 'Received · Sep 22, 2026');
+  assert.equal(stampText({ takenAt: taken.toISOString(), zone: 'Mars/Base', source: 'camera', receivedAt: received }), 'Sep 23, 2026 · 1:14 AM UTC');
+  const document = { photoTimes: { a1: { takenAt: taken.toISOString(), zone: 'America/Chicago' }, a2: { zone: 'America/Chicago' } } };
+  assert.equal(photoCaption(document, { id: 'a1', source: 'camera', createdAt: received }), 'Taken Sep 22, 2026 at 8:14 PM · received by Marketel 8:15 PM');
+  assert.equal(photoCaption(document, { id: 'a2', source: 'import', createdAt: received }), 'Imported · received by Marketel Sep 22, 2026 at 8:15 PM');
+  assert.equal(usDate('2026-09-12'), 'Sep 12, 2026');
+  // Only photos the document holds keep a time, and only values that parse.
+  const kept = validateDocument({ propertyName: 'Pine', type: 'damage', date: '2026-09-22', author: 'Sam',
+    rooms: [{ name: 'Bedroom', observation: '', photos: ['a1'] }],
+    photoTimes: { a1: { takenAt: taken.toISOString(), zone: 'America/Chicago' }, stranger: { takenAt: taken.toISOString() }, a9: 'nope' } });
+  assert.deepEqual(kept.photoTimes, { a1: { takenAt: taken.toISOString(), zone: 'America/Chicago' } });
+});
+
+test('a check-in is saved free: no allowance, no trial end, nothing to Meta, no name needed', async () => {
+  const updates = [];
+  const h = moneyHarness({
+    account: { subscriptionStatus: 'trialing', stripeSubscriptionId: 'sub_trial', periodEnd: new Date(Date.now() + 86400000), metaAttribution: { fbp: 'fb.1.1700000000.1' } },
+    report: { document: { propertyName: 'Pine Ave', type: 'check-in', date: '2026-09-12', author: '', rooms: [{ name: 'Bedroom', observation: '', issue: false, photos: ['p1'] }], signatures: [] } },
+    stripe: { subscriptions: { update: async (id, params) => { updates.push({ id, params }); return { id }; } } },
+  });
+  try {
+    const response = await request(h.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.equal(h.calls.accountUpdates.length, 0, 'nothing is spent');
+    assert.deepEqual(updates, [], 'the trial is left alone');
+    assert.equal(h.calls.capi.length, 0, 'Meta hears nothing');
+    assert.ok(h.calls.events.some(e => e.name === 'CheckInSaved'));
+    assert.ok(!h.calls.events.some(e => e.name === 'ReportFinalized'));
+  } finally { h.registration.close(); }
+});
+
+test('a damage report links only to its own property\'s saved check-in', async () => {
+  const checkIn = { finalizedAt: new Date(), propertyName: 'Pine Ave',
+    document: { propertyName: 'Pine Ave', type: 'check-in', date: '2026-09-12', author: '', rooms: [{ name: 'Bedroom', observation: '', issue: false, photos: ['p1'] }], signatures: [] } };
+  const body = extra => JSON.stringify({ propertyName: 'pine ave', type: 'damage', date: '2026-09-22', author: 'Sam', rooms: [{ name: 'Bedroom', observation: '', photos: [] }], ...extra });
+  let h = moneyHarness({ report: checkIn });
+  try {
+    const response = await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers, body: body({ baselineReportId: 'rep_1' }) });
+    assert.equal(response.status, 200);
+    assert.equal(h.calls.reportsCreated[0].baselineReportId, 'rep_1');
+    assert.equal((await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers,
+      body: body({ propertyName: 'Oak Street', baselineReportId: 'rep_1' }) })).status, 400, 'another property\'s check-in is refused');
+  } finally { h.registration.close(); }
+  h = moneyHarness({ report: { ...checkIn, finalizedAt: null } });
+  try {
+    assert.equal((await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers, body: body({ baselineReportId: 'rep_1' }) })).status, 400, 'an unsaved check-in is refused');
+  } finally { h.registration.close(); }
+});
+
+test('properties know their last check-in, counted apart from reports', async () => {
+  const h = moneyHarness({ report: { finalizedAt: new Date(),
+    document: { propertyName: 'Pine Ave', type: 'check-in', date: '2026-09-12', author: '', rooms: [{ name: 'Bedroom', photos: ['p1', 'p2'] }, { name: 'Kitchen', photos: ['p3'] }], signatures: [] } } });
+  try {
+    const response = await request(h.app, '/api/inspect/properties', { headers: h.headers });
+    const [pine] = (await response.json()).propertyDetails;
+    assert.deepEqual({ reportCount: pine.reportCount, checkInCount: pine.checkInCount, latestCheckIn: pine.latestCheckIn },
+      { reportCount: 0, checkInCount: 1, latestCheckIn: { id: 'rep_1', date: '2026-09-12', photoCount: 3 } });
+  } finally { h.registration.close(); }
+});
+
+test('a shared damage report shows each finding against the check-in of the same room, with its times', async () => {
+  const received = new Date(Date.UTC(2026, 8, 23, 1, 15));
+  const h = moneyHarness({ report: { finalizedAt: new Date(), shareHash: 'x',
+    attachments: [{ id: 'p1', source: 'camera', createdAt: received }],
+    document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-22', author: 'Sam', signatures: [],
+      rooms: [{ name: 'Bedroom', observation: 'Hole in the wall.', issue: true, photos: ['p1'] }, { name: 'Hallway', observation: 'Scuff.', issue: true, photos: [] }],
+      photoTimes: { p1: { takenAt: new Date(received.getTime() - 60000).toISOString(), zone: 'America/Chicago' } } },
+    baselineReport: { attachments: [{ id: 'b1', source: 'camera', createdAt: new Date(Date.UTC(2026, 8, 12, 20)) }],
+      document: { propertyName: 'Pine Ave', type: 'check-in', date: '2026-09-12', author: '', signatures: [],
+        rooms: [{ name: 'bedroom', observation: '', photos: ['b1'] }, { name: 'Kitchen', observation: '', photos: [] }] } } } });
+  try {
+    const html = await (await request(h.app, `/api/inspect/shared/${'a'.repeat(43)}`, {})).text();
+    assert.match(html, /Compared with:<\/strong> the check-in on Sep 12, 2026/);
+    assert.equal((html.match(/Before · check-in Sep 12, 2026/g) || []).length, 1, 'only the room with the same name gets a before');
+    assert.match(html, /compare-label">After</);
+    assert.match(html, /Taken Sep 22, 2026 at 8:14 PM · received by Marketel 8:15 PM/);
+    assert.doesNotMatch(html, /Upload date recorded separately|No observation recorded\.<\/p><figure><img alt="Recorded property condition" src="[^"]*\/b1"/);
+  } finally { h.registration.close(); }
+  const server = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'inspect.js'), 'utf8');
+  assert.match(server, /doc\.fontSize\(9\)\.text\(photoCaption\(report\.document, a\)\)/, 'the PDF uses the same caption');
+  assert.doesNotMatch(server, /Uploaded \$\{a\.createdAt\.toISOString\(\)\}/);
+});
+
+test('the app dates photos, keeps check-ins with their property, and shows the before', () => {
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  assert.match(client, /if\(f\.takenAt\)form\.append\('takenAt',f\.takenAt\);\s*form\.append\('zone',f\.zone\|\|PHONE_ZONE\);/);
+  assert.match(client, /draft\.files\.push\(\{id,blob,source:'camera',name:`camera-\$\{id\}\.jpg`,takenAt:new Date\(\)\.toISOString\(\),zone:PHONE_ZONE\}\)/);
+  assert.match(client, /return \{\.\.\.draft\.document,photoTimes:times,rooms:/);
+  assert.match(client, /TOOL_LIST_TYPES = Object\.freeze\(\{ inspect: TOOL_TYPES\.inspect, claims: \['damage'\]/);
+  assert.match(client, /const toolTypesQuery = \(\) => `types=\$\{TOOL_LIST_TYPES\[toolId\(\)\]\.join\(','\)\}`;/);
+  assert.match(client, /data-check-in="\$\{index\}">Check in<\/button>/);
+  assert.match(client, /keep\.textContent='Save check-in';/);
+  assert.match(client, /baselineReportId:draft\.baselineId/);
+  assert.match(client, /data-ask-name="\$\{esc\(name\)\}"/);
+  assert.match(client, /if\(cameraAsk\|\|cameraBefore\)return;/);
+  assert.match(client, /hudShell\(\)&&!photosOnly\?/);
+  assert.match(client, /Shots land here, each one dated\./);
 });
 
 test('a property can be added on its own, and deleted with its reports', async () => {
@@ -1070,7 +1206,7 @@ test('switching tools can never strand the app on a blank page', () => {
   assert.doesNotMatch(client, /location\.assign\('\.\.\/index\.html/);
   // Each tool keeps its own draft and asks only for its own reports.
   assert.match(client, /const draftKey = \(\) => `current:\$\{toolId\(\)\}`/);
-  assert.match(client, /inspect: \['routine', 'move-in', 'move-out'\], claims: \['damage'\], incident: \['incident'\]/);
+  assert.match(client, /inspect: \['routine', 'move-in', 'move-out'\], claims: \['damage', 'check-in'\], incident: \['incident'\]/);
   assert.equal((client.match(/\/reports\?take=50&\$\{toolTypesQuery\(\)\}/g) || []).length, 3);
   assert.match(client, /<small>\$\{esc\(documentLabelFor\(d\.type\)\)\}<\/small>/);
   // A chooser restored from the back/forward cache undoes its departure.
@@ -2483,7 +2619,7 @@ test('the room is asked before the camera, and changing your mind leaves nothing
   // The camera sheet only opens once the room has a name or one is picked.
   assert.match(client, /if\(entryTool\(\)&&!\(room\?\.name\|\|''\)\.trim\(\)\)\{ cameraAsk='name'; cameraCompanion\(true\); return; \}/);
   // A dismissal we asked for is not the owner leaving the camera.
-  assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraAsk\)return;/);
+  assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraAsk\|\|cameraBefore\)return;/);
 });
 
 test('Meta hears about the website, never about what happens inside the app', async () => {

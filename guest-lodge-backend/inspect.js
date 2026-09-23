@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const path = require('path');
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -9,6 +10,67 @@ const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = re
 const { marketelMetaRequestContext } = require('./marketel-meta-capi');
 
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
+
+// ——— Dated photos ——————————————————————————————————————————————————————
+// A claim is won on dated photos, and a claim form takes them one at a time,
+// so a date that lives only in the report is lost the moment one is uploaded
+// on its own. The date is burned into the display copy; the original stays
+// byte-for-byte what was received. The font ships with the app because the
+// server has none of its own.
+const STAMP_FONT = path.join(__dirname, 'assets', 'fonts', 'LiberationSans-Bold.ttf');
+const validZone = zone => {
+  if (typeof zone !== 'string' || !zone || zone.length > 64) return false;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: zone }); return true; } catch { return false; }
+};
+// The phone says when it was taken. Believed only if it is not in the future
+// and not older than anything a report could honestly hold.
+const photoMoment = (takenAt, receivedAt = new Date()) => {
+  const taken = new Date(takenAt), now = new Date(receivedAt).getTime();
+  const ms = taken.getTime();
+  return Number.isFinite(ms) && ms <= now + 5 * 60000 && ms >= now - 2 * 365 * 86400000 ? taken : null;
+};
+const photoDay = (when, zone) => when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: zone });
+const photoClock = (when, zone) => when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: zone });
+const photoWhen = (when, zone) => `${photoDay(when, zone)} at ${photoClock(when, zone)}${zone === 'UTC' ? ' UTC' : ''}`;
+// What the stamp says. A camera shot carries the moment it was taken; an
+// import only the day it reached Marketel, because a file's own date is
+// whatever the last app to touch it made it.
+function stampText({ takenAt, zone, source, receivedAt = new Date() }) {
+  const tz = validZone(zone) ? zone : 'UTC';
+  const taken = source === 'camera' ? photoMoment(takenAt, receivedAt) : null;
+  if (!taken) return `${source === 'camera' ? 'Received' : 'Imported'} · ${photoDay(new Date(receivedAt), tz)}`;
+  return `${photoDay(taken, tz)} · ${photoClock(taken, tz)}${tz === 'UTC' ? ' UTC' : ''}`;
+}
+async function stampPhoto(bytes, details) {
+  const image = sharp(bytes);
+  const { width, height } = await image.metadata();
+  const size = Math.max(14, Math.round(Math.min(width, height) * 0.03));
+  const text = stampText(details).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const label = await sharp({ text: { text: `<span foreground="white">${text}</span>`, font: `Liberation Sans Bold ${size}px`,
+    fontfile: STAMP_FONT, rgba: true, dpi: 72 } }).png().toBuffer({ resolveWithObject: true });
+  const padX = Math.round(size * 0.7), padY = Math.round(size * 0.45), margin = Math.round(size * 0.8);
+  const pillW = label.info.width + padX * 2, pillH = label.info.height + padY * 2;
+  const left = margin, top = Math.max(0, height - margin - pillH);
+  const pill = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${pillW}" height="${pillH}"><rect width="${pillW}" height="${pillH}" rx="${Math.round(pillH / 2)}" fill="rgb(16,28,22)" fill-opacity="0.62"/></svg>`);
+  return image.composite([{ input: pill, left, top }, { input: label.data, left: left + padX, top: top + padY }])
+    .jpeg({ quality: 80 }).toBuffer();
+}
+const usDate = value => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  return match ? new Date(Date.UTC(+match[1], +match[2] - 1, +match[3])).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : String(value || '');
+};
+// The line under a photo in the shared report and the PDF: when it was taken,
+// by the phone's clock, and when Marketel received it, by ours.
+function photoCaption(document, attachment) {
+  if (!attachment) return '';
+  const meta = document?.photoTimes?.[attachment.id];
+  const zone = validZone(meta?.zone) ? meta.zone : 'UTC';
+  const received = new Date(attachment.createdAt);
+  const taken = attachment.source === 'camera' ? photoMoment(meta?.takenAt, received) : null;
+  const receivedText = taken && photoDay(taken, zone) === photoDay(received, zone) ? photoClock(received, zone) : photoWhen(received, zone);
+  return taken ? `Taken ${photoWhen(taken, zone)} · received by Marketel ${receivedText}`
+    : `${attachment.source === 'camera' ? 'Camera photo' : 'Imported'} · received by Marketel ${photoWhen(received, zone)}`;
+}
 const token = () => crypto.randomBytes(32).toString('base64url');
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const safe = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -68,14 +130,16 @@ const VOICE_INSTRUCTIONS = {
 };
 const SIGNATURE_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
 const signatureRoles = type => SIGNATURE_ROLES[type] || SIGNATURE_ROLES.default;
-const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident', 'damage']);
+// A check-in is the "before": how a unit looked at turnover, kept so a later
+// damage report can show the change. It is never sent and never charged.
+const REPORT_TYPES = Object.freeze(['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in']);
 // Per-tool commercial settings. A 'first-free' tool includes one lifetime free
 // finalized report. A 'pay-at-export' tool is free to build and asks at the
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
 const TOOLS = Object.freeze({
   inspect: Object.freeze({ unit: 'room', types: ['routine', 'move-in', 'move-out'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Inspect', home: '/inspect/' }),
-  claims: Object.freeze({ unit: 'entry', types: ['damage'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
+  claims: Object.freeze({ unit: 'entry', types: ['damage', 'check-in'], offerMode: 'pay-at-export', reportPrice: 1200, label: 'Marketel Claims', home: '/claims' }),
   incident: Object.freeze({ unit: 'room', types: ['incident'], offerMode: 'first-free', reportPrice: 1200, label: 'Marketel Incident', home: '/incident' }),
 });
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
@@ -90,12 +154,13 @@ const ROLE_LABELS = { witness: 'Witness', resident: 'Resident / tenant', owner: 
 const roleLabel = role => ROLE_LABELS[role] || ROLE_LABELS.manager;
 // The enum is storage; this is what a reader sees. Without it a damage report
 // prints the word "damage" where its own name belongs.
-const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
+const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'check-in': 'Check-in record', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
 const typeLabel = type => TYPE_LABELS[type] || TYPE_LABELS.routine;
 // The identity the artifact carries once it has left the product.
 const DOCUMENT_IDENTITY = {
   incident: { brand: 'MARKETEL INCIDENT', file: 'incident-record.pdf' },
   damage: { brand: 'MARKETEL CLAIMS', file: 'damage-report.pdf' },
+  'check-in': { brand: 'MARKETEL CLAIMS', file: 'check-in-record.pdf' },
   default: { brand: 'MARKETEL INSPECT', file: 'inspection-report.pdf' },
 };
 const documentIdentity = type => DOCUMENT_IDENTITY[type] || DOCUMENT_IDENTITY.default;
@@ -192,6 +257,22 @@ function validateDocument(input) {
   });
   if (photoCount > LIMITS.photos) throw fail(400, 'Maximum 100 photos per report.');
   const document = { propertyName, author, type: input.type, date: input.date, rooms };
+  // When each photo was taken, by the phone's clock, and in which zone. Only
+  // for photos this document holds, and only values that parse.
+  if (input.photoTimes && typeof input.photoTimes === 'object') {
+    const held = new Set(rooms.flatMap(room => room.photos));
+    const times = {};
+    for (const [id, value] of Object.entries(input.photoTimes)) {
+      if (!held.has(id) || !value || typeof value !== 'object') continue;
+      // An import has no taken time worth keeping, but its zone still says
+      // how to show when it arrived.
+      const takenAt = new Date(value.takenAt);
+      const entry = { ...(value.takenAt != null && Number.isFinite(takenAt.getTime()) ? { takenAt: takenAt.toISOString() } : {}),
+        ...(validZone(value.zone) ? { zone: value.zone } : {}) };
+      if (Object.keys(entry).length) times[id] = entry;
+    }
+    if (Object.keys(times).length) document.photoTimes = times;
+  }
   // `date` is the report's date and finalizedAt is when it was frozen. Neither
   // says when the thing happened, which is the one field every real incident
   // form has. Optional, and unknown is a real answer a witness may have to give.
@@ -483,6 +564,7 @@ function registerInspect(app, {
   const DISCLAIMER = {
   incident: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
   damage: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
+  'check-in': 'Photos of the unit\'s condition at check-in, kept for comparison.',
   default: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
 };
 const disclaimerFor = type => DISCLAIMER[type] || DISCLAIMER.default;
@@ -510,7 +592,7 @@ function locationLines(document) {
 }
 const signaturesHtml = document => (document.signatures || []).map(signature => `<section class="signature"><h3>${safe(roleLabel(signature.role))} signature</h3>${signatureSvg(signature)}<p>${safe(signature.name)} · Signed ${safe(signature.signedAt || 'when this document was finalized')}</p></section>`).join('');
   const entryHeading = (room, index) => room.name || `Finding ${index + 1}`;
-  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${room.issue ? ' · Issue noted' : ''}</h2><p>${safe(room.observation || 'No observation recorded.')}</p>${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${report.attachments.find(a => a.id === id)?.source === 'camera' ? 'Camera capture' : 'Imported photo'} · Upload date recorded separately</figcaption></figure>`).join('')}</section>`;
+  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${room.issue ? ' · Issue noted' : ''}</h2>${!room.observation && report.document?.type === 'check-in' ? '' : `<p>${safe(room.observation || 'No observation recorded.')}</p>`}${room.photos.map(id => `<figure><img alt="Recorded property condition" src="${photoPrefix}/${id}"><figcaption>${safe(photoCaption(report.document, report.attachments.find(a => a.id === id)))}</figcaption></figure>`).join('')}</section>`;
   const claimAiUse = async (accountId, reportId) => prisma.$transaction(async tx => {
     await lockAccount(tx, accountId);
     const report = await owned(tx, accountId, reportId); mutable(report);
@@ -666,15 +748,19 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const d = report.document;
     const baseline = report.baselineReport;
     const baselineRooms = new Map((baseline?.document?.rooms || []).map(room => [room.name.toLowerCase(), room]));
+    // Against a check-in, a finding pairs only with the room of the same name:
+    // an unrelated room shown as its "before" would be worse than none.
+    const checkInBase = baseline?.document?.type === 'check-in';
+    const beforeLabel = checkInBase ? `Before · check-in ${usDate(baseline.document.date)}` : 'Previous finalized report';
     const rooms = d.rooms.map((room, index) => {
-      const before = baselineRooms.get(room.name.toLowerCase()) || baseline?.document?.rooms?.[index];
-      return `${before ? roomHtml(before, baseline, `${req.params.token}/photos`, '<p class="compare-label">Previous finalized report</p>', index) : ''}${roomHtml(room, report, `${req.params.token}/photos`, before ? '<p class="compare-label">Current report</p>' : '', index)}`;
+      const before = baselineRooms.get(room.name.toLowerCase()) || (checkInBase ? null : baseline?.document?.rooms?.[index]);
+      return `${before ? roomHtml(before, baseline, `${req.params.token}/photos`, `<p class="compare-label">${safe(beforeLabel)}</p>`, index) : ''}${roomHtml(room, report, `${req.params.token}/photos`, before ? `<p class="compare-label">${checkInBase ? 'After' : 'Current report'}</p>` : '', index)}`;
     }).join('');
     const business = d.business && (d.business.name || d.business.logoKey)
       ? `<header style="display:flex;align-items:center;gap:14px;margin:0 0 18px">${d.business.logoKey ? `<img src="${req.params.token}/logo" alt="" style="max-height:56px;max-width:160px">` : ''}<strong style="font-size:22px">${safe(d.business.name)}</strong></header>`
       : '';
     res.set('Content-Security-Policy', "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'");
-    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}.location{margin:2px 0;font-size:13px;color:#587064}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(d.date)}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}</p>` : ''}${locationLines(d).map(line => `<p class="location">${safe(line)}</p>`).join('')}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
+    res.type('html').send(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${safe(typeLabel(d.type))}</title><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}p{white-space:pre-wrap}.compare-label{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#587064;font-weight:700}.signature svg{max-width:320px;border:1px solid #d8e4dc;border-radius:12px}.location{margin:2px 0;font-size:13px;color:#587064}</style></head><body>${business}<small>${safe(documentIdentity(d.type).brand)} · ${safe(disclaimerFor(d.type))}</small><h1>${safe(d.propertyName)}</h1><p>${safe(typeLabel(d.type))} · ${safe(usDate(d.date))}${d.eventTime ? ` · ${d.type === 'damage' ? 'found' : 'occurred'} ${safe(d.eventTime)}` : ''} · ${safe(d.author)}</p>${baseline ? `<p><strong>Compared with:</strong> ${checkInBase ? `the check-in on ${safe(usDate(baseline.document.date))}` : `${safe(typeLabel(baseline.document.type))} from ${safe(baseline.document.date)}`}</p>` : ''}${locationLines(d).map(line => `<p class="location">${safe(line)}</p>`).join('')}<a href="${req.params.token}/pdf">Download PDF</a>${rooms}${signaturesHtml(d)}</body></html>`);
   }));
   router.get('/shared/:token/logo', guarded(async (req, res) => {
     const r = await shared(req.params.token);
@@ -708,13 +794,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   async function appendPdfRoom(doc, report, room, label, index = 0) {
     doc.addPage().fontSize(9).fillColor('#587064').text(label.toUpperCase());
     doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index)}${room.issue ? ' - Issue noted' : ''}`);
-    doc.moveDown().fontSize(11).text(room.observation || 'No observation recorded.');
+    if (room.observation || report.document?.type !== 'check-in') doc.moveDown().fontSize(11).text(room.observation || 'No observation recorded.');
     for (const id of room.photos) {
       const a = report.attachments.find(item => item.id === id);
       if (!a) continue;
       const bytes = await object(a.objectKey);
       doc.addPage().fontSize(12).text(room.name);
-      doc.fontSize(9).text(`${a.source === 'camera' ? 'Camera capture' : 'Imported photo'} | Uploaded ${a.createdAt.toISOString()}`);
+      doc.fontSize(9).text(photoCaption(report.document, a));
       doc.image(bytes, 44, 90, { fit: [507, 660], align: 'center', valign: 'center' });
     }
   }
@@ -731,20 +817,23 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     doc.fontSize(10).text(identity.brand);
     doc.moveDown().fontSize(24).text(report.document.propertyName);
     const legacy = report.document.type !== 'incident' && report.document.type !== 'damage';
-    doc.fontSize(11).text(`${legacy ? report.document.type : typeLabel(report.document.type)} | ${report.document.date}${report.document.eventTime ? ` | ${report.document.type === 'damage' ? 'found' : 'occurred'} ${report.document.eventTime}` : ''} | ${report.document.author}`);
+    doc.fontSize(11).text(`${legacy ? report.document.type : typeLabel(report.document.type)} | ${usDate(report.document.date)}${report.document.eventTime ? ` | ${report.document.type === 'damage' ? 'found' : 'occurred'} ${report.document.eventTime}` : ''} | ${report.document.author}`);
     doc.moveDown().fontSize(9).text(disclaimerFor(report.document.type));
     const located = locationLines(report.document);
     if (located.length) { doc.moveDown(.5); for (const line of located) doc.fontSize(9).text(line); }
     try {
       if (report.baselineReport) {
-        doc.moveDown().fontSize(10).text(legacy
+        const checkInBase = report.baselineReport.document.type === 'check-in';
+        doc.moveDown().fontSize(10).text(checkInBase
+          ? `Compared with the check-in on ${usDate(report.baselineReport.document.date)}.`
+          : legacy
           ? `Compared with ${report.baselineReport.document.type} report from ${report.baselineReport.document.date}.`
           : `Compared with ${typeLabel(report.baselineReport.document.type)} from ${report.baselineReport.document.date}.`);
         const previous = report.baselineReport.document.rooms;
         for (const [index, room] of report.document.rooms.entries()) {
-          const before = previous.find(item => item.name.toLowerCase() === room.name.toLowerCase()) || previous[index];
-          if (before) await appendPdfRoom(doc, report.baselineReport, before, 'Previous finalized report', index);
-          await appendPdfRoom(doc, report, room, 'Current report', index);
+          const before = previous.find(item => item.name.toLowerCase() === room.name.toLowerCase()) || (checkInBase ? null : previous[index]);
+          if (before) await appendPdfRoom(doc, report.baselineReport, before, checkInBase ? `Before · check-in ${usDate(report.baselineReport.document.date)}` : 'Previous finalized report', index);
+          await appendPdfRoom(doc, report, room, before ? (checkInBase ? 'After' : 'Current report') : 'Recorded condition', index);
         }
       } else {
         for (const [index, room] of report.document.rooms.entries()) await appendPdfRoom(doc, report, room, 'Recorded condition', index);
@@ -1068,16 +1157,25 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         take: 1000,
       }),
     ]);
-    const latest = new Map();
-    for (const report of finalized) if (!latest.has(report.propertyName)) latest.set(report.propertyName, report);
-    const reportCount = new Map(counts.map(row => [row.propertyName, row._count._all]));
+    const latest = new Map(), latestCheckIn = new Map(), checkIns = new Map();
+    for (const report of finalized) {
+      if (report.document?.type === 'check-in') {
+        checkIns.set(report.propertyName, (checkIns.get(report.propertyName) || 0) + 1);
+        if (!latestCheckIn.has(report.propertyName)) latestCheckIn.set(report.propertyName, report);
+      } else if (!latest.has(report.propertyName)) latest.set(report.propertyName, report);
+    }
+    const reportCount = new Map(counts.map(row => [row.propertyName, row._count._all - (checkIns.get(row.propertyName) || 0)]));
     const names = [...new Set([...saved.map(row => row.name), ...reportCount.keys()])]
       .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
     return {
       properties: names,
       propertyDetails: names.map(name => {
         const report = latest.get(name);
-        return { name, reportCount: reportCount.get(name) || 0, latestFinalizedReportId: report?.id || null,
+        const checkIn = latestCheckIn.get(name);
+        return { name, reportCount: reportCount.get(name) || 0, checkInCount: checkIns.get(name) || 0,
+          latestCheckIn: checkIn ? { id: checkIn.id, date: checkIn.document.date,
+            photoCount: (checkIn.document.rooms || []).reduce((total, room) => total + (room.photos || []).length, 0) } : null,
+          latestFinalizedReportId: report?.id || null,
           latestType: report?.document?.type || null, latestDate: report?.document?.date || null };
       }),
     };
@@ -1121,7 +1219,18 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const report = await prisma.$transaction(async tx => {
       await lockAccount(tx, req.inspect.id);
       if (await tx.inspectReport.count({ where: { accountId: req.inspect.id, finalizedAt: null } }) >= LIMITS.drafts) throw fail(409, 'You can keep five drafts. Finish or delete a draft first.');
-      const created = await tx.inspectReport.create({ data: { accountId: req.inspect.id, propertyName: document.propertyName, document } });
+      // The "before" a damage report is compared with: only this account's own
+      // saved check-in of the same property.
+      let baselineReportId = null;
+      if (req.body?.baselineReportId != null && document.type === 'damage') {
+        const baseline = await owned(tx, req.inspect.id, String(req.body.baselineReportId)).catch(() => null);
+        const matches = baseline?.finalizedAt && baseline.document?.type === 'check-in'
+          && String(baseline.propertyName).trim().toLowerCase() === document.propertyName.trim().toLowerCase();
+        if (!matches) throw fail(400, 'That check-in is not available for this property.');
+        baselineReportId = baseline.id;
+      }
+      const created = await tx.inspectReport.create({ data: { accountId: req.inspect.id, propertyName: document.propertyName, document,
+        ...(baselineReportId ? { baselineReportId } : {}) } });
       await tx.inspectEvent.create({ data: { accountId: req.inspect.id, name: 'ReportStarted', sourceId: `inspect-start:${created.id}` } });
       return created;
     });
@@ -1194,6 +1303,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     let bytes;
     try { bytes = await sharp(req.file.buffer, { limitInputPixels: 40000000 }).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer(); }
     catch { throw fail(400, 'This photo format could not be read. Choose JPEG, PNG or WebP, or use your camera.'); }
+    // Dated on the copy everyone reads. A stamp that fails never costs the photo.
+    bytes = await stampPhoto(bytes, { takenAt: req.body.takenAt, zone: req.body.zone,
+      source: req.body.source === 'camera' ? 'camera' : 'import', receivedAt: new Date() })
+      .catch(error => { console.error('Inspect photo stamp failed:', error.message); return bytes; });
     const key = `inspect/${req.inspect.id}/${report.id}/${token()}`;
     const originalKey = `${key}/original`; const objectKey = `${key}/display.jpg`;
     // Queue first, then remove only after ownership is durably committed.
@@ -1425,13 +1538,21 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   router.post('/reports/:id/finalize', guarded(async (req, res) => {
     // Set inside the transaction, acted on after it commits: the offer says
     // billing starts with the first report, and this is that moment.
-    let endTrialFor = null;
+    let endTrialFor = null, checkIn = false;
     const result = await prisma.$transaction(async tx => {
       const a = await lockAccount(tx, req.inspect.id);
       endTrialFor = a.subscriptionStatus === 'trialing' ? a.stripeSubscriptionId : null;
       const r = await owned(tx, a.id, req.params.id);
       if (r.finalizedAt) return r;
       const document = validateDocument(r.document);
+      checkIn = document.type === 'check-in';
+      if (checkIn) {
+        if (!document.rooms.some(room => room.photos.length)) throw fail(400, 'Add at least one uploaded photo.');
+        if (document.rooms.some(room => room.photos.some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
+        const saved = await tx.inspectReport.update({ where: { id: r.id }, data: { document, finalizedAt: new Date() }, include: { attachments: true, baselineReport: { include: { attachments: true } } } });
+        await tx.inspectEvent.create({ data: { accountId: a.id, name: 'CheckInSaved', sourceId: `inspect-checkin:${r.id}`, tool: 'claims' } });
+        return saved;
+      }
       if (!document.author || !document.rooms.some(room => room.photos.length)) throw fail(400, 'Add your name and at least one uploaded photo.');
       if (document.rooms.some(room => room.photos.some(id => !r.attachments.some(photo => photo.id === id)))) throw fail(400, 'Wait for all photos to upload.');
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(a.email) } });
@@ -1468,6 +1589,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       await tx.inspectEvent.create({ data: { accountId: a.id, name: 'ReportFinalized', sourceId: `inspect-final:${r.id}`, tool: toolForType(document.type) } });
       return finalized;
     });
+    // Saving a check-in is not a sale: no trial ends and Meta hears nothing.
+    if (checkIn) return res.json(serialize(result));
     await queueInspectCapi('CompleteRegistration', {
       account: req.inspect,
       req,
@@ -1934,6 +2057,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
 
 module.exports = {
   registerInspect,
+  stampPhoto,
+  stampText,
+  photoCaption,
+  usDate,
   validateDocument,
   validateSignatures,
   validateInspectPrice,
