@@ -90,13 +90,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 input[type="date"] { display: block; width: 100%; min-width: 0; max-width: 100%; -webkit-appearance: none; appearance: none; }
 textarea { min-height: 105px; resize: vertical; }
 button, .button { font: inherit; cursor: pointer; background: var(--green); color: #fff; border: 0; border-radius: 12px; padding: 14px 20px; display: inline-block; text-decoration: none; font-weight: 650; min-height: 46px; box-shadow: none; transition: transform .14s, background-color .14s, opacity .14s; -webkit-tap-highlight-color: transparent; }
-button:active, .button:active { transform: scale(.97); }
+button:active, .button:active, button.is-pressed, .button.is-pressed { transform: scale(.97); }
 button:disabled { opacity: .5; cursor: wait; }
 .quiet { background: transparent; color: var(--green); padding: 10px 12px; box-shadow: none; }
 .secondary { background: var(--green-pale); color: var(--green); box-shadow: none; }
-.quiet:active { background: #e4efe8; }
-.secondary:active { background: #d3e8dd; }
-.danger:active { background: #f6e4e1; }
+.quiet:active, .quiet.is-pressed { background: #e4efe8; }
+.secondary:active, .secondary.is-pressed { background: #d3e8dd; }
+.danger:active, .danger.is-pressed { background: #f6e4e1; }
 .danger { color: #aa382b; }
 .wide { width: 100%; }
 /* Label swaps for a spinner in place, so nothing reflows and a second tap
@@ -122,7 +122,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 .photo-grid figure { margin: 0; border-radius: 12px; position: relative; touch-action: pan-y; transition: opacity .12s; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* Feedback goes on the image, never the figure: the drag measures the figure's
    box to place the lifted tile, and a transform on it would measure short. */
-.photo-grid figure:active img { transform: scale(.985); }
+.photo-grid figure:active img, .photo-grid figure.is-pressed img { transform: scale(.985); }
 .photo-grid figure.is-drag-source { opacity: 0; }
 .photo-ghost { position: fixed; z-index: 60; margin: 0; padding: 0; pointer-events: none; will-change: transform; border-radius: 12px; box-shadow: 0 18px 38px #173b2340; }
 .photo-ghost img { display: block; width: 100%; height: 125px; object-fit: cover; border-radius: 10px; }
@@ -131,7 +131,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #74a581; outline-offs
 /* Removing a photo is the frequent action, so it sits on the tile rather than
    behind the overflow menu. */
 .photo-x { position: absolute; z-index: 2; top: 6px; right: 6px; width: 28px; height: 28px; min-height: 28px; padding: 0; display: grid; place-items: center; font-size: 12px; line-height: 1; color: #fff; background: #17231ba8; border-radius: 999px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.photo-x:active { transform: scale(.92); }
+.photo-x:active, .photo-x.is-pressed { transform: scale(.92); }
 .photo-grid img { cursor: zoom-in; }
 /* No plate behind the photo: contain letterboxes anything that is not the
    sheet's aspect, and a dark plate turned that into black bars. */
@@ -190,6 +190,14 @@ nav button.is-active { background: #ffffff9e; border-color: #ffffffc7; box-shado
    its own, rather than a full-width bar that the keyboard used to sit on top of. */
 #notice { position: fixed; z-index: 30; left: 16px; right: 16px; bottom: calc(var(--kb, 0px) + 100px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 7px; pointer-events: none; transition: bottom .18s ease; }
 #notice:empty { display: none; }
+/* Shown as a popover so it can sit above an open sheet (see raiseNotices);
+   these undo the browser's popover box so it stays a plain toast stack. */
+#notice[popover] { top: auto; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; overflow: visible; width: auto; height: auto; }
+.toast.in-sheet { max-width: none; margin: 0 0 12px; text-align: center; }
+button.is-done { background: var(--green-dark); }
+@keyframes note-updated { from { border-color: var(--green); background: #e8f5ee; } }
+textarea.just-changed { animation: note-updated 1.4s ease-out; }
+@media (prefers-reduced-motion: reduce) { textarea.just-changed { animation: none; } }
 .toast { max-width: min(420px, 100%); background: #213b2f; color: #fff; border-radius: 11px; padding: 11px 16px; font-size: 12px; font-weight: 600; line-height: 1.45; box-shadow: 0 12px 32px #173b2333; animation: toast-in .2s ease, toast-out .3s ease 3.4s forwards; }
 .toast.success { background: var(--green); }
 .toast.error { background: #aa382b; }
@@ -222,7 +230,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .billing-toggle { display: flex; gap: 6px; padding: 5px; margin: 4px 0 18px; background: #e7efe9; border-radius: 15px; }
 .billing-toggle button { flex: 1 1 0; min-height: 44px; padding: 9px 10px; font-size: 14px; background: transparent; color: var(--muted); border-radius: 11px; transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .12s ease; }
 .billing-toggle button[aria-checked="true"] { background: #fff; color: var(--green-dark); box-shadow: 0 2px 8px #173b2317; }
-.billing-toggle button:active { transform: scale(.97); }
+.billing-toggle button:active, .billing-toggle button.is-pressed { transform: scale(.97); }
 /* The price cross-fades so the toggle reads as having moved something. */
 .price, .price-save { animation: price-in .22s ease; }
 @keyframes price-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -263,7 +271,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .flow-close { position: absolute; top: 10px; right: 10px; width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; color: var(--muted); border-radius: 999px; }
 .danger-button { background: #aa382b; color: #fff; }
 .property-row, .report-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; -webkit-tap-highlight-color: transparent; transition: transform .16s ease; }
-.property-row:active, .report-row:active { transform: scale(.995); }
+.property-row:active, .report-row:active, .property-row.is-pressed, .report-row.is-pressed { transform: scale(.995); }
 /* Both of these sat under a comfortable 44px target. */
 .photo-menu summary { min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .skeleton { color: var(--muted); min-height: 86px; animation: skeleton-pulse 1.2s ease-in-out infinite alternate; }
@@ -293,7 +301,7 @@ blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 
 /* Most app users arrive from the web funnel with an account already, so their
    way back in is an outlined button of full weight, not a text link. */
 .native-inspect-shell .hero #sign-in { margin-top: 12px; background: #ffffffe6; border: 1.5px solid #9cc9ae; }
-.native-inspect-shell .hero #sign-in:active { background: #e8f5ee; }
+.native-inspect-shell .hero #sign-in:active, .native-inspect-shell .hero #sign-in.is-pressed { background: #e8f5ee; }
 /* In the app main has 16px of top padding instead of the margin. */
 .native-inspect-shell .flow-screen { margin-top: -16px; }
 /* A sheet tall enough to need the whole screen takes the shell with it. */
@@ -366,7 +374,7 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .offer-option strong { font-size: 19px; }
 .offer-option small { color: var(--muted); font-weight: 500; }
 .offer-option.is-selected { border-color: var(--green); background: var(--green-pale); }
-.offer-option:active { transform: scale(.99); }
+.offer-option:active, .offer-option.is-pressed { transform: scale(.99); }
 @media (max-width: 540px) {
   header { padding: 0 15px; }
   .header-drawer-content { padding-bottom: 18px; }
@@ -524,7 +532,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-pick { display: block; padding: 0; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; text-align: center; color: inherit; }
 .sim-pick img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
 .sim-pick span { display: block; padding: 8px 5px; font-size: 12px; font-weight: 600; line-height: 1.25; }
-.sim-pick:active { transform: scale(.97); border-color: var(--green); }
+.sim-pick:active, .sim-pick.is-pressed { transform: scale(.97); border-color: var(--green); }
 .sim-foot { color: var(--muted); margin-top: 14px; }
 .sim-stage .sim-foot { margin: 8px 0 0; font-size: 11px; }
 
@@ -559,7 +567,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-sheet-strip img { width: 40px; height: 40px; object-fit: cover; border-radius: 9px; border: 1.5px solid #ffffff5c; }
 .sim-sheet-note { margin: 0; color: #fff; font-size: 13px; font-weight: 600; text-align: center; text-shadow: 0 1px 4px #000000a1; }
 .sim-shutter { width: 68px; height: 68px; padding: 0; border-radius: 50%; background: #fff; border: 4px solid #ffffff6b; box-shadow: 0 2px 14px #0000004d; }
-.sim-shutter:active { transform: scale(.92); }
+.sim-shutter:active, .sim-shutter.is-pressed { transform: scale(.92); }
 .sim-shutter:disabled { opacity: .45; }
 .sim-strip { display: flex; gap: 8px; align-items: center; min-height: 50px; margin: 8px 0 2px; }
 .sim-strip p { margin: 0; }
@@ -598,7 +606,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 /* Filled and pulsing, because a white circle reads as decoration and this is
    the one thing on the screen waiting to be pressed. */
 .sim-mic { width: 66px; height: 66px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #fff; border: none; }
-.sim-mic:active { transform: scale(.93); }
+.sim-mic:active, .sim-mic.is-pressed { transform: scale(.93); }
 .sim-mic:not(.is-live):not(.is-done) { animation: sim-pulse 1.9s ease-in-out infinite; }
 .sim-mic.is-live { background: var(--green-dark); color: #fff; animation: sim-pulse 1.1s ease-in-out infinite; }
 .sim-mic.is-done { background: var(--green-pale); color: var(--green-dark); box-shadow: none; animation: none; opacity: 1; }
@@ -666,7 +674,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
    the sticky bar is the offer, and a second full choice under it is a fifth
    decision on a screen that has already made its case. */
 .sim-plan-switch { display: inline; padding: 0; min-height: 0; font-size: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
-.sim-plan-switch:active { background: transparent; }
+.sim-plan-switch:active, .sim-plan-switch.is-pressed { background: transparent; }
 /* One field, on our page rather than Stripe's, so their page opens prefilled. */
 .sim-email h1 { font-size: clamp(23px, 6.4vw, 30px); line-height: 1.15; letter-spacing: -.7px; margin: 6px 0 10px; }
 .sim-email input { width: 100%; min-height: 54px; margin: 16px 0 12px; padding: 14px 16px; font-family: inherit; font-size: 16px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; }

@@ -240,6 +240,24 @@ function notice(message, type = '') {
   // Slightly outlives the CSS fade so the pill is never removed mid-animation.
   setTimeout(() => el.remove(), 3800);
   while (box.children.length > 3) box.firstChild.remove();
+  if (!raiseNotices(box) && $('dialog')?.open) {
+    const inline = el.cloneNode(true); inline.classList.add('in-sheet');
+    $('dialog-body').prepend(inline); setTimeout(() => inline.remove(), 3800);
+  }
+}
+// An open sheet sits in the browser's top layer, above every z-index, so a
+// toast about something done inside it (a copied link, a failed request) was
+// drawn underneath it, out of sight. Opening the toast box as a popover again
+// puts it above the sheet. iOS before 17 has no popovers; there the message
+// goes inside the sheet instead.
+function raiseNotices(box) {
+  if (typeof box.showPopover !== 'function') return false;
+  try {
+    if (!box.hasAttribute('popover')) box.setAttribute('popover', 'manual');
+    if (box.matches(':popover-open')) box.hidePopover();
+    box.showPopover();
+    return true;
+  } catch { return false; }
 }
 async function persist() { if (draft) await stored('put', draft); }
 // True only when this device holds work the server has not seen. Without it the
@@ -284,7 +302,33 @@ async function api(path, options = {}) {
   }
   return options.blob ? response.blob() : response.json();
 }
-async function run(fn, trigger = document.activeElement?.closest?.('button')) {
+// iOS gives a button no :active state unless the page listens for touches, and
+// a quick tap is over before a transition can show. So every tap visibly lands:
+// whatever was pressed dips for at least a beat.
+const PRESSABLE = 'button,.button,.property-row,.report-row';
+let pressedEl = null, pressedAt = 0;
+document.addEventListener('touchstart', () => {}, { passive: true });
+document.addEventListener('pointerdown', event => {
+  const el = event.target.closest?.(PRESSABLE);
+  if (!el || el.disabled) return;
+  pressedEl = el; pressedAt = performance.now(); el.classList.add('is-pressed');
+}, { passive: true, capture: true });
+const releasePress = () => {
+  const el = pressedEl; if (!el) return; pressedEl = null;
+  setTimeout(() => el.classList.remove('is-pressed'), Math.max(0, 140 - (performance.now() - pressedAt)));
+};
+for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, releasePress, { passive: true, capture: true });
+// The button a tap is working for, so it can show its spinner. iOS never
+// focuses a tapped button, so reading document.activeElement found the page
+// instead, and on the phone slow buttons (Polish, Manage subscription) showed
+// nothing at all while they worked.
+function tappedButton() {
+  const event = window.event;
+  if (event?.type === 'submit' && event.submitter) return event.submitter;
+  const target = event && /^(click|change)$/.test(event.type) ? event.target : null;
+  return target?.closest?.('button') || document.activeElement?.closest?.('button') || null;
+}
+async function run(fn, trigger = tappedButton()) {
   if (trigger?.disabled) return;
   if (trigger) { trigger.disabled = true; trigger.classList.add('is-busy'); }
   try { await fn(); } catch (error) { notice(error.message, 'error'); }
@@ -378,7 +422,7 @@ function settleSheet(){
   dialog.style.setProperty('--sheet-max-height',`${Math.round(available)}px`);
   document.documentElement.style.setProperty('--viewport-pan',`${Math.round(viewTop)}px`);
 }
-const haptic=()=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic'});};
+const haptic=(style='')=>{if(native)window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectHaptic',...(style?{style}:{})});};
 // Best effort by design: a dropped count is better than a blocked walkthrough.
 // `anonymous` routes past the auth boundary for the one event that has to fire
 // before the email wall — otherwise the owners it exists to count are invisible.
@@ -443,6 +487,52 @@ function photoURL(id) {
   const url = URL.createObjectURL(file.blob); urls.set(id, url); return url;
 }
 function clearURLs() { for (const url of urls.values()) URL.revokeObjectURL(url); urls.clear(); }
+// Points every image of this photo at its current copy.
+function swapPhoto(file) {
+  const old = [file.id, file.remoteId].filter(Boolean).map(id => { const url = urls.get(id); urls.delete(id); return url; }).filter(Boolean);
+  for (const id of [file.id, file.remoteId].filter(Boolean))
+    document.querySelectorAll(`img[data-photo="${CSS.escape(id)}"]`).forEach(img => { img.src = photoURL(id); });
+  setTimeout(() => old.forEach(url => URL.revokeObjectURL(url)), 1000);
+}
+const readable = blob => blob?.size ? blob.slice(0, 16).arrayBuffer().then(() => true, () => false) : Promise.resolve(false);
+// A sent report shows what its reader sees: the dated copies Marketel keeps.
+// They take over from the phone's copies one by one, in place, and are what
+// the report shows from then on.
+async function adoptSentPhotos() {
+  const current = draft;
+  if (!current?.serverId || !current.finalizedAt || !session) return;
+  let changed = false;
+  for (const id of current.document.rooms.flatMap(heldIds)) {
+    const blob = await api(`/reports/${current.serverId}/photos/${id}`, { blob: true }).catch(() => null);
+    if (draft !== current) return;
+    const file = current.files.find(f => f.id === id || f.remoteId === id);
+    if (!file || !blob?.size) continue;
+    file.blob = blob; changed = true; swapPhoto(file);
+  }
+  if (changed) await persist().catch(() => {});
+}
+// iOS's web view can lose a photo held only in memory (it showed as a blue
+// question mark after sending a report) while the same photo is still safe on
+// the phone and online. A photo that fails to load is fetched again from
+// whichever of those still has it.
+document.addEventListener('error', event => {
+  const img = event.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.photo || img.dataset.repair) return;
+  img.dataset.repair = '1';
+  repairPhoto(img.dataset.photo).catch(() => {});
+}, true);
+async function repairPhoto(id) {
+  const current = draft;
+  const file = current?.files.find(f => f.id === id || f.remoteId === id);
+  if (!file) return;
+  const online = () => file.remoteId && current.serverId && session ? api(`/reports/${current.serverId}/photos/${file.remoteId}`, { blob: true }).catch(() => null) : null;
+  const onPhone = async () => (await stored('get').catch(() => null))?.files?.find(f => f.id === file.id)?.blob || null;
+  for (const source of current.finalizedAt ? [online, onPhone] : [onPhone, online]) {
+    const blob = await source();
+    if (draft !== current) return;
+    if (await readable(blob)) { file.blob = blob; swapPhoto(file); return; }
+  }
+}
 const ORIGINAL_EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic', 'image/heif': 'heif', 'image/webp': 'webp', 'image/avif': 'avif' };
 async function downloadOriginal(remoteId){
   const blob=await api(`/reports/${draft.serverId}/photos/${remoteId}/original`,{blob:true});
@@ -1314,7 +1404,7 @@ function editor(step) {
   if (!draft) return landing();
   dismissFlow();
   updateHeader();
-  setActiveNav('current');
+  setActiveNav(draft.finalizedAt ? (draft.document.type === 'check-in' ? 'properties' : 'reports') : 'current');
   const d = draft.document;
   d.signatures ||= [];
   if (draft.document.type === 'check-in' && draft.finalizedAt) return checkInView();
@@ -1348,7 +1438,7 @@ function editor(step) {
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1&&!dragHintSeen()?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Saved' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div>${d.type==='damage'?`<div class="receipts">${(r.receipts||[]).length?`<div class="receipt-grid">${r.receipts.map(id=>`<figure><img src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>`:''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>`:''}<div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' || d.type === 'damage' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1&&!dragHintSeen()?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Saved' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div>${d.type==='damage'?`<div class="receipts">${(r.receipts||[]).length?`<div class="receipt-grid">${r.receipts.map(id=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>`:''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>`:''}<div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' || d.type === 'damage' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -1444,7 +1534,7 @@ function viewPhoto(id){
   // Downloads leave the page, which WKWebView does not allow; the app would
   // need its own export handler the way the PDF has one.
   const canDownload=!native&&draft.serverId&&remoteId;
-  modal(`<h2>Photo</h2><img class="photo-full" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The uploaded file as received — resized copies appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
+  modal(`<h2>Photo</h2><img class="photo-full" data-photo="${esc(id)}" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The uploaded file as received — resized copies appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
   $('photo-close').onclick=()=>$('dialog').close();
   if($('photo-original'))$('photo-original').onclick=event=>run(()=>downloadOriginal(remoteId),event.currentTarget);
   $('photo-remove').onclick=()=>{
@@ -1594,7 +1684,7 @@ function entryScreen(index){
   if(!room)return editor('rooms');
   enterScreen(`entry:${index}`);
   updateHeader();setActiveNav('current');
-  const photos=room.photos.map((id,at)=>`<figure data-photo-id="${esc(id)}"><img src="${esc(photoURL(id))}" alt="Photo ${at+1}"><button type="button" class="photo-x" data-entry-remove="${esc(id)}" aria-label="Remove photo ${at+1}">&#10005;</button></figure>`).join('');
+  const photos=room.photos.map((id,at)=>`<figure data-photo-id="${esc(id)}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${at+1}"><button type="button" class="photo-x" data-entry-remove="${esc(id)}" aria-label="Remove photo ${at+1}">&#10005;</button></figure>`).join('');
   $('app').innerHTML=`<section class="entry-screen"><div class="screen-bar"><button type="button" id="entry-back" class="quiet">← All findings</button><span class="muted">${esc(entryLabel(room,index))}</span></div><div class="entry-photos">${photos}</div><label class="entry-note">What is this?<input id="entry-text" maxlength="4000" value="${esc(room.observation)}" placeholder="Chipped counter edge by the sink" autocomplete="off"></label>${session?`<button type="button" class="secondary wide" data-voice="${index}">Or record it</button>`:''}<div class="stack entry-actions"><label class="button wide">Add another photo<input type="file" id="entry-more" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label><button type="button" id="entry-done" class="secondary wide">Done · ${d.rooms.filter(item=>item.photos.length||item.observation.trim()).length} ${d.rooms.filter(item=>item.photos.length||item.observation.trim()).length===1?'finding':'findings'}</button></div></section>`;
   $('entry-text').oninput=event=>{room.observation=event.target.value;remember();};
   $('entry-back').onclick=()=>editor('rooms');
@@ -2169,7 +2259,7 @@ function signaturePreview(signature){
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label='',index=0,sample=null,photosOnly=false){
-  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&draft?.document?.type!=='damage'?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo" src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
+  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&draft?.document?.type!=='damage'?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo"${sample?'':` data-photo="${esc(id)}"`} src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -2183,7 +2273,7 @@ function renderCoverage(rooms){
 function reportPreview(){
   enterScreen('preview');
   const pw = wedge(draft?.document?.type);
-  updateHeader();setActiveNav('current');const d=draft.document;d.signatures ||= [];
+  updateHeader();setActiveNav(draft.finalizedAt?'reports':'current');const d=draft.document;d.signatures ||= [];
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   // Against a check-in, a finding pairs only with the room of its own name,
   // and its photos arrive as they are fetched.
@@ -2231,7 +2321,7 @@ function reportPreview(){
     let r;
     try{ r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'}); } finally { veil.done(); }
     draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;await persist();await refresh();reportPreview();
-    deliverySheet('share');
+    deliverySheet('share');adoptSentPhotos();
   },button));};
   if($('pdf'))$('pdf').onclick=()=>run(downloadPdfNow);
   if($('originals'))$('originals').onclick=()=>originalsSheet();
@@ -2315,24 +2405,43 @@ function rewrite(index){ensureAuth(()=>run(async()=>{
   await ensureServerDraft();const original=draft.document.rooms[index].observation;
   if(!original.trim())throw new Error('Type an observation first, or use Talk through this room.');
   const r=await api(`/reports/${draft.serverId}/rewrite`,{method:'POST',body:{observation:original}});
-  modal(`<h2>Review the wording</h2><p class="muted">Check that this still says exactly what you observed.</p><blockquote>${esc(r.suggestion)}</blockquote><button id="accept-ai">Use this wording</button>`);
-  $('accept-ai').onclick=()=>{draft.document.rooms[index].observation=r.suggestion;remember();$('dialog').close();editor();};
+  modal(`<h2>Review the wording</h2><p class="muted">Check that this still says exactly what you observed.</p><blockquote>${esc(r.suggestion)}</blockquote><div class="stack"><button id="accept-ai" class="wide">Use this wording</button><button id="keep-ai" class="quiet wide">Keep mine</button></div>`);
+  $('accept-ai').onclick=()=>{draft.document.rooms[index].observation=r.suggestion;remember();$('dialog').close();haptic('success');editor();
+    const field=document.querySelectorAll('[data-field="observation"]')[index];if(field){field.classList.add('just-changed');setTimeout(()=>field.classList.remove('just-changed'),1400);}
+    notice('Note updated.','success');};
+  $('keep-ai').onclick=()=>$('dialog').close();
 }));}
 async function requestStorefront(){
   if(!native)return storefront;
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectStorefront'});
   return new Promise(resolve=>{const done=()=>{storefrontWaiters=storefrontWaiters.filter(item=>item!==done);resolve(storefront);};storefrontWaiters.push(done);setTimeout(done,1000);});
 }
+let pdfWait=null;
+const settlePdf=result=>{if(!pdfWait)return false;result instanceof Error?pdfWait.reject(result):pdfWait.resolve(result);return true;};
 async function downloadPdfNow(){
-  if(native){window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});return;}
+  // The phone fetches the PDF itself and opens the share sheet, which takes a
+  // few seconds; the button keeps its spinner until that sheet is on screen.
+  if(native)return new Promise((resolve,reject)=>{
+    pdfWait?.reject(new Error('Starting the PDF again.'));
+    const timer=setTimeout(()=>settlePdf(new Error('The PDF is taking too long. Check your connection and retry.')),60000);
+    pdfWait={resolve:value=>{clearTimeout(timer);pdfWait=null;resolve(value);},reject:error=>{clearTimeout(timer);pdfWait=null;reject(error);}};
+    window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectExportPDF',reportId:draft.serverId,token:session});
+  });
   const blob=await api(`/reports/${draft.serverId}/pdf`,{blob:true});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=documentFileName(draft.document.type);a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 async function openShareSheetNow(){
   const r=await api(`/reports/${draft.serverId}/share`,{method:'POST'});
-  modal(`<h2>Private report link</h2><p>Anyone with this link can read and download this version. Creating a new link replaces the previous one.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Revoke this link</button>`);
-  $('copy-link').onclick=()=>run(async()=>{try{await navigator.clipboard.writeText(r.url);}catch{$('share-url').select();document.execCommand('copy');}notice('Link copied.');});
-  $('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Shared link revoked.');});
+  haptic('success');
+  modal(`<h2>Your private link is ready.</h2><p class="muted">Anyone with this link can read and download this version. Making a new link turns this one off.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Turn off this link</button>`);
+  $('copy-link').onclick=event=>{
+    const button=event.currentTarget;
+    const copied=()=>{haptic('success');button.textContent='Copied ✓';button.classList.add('is-done');notice('Link copied. Paste it into your claim or message.','success');
+      setTimeout(()=>{if(button.isConnected){button.textContent='Copy link';button.classList.remove('is-done');}},2400);};
+    const fallback=()=>{$('share-url').select();try{if(document.execCommand('copy'))return copied();}catch{}notice('Press and hold the link above to copy it.','error');};
+    if(navigator.clipboard?.writeText)navigator.clipboard.writeText(r.url).then(copied,fallback);else fallback();
+  };
+  $('revoke').onclick=()=>run(async()=>{await api(`/reports/${draft.serverId}/share`,{method:'DELETE'});$('dialog').close();notice('Link turned off. It no longer opens the report.','success');});
 }
 // The business a report is sent under: typed during setup (kept on the local
 // draft until there is an account), then snapshotted by the server at finalize.
@@ -2400,7 +2509,7 @@ async function finishExport(action){
   try{ r=await api(`/reports/${draft.serverId}/finalize`,{method:'POST'}); } finally { veil.done(); }
   draft.finalizedAt=r.finalizedAt;draft.document=r.document;reportsCache=null;propertiesCache=null;
   await persist();await refresh();preview=true;reportPreview();
-  deliverySheet(action);
+  deliverySheet(action);adoptSentPhotos();
 }
 // One sheet at the moment the document becomes real, listing every way out of
 // it. The button pressed before paying is only the default here, never the
@@ -2416,7 +2525,7 @@ function deliverySheet(preferred='share'){
   ].filter(Boolean).sort((a,b)=>Number(b.primary)-Number(a.primary));
   modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p>${fileByText(d)?`<p class="deadline">${esc(fileByText(d))} — 14 days after check-out, or before the next guest arrives.</p>`:''}<div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
   if($('delivery-share'))$('delivery-share').onclick=event=>run(()=>openShareSheetNow(),event.currentTarget);
-  if($('delivery-pdf'))$('delivery-pdf').onclick=event=>run(async()=>{await downloadPdfNow();notice(`Your ${sk.doc} was downloaded.`,'success');},event.currentTarget);
+  if($('delivery-pdf'))$('delivery-pdf').onclick=event=>run(async()=>{await downloadPdfNow();if(!native)notice(`Your ${sk.doc} was downloaded.`,'success');},event.currentTarget);
   if($('delivery-originals'))$('delivery-originals').onclick=()=>originalsSheet();
   $('delivery-later').onclick=()=>{$('dialog').close();notice(`Your ${sk.doc} is saved and ready whenever you are.`,'success');};
 }
@@ -2770,7 +2879,14 @@ $('dialog').addEventListener('close',()=>{unlockPage();document.documentElement.
 $('product-switch').onclick=event=>{if(!native)return;event.preventDefault();location.replace('../index.html?choose=1');};
 document.addEventListener('click',event=>{const link=event.target.closest('a[href^="http"]');if(native&&link){event.preventDefault();openExternal(link.href);}});
 window.marketelInspectStorefront=country=>{storefront=country;const waiters=storefrontWaiters;storefrontWaiters=[];waiters.forEach(resolve=>resolve());};
-window.marketelInspectExportResult=result=>notice(result==='complete'?'PDF export complete.':result==='busy'?'Close the open screen and try exporting again.':'PDF export failed. Please retry.');
+// "shown" when the share sheet opens; then "complete" if something was done
+// with the PDF, or "dismissed". Builds before 1108 only say "complete", after.
+window.marketelInspectExportResult=result=>{
+  if(result==='shown'||result==='dismissed'){settlePdf(result);return;}
+  if(result==='complete'){settlePdf(result);haptic('success');notice('PDF shared.','success');return;}
+  const error=new Error(result==='busy'?'Close the open screen and try the PDF again.':'The PDF could not be made. Please retry.');
+  if(!settlePdf(error))notice(error.message,'error');
+};
 // Each shot arrives on its own while the sheet stays open, so the room rebuilds
 // between captures and the photo is already in the draft if the app is killed.
 // The camera sheet stops at the medium detent, and the half of the screen it
@@ -2884,7 +3000,7 @@ function cameraCompanion(entering=false){
   const beforeIds=beforeIdsFor(room.name);
   if(beforeIds.length&&beforeIds.some(id=>!photoFile(id)))ensureBeforeFiles(beforeIds).then(loaded=>{if(loaded&&cameraRoom!==null&&!cameraAsk&&!cameraBefore)cameraCompanion();}).catch(()=>{});
   const beforeThumb=beforeIds.find(id=>photoFile(id));
-  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at check-in"><img src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><img src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
+  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at check-in"><img data-photo="${esc(beforeThumb)}" src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
   const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?((item.name||'').trim()||'New'):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
   // Rooms are typed before the camera opens now, so this only asks by voice
   // for a finding from an older draft that was never given one.
@@ -2946,7 +3062,7 @@ function cameraBeforeScreen(id){
   document.documentElement.classList.remove('camera-open');
   const room=draft?.document?.rooms?.[cameraRoom],base=checkInBaseline(),ids=beforeIdsFor(room?.name).filter(item=>photoFile(item));
   enterScreen('before');
-  $('app').innerHTML=`<section class="before-page"><button type="button" id="before-back" class="quiet">← Back to camera</button><small class="eyebrow">Before · check-in ${esc(docDateText(base?.document?.date))}</small><h1>${esc(room?.name||'')}</h1><img class="before-photo" src="${esc(photoURL(cameraBefore))}" alt="How ${esc(room?.name||'it')} looked at check-in"><p class="muted"><small>${esc(photoCaptionText(cameraBefore))}</small></p>${ids.length>1?`<div class="before-thumbs">${ids.map(item=>`<button type="button" class="${item===cameraBefore?'is-active':''}" data-before-pick="${esc(item)}" aria-label="Another check-in photo"><img src="${esc(photoURL(item))}" alt=""></button>`).join('')}</div>`:''}</section>`;
+  $('app').innerHTML=`<section class="before-page"><button type="button" id="before-back" class="quiet">← Back to camera</button><small class="eyebrow">Before · check-in ${esc(docDateText(base?.document?.date))}</small><h1>${esc(room?.name||'')}</h1><img class="before-photo" data-photo="${esc(cameraBefore)}" src="${esc(photoURL(cameraBefore))}" alt="How ${esc(room?.name||'it')} looked at check-in"><p class="muted"><small>${esc(photoCaptionText(cameraBefore))}</small></p>${ids.length>1?`<div class="before-thumbs">${ids.map(item=>`<button type="button" class="${item===cameraBefore?'is-active':''}" data-before-pick="${esc(item)}" aria-label="Another check-in photo"><img data-photo="${esc(item)}" src="${esc(photoURL(item))}" alt=""></button>`).join('')}</div>`:''}</section>`;
   $('before-back').onclick=()=>{const at=cameraRoom;cameraBefore=null;openNativeCamera(at);};
   document.querySelectorAll('[data-before-pick]').forEach(button=>button.onclick=()=>{haptic();cameraBefore=button.dataset.beforePick;cameraBeforeScreen();});
 }
@@ -2984,7 +3100,7 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
 window.marketelInspectNativeSelectTab=page=>{
   // The tab bar stays visible over a sheet now, so a tap has to dismiss it first.
   if($('dialog').open)$('dialog').close();
-  if(page==='current'){if(draft)editor();else run(()=>start());return;}
+  if(page==='current'){if(hasUnfinishedDraft())editor();else run(()=>start(),null);return;}
   list(page).catch(error=>notice(error.message));
 };
 window.marketelInspectOpenHandoff=async rawToken=>{

@@ -1878,11 +1878,14 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                     popover.sourceView = self.view
                     popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 1, height: 1)
                 }
-                share.completionWithItemsHandler = { [weak self] _, _, _, _ in
+                share.completionWithItemsHandler = { [weak self] _, completed, _, _ in
                     try? FileManager.default.removeItem(at: destination)
-                    self?.callWeb(function: "marketelInspectExportResult", argument: "complete")
+                    self?.callWeb(function: "marketelInspectExportResult", argument: completed ? "complete" : "dismissed")
                 }
-                self.present(share, animated: true)
+                // The page keeps the PDF button busy until the sheet is up.
+                self.present(share, animated: true) { [weak self] in
+                    self?.callWeb(function: "marketelInspectExportResult", argument: "shown")
+                }
             }
         }.resume()
     }
@@ -2093,7 +2096,13 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
                 camera.roomName = payload["name"] as? String ?? ""
             }
         case "inspectHaptic":
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            // "success" marks something finished (a link made, a PDF shared);
+            // every other tap is the ordinary press.
+            if payload["style"] as? String == "success" {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } else {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
         case "inspectSignOut":
             // Inspect owns a separate bearer session in web storage. Do not
             // clear Front Desk credentials when only Inspect signs out.
