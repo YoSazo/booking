@@ -1,1 +1,1 @@
-inspection,property,report,walkthrough,rental,photos,hotel,booking,front desk,rooms
+damage,claim,host,rental,guest,report,photo,evidence,checkout,deposit,property,short-term,vacation
