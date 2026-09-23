@@ -960,7 +960,15 @@ function simCheckout(email,trigger){
 // It is always shown, even when an address is remembered: Stripe shows a
 // prefilled email read-only, so a typo remembered once would otherwise send
 // every later checkout off with an address the buyer can never sign in with.
+// The tap on either start button, on either plan, is Meta's InitiateCheckout —
+// the event the ads optimize for at launch. Sent on every tap; the server
+// counts one per visitor. The attribution goes with it, since there is no
+// account yet to carry it.
+function simCheckoutTapped(){
+  api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:planInterval,attribution:inspectAttribution}}).catch(()=>{});
+}
 function simBuy(trigger){
+  simCheckoutTapped();
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
   enterScreen('sim');
   $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">${esc(copy.lede)}</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">${esc(copy.go)}</button></form><p class="muted"><small>${esc(copy.small)}</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;

@@ -770,7 +770,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({
@@ -779,10 +779,40 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     detail: body?.name === 'OfferDeclined' && DECLINE_REASONS.includes(body?.detail) ? body.detail
       : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail) : null,
   });
+  // The tap on the demo's start button — from the card or the pay bar, on
+  // either plan — is what Meta optimizes for at launch: there are enough of
+  // them early, before an email or a trial exists. There is no account yet, so
+  // it goes with the browser's Meta ids and the visitor id, counted once per
+  // visitor however often they tap. Never from the app.
+  const queueCheckoutTap = async req => {
+    const visitor = visitorOf(req.body?.visitorId);
+    const fromApp = /^(capacitor|ionic):\/\//.test(String(req.headers?.origin || ''));
+    if (!capiConfigured || typeof queueCapi !== 'function' || !visitor || fromApp) return;
+    const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
+    const tool = toolOf(req.body?.tool);
+    const plan = inspectPlan(req.body?.detail === 'year' ? 'year' : 'month');
+    await queueCapi('InitiateCheckout', {
+      product: 'marketel-inspect',
+      hotelId: `inspect-visitor:${visitor}`,
+      externalId: `inspect-visitor:${visitor}`,
+      ip: attribution.ipAddress || req.ip || '',
+      userAgent: attribution.userAgent || req.headers?.['user-agent'] || '',
+      sourceUrl: attribution.sourceUrl || `${origin}${TOOLS[tool].home}`,
+      fbp: attribution.fbp || '',
+      fbc: attribution.fbc || '',
+      value: plan.amount / 100,
+      currency: 'USD',
+      eventId: `inspect-sim-tap.${visitor}`,
+      contentName: `${TOOLS[tool].label} ${plan.interval} plan`,
+    });
+  };
   router.post('/events/anon', guarded(async (req, res) => {
     if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown Inspect event.');
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
     await record(null, req.body.name, undefined, eventExtra(req.body));
+    if (req.body.name === 'SimCheckoutTapped') {
+      await queueCheckoutTap(req).catch(error => console.error('Inspect checkout-tap CAPI queue failed:', error.message));
+    }
     res.json({ success: true });
   }));
   // The email on the landing is the lead, exactly as in the booking funnel: no

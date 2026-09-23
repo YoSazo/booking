@@ -1935,6 +1935,37 @@ test('a demo checkout tells Meta a trial started, or the sale, under one id', as
   } finally { h.registration.close(); }
 });
 
+test('the demo start-button tap reaches Meta as InitiateCheckout, once per visitor, never from the app', async () => {
+  const visitorId = `v_${'a'.repeat(12)}`;
+  const tap = (h, body = {}, origin = 'https://bookmarketel.com') => request(h.app, '/api/inspect/events/anon', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin },
+    body: JSON.stringify({ name: 'SimCheckoutTapped', tool: 'claims', visitorId, detail: 'month', attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' }, ...body }) });
+
+  let h = moneyHarness();
+  try {
+    assert.equal((await tap(h)).status, 200);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 25, contentName: 'Marketel Claims month plan', eventId: `inspect-sim-tap.${visitorId}` }]);
+    assert.ok(h.calls.events.some(e => e.name === 'SimCheckoutTapped' && e.detail === 'month' && e.visitorId === visitorId), 'our own ladder counts it too');
+    // The yearly plan carries its own price; the id is the visitor's, so Meta
+    // counts one however many times they tap.
+    assert.equal((await tap(h, { detail: 'year' })).status, 200);
+    assert.equal(h.calls.capi[1].value, 199);
+    assert.equal(h.calls.capi[1].eventId, h.calls.capi[0].eventId);
+  } finally { h.registration.close(); }
+
+  // From the app, or with no visitor to count once: our ladder only.
+  h = moneyHarness();
+  try {
+    assert.equal((await tap(h, {}, 'capacitor://localhost')).status, 200);
+    assert.equal((await tap(h, { visitorId: 'nope' })).status, 200);
+    assert.equal(h.calls.capi.length, 0);
+  } finally { h.registration.close(); }
+
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  assert.match(client, /function simBuy\(trigger\)\{\n  simCheckoutTapped\(\);/);
+  assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:planInterval,attribution:inspectAttribution/);
+});
+
 test('"keep it free" emails the link once, and only when asked', async () => {
   const h = moneyHarness();
   const lead = body => request(h.app, '/api/inspect/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' },
