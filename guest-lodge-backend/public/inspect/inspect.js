@@ -307,9 +307,10 @@ async function run(fn, trigger = tappedButton()) {
 // a long editor instead of at the top of the report.
 let currentScreen='';
 function enterScreen(key){
-  const keep = currentScreen===key ? window.scrollY : 0;
+  const framed = document.documentElement.classList.contains('sim-framed');
+  const keep = currentScreen===key ? (framed ? $('app').scrollTop : window.scrollY) : 0;
   currentScreen=key;
-  requestAnimationFrame(()=>{ try { window.scrollTo({ top: keep, behavior: 'auto' }); } catch { window.scrollTo(0, keep); } });
+  requestAnimationFrame(()=>{ if (framed) { $('app').scrollTop = keep; return; } try { window.scrollTo({ top: keep, behavior: 'auto' }); } catch { window.scrollTo(0, keep); } });
 }
 function syncNativeInspectState(page=currentPage,visible=!$('dialog').open){
   if(!native)return;
@@ -635,8 +636,24 @@ function simActive(){
   // `arm` is only ever set by the app's own tool chooser, so its presence
   // means this page was opened as the product rather than as an ad landing.
   if(params.has('arm'))return false;
-  return window.matchMedia?.('(max-width: 760px)')?.matches ?? window.innerWidth<=760;
+  // Asked for (the desktop "See how it works", or Stripe returning a demo
+  // buyer): run it at any width. On a computer it runs in a phone frame.
+  if(params.get('sim')==='1')return true;
+  return phoneWidth();
 }
+const phoneWidth = () => window.matchMedia?.('(max-width: 760px)')?.matches ?? window.innerWidth<=760;
+// A fake camera sheet stretched across a desktop window reads as broken, so on
+// a computer the simulation runs inside a phone-sized frame, with a way back.
+function simFrame(){
+  const framed=!native&&!phoneWidth();
+  document.documentElement.classList.toggle('sim-framed',framed);
+  if(!framed||$('sim-frame-back'))return;
+  const back=document.createElement('button');
+  back.type='button';back.id='sim-frame-back';back.className='quiet';back.textContent='← Back';
+  back.onclick=()=>{simUnframe();history.replaceState(null,'',location.pathname);landing();};
+  document.body.insertBefore(back,$('app'));
+}
+function simUnframe(){document.documentElement.classList.remove('sim-mode','sim-framed');$('sim-frame-back')?.remove();}
 const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 const simPhoto = (name,thumb=false) => `/inspect/sample/${name}${thumb?'-thumb':''}.jpg`;
 // Every full-size photo the demo can show, fetched while they read the intro.
@@ -694,12 +711,13 @@ function simThanks(){
   track('SimSubscribed');
   if($('sim-get-app'))$('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
-    document.documentElement.classList.remove('sim-mode');
+    simUnframe();
     history.replaceState(null,'',location.pathname);
     ensureAuth(()=>run(()=>openAccountHome()),'paid');
   };
 }
 function simResume(){
+  simFrame();
   const state=new URLSearchParams(location.search).get('checkout');
   if(state==='success'){simThanks();return;}
   const s=simTool();
@@ -718,7 +736,7 @@ function simIntro(){
   $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>${esc(s.placeLabel||"Property")}</small><strong>${esc(s.property)}</strong></div><div><small>${esc(s.unitLabel||"Unit")}</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
   simRun=null;
   $('sim-signin-link').onclick=()=>{
-    document.documentElement.classList.remove('sim-mode');
+    simUnframe();
     ensureAuth(()=>run(()=>openAccountHome()),'signin');
   };
   for(const button of $('app').querySelectorAll('[data-sim-pick]'))
@@ -908,7 +926,7 @@ function simCheckout(email,trigger){
       // what they already have is the one useful thing left.
       if(error.status!==409)throw error;
       try{localStorage.setItem('inspect.email',email);}catch{}
-      document.documentElement.classList.remove('sim-mode');
+      simUnframe();
       notice(error.message,'success');
       return ensureAuth(()=>run(()=>openAccountHome()),'paid');
     }
@@ -1039,7 +1057,11 @@ function demoMarkup(arm){
 // here, so nothing stands between the ad and the build.
 function goldenLanding(arm){
   const g=arm.golden||{},sk=skin();
-  $('app').innerHTML=`<section class="hero golden"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(g.sub||arm.lede||'')}</p><form id="lead-form" class="lead-box" novalidate><input id="lead-email" type="email" autocomplete="email" inputmode="email" placeholder="Your email" aria-label="Your email" value="${esc(storedEmail())}"><button id="start">${esc(g.cta||`Build my free ${sk.doc} →`)}</button></form><p class="lead-note"><small>${esc(g.note||'')}</small></p>${g.proof?`<p class="proof">${esc(g.proof)}</p>`:''}<button id="see-plans" class="quiet">See prices</button><button id="sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button>${demoMarkup(arm)}</section>`;
+  // Cold visitors have no damage in front of them, so where a simulation exists
+  // the page leads with it. Building a real one stays one quiet tap away.
+  const demo=!native&&!!simTool();
+  const cta=demo?`<div class="demo-cta-box"><button type="button" id="see-demo" class="wide">See how it works →</button><button type="button" id="real-report" class="quiet">Have damage to document now? Start a real ${esc(sk.doc)}</button></div>`:'';
+  $('app').innerHTML=`<section class="hero golden"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(g.sub||arm.lede||'')}</p>${cta}<form id="lead-form" class="lead-box"${demo?' hidden':''} novalidate><input id="lead-email" type="email" autocomplete="email" inputmode="email" placeholder="Your email" aria-label="Your email" value="${esc(storedEmail())}"><button id="start">${esc(g.cta||`Build my free ${sk.doc} →`)}</button></form><p class="lead-note"${demo?' hidden':''}><small>${esc(g.note||'')}</small></p>${g.proof?`<p class="proof">${esc(g.proof)}</p>`:''}<button id="see-plans" class="quiet">See prices</button><button id="sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button>${demoMarkup(arm)}</section>`;
   $('demo-result').querySelector('.demo-note').textContent=arm.demoNote||'';
   playDemo();
   $('lead-form').onsubmit=event=>{
@@ -1051,6 +1073,8 @@ function goldenLanding(arm){
     haptic();setupFlow();
   };
   $('lead-email').oninput=()=>$('lead-email').classList.remove('invalid');
+  if($('see-demo'))$('see-demo').onclick=()=>{haptic();history.replaceState(null,'',`${location.pathname}?sim=1`);simResume();};
+  if($('real-report'))$('real-report').onclick=()=>{$('real-report').hidden=true;$('lead-form').hidden=false;document.querySelector('.lead-note').hidden=false;$('lead-email').focus();};
   $('see-plans').onclick=previewPlans;
   $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
 }

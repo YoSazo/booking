@@ -110,6 +110,12 @@ owner/test emails with normalized plus aliases, and excludes app purchases
 the US storefront. Outside the US, show no prices, purchase links, or “need a
 plan” language. The Stripe billing portal is US only.
 
+**Desktop.** Cold visitors have no damage in front of them, so on a computer
+the landing leads with "See how it works →", which runs the same simulation
+inside a phone frame (`simFrame`; `?sim=1` also brings Stripe's demo buyers
+back into it). Starting a real report stays one quiet link below. Phones get
+the simulation directly.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first
