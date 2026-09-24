@@ -124,8 +124,8 @@ test('the originals line on the send sheet is each wedge\'s own', () => {
 });
 
 // appStore.live is the switch between "use it here in the browser" and "get the
-// iPhone app" after paying. Claims stays on the web until Apple approves.
-for (const [id, live] of [['claims', false], ['fixture', true]]) {
+// iPhone app" after paying. Claims is in the approved app; Moveout is not yet.
+for (const [id, live] of [['moveout', false], ['claims', true]]) {
   test(`${id}: after paying, ${live ? 'buyers are pointed at the iPhone app' : 'buyers start in the browser and never see the App Store'}`, async () => {
     const config = load({ fixture: true }).byId[id];
     assert.equal(config.appStore.live, live);
