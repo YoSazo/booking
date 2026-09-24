@@ -113,7 +113,9 @@ plan” language. The Stripe billing portal is US only.
 **Desktop.** Cold visitors have no damage in front of them, so on a computer
 the landing leads with "See how it works →", which runs the same simulation
 inside a phone frame (`simFrame`; `?sim=1` also brings Stripe's demo buyers
-back into it). Starting a real report stays one quiet link below. Phones get
+back into it). From about 880px wide the report builds beside the phone as
+they go (`simSide`: the note as it is said, the dated photo, the filing date),
+and the offer moves out of the phone to sit next to it. Starting a real report stays one quiet link below. Phones get
 the simulation directly.
 
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone

@@ -49,7 +49,7 @@ test('desktop: See how it works opens the simulation in a phone frame', async ()
     await h.page.waitForSelector('[data-sim-pick]');
     assert.equal(await h.page.evaluate(() => document.documentElement.classList.contains('sim-framed')), true);
     const frame = await h.page.evaluate(() => { const r = document.getElementById('app').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
-    assert.ok(frame.w <= 420 && frame.x > 300, JSON.stringify(frame));
+    assert.ok(frame.w <= 420 && frame.x > 100, JSON.stringify(frame)); // phone-sized, set in from the edge
     await h.page.locator('[data-sim-pick]').first().click();
     await h.page.waitForSelector('.sim-sheet');
     const sheet = await h.page.evaluate(() => { const r = document.querySelector('.sim-sheet').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
@@ -60,3 +60,36 @@ test('desktop: See how it works opens the simulation in a phone frame', async ()
     h.assertClean();
   } finally { await h.close(); }
 });
+
+// Wide enough, the report builds beside the phone and the offer ends up next to
+// it; too narrow, the phone stands alone and keeps its offer and pay bar.
+for (const [width, split] of [[1280, true], [800, false]]) {
+  test(`desktop ${width}px: the demo ${split ? 'builds the report beside the phone and offers beside it' : 'keeps everything in the phone'}`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, viewport: { width, height: 800 } });
+    try {
+      await h.page.waitForSelector('#see-demo');
+      await h.page.click('#see-demo');
+      await h.page.locator('[data-sim-pick]').first().click();
+      await h.page.waitForSelector('#sim-mic-button');
+      assert.equal(!!(await h.page.$('#sim-side')), split);
+      if (split) assert.match(await h.page.textContent('#sim-side-note'), /Your words become this note/);
+      await h.page.click('#sim-mic-button');
+      await h.page.waitForSelector('#sim-shutter:not([disabled])', { timeout: 10000 });
+      if (split) assert.doesNotMatch(await h.page.textContent('#sim-side-note'), /Your words become this note/);
+      await h.page.click('#sim-shutter');
+      await h.page.waitForSelector('#sim-see', { timeout: 10000 });
+      if (split) {
+        await h.page.waitForSelector('#sim-side .sim-side-photo img');
+        assert.match(await h.page.textContent('#sim-side .sim-side-photo figcaption'), /\d{4} · \d{1,2}:\d{2}/);
+        assert.match(await h.page.textContent('#sim-side'), /File by /);
+      }
+      await h.page.click('#sim-see');
+      await h.page.waitForSelector('#sim-buy');
+      const where = await h.page.evaluate(() => ({ inSide: !!document.querySelector('#sim-side #sim-buy'), inPhone: !!document.querySelector('#app #sim-buy'),
+        paybar: getComputedStyle(document.getElementById('sim-paybar')).display, date: document.querySelector('.sim-doc .muted')?.textContent || '' }));
+      assert.deepEqual({ inSide: where.inSide, inPhone: where.inPhone, paybarShown: where.paybar !== 'none' }, { inSide: split, inPhone: !split, paybarShown: !split });
+      assert.doesNotMatch(where.date, /\d{4}-\d{2}-\d{2}/, 'the sample report shows its date in words');
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}

@@ -307,6 +307,7 @@ async function run(fn, trigger = tappedButton()) {
 // a long editor instead of at the top of the report.
 let currentScreen='';
 function enterScreen(key){
+  if(key==='sim')simSide('done');
   const framed = document.documentElement.classList.contains('sim-framed');
   const keep = currentScreen===key ? (framed ? $('app').scrollTop : window.scrollY) : 0;
   currentScreen=key;
@@ -653,7 +654,37 @@ function simFrame(){
   back.onclick=()=>{simUnframe();history.replaceState(null,'',location.pathname);landing();};
   document.body.insertBefore(back,$('app'));
 }
-function simUnframe(){document.documentElement.classList.remove('sim-mode','sim-framed');$('sim-frame-back')?.remove();}
+function simUnframe(){document.documentElement.classList.remove('sim-mode','sim-framed','sim-split');$('sim-frame-back')?.remove();$('sim-side')?.remove();}
+// Desktop only: beside the phone, the report builds as they go (the note as
+// it is said, the dated photo the moment it is taken), and when it is done the
+// offer sits next to it instead of below it in the phone.
+function simSide(stage){
+  const root=document.documentElement;
+  let panel=$('sim-side');
+  // Below about 880px there is no room for both; the phone alone, offer inside.
+  if(!root.classList.contains('sim-framed')||!simTool()||stage==='none'||!window.matchMedia?.('(min-width: 880px)')?.matches){panel?.remove();root.classList.remove('sim-split');return;}
+  if(!panel){panel=document.createElement('aside');panel.id='sim-side';panel.className='sim-side';panel.setAttribute('aria-label',`Your ${skin().doc}, as it builds`);$('app').after(panel);}
+  root.classList.add('sim-split');
+  const s=simTool(),sk=skin(),arm=landingArm(),row=simRun?.[0],f=row?.finding||simPicked||s.findings[0];
+  const done=stage==='report'||stage==='done';
+  const at=done?3:stage==='intro'?0:!row?.note?0:!row?.photo?1:2;
+  const steps=['Say what you see','Snap the photo',`${sk.doc[0].toUpperCase()+sk.doc.slice(1)} ready`];
+  const stepLine=`<ol class="sim-side-steps">${steps.map((label,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}">${esc(label)}</li>`).join('')}</ol>`;
+  if(stage==='report'){
+    panel.innerHTML=`${stepLine}<h2 class="sim-side-ready">Your ${esc(sk.doc)} is ready.</h2><p class="muted">Scroll it on the phone. That is what gets sent.</p><div id="sim-side-offer"></div>`;
+    const offer=$('sim-offer');
+    if(offer)$('sim-side-offer').replaceWith(offer);
+    return;
+  }
+  const now=new Date(),dl=wedge(arm?.type).can?.deadline;
+  const due=dl?.days?new Date(now.getTime()+dl.days*86400000):null;
+  const deadline=dl?`<p class="sim-side-deadline">${due?`File by ${esc(due.toLocaleDateString('en-US',{month:'short',day:'numeric'}))} — `:''}${esc(dl.text)}.</p>`:'';
+  const photo=row?.photo||done
+    ?`<figure class="sim-side-photo"><img src="${esc(simPhoto(f.photo))}" alt=""><figcaption>${esc(photoDayText(now))} · ${esc(photoClockText(now))}</figcaption></figure>`
+    :`<div class="sim-side-photo is-empty"><span>The dated photo lands here.</span></div>`;
+  const note=row?.note||(done?f.note:'');
+  panel.innerHTML=`${stepLine}<article class="card sim-side-doc"><small class="eyebrow">${esc(documentLabelFor(arm?.type||'routine'))} · Sample</small><h2>${esc(s.property)}</h2><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p><section class="sim-side-room"><h3>${esc(f.room)}</h3><p class="sim-side-note${note?'':' is-empty'}" id="sim-side-note">${note?esc(note):'Your words become this note.'}</p>${photo}</section>${deadline}</article>`;
+}
 const simReduced = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 const simPhoto = (name,thumb=false) => `/inspect/sample/${name}${thumb?'-thumb':''}.jpg`;
 // Every full-size photo the demo can show, fetched while they read the intro.
@@ -692,6 +723,7 @@ function speechEnvelope(text,bars=40){
 // saying here is how to get into it, and where the app is.
 function simThanks(){
   enterScreen('sim');
+  simSide('none');
   const sk=skin();
   document.documentElement.classList.add('sim-mode');
   // Usually we already know the address, because it was taken before Stripe.
@@ -735,6 +767,7 @@ function simIntro(){
   track('SimStarted');
   $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>${esc(s.placeLabel||"Property")}</small><strong>${esc(s.property)}</strong></div><div><small>${esc(s.unitLabel||"Unit")}</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
   simRun=null;
+  simSide('intro');
   $('sim-signin-link').onclick=()=>{
     simUnframe();
     ensureAuth(()=>run(()=>openAccountHome()),'signin');
@@ -782,6 +815,7 @@ function simStage(){
   const hint=step==='say'?'Your words appear here.':'Now photograph it.';
   const caption=step==='shoot'?`Tap to photograph the ${esc(f.label).toLowerCase()}.`:step==='say'?`${esc(f.room)} · ${esc(f.label)}`:`${esc(f.room)} documented.`;
   $('app').innerHTML=`<section class="sim sim-stage"><p class="sim-eyebrow">${esc(s.property)} · ${esc(s.unit)} <span class="sim-demo">Demo</span></p><h1>${esc(f.room)} <span class="sim-count">${row.photo?'1 photo':'no photos yet'}</span></h1><div class="sim-note${row.note?' is-written':''}" id="sim-note"><span class="sim-hint-line${row.note?' is-gone':''}" id="sim-hint-line">${hint}</span><span class="sim-said" id="sim-said"></span><div class="sim-written" id="sim-written"><p>${esc(f.note)}</p><small>Written up by Marketel ${esc(sk.product)}</small></div></div>${done?`<button type="button" id="sim-see" class="wide is-live-step">See your ${esc(sk.doc)} →</button>`:''}${row.note?'':`<div class="sim-wave" id="sim-wave">${levels.map(()=>'<i></i>').join('')}</div><div class="sim-actions"><button type="button" id="sim-mic-button" class="sim-mic" aria-label="Play the dictation">${icon('mic',24)}</button></div><p class="sim-mic-hint">Tap the mic &mdash; you will not have to say anything.</p>`}<p class="muted sim-foot"><small>In the app, this is your voice.</small></p></section><aside class="sim-sheet" aria-label="Camera"><div class="sim-grabber"></div><div class="sim-view" id="sim-view"><img class="sim-feed" src="${esc(simPhoto(f.photo))}" alt=""><div class="sim-grain"></div><div class="sim-reticle"></div><div class="sim-flash" id="sim-flash"></div></div><button type="button" id="sim-done" class="sim-done"${done?'':' hidden'}>Done</button><div class="sim-sheet-bar"><div class="sim-sheet-strip">${row.photo?`<img src="${esc(simPhoto(f.photo,true))}" alt="">`:''}</div><p class="sim-sheet-note" id="sim-sheet-note">${caption}</p><div class="sim-shutter-wrap">${step==='shoot'?'<p class="sim-coach" id="sim-coach">Tap to take the photo</p><span class="sim-coach-ring" id="sim-coach-ring" aria-hidden="true"></span>':''}<button type="button" id="sim-shutter" class="sim-shutter${step==='shoot'?' is-live-step':''}"${step==='shoot'?'':' disabled'} aria-label="Take photo"></button></div></div></aside>`;
+  simSide('stage');
   $('sim-shutter').onclick=()=>simShoot(at);
   $('sim-done').onclick=()=>simReport();
   if($('sim-see'))$('sim-see').onclick=()=>simReport();
@@ -810,6 +844,7 @@ function simShoot(at){
   if(row.photo)return;
   row.photo=true;
   track('SimPhotoTaken',row.finding.id);
+  simSide('stage');
   const quick=simReduced();
   if(!quick){
     $('sim-view').classList.add('is-capturing');
@@ -839,6 +874,8 @@ function simListen(at,levels,schedule){
     const now=progress*span;
     const shown=schedule.filter(step=>step.at<=now).length;
     said.textContent=schedule.slice(0,Math.max(1,shown)).map(step=>step.word).join(' ');
+    const sideNote=$('sim-side-note');
+    if(sideNote){sideNote.textContent=said.textContent;sideNote.classList.remove('is-empty');sideNote.classList.add('is-live');}
     hint.classList.add('is-gone');
     const head=Math.min(1,progress)*ticks.length;
     ticks.forEach((bar,i)=>{
@@ -853,6 +890,7 @@ function simListen(at,levels,schedule){
     row.note=row.finding.note;
     track('SimNoteWritten',row.finding.id);
     const reveal=()=>{
+      simSide('stage');
       note.classList.add('is-written');
       wave.classList.add('is-done');
       mic?.classList.remove('is-live');
@@ -1009,12 +1047,13 @@ function simReport({declined=false}={}){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
   $('sim-keep').onclick=()=>{haptic();simKeep();};
   $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
+  simSide('report');
   // The price is on screen from the moment the report is, so the offer really
   // has been seen by now — it is no longer something they scroll down to find.
   track('SimOfferViewed');

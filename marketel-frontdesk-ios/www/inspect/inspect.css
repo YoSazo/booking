@@ -748,3 +748,34 @@ html.sim-framed #app { width: 390px; max-width: calc(100vw - 32px); height: min(
 html.sim-framed #app::-webkit-scrollbar { display: none; }
 html.sim-framed .sim-sheet { height: 52%; }
 #sim-frame-back { display: block; width: 390px; max-width: calc(100vw - 32px); margin: 0 auto 10px; text-align: left; }
+
+/* Desktop split (simSide): the phone on the left, the report building on the
+   right, and at the end the offer beside it rather than inside the phone. */
+html.sim-framed.sim-split body { padding-left: 24px; padding-right: 24px; display: grid; grid-template-columns: 390px minmax(280px, 460px); justify-content: center; column-gap: clamp(24px, 4vw, 64px); align-content: start; }
+html.sim-framed.sim-split #sim-frame-back { grid-row: 1; grid-column: 1; width: auto; margin: 0 0 10px; }
+html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
+.sim-side { grid-row: 2; grid-column: 2; align-self: center; max-height: min(844px, calc(100vh - 96px)); overflow-y: auto; padding: 4px; }
+.sim-split .sim-paybar { display: none; }
+.sim-split .sim-report { padding-bottom: 28px; }
+.sim-side-steps { list-style: none; counter-reset: step; display: flex; flex-wrap: nowrap; gap: 6px; padding: 0; margin: 0 0 16px; }
+.sim-side-steps li { counter-increment: step; display: flex; align-items: center; gap: 7px; white-space: nowrap; padding: 6px 11px 6px 7px; border-radius: 999px; background: #fff; border: 1px solid var(--border); color: var(--muted); font-size: 13px; font-weight: 650; transition: color .2s, border-color .2s, box-shadow .2s; }
+.sim-side-steps li::before { content: counter(step); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--green-pale); color: var(--green); font-size: 11px; font-weight: 750; }
+.sim-side-steps li.is-now { color: var(--green-dark); border-color: var(--green); box-shadow: 0 0 0 3px #e8f5ee; }
+.sim-side-steps li.is-done { color: var(--green-dark); }
+.sim-side-steps li.is-done::before { content: "\2713"; background: var(--green); color: #fff; }
+.sim-side-doc { margin: 0; }
+.sim-side-doc h2 { margin: 6px 0 2px; font-size: 26px; letter-spacing: -.4px; }
+.sim-side-room { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 16px; }
+.sim-side-room h3 { margin: 0 0 6px; font-size: 18px; }
+.sim-side-note { margin: 0 0 12px; line-height: 1.5; min-height: 1.5em; }
+.sim-side-note.is-empty { color: var(--muted); font-style: italic; }
+.sim-side-note.is-live { color: var(--muted); }
+.sim-side-photo { position: relative; margin: 0; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; background: var(--green-pale); }
+.sim-side-photo img { display: block; width: 100%; height: 100%; object-fit: cover; animation: side-photo-in .35s ease; }
+.sim-side-photo figcaption { position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border-radius: 999px; background: #1a2b22cc; color: #fff; font-size: 12px; font-weight: 700; }
+.sim-side-photo.is-empty { display: grid; place-items: center; background: transparent; border: 1.5px dashed var(--border); color: var(--muted); font-size: 14px; }
+.sim-side-deadline { margin: 14px 0 0; color: var(--green-dark); font-size: 14px; font-weight: 700; }
+.sim-side-ready { margin: 0 0 4px; font-size: 28px; letter-spacing: -.4px; }
+@media (max-width: 1000px) { .sim-side-steps { flex-wrap: wrap; } }
+@keyframes side-photo-in { from { opacity: 0; transform: scale(1.03); } }
+@media (prefers-reduced-motion: reduce) { .sim-side-photo img { animation: none; } }
