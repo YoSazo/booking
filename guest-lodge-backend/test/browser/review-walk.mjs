@@ -2,7 +2,8 @@ import fs from 'fs';
 const API = 'https://bookmarketel.com/api/inspect';
 // Production walk of App Review's path with the review account. Run by hand:
 //   INSPECT_REVIEW_EMAIL=… INSPECT_REVIEW_CODE=… node test/browser/review-walk.mjs
-// It deletes everything it creates. Uses one report credit (topped up to 25 at sign-in).
+// It deletes everything it creates. Taken times are set from the server's
+// upload time, because a local clock running fast makes them future and dropped. Uses one report credit (topped up to 25 at sign-in).
 const signin = await (await fetch(API + '/auth/verify', { method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ email: process.env.INSPECT_REVIEW_EMAIL, code: process.env.INSPECT_REVIEW_CODE }) })).json();
 if (!signin.token) { console.log('Review sign-in failed:', signin.error || signin); process.exit(1); }
@@ -36,7 +37,7 @@ try {
   const dr = await call('/reports', { method: 'POST', json: { ...doc('damage'), baselineReportId: ci.body.id } }); made.push(dr.body.id); step('start a damage report linked to the check-in', dr.status === 200, `${dr.status} baseline ${dr.body.baselineReportId || 'none'}`);
   const dp = await photo(dr.body.id); step('upload a damage photo', dp.status === 200, String(dp.status));
   const rp = await photo(dr.body.id, 'receipt'); step('upload a receipt', rp.status === 200, String(rp.status));
-  const put = await call(`/reports/${dr.body.id}`, { method: 'PUT', json: doc('damage', [dp.body.id], { checkoutDate: today, photoTimes: { [dp.body.id]: { takenAt: new Date(Date.now() - 60000).toISOString(), zone: 'America/Chicago' } }, rooms: [{ name: 'Bathroom', observation: 'Toilet paper holder torn off the wall.', issue: false, photos: [dp.body.id], receipts: [rp.body.id] }] }) });
+  const put = await call(`/reports/${dr.body.id}`, { method: 'PUT', json: doc('damage', [dp.body.id], { checkoutDate: today, photoTimes: { [dp.body.id]: { takenAt: new Date(Date.parse(dp.body.createdAt) - 60000).toISOString(), zone: 'America/Chicago' } }, rooms: [{ name: 'Bathroom', observation: 'Toilet paper holder torn off the wall.', issue: false, photos: [dp.body.id], receipts: [rp.body.id] }] }) });
   step('save the report online', put.status === 200, put.status === 200 ? '' : JSON.stringify(put.body));
   const pol = await call(`/reports/${dr.body.id}/rewrite`, { method: 'POST', json: { observation: 'holder ripped off wall left side gone' } }); step('Polish typed note (OpenAI)', pol.status === 200 && !!pol.body.suggestion, pol.body.suggestion || JSON.stringify(pol.body));
   const fin = await call(`/reports/${dr.body.id}/finalize`, { method: 'POST' }); step('send it using a credit, no purchase', fin.status === 200 && !!fin.body.finalizedAt, fin.status === 200 ? '' : JSON.stringify(fin.body));
