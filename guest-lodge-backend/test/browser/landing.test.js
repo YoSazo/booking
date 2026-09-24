@@ -93,3 +93,31 @@ for (const [width, split] of [[1280, true], [800, false]]) {
     } finally { await h.close(); }
   });
 }
+
+// Under the offer, screens of the real app: in the phone on a phone, beside it
+// on a wide screen, and not at all for a wedge the approved app does not carry.
+for (const [arm, width, expect] of [['claims', 390, 'phone'], ['claims', 1280, 'side'], ['moveout', 390, 'none']]) {
+  test(`${arm} at ${width}px: the real app's screens ${expect === 'none' ? 'are not shown' : `sit under the offer (${expect})`}`, async () => {
+    const h = await open({ arm, signedIn: false, demo: width < 760, viewport: { width, height: 844 } });
+    try {
+      if (width >= 760) { await h.page.waitForSelector('#see-demo'); await h.page.click('#see-demo'); }
+      await h.page.locator('[data-sim-pick]').first().click();
+      await h.page.waitForSelector('#sim-mic-button');
+      await h.page.click('#sim-mic-button');
+      await h.page.waitForSelector('#sim-shutter:not([disabled])', { timeout: 10000 });
+      await h.page.click('#sim-shutter');
+      await h.page.waitForSelector('#sim-see', { timeout: 10000 });
+      await h.page.click('#sim-see');
+      await h.page.waitForSelector('#sim-buy');
+      const proof = await h.page.evaluate(() => { const p = document.getElementById('sim-app-proof'); return p ? { inSide: !!p.closest('#sim-side'), inPhone: !!p.closest('#app'), afterOffer: !!(document.getElementById('sim-offer').compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING), shots: p.querySelectorAll('figure img').length, captions: [...p.querySelectorAll('figcaption')].map(f => f.textContent) } : null; });
+      if (expect === 'none') { assert.equal(proof, null); return h.assertClean(); }
+      assert.ok(proof && proof.shots === 4 && proof.afterOffer, JSON.stringify(proof));
+      assert.equal(proof.inSide, expect === 'side');
+      assert.equal(proof.inPhone, expect === 'phone');
+      assert.ok(!proof.captions.some(c => /book directly/i.test(c)), 'no booking-engine captions');
+      await h.page.locator('#sim-app-proof').scrollIntoViewIfNeeded();
+      await h.page.waitForFunction(() => [...document.querySelectorAll('#sim-app-proof img')].slice(0, 1).every(img => img.complete && img.naturalWidth > 0), null, { timeout: 5000 });
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}

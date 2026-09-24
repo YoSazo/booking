@@ -672,8 +672,9 @@ function simSide(stage){
   const stepLine=`<ol class="sim-side-steps">${steps.map((label,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}">${esc(label)}</li>`).join('')}</ol>`;
   if(stage==='report'){
     panel.innerHTML=`${stepLine}<h2 class="sim-side-ready">Your ${esc(sk.doc)} is ready.</h2><p class="muted">Scroll it on the phone. That is what gets sent.</p><div id="sim-side-offer"></div>`;
-    const offer=$('sim-offer');
+    const offer=$('sim-offer'),proof=$('sim-app-proof');
     if(offer)$('sim-side-offer').replaceWith(offer);
+    if(proof)panel.appendChild(proof);
     return;
   }
   const now=new Date(),dl=wedge(arm?.type).can?.deadline;
@@ -1037,6 +1038,23 @@ function simKept(email){
   enterScreen('sim');
   $('app').innerHTML=`<section class="sim sim-thanks"><h1>Saved.</h1><p class="muted">We've emailed the link to <strong>${esc(email)}</strong>. When you need a ${esc(sk.doc)}, open it on your phone. Building one is always free.</p><a class="button wide" id="sim-start-real" href="${esc(location.pathname)}?sim=0">Start one now →</a></section>`;
 }
+// Under the offer: the app they will actually use, from the wedge's App Store
+// screenshots. Only once the approved app carries the wedge.
+function simAppProof(){
+  const shots=MANIFESTS?.[toolId()]?.appStore?.screens||[];
+  if(!appLive()||!shots.length)return '';
+  return `<section class="sim-app-proof" id="sim-app-proof"><small class="eyebrow">The real app</small><h3>This is what you'll use.</h3><div class="sim-screens" id="sim-screens" tabindex="0" role="group" aria-label="Screens of the Marketel app">${shots.map(shot=>`<figure><img src="/inspect/sample/${esc(shot.file)}" alt="${esc(shot.caption)}" loading="lazy" decoding="async" width="480" height="928"><figcaption>${esc(shot.caption)}</figcaption></figure>`).join('')}</div><div class="sim-screens-nav"><button type="button" class="quiet" data-screens="-1" aria-label="Previous screen">←</button><button type="button" class="quiet" data-screens="1" aria-label="Next screen">→</button></div><p class="muted"><small>On the App Store for iPhone, and right here in your browser.</small></p></section>`;
+}
+function bindAppProof(){
+  const proof=$('sim-app-proof'),strip=$('sim-screens');
+  if(!proof||!strip)return;
+  strip.addEventListener('scroll',()=>track('SimScreensSwiped'),{once:true,passive:true});
+  proof.querySelectorAll('[data-screens]').forEach(button=>button.onclick=()=>strip.scrollBy({left:Number(button.dataset.shots)*strip.clientWidth*0.66,behavior:simReduced()?'auto':'smooth'}));
+  if(typeof IntersectionObserver==='function'){
+    const seen=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){track('SimScreensViewed');seen.disconnect();}},{threshold:0.4});
+    seen.observe(proof);
+  }
+}
 function simReport({declined=false}={}){
   enterScreen('sim');
   const s=simTool(),sk=skin();
@@ -1048,12 +1066,13 @@ function simReport({declined=false}={}){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>${simAppProof()}</section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
   $('sim-keep').onclick=()=>{haptic();simKeep();};
   $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
+  bindAppProof();
   simSide('report');
   // The price is on screen from the moment the report is, so the offer really
   // has been seen by now — it is no longer something they scroll down to find.

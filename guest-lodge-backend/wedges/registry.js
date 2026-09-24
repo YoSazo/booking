@@ -18,6 +18,9 @@ function validate(manifest, filename = '') {
   // Whether the approved iPhone app carries this wedge. Until it does, buyers stay
   // on the web app; flipping it to true is the whole switch once Apple approves.
   if (typeof manifest.appStore?.live !== 'boolean') bad('appStore.live must be true or false');
+  // Screens of the real app, shown under the demo's offer once the app is live.
+  if (manifest.appStore.screens !== undefined && (!Array.isArray(manifest.appStore.screens)
+    || manifest.appStore.screens.some(shot => !/^[a-z0-9-]+\.(webp|jpg|png)$/.test(String(shot?.file || '')) || typeof shot.caption !== 'string' || !shot.caption.trim()))) bad('appStore.screens must be files with captions');
   if (manifest.id !== 'inspect' && (!manifest.webTitle || !manifest.skin.home || !manifest.skin.terms)) bad('web title, home and terms are required');
   if (!['single', 'select'].includes(manifest.selection)) bad('selection must be single or select');
   if (manifest.id !== 'inspect' && (!manifest.landing.type || !manifest.types[manifest.landing.type])) bad('landing type must exist');

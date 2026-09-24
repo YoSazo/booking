@@ -124,7 +124,10 @@ browser: the page after paying says it works right here and starts the first
 report, and no App Store link or "open in the app" card appears. Ads can run
 before Apple approves. Once Apple approves a build that carries the wedge, set
 `appStore.live: true`, run `npm run wedges:build`, and push; the funnel then
-points buyers at the app.
+points buyers at the app. A live wedge can also list `appStore.screens`
+(480px-wide images in `public/inspect/sample/`, each with a caption, under
+80KB); the demo then shows them under its offer as "The real app", with the
+captions as page text so a bad caption is a one-line fix.
 
 **Funnel dashboard.** `/funnel` shows each live, in-app wedge from the ad to
 paying (`wedge-funnel.js` reads `inspectEvent`). Every step a visitor can take

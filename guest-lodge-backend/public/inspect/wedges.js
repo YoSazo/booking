@@ -208,6 +208,24 @@ window.MARKETEL_WEDGES = {
     },
     "appStore": {
       "live": true,
+      "screens": [
+        {
+          "file": "claims-app-1.webp",
+          "caption": "Snap the damage. Say what you see."
+        },
+        {
+          "file": "claims-app-2.webp",
+          "caption": "A clean, dated report."
+        },
+        {
+          "file": "claims-app-3.webp",
+          "caption": "Know your filing deadline."
+        },
+        {
+          "file": "claims-app-4.webp",
+          "caption": "Every photo dated. One private link."
+        }
+      ],
       "captions": [
         "Snap the damage. Say what you see.",
         "Keep every original photo",

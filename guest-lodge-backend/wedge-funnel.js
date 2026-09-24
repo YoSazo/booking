@@ -27,6 +27,7 @@ const STEPS = Object.freeze([
 const BRANCHES = Object.freeze([
   { key: 'kept', label: 'Kept it free', steps: [['Opened keep it free', ['SimKeepFreeOpened']], ['Left their email', ['SimKeptFree', 'KeptFree']]] },
   { key: 'real', label: 'Desktop: started a real report', steps: [['Tapped start a real report', ['SimRealReportTapped']], ['Started setup', ['SetupStarted']], ['Finished setup', ['SetupCompleted']], ['Added a photo', ['FirstPhotoAdded']], ['Saw their report', ['ReportRevealed']], ['Saw the offer', ['ExportOfferViewed']]] },
+  { key: 'shots', label: 'App screenshots', steps: [['Saw them under the offer', ['SimScreensViewed']], ['Swiped through', ['SimScreensSwiped']]] },
   { key: 'left', label: 'Left the demo', steps: [['Pressed back', ['SimBackTapped']], ['Declined the offer', ['OfferDeclined']]] },
   { key: 'churn', label: 'Cancellations', steps: [['Cancelled in the trial', ['CancellationScheduled:trial']], ['Cancelled after paying', ['CancellationScheduled:paid']], ['Subscription ended', ['SubscriptionEnded']]] },
 ]);
@@ -37,7 +38,7 @@ const BRANCHES = Object.freeze([
 const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
-  'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted',
+  'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);

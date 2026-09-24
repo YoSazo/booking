@@ -57,6 +57,12 @@ function checkManifest(wedge) {
       }
     }
   }
+  // App screens shown under the demo's offer: present, and light enough for a phone.
+  for (const shot of wedge.appStore?.screens || []) {
+    const file = path.join(root, 'public/inspect/sample', shot.file);
+    if (!fs.existsSync(file)) fail(`${wedge.id}: missing app screenshot ${file}`);
+    if (fs.statSync(file).size > 80_000) fail(`${wedge.id}: ${file} exceeds 80000 bytes; export it at 480px wide`);
+  }
 }
 // Sentences of five or more words that belong to another wedge's manifest and
 // not to this one. The engine rendering one of them in this wedge means copy
