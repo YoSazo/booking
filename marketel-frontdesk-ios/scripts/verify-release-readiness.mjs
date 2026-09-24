@@ -130,8 +130,11 @@ expect(bundledRoot, /data-product="claims"/,
 if (/data-product="(inspect|incident)"/.test(bundledRoot)) {
   failures.push('The native app entry offers a tool that is meant to be hidden for now');
 }
-expect(bundledRoot, /const products = \['inspect', 'claims', 'incident'\]/,
-  'The native app entry must still be able to open all three report jobs');
+const productList = bundledRoot.match(/const products = \/\* WEDGE_PRODUCTS_START \*\/ (\[[^;]+?\]) \/\* WEDGE_PRODUCTS_END \*\//);
+const products = productList ? JSON.parse(productList[1]) : [];
+if (!['inspect', 'claims', 'incident'].every(id => products.includes(id))) {
+  failures.push('The native app entry must still be able to open all three report jobs');
+}
 expect(bundledRoot, /if \(!choosing && offered\.includes\(selected\)\) return open\(selected\);/,
   'The native app entry reopens a tool that is not on its menu');
 expect(bundledRoot, /marketel\.product[\s\S]*inspect\/index\.html\?arm=\$\{product\}/,
@@ -180,6 +183,16 @@ if (!bundledAssets.some(filename => /^native-onboarding-.*\.js$/.test(filename))
 for (const relativePath of ['www/inspect/index.html', 'www/inspect/inspect.js', 'www/inspect/inspect.css']) {
   if (!fs.existsSync(path.resolve(root, relativePath))) failures.push(`Missing ${relativePath}`);
 }
+for (const asset of ['index.html', 'inspect.js', 'inspect.css', 'wedges.js']) {
+  const app = path.resolve(root, 'www/inspect', asset);
+  const web = path.resolve(repositoryRoot, 'guest-lodge-backend/public/inspect', asset);
+  if (!fs.existsSync(app) || !fs.existsSync(web) || !fs.readFileSync(app).equals(fs.readFileSync(web))) {
+    failures.push(`Inspect web and app copies differ: ${asset}`);
+  }
+}
+const wedgeBuildCheck = await import('node:child_process').then(({ spawnSync }) => spawnSync(process.execPath,
+  [path.resolve(repositoryRoot, 'guest-lodge-backend/scripts/wedges-build.js'), '--check'], { encoding: 'utf8' }));
+if (wedgeBuildCheck.status !== 0) failures.push(`Generated wedge data is stale: ${wedgeBuildCheck.stderr.trim()}`);
 for (const match of bundledFrontDesk.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
   const referencedFile = path.resolve(root, 'www/frontdesk', match[1]);
   if (!fs.existsSync(referencedFile)) {

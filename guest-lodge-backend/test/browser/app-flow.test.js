@@ -26,7 +26,10 @@ test('property add and refused delete leave an honest list', async () => {
     await h.page.waitForSelector('[data-delete-property]');
     assert.match(await h.body(), /Pine Cottage/);
     await h.page.locator('[data-delete-property]').first().click();
-    // The confirmation is a meaningful stop before removing a property.
+    await h.page.waitForSelector('#flow-confirm');
+    await h.page.click('#flow-confirm');
+    await h.page.waitForSelector('.property-row:not(.is-leaving)');
+    assert.match(await h.body(), /Could not delete property/);
     assert.match(await h.body(), /Pine Cottage/);
     h.assertClean();
   } finally { await h.close(); }
@@ -67,7 +70,33 @@ test('refused report delete restores the row', async () => {
   try {
     await h.page.waitForSelector('[data-delete-report]');
     await h.page.click('[data-delete-report]');
-    assert.match(await h.body(), /Delete permanently/);
+    await h.page.waitForSelector('#flow-confirm');
+    await h.page.click('#flow-confirm');
+    await h.page.waitForSelector('.report-row:not(.is-leaving)');
+    assert.match(await h.body(), /Could not delete report/);
+    assert.match(await h.body(), /Pine Cottage/);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('polish can be declined or applied without losing the original note', async () => {
+  const h = await open({ accountData: { businessName: 'Pine Stays' }, properties: ['Pine Cottage'] });
+  try {
+    await h.page.waitForSelector('#new-report');
+    await h.page.click('#new-report');
+    await h.page.click('[data-pick-property="Pine Cottage"]');
+    await h.page.waitForSelector('.write-own');
+    await h.page.click('.write-own summary');
+    await h.page.fill('[data-field="observation"]', 'A mark by the door.');
+    await h.page.click('[data-ai]');
+    await h.page.waitForSelector('#keep-ai');
+    await h.page.click('#keep-ai');
+    assert.equal(await h.page.inputValue('[data-field="observation"]'), 'A mark by the door.');
+    await h.page.click('[data-ai]');
+    await h.page.waitForSelector('#accept-ai');
+    await h.page.click('#accept-ai');
+    assert.equal(await h.page.inputValue('[data-field="observation"]'), 'The fixture wording.');
+    assert.match(await h.body(), /Note updated/);
     h.assertClean();
   } finally { await h.close(); }
 });

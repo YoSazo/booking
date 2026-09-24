@@ -11,6 +11,8 @@
     "test:browser": "node --test test/browser/*.test.js && node test/browser/plans.js",
     "test:browser:prod": "node test/browser/prod-smoke.js",
     "test:browser:review": "node test/browser/review-walk.mjs",
+    "wedges:build": "node scripts/wedges-build.js",
+    "wedges:check": "node scripts/wedges-build.js --check",
     "qa:release:auto": "npm test && node scripts/release-qa.js",
     "qa:release:database": "node scripts/release-qa.js",
     "stripe:domains:sync": "node scripts/register-stripe-payment-domains.js",
@@ -18,7 +20,9 @@
     "postinstall": "prisma generate",
     "build:frontdesk": "cd frontdesk && npm install && npm run build",
     "db:push": "dotenv -e .env -- npx prisma db push",
-    "db:generate": "dotenv -e .env -- npx prisma generate"
+    "db:generate": "dotenv -e .env -- npx prisma generate",
+    "wedge:new": "node scripts/wedge-new.js",
+    "wedge:check": "node scripts/wedge-check.js"
   },
   "keywords": [],
   "author": "",

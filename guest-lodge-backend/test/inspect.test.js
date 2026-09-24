@@ -58,16 +58,16 @@ test('damage voice notes and artifacts use the Claims guardrails and identity', 
   const web = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const terms = fs.readFileSync(path.join(root, 'public/inspect/terms.html'), 'utf8');
   const chooser = fs.readFileSync(path.join(root, '../marketel-frontdesk-ios/www/index.html'), 'utf8');
-  assert.match(server, /damage: `You format a spoken damage note/);
-  assert.match(server, /Never estimate repair or replacement cost, assign blame, or state a cause/);
+  assert.match(require('../wedges/claims').types.damage.voiceInstruction, /You format a spoken damage note/);
+  assert.match(require('../wedges/claims').types.damage.voiceInstruction, /Never estimate repair or replacement cost, assign blame, or state a cause/);
   assert.match(server, /VOICE_INSTRUCTIONS\[report\.document\.type\]/);
-  assert.match(server, /damage: \{ brand: 'MARKETEL CLAIMS', file: 'damage-report\.pdf' \}/);
+  assert.deepEqual([require('../wedges/claims').types.damage.brand, require('../wedges/claims').types.damage.file], ['MARKETEL CLAIMS', 'damage-report.pdf']);
   assert.match(server, /res\.type\('html'\)\.send\(`<!doctype html><html><head>.*?<title>\$\{safe\(typeLabel\(d\.type\)\)\}/);
   assert.match(server, /roleLabel\(signature\.role\)/);
-  assert.match(client, /damage: \['owner', 'guest'\]/);
+  assert.deepEqual(require('../wedges/claims').types.damage.signers, { manager: 'owner', other: 'guest' });
   assert.match(client, /data-original-photo/);
-  assert.match(client, /const documentFileName = type => type === 'incident'.*?'damage-report\.pdf'/);
-  assert.match(web, /Claims produces documentation; it does not file, submit or manage claims/);
+  assert.match(client, /const documentFileName = type => typeConfig\(type\)\.file/);
+  assert.match(require('../wedges/claims').termsIntro, /Claims produces documentation; it does not file, submit or manage claims/);
   assert.match(terms, /it does not file, submit or manage claims/);
   // Claims is the only wedge running ads, so it is the only one on the menu.
   // The others still open if something links straight to them.
@@ -77,7 +77,7 @@ test('damage voice notes and artifacts use the Claims guardrails and identity', 
   }
   assert.match(chooser, /More tools coming soon/);
   assert.doesNotMatch(chooser, /All three use the same account/);
-  assert.match(chooser, /const products = \['inspect', 'claims', 'incident'\]/);
+  assert.match(chooser, /WEDGE_PRODUCTS_START/);
   // Only what is offered reopens by itself; a hidden tool someone last used
   // must not skip the menu and land them straight back in it.
   assert.match(chooser, /if \(!choosing && offered\.includes\(selected\)\) return open\(selected\);/);
@@ -246,7 +246,7 @@ test('an incident record does not misstate anything to an insurer', () => {
 
     // type is the wedge discriminator and needs no migration, but the three
     // existing types must keep working.
-    assert.match(server, /\['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in'\]/);
+    assert.deepEqual(require('../wedges/registry').load().all.flatMap(w => Object.keys(w.types)).sort(), ['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in', 'landlord-move-out', 'landlord-move-in'].sort());
 
     // date is when it was written down; neither it nor finalizedAt says when
     // the thing happened. Optional, and unknown is a real answer.
@@ -255,23 +255,23 @@ test('an incident record does not misstate anything to an insurer', () => {
 
     // A witness is not a "resident", and nobody signed at the moment the
     // report was frozen.
-    assert.match(server, /incident: \['manager', 'witness'\]/);
-    assert.match(server, /default: \['manager', 'resident'\]/);
+    assert.deepEqual(require('../wedges/incident').types.incident.signers, { manager: 'staff', other: 'witness' });
+    assert.deepEqual(require('../wedges/inspect').types.routine.signers, { manager: 'manager', other: 'resident' });
     const finalize = server.slice(server.indexOf('const finalizedAt = new Date();'), server.indexOf('const finalized = await tx.inspectReport.update'));
     assert.match(finalize, /stampSignatures\(document\.signatures, r\.document\?\.signatures, finalizedAt\)/);
     assert.doesNotMatch(finalize, /signedAt: finalizedAt\.toISOString\(\)/);
 
     // A share link is a bearer token to the whole document, and an incident
     // narrative can name a person and their injury.
-    assert.match(server, /Incident records are not shareable by link/);
-    assert.match(client, /d\.type==='incident'\?'':'<button id="share"/);
+    assert.equal(require('../wedges/incident').types.incident.can.shareable, false);
+    assert.match(client, /wedge\(d\.type\)\.can\.shareable/);
 
     // The model must never turn "her wrist looked bad" into an injury.
-    assert.match(server, /Never diagnose, characterise or speculate about injury/);
+    assert.match(require('../wedges/incident').types.incident.voiceInstruction, /Never diagnose, characterise or speculate about injury/);
     assert.match(server, /VOICE_INSTRUCTIONS\[report\.document\.type\] \|\| VOICE_INSTRUCTIONS\.default/);
 
     // And both artifacts that leave the app carry the right disclaimer.
-    assert.match(server, /Not a legal, medical or insurance determination/);
+    assert.match(require('../wedges/incident').types.incident.disclaimer, /Not a legal, medical or insurance determination/);
     assert.match(server, /disclaimerFor\(report\.document\.type\)/);
     assert.match(server, /disclaimerFor\(d\.type\)/);
     assert.match(client, /esc\(pw\.disclaimer\)/);
@@ -322,8 +322,8 @@ test('each wedge is a root path, skinned per arm, and still attributed for free'
 
     // A slug has to survive the root namespace, which it shares with Booking's
     // own pages and with express.static(public) serving every file in there.
-    const slugs = [...server.matchAll(/^    (\w+): Object\.freeze\(\{ product: '(\w+)'/gm)].map(m => m[1]);
-    assert.deepEqual(slugs, ['incident', 'claims']);
+    const slugs = require('../wedges/registry').load().all.filter(w => w.id !== 'inspect').map(w => w.id);
+    assert.deepEqual(slugs, ['claims', 'incident', 'moveout']);
     const taken = new Set([...server.matchAll(/app\.(?:get|post|use|all)\('\/([a-z0-9-]+)'/g)].map(m => m[1]));
     for (const slug of slugs) {
         assert.ok(!taken.has(slug), `/${slug} collides with an existing route`);
@@ -347,12 +347,10 @@ test('each wedge is a root path, skinned per arm, and still attributed for free'
     // Someone who clicked an advertisement about incidents must not land inside
     // a product that talks about move-out comparisons, so the chrome, the
     // paywall and the terms link all follow the arm rather than the codebase.
-    const skin = client.slice(client.indexOf('const SKIN = {'), client.indexOf('const landingArm'));
-    for (const key of ['product', 'home', 'terms', 'navList', 'navCreate', 'navPlaces',
-                       'listHeading', 'placesHeading', 'documentLabel', 'offerHeading',
-                       'offerAnchor', 'offerPoints']) {
-        assert.match(skin, new RegExp(`\\b${key}:`), `the incident arm must override ${key}`);
-        assert.ok(skin.split(`${key}:`).length > 2, `${key} needs a default and an incident value`);
+    const inspect = require('../wedges/inspect'), incident = require('../wedges/incident');
+    for (const key of ['product','home','terms','navList','navCreate','navPlaces','listHeading','placesHeading','documentLabel','offerHeading','offerAnchor','offerPoints']) {
+      assert.ok(inspect.skin[key], `Inspect missing ${key}`);
+      assert.ok(incident.skin[key], `Incident missing ${key}`);
     }
     // No surface may hardcode the product name or its terms URL any more.
     const surfaces = client.slice(client.indexOf('function landing()'));
@@ -362,16 +360,15 @@ test('each wedge is a root path, skinned per arm, and still attributed for free'
     assert.match(surfaces, /esc\(sk\.terms\)/);
 
     // Each arm has its own name; all use one account and report allowance.
-    assert.match(server, /incident: Object\.freeze\(\{ product: 'Incident'/);
-    assert.match(server, /claims: Object\.freeze\(\{ product: 'Claims'/);
+    assert.match(server, /require\('\.\/wedges\/registry'\)\.load\(\)/);
+    assert.equal(require('../wedges/incident').product, 'Incident');
+    assert.equal(require('../wedges/claims').product, 'Claims');
 
     // Claims leads with uploaded evidence rather than an AI-generated finding.
-    const arms = client.slice(client.indexOf('const LANDING_ARMS'), client.indexOf('const ARM_PATH'));
-    assert.match(arms, /photos kept as uploaded/);
-    assert.doesNotMatch(arms, /\bAI\b|writes the notes/);
-
-    // And it promises preservation, never an outcome.
-    assert.doesNotMatch(arms, /\b(guarantee[sd]?|approved|accepted|win|reimburse[sd]?)\b/i);
+    const claimsCopy = JSON.stringify(require('../wedges/claims').landing);
+    assert.match(claimsCopy, /photos kept as uploaded/);
+    assert.doesNotMatch(claimsCopy, /\bAI\b|writes the notes/);
+    assert.doesNotMatch(claimsCopy, /\b(guarantee[sd]?|approved|accepted|win|reimburse[sd]?)\b/i);
 });
 
 test('a sheet opens without summoning the keyboard', () => {
@@ -770,6 +767,32 @@ test('a damage report links only to its own property\'s saved check-in', async (
   } finally { h.registration.close(); }
 });
 
+test('Moveout saves a free move-in baseline and links only the same unit to its departure report', async () => {
+  const baseline = { finalizedAt: new Date(), propertyName: 'Unit A', document: {
+    propertyName: 'Unit A', type: 'landlord-move-in', date: '2026-09-12', author: '',
+    rooms: [{ name: 'Bedroom', observation: '', photos: ['p1'] }], signatures: [] } };
+  const h = moneyHarness({ report: baseline });
+  const body = extra => JSON.stringify({ propertyName: 'unit a', type: 'landlord-move-out', date: '2026-09-24',
+    author: 'Sam', rooms: [{ name: 'Bedroom', observation: '', photos: [] }], ...extra });
+  try {
+    const saved = await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers,
+      body: body({ baselineReportId: 'rep_1' }) });
+    assert.equal(saved.status, 200);
+    assert.equal(h.calls.reportsCreated[0].baselineReportId, 'rep_1');
+    assert.equal((await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers,
+      body: body({ propertyName: 'Unit B', baselineReportId: 'rep_1' }) })).status, 400);
+    assert.equal((await request(h.app, '/api/inspect/reports', { method: 'POST', headers: h.headers,
+      body: JSON.stringify({ ...JSON.parse(body({ baselineReportId: 'rep_1' })), type: 'damage' }) })).status, 400);
+  } finally { h.registration.close(); }
+  const free = moneyHarness({ report: { ...baseline, finalizedAt: null } });
+  try {
+    const response = await request(free.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: free.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    assert.equal(free.calls.accountUpdates.length, 0);
+    assert.ok(free.calls.events.some(event => event.name === 'MoveInSaved'));
+  } finally { free.registration.close(); }
+});
+
 test('properties know their last check-in, counted apart from reports', async () => {
   const h = moneyHarness({ report: { finalizedAt: new Date(),
     document: { propertyName: 'Pine Ave', type: 'check-in', date: '2026-09-12', author: '', rooms: [{ name: 'Bedroom', photos: ['p1', 'p2'] }, { name: 'Kitchen', photos: ['p3'] }], signatures: [] } } });
@@ -809,10 +832,10 @@ test('the app dates photos, keeps check-ins with their property, and shows the b
   assert.match(client, /if\(f\.takenAt\)form\.append\('takenAt',f\.takenAt\);\s*form\.append\('zone',f\.zone\|\|PHONE_ZONE\);/);
   assert.match(client, /draft\.files\.push\(\{id,blob,source:'camera',name:`camera-\$\{id\}\.jpg`,takenAt:new Date\(\)\.toISOString\(\),zone:PHONE_ZONE\}\)/);
   assert.match(client, /return \{\.\.\.draft\.document,photoTimes:times,rooms:/);
-  assert.match(client, /TOOL_LIST_TYPES = Object\.freeze\(\{ inspect: TOOL_TYPES\.inspect, claims: \['damage'\]/);
+  assert.deepEqual(require('../wedges/claims').listTypes, ['damage']);
   assert.match(client, /const toolTypesQuery = \(\) => `types=\$\{TOOL_LIST_TYPES\[toolId\(\)\]\.join\(','\)\}`;/);
-  assert.match(client, /data-check-in="\$\{index\}">Check in<\/button>/);
-  assert.match(client, /keep\.textContent='Save check-in';/);
+  assert.match(client, /data-baseline="\$\{index\}"/);
+  assert.equal(require('../wedges/claims').types['check-in'].baselineSave, 'Save check-in');
   assert.match(client, /baselineReportId:draft\.baselineId/);
   assert.match(client, /data-ask-name="\$\{esc\(name\)\}"/);
   assert.match(client, /if\(cameraAsk\|\|cameraBefore\)return;/);
@@ -905,7 +928,8 @@ test('the Properties page adds and deletes a property itself, and names it prope
   // "+ New propertie" came from stripping an s off the heading.
   assert.doesNotMatch(client, /placesHeading\.replace\(/);
   assert.match(client, /\+ New \$\{esc\(sk\.placeSingular\)\}/);
-  for (const skinName of ["placeSingular: 'property'", "placeSingular: 'location'"]) assert.ok(client.includes(skinName), skinName);
+  assert.equal(require('../wedges/claims').skin.placeSingular, 'property');
+  assert.equal(require('../wedges/incident').skin.placeSingular, 'location');
   // Adding one opens its own sheet; it no longer starts a damage report.
   assert.match(client, /\$\('new-property'\)\.onclick=\(\)=>\{haptic\(\);newProperty\(\);\}/);
   assert.match(client, /function newProperty\(\)[\s\S]{0,1400}api\('\/properties',\{method:'POST'/);
@@ -1189,9 +1213,9 @@ test('a damage report is findings, and the capture screen is the recording', () 
 
   // Claims counts findings; Inspect and Incident still walk rooms, because
   // comparisons match by room name and coverage is per room.
-  assert.match(client, /damage: \{[\s\S]{0,400}unit: 'entry'/);
-  assert.match(server, /claims: Object\.freeze\(\{ unit: 'entry'/);
-  for (const tool of ['inspect', 'incident']) assert.match(server, new RegExp(`${tool}: Object\\.freeze\\(\\{ unit: 'room'`));
+  assert.equal(require('../wedges/claims').types.damage.unit, 'entry');
+  assert.match(server, /unit: item\.types\[item\.listTypes\[0\]\]\.unit/);
+  for (const tool of ['inspect', 'incident']) assert.equal(require('../wedges/'+tool).types[require('../wedges/'+tool).listTypes[0]].unit, 'room');
   assert.match(client, /rooms: \[\{ name: entryTool\(type\) \? '' : wedge\(type\)\.seeds\[0\]/);
 
   // An unnamed entry keeps its empty name through validation and is numbered
@@ -1249,7 +1273,7 @@ test('switching tools can never strand the app on a blank page', () => {
   assert.doesNotMatch(client, /location\.assign\('\.\.\/index\.html/);
   // Each tool keeps its own draft and asks only for its own reports.
   assert.match(client, /const draftKey = \(\) => `current:\$\{toolId\(\)\}`/);
-  assert.match(client, /inspect: \['routine', 'move-in', 'move-out'\], claims: \['damage', 'check-in'\], incident: \['incident'\]/);
+  assert.match(client, /Object\.entries\(MANIFESTS\)\.map\(\(\[id, item\]\) => \[id, Object\.keys\(item\.types\)\]\)/);
   assert.equal((client.match(/\/reports\?take=50&\$\{toolTypesQuery\(\)\}/g) || []).length, 3);
   assert.match(client, /<small>\$\{esc\(documentLabelFor\(d\.type\)\)\}<\/small>/);
   // A chooser restored from the back/forward cache undoes its departure.
@@ -1395,32 +1419,23 @@ test('every tool sells a single report, and the free first one survives it', () 
     // The offer used to hang off the landing arm, but /inspect/ has no arm
     // entry — landingArm() is null there — so Inspect could never be priced.
     // It belongs to the tool, beside the types.
-    assert.match(client, /const TOOL_OFFERS = Object\.freeze\(\{/);
+    assert.match(client, /const TOOL_OFFERS = Object\.fromEntries/);
     assert.match(client, /const payAtExport = \(\) => toolOffer\(\)\.mode === 'pay-at-export'/);
     assert.match(client, /const reportPrice = \(\) => toolOffer\(\)\.reportPrice \|\| 0/);
     assert.doesNotMatch(client, /landingArm\(\)\?\.offer/);
 
-    // Two tables describe the same three tools; drift between them is a
-    // priced page that cannot take the payment, or the reverse.
-    const readTools = (src, re) => Object.fromEntries([...src.matchAll(re)].map(m => [m[1], m[2]]));
-    const serverTools = readTools(server, /^  (\w+): Object\.freeze\(\{[^}]*offerMode: '([\w-]+)'/gm);
-    const clientTools = readTools(client, /^  (\w+): Object\.freeze\(\{ mode: '([\w-]+)'/gm);
-    assert.deepEqual(clientTools, serverTools, 'client and server offer modes must agree');
-
-    const price = (src, re) => Object.fromEntries([...src.matchAll(re)].map(m => [m[1], Number(m[2])]));
-    const serverPrices = price(server, /^  (\w+): Object\.freeze\(\{[^}]*reportPrice: (\d+)/gm);
-    const clientPrices = price(client, /^  (\w+): Object\.freeze\(\{[^}]*reportPrice: (\d+)/gm);
-    assert.deepEqual(Object.keys(serverPrices).sort(), ['claims','incident','inspect']);
-    for (const [tool, cents] of Object.entries(serverPrices)) {
-        assert.equal(cents, clientPrices[tool] * 100, `${tool}: server cents must match the client's dollars`);
-    }
+    const manifests=require('../wedges/registry').load().all;
+    assert.match(server, /WEDGE_REGISTRY\.all\.map/);
+    assert.match(client, /Object\.entries\(MANIFESTS\)\.map/);
+    assert.deepEqual(Object.fromEntries(manifests.map(w=>[w.id,w.offer.mode])), {claims:'pay-at-export',incident:'first-free',inspect:'first-free',moveout:'pay-at-export'});
+    assert.ok(manifests.every(w=>w.offer.reportPrice===12));
 
     // offerMode is independent of the price. A first-free tool still gives the
     // first report away; what changed is that the wall after it is $12 rather
     // than a monthly subscription — the shape that sold nothing on booking.
-    assert.match(serverTools.inspect, /first-free/);
-    assert.match(serverTools.incident, /first-free/);
-    assert.match(serverTools.claims, /pay-at-export/);
+    assert.equal(require('../wedges/inspect').offer.mode, 'first-free');
+    assert.equal(require('../wedges/incident').offer.mode, 'first-free');
+    assert.equal(require('../wedges/claims').offer.mode, 'pay-at-export');
     assert.match(client, /\(!payAtExport\(\) && account\.freeAvailable\)/,
         'the free first report must not depend on the tool being unpriced');
     // Finalize spends the free report first, then plan allowance, then a
@@ -1653,12 +1668,12 @@ test('a blocking wait shows the product waiting, and finishing offers every way 
     // that is not allowed to have one.
     const sheet = client.slice(client.indexOf('function deliverySheet'), client.indexOf('function exportOffer'));
     assert.match(sheet, /is built\./);
-    assert.match(sheet, /const canShare=d\.type!=='incident'/);
+    assert.match(sheet, /const canShare=!!wedge\(d\.type\)\.can\.shareable/);
     assert.match(sheet, /delivery-share/);
     assert.match(sheet, /delivery-pdf/);
     // The original files are the reason a damage report is worth paying for,
     // so they are a listed choice rather than something to go hunting for.
-    assert.match(sheet, /hasOriginals=d\.type==='damage'/);
+    assert.match(sheet, /hasOriginals=!!wedge\(d\.type\)\.can\.originals/);
     assert.match(sheet, /delivery-originals/);
     // Declining is a real answer and must not trap anyone in the sheet.
     assert.match(sheet, /delivery-later/);
@@ -2353,12 +2368,8 @@ test('the simulation ladder is measurable and closed to anything else', async ()
 test('every sample photo the simulation offers actually exists', () => {
   const fs = require('node:fs'), path = require('node:path');
   const root = path.join(__dirname, '..', 'public', 'inspect');
-  const src = fs.readFileSync(path.join(root, 'inspect.js'), 'utf8');
-  const block = src.slice(src.indexOf('const SIMS = {'), src.indexOf('const simTool ='));
-  assert.ok(block.length > 500, 'the simulation registry should be in the bundle');
-  for (const tool of ['inspect', 'claims']) {
-    const arm = block.slice(block.indexOf(`  ${tool}: {`));
-    const photos = [...arm.slice(0, arm.indexOf('\n  },')).matchAll(/photo: '([a-z-]+)'/g)].map(m => m[1]);
+  for (const tool of ['inspect', 'claims', 'moveout']) {
+    const photos = require('../wedges/'+tool).demo.findings.map(f => f.photo);
     assert.equal(photos.length, 3, `${tool} should offer three things to document`);
     assert.ok(photos.every(photo => photo.startsWith(`${tool}-`)), `${tool} photos: ${photos.join(', ')}`);
     for (const photo of photos) {
@@ -2373,7 +2384,8 @@ test('every sample photo the simulation offers actually exists', () => {
     }
   }
   // The simulation must never write into the real pipeline.
-  const sim = src.slice(src.indexOf('const SIMS = {'), src.indexOf('function landing() {'));
+  const src=fs.readFileSync(path.join(root,'inspect.js'),'utf8');
+  const sim = src.slice(src.indexOf('const SIMS ='), src.indexOf('function landing() {'));
   assert.ok(!/persist\(|stored\('put'|api\('\/reports/.test(sim), 'the simulation must not touch drafts or reports');
 });
 
@@ -2638,10 +2650,9 @@ test('the app stops quoting a price to someone who already paid, and a business 
   assert.doesNotMatch(client, /role==='owner' \? \(draft\.document\.author\|\|rememberedAuthor\(\)\)/);
 
   // Where the phone stood proves nothing about damage found at checkout.
-  const damage = client.slice(client.indexOf('  damage: {'), client.indexOf('  default: {'));
-  assert.match(damage, /location: false/);
-  assert.match(client, /if\(wedge\(draft\.document\?\.type\)\.location===false\)return Promise\.resolve\(\);/);
-  assert.match(client, /\$\{wedge\(d\.type\)\.location===false\?'':locationPreview\(d\)\}/);
+  assert.equal(require('../wedges/claims').types.damage.can.location, false);
+  assert.match(client, /if\(wedge\(draft\.document\?\.type\)\.can\.location===false\)return Promise\.resolve\(\);/);
+  assert.match(client, /\$\{wedge\(d\.type\)\.can\.location===false\?'':locationPreview\(d\)\}/);
 
   // The capture control is a microphone that needs the shell bridge, not a URL
   // scheme, and it never tells anyone to hold anything.

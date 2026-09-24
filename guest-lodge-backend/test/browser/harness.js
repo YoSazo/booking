@@ -12,16 +12,18 @@ const APP = path.resolve(__dirname, '../../../marketel-frontdesk-ios/www/inspect
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2' };
 const JPEG = fs.readFileSync(path.join(WEB, 'sample/claims-wall-thumb.jpg'));
 const token = 't'.repeat(43);
+const fixtureManifest = require('../../wedges/_fixture');
 const account = (extra = {}) => ({ token, email: 'owner@example.test', active: false, freeAvailable: true, remaining: 0, credits: 0, plans: ['month', 'year'], businessName: '', ...extra });
 const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage', author: 'A. Host', type, date: '2026-09-23', rooms: [{ name: type === 'damage' ? '' : 'Kitchen', observation: '', issue: false, photos: [] }], signatures: [], ...extra });
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, refuseDelete = false, country = 'USA' } = {}) {
+async function open({ native = false, arm = 'claims', demo = false, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null } = {}) {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [];
-  const data = { reports: [...reports], properties: [...properties], account: account(accountData), photoCount: 0 };
+  const fallbackPhoto = photoFallback ? fs.readFileSync(photoFallback) : JPEG;
+  const data = { reports: [...reports], properties: [...properties], account: account(accountData), photoCount: 0, photoBytes: new Map() };
   await context.exposeBinding('__shell', (_, message) => shell.push(message));
   await context.addInitScript(({ native, signedIn, token, arm, country }) => {
     if (signedIn) localStorage.setItem('inspect.session', token);
@@ -40,15 +42,30 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
   page.on('pageerror', error => errors.push(error.message));
   await page.route('http://app.test/**', route => {
     const url = new URL(route.request().url());
-    let rel = /^\/(claims|incident|moveout)\/?$/.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/inspect\/?/, '');
+    let rel = /^\/(claims|incident|moveout|fixture)\/?$/.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/inspect\/?/, '');
     if (!rel || rel.endsWith('/')) rel += 'index.html';
     const root = native ? APP : WEB;
-    const filename = path.resolve(root, rel);
-    if (!filename.startsWith(root + path.sep) || !fs.existsSync(filename)) return route.fulfill({ status: 404, body: '' });
+    let filename = path.resolve(root, rel);
+    if (/^\/(marketel\.svg|marketel-frontdesk-icon\.png)$/.test(url.pathname)) filename = path.resolve(root, '..', url.pathname.slice(1));
+    if ((!filename.startsWith(root + path.sep) && !filename.startsWith(path.resolve(root, '..') + path.sep)) || !fs.existsSync(filename)) return route.fulfill({ status: 404, body: '' });
     let body = fs.readFileSync(filename);
     if (/\.(css|html)$/.test(filename)) body = Buffer.from(body.toString().replace(/(\d)svh/g, '$1vh'));
+    if (includeFixture && filename.endsWith('wedges.js')) body = Buffer.from(body.toString() + `\nwindow.MARKETEL_WEDGES.fixture = ${JSON.stringify(fixtureManifest)};\n`);
     if (native && filename.endsWith('inspect.js')) body = Buffer.from(body.toString().replace(/^.*\n/, 'const native = true;\n'));
     return route.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(filename)] || 'application/octet-stream' } });
+  });
+  const propertyDetails = () => data.properties.map(name => {
+    const rows = data.reports.filter(row => row.document.propertyName === name);
+    const baselines = {};
+    for (const row of rows.filter(row => row.finalizedAt)) {
+      const type = row.document.type;
+      if (!baselines[type]) baselines[type] = { count: 0, latest: null };
+      baselines[type].count++;
+      if (!baselines[type].latest) baselines[type].latest = { id: row.id, date: row.document.date,
+        photoCount: row.document.rooms.reduce((sum, room) => sum + room.photos.length, 0) };
+    }
+    return { name, reportCount: rows.filter(row => row.document.type !== 'check-in' && row.document.type !== 'landlord-move-in' && row.document.type !== 'fixture-arrival').length,
+      baselines, checkInCount: baselines['check-in']?.count || 0, latestCheckIn: baselines['check-in']?.latest || null };
   });
   await page.route('**/api/inspect/**', async route => {
     const request = route.request();
@@ -57,13 +74,22 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
     const method = request.method();
     const json = (body, status = 200) => route.fulfill({ status, body: JSON.stringify(body), headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } });
     if (method === 'OPTIONS') return json({});
+    if (p === '/shared/test' && method === 'GET') {
+      const row = data.reports.find(item => item.finalizedAt && item.document.rooms.some(room => room.photos.length));
+      if (!row) return route.fulfill({ status: 404, body: 'No shared report' });
+      const date = new Date(`${row.document.date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+      const rooms = row.document.rooms.map(room => `<section><h2>${room.name || 'Finding'}</h2>${room.photos.map(id => `<figure><img src="/api/inspect/shared/test/photos/${id}" alt="Recorded photo"><figcaption>Imported · received by Marketel ${date}</figcaption></figure>`).join('')}</section>`).join('');
+      return route.fulfill({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:16px system-ui;max-width:850px;margin:40px auto;padding:20px;color:#21372b}img{max-width:100%;max-height:500px}section{border-top:1px solid #ccc;padding:24px 0}figcaption{font-size:13px;color:#587064}</style></head><body><small>PRIVATE REPORT LINK</small><h1>${row.document.propertyName}</h1><p>${date}</p>${rooms}</body></html>` });
+    }
+    if (p.startsWith('/shared/test/photos/') && method === 'GET') return route.fulfill({ status: 200,
+      body: data.photoBytes.get(p.split('/').pop()) || fallbackPhoto, headers: { 'content-type': 'image/jpeg' } });
     if (p === '/config') return json({ enabled: true, limits: { photos: 100, reports: 300 } });
     if (p === '/account' && method === 'GET') { if (slowAccount) await wait(slowAccount); return json(data.account); }
-    if (p === '/properties' && method === 'GET') return json({ properties: data.properties, propertyDetails: data.properties.map(name => ({ name, reportCount: 0, checkInCount: 0, latestCheckIn: null })) });
-    if (p === '/properties' && method === 'POST') { const name = JSON.parse(request.postData()).name; if (!data.properties.includes(name)) data.properties.push(name); return json({ properties: data.properties, propertyDetails: data.properties.map(name => ({ name, reportCount: 0, checkInCount: 0, latestCheckIn: null })) }); }
-    if (p === '/properties' && method === 'DELETE') { if (refuseDelete) return json({ error: 'Could not delete property.' }, 409); data.properties = data.properties.filter(name => name !== JSON.parse(request.postData()).name); return json({ properties: data.properties, propertyDetails: data.properties.map(name => ({ name, reportCount: 0, checkInCount: 0, latestCheckIn: null })) }); }
+    if (p === '/properties' && method === 'GET') return json({ properties: data.properties, propertyDetails: propertyDetails() });
+    if (p === '/properties' && method === 'POST') { const name = JSON.parse(request.postData()).name; if (!data.properties.includes(name)) data.properties.push(name); return json({ properties: data.properties, propertyDetails: propertyDetails() }); }
+    if (p === '/properties' && method === 'DELETE') { if (refuseDelete) return json({ error: 'Could not delete property.' }, 409); data.properties = data.properties.filter(name => name !== JSON.parse(request.postData()).name); return json({ properties: data.properties, propertyDetails: propertyDetails() }); }
     if (p === '/reports' && method === 'GET') { if (slowList) await wait(slowList); const types = url.searchParams.get('types')?.split(',') || []; return json({ reports: data.reports.filter(row => !types.length || types.includes(row.document.type)), nextCursor: null }); }
-    if (p === '/reports' && method === 'POST') { const body = JSON.parse(request.postData()); const row = report(body.type, { document: body }); data.reports.unshift(row); return json(row); }
+    if (p === '/reports' && method === 'POST') { const body = JSON.parse(request.postData()); const row = report(body.type, { document: body, baselineReportId: JSON.parse(request.postData()).baselineReportId || null }); data.reports.unshift(row); return json(row); }
     const match = /^\/reports\/([^/]+)(.*)$/.exec(p);
     if (match) {
       const row = data.reports.find(item => item.id === match[1]);
@@ -74,8 +100,14 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
       if (!tail && method === 'DELETE') { if (refuseDelete) return json({ error: 'Could not delete report.' }, 409); data.reports = data.reports.filter(item => item.id !== row.id); return json({ success: true }); }
       if (tail === '/comparison' && method === 'GET') return json({ report: row, baseline: data.reports.find(item => item.id === row.baselineReportId) || null });
       if (tail === '/finalize' && method === 'POST') { row.finalizedAt = new Date().toISOString(); return json(row); }
-      if (tail === '/photos' && method === 'POST') { const id = `photo-${++data.photoCount}`; row.attachments.push({ id, source: 'camera', createdAt: new Date().toISOString() }); return json({ id, source: 'camera', createdAt: new Date().toISOString() }); }
-      if (/^\/photos\/[^/]+/.test(tail)) return route.fulfill({ status: 200, body: JPEG, headers: { 'content-type': 'image/jpeg', 'access-control-allow-origin': '*' } });
+      if (tail === '/photos' && method === 'POST') {
+        const id = `photo-${++data.photoCount}`, raw = request.postDataBuffer(), start = raw?.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
+        const end = start >= 0 ? raw.indexOf(Buffer.from([0xff, 0xd9]), start) : -1;
+        if (end > start) data.photoBytes.set(id, raw.subarray(start, end + 2));
+        row.attachments.push({ id, source: 'camera', createdAt: new Date().toISOString() });
+        return json({ id, source: 'camera', createdAt: new Date().toISOString() });
+      }
+      if (/^\/photos\/[^/]+/.test(tail)) return route.fulfill({ status: 200, body: data.photoBytes.get(tail.split('/')[2]) || fallbackPhoto, headers: { 'content-type': 'image/jpeg', 'access-control-allow-origin': '*' } });
       if (tail === '/coverage' && method === 'POST') return json({ rooms: [] });
       if (tail === '/rewrite' && method === 'POST') return json({ suggestion: 'The fixture wording.' });
       if (tail === '/share' && method === 'POST') return json({ url: 'https://bookmarketel.com/api/inspect/shared/test' });

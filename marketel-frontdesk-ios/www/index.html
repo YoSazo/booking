@@ -66,19 +66,21 @@
     <h1>What are you working on?</h1>
     <p id="intro">Document guest damage and send a dated report.</p>
     <div id="choices" class="choices hidden">
+      <!-- WEDGE_CHOICES_START -->
       <button class="choice" data-product="claims"><span><strong>Claims</strong><small>Record damage and keep the original uploaded photos.</small></span><span class="arrow" aria-hidden="true">→</span></button>
       <p class="soon">More tools coming soon.</p>
+      <!-- WEDGE_CHOICES_END -->
     </div>
   </main>
   <script>
     (() => {
       // The others still open if something links straight to them; they are
       // only off the menu.
-      const products = ['inspect', 'claims', 'incident'];
+      const products = /* WEDGE_PRODUCTS_START */ ["claims","incident","inspect","moveout"] /* WEDGE_PRODUCTS_END */;
       // Only what is on the menu reopens by itself. Otherwise anyone who last
       // used a hidden tool would skip the menu and land straight back in it.
       const offered = [...document.querySelectorAll('[data-product]')].map(button => button.dataset.product);
-      const names = { inspect: 'Inspect', claims: 'Claims', incident: 'Incident' };
+      const names = /* WEDGE_NAMES_START */ {"claims":"Claims","incident":"Incident","inspect":"Inspect","moveout":"Moveout"} /* WEDGE_NAMES_END */;
       const shell = message => window.webkit?.messageHandlers?.marketelShell?.postMessage(message);
       const open = product => {
         localStorage.setItem('marketel.product', product);

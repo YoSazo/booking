@@ -132,9 +132,19 @@ both `index.html` asset versions together. `verify:release` checks the app;
    the report engine can honestly do.
 2. Run `npm run wedge:new -- <id>`. Fill its manifest: copy, document types,
    seeds, capabilities, disclaimer, demo findings and App Store captions.
+   Use a type name unique across all wedges. A photos-only baseline is a type
+   with `can.free` and `can.photosOnly`; the paid type points to it through
+   `can.baseline`. `startBaseline`, `linkBaseline`, `/properties` and
+   `baselineReportId` then use it without engine edits. A deadline with only
+   `text` displays guidance and computes no “File by” date. Add `days`,
+   `from` and `field` only when one rule truly applies to the whole audience.
 3. Provide three real demo photos and thumbnails.
 4. Run `npm run wedge:check -- <id>`. Review its screenshots at phone size and
    the demo recording by eye, including the wording on every rendered page.
+   `wedges/_fixture.js` exercises new nouns such as unit and tenant, and
+   `test/browser/wedges.test.js` checks them in the page, editor and send
+   sheet. The checker writes screenshots and a 1080×1920 recording under
+   `artifacts/wedges/<id>/` and reruns the backend, browser and iOS gates.
 5. Keep `status: 'draft'` until review. Merging makes its web route available
    with noindex; `status: 'live'` adds it to the app chooser after a TestFlight
    build and updated App Store review notes.
@@ -142,6 +152,9 @@ both `index.html` asset versions together. `verify:release` checks the app;
    recording for the UGC creator. The script can say “under 3 minutes”,
    “works with whatever you use now” and “free to try” only when the wedge
    actually demonstrates those claims.
+
+For the first proof wedge, read `docs/wedges/MOVEOUT-BRIEF.md` before changing
+its offer or deadline copy. It records the research and intended limits.
 
 ### Gotchas
 
