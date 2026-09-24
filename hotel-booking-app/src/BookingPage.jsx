@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PawPrint, Users } from 'lucide-react';
 import RoomCard from './RoomCard.jsx';
 import InstallAppBanner from './InstallAppBanner.jsx';
@@ -140,6 +140,15 @@ function BookingPage({
     return { payToday: 0, balanceDue: grandTotal };
   }, [railRoom, nights, rates]);
 
+  // With no dates yet, the rail's button points at the calendar above it
+  // instead of sitting there disabled under a label it could not act on.
+  const railCalendarRef = useRef(null);
+  const [railNudge, setRailNudge] = useState(false);
+  const focusRailCalendar = () => {
+    railCalendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setRailNudge(true);
+    window.setTimeout(() => setRailNudge(false), 1200);
+  };
   const handleRailBook = () => {
     if (!railRoom || nights <= 0) return;
     if (selectedRoom?.id === railRoom.id) {
@@ -283,15 +292,17 @@ function BookingPage({
       </div>
 
       <aside className="booking-desktop-rail" aria-label="Choose dates and book">
-        <CalendarModal
-          inline
-          isOpen
-          onClose={() => {}}
-          onDatesChange={onDatesChange}
-          initialCheckin={checkinDate}
-          initialCheckout={checkoutDate}
-          rates={rates}
-        />
+        <div ref={railCalendarRef} className={`booking-rail-calendar${railNudge ? ' is-nudged' : ''}`}>
+          <CalendarModal
+            inline
+            isOpen
+            onClose={() => {}}
+            onDatesChange={onDatesChange}
+            initialCheckin={checkinDate}
+            initialCheckout={checkoutDate}
+            rates={rates}
+          />
+        </div>
         <p className="booking-rail-meta">
           {nights > 0
             ? `${nights} night${nights === 1 ? '' : 's'} · ${railRoom?.name || 'Select a room'}`
@@ -355,10 +366,10 @@ function BookingPage({
             <button
               type="button"
               className="premium-select-button"
-              onClick={handleRailBook}
-              disabled={!railRoom || nights <= 0}
+              onClick={nights > 0 ? handleRailBook : focusRailCalendar}
+              disabled={nights > 0 && !railRoom}
             >
-              {nights > 0 ? 'Continue Booking' : 'Select Room'}
+              {nights > 0 ? 'Continue Booking' : 'Pick your dates'}
             </button>
           </div>
         )}
