@@ -1215,10 +1215,10 @@ app.get('/inspect/open', (req, res) => {
 // One account, one subscription and one report allowance sit behind all of
 // them, which the arm's terms page says in its own words rather than leaving
 // someone to discover it at the card.
-const INSPECT_ARMS = Object.freeze({
-    incident: Object.freeze({ product: 'Incident', title: 'Marketel Incident \u2014 Write it before anyone goes home' }),
-    claims: Object.freeze({ product: 'Claims', title: 'Marketel Claims \u2014 Document the damage while it is in front of you' }),
-});
+const INSPECT_ARMS = Object.freeze(Object.fromEntries(require('./wedges/registry').load().all
+    .filter(wedge => wedge.id !== 'inspect')
+    .map(wedge => [wedge.id, Object.freeze({ product: wedge.product, title: wedge.webTitle,
+      termsIntro: wedge.termsIntro || '', termsScope: wedge.termsScope || 'every Marketel report tool' })])));
 
 // The shell and the terms page are shipped as ordinary, complete HTML and
 // rewritten per arm at send time. Tokens would have been simpler here but they
@@ -1236,7 +1236,7 @@ function inspectSkinned(file, slug) {
     const source = fs.readFileSync(path.join(INSPECT_PUBLIC_ROOT, file), 'utf8');
     let html = source;
     if (arm) {
-        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover all three. ${slug === 'claims' ? 'Claims reports are free to build and $12 each to send, or included in a plan. Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.' : ''}</div>`;
+        const shared = `<div class="box"><strong>Marketel ${arm.product}</strong> is a front door to the Marketel Inspect service described below. One account, one subscription and one report allowance cover ${arm.termsScope}. ${arm.termsIntro}</div>`;
         const swaps = file === 'index.html' ? [
             ['<title>Marketel Inspect \u2014 Your walkthrough, a finished report</title>', `<title>${arm.title}</title>`],
             ['<span>Inspect</span>', `<span>${arm.product}</span>`],

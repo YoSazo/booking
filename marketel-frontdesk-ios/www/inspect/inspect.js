@@ -2,6 +2,13 @@ const native = location.protocol === 'capacitor:' || location.protocol === 'ioni
 if(native)document.documentElement.classList.add('native-inspect-shell');
 const API = native ? 'https://bookmarketel.com/api/inspect' : '/api/inspect';
 const $ = id => document.getElementById(id);
+const MANIFESTS = window.MARKETEL_WEDGES;
+// The approved iPhone app carries this wedge (appStore.live). Until it does, the
+// web funnel keeps buyers in the browser and never points them at the App Store.
+const appLive = () => !!MANIFESTS?.[toolId()]?.appStore?.live;
+if (!MANIFESTS?.inspect) throw new Error('Wedge data is missing. Reload Marketel.');
+const TYPE_CONFIG = Object.fromEntries(Object.values(MANIFESTS).flatMap(item => Object.entries(item.types)));
+const typeConfig = type => TYPE_CONFIG[type] || MANIFESTS.inspect.types.routine;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let session = localStorage.getItem('inspect.session') || '';
 let account = null, draft = null, reports = [], nextReportCursor = null, preview = false, storefront = null, storefrontWaiters = [];
@@ -72,66 +79,28 @@ const rememberedAuthor = () => { try { return localStorage.getItem(AUTHOR_KEY) |
 const storeAuthor = value => { try { const name = String(value || '').trim(); if (name) localStorage.setItem(AUTHOR_KEY, name); } catch {} };
 // A whole unit is five to eight rooms, and every one of them used to arrive
 // called "Room". Names already used in this report are skipped.
-const WEDGES = {
-  incident: {
-    noun: 'detail', nounPlural: 'details',
-    seeds: ['What happened', 'Where it happened', 'Who was involved', 'What we did'],
-    eyebrow: 'New incident record', dateLabel: 'Date of the incident',
-    unit: 'room',
-    signers: { manager: 'staff', other: 'witness' },
-    disclaimer: 'A record of what was reported and observed at the time. Not a legal, medical or insurance determination.',
-  },
-  damage: {
-    noun: 'room', nounPlural: 'rooms',
-    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
-    eyebrow: 'New damage report', dateLabel: 'Date you found the damage',
-    // A damage report is a list of findings, not a walk through rooms, so
-    // nothing has to be named before the first photograph.
-    unit: 'entry',
-    // Where the phone was standing proves nothing about damage found at
-    // checkout, and a pair of coordinates on the page is noise on a document
-    // whose job is the photographs.
-    location: false,
-    signers: { manager: 'owner', other: 'guest' },
-    disclaimer: 'A dated record of damage as observed. Not a valuation, cause determination or insurance assessment.',
-  },
-  // The "before": the unit room by room at turnover, photos only. Never sent
-  // and never charged; a damage report of the same property shows it back.
-  'check-in': {
-    noun: 'room', nounPlural: 'rooms',
-    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
-    eyebrow: 'Check-in', dateLabel: 'Check-in date',
-    unit: 'room',
-    location: false,
-    photosOnly: true,
-    signers: { manager: 'owner', other: 'guest' },
-    disclaimer: 'Photos of the unit\'s condition at check-in, kept for comparison.',
-  },
-  default: {
-    noun: 'room', nounPlural: 'rooms',
-    seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway', 'Closet', 'Laundry', 'Balcony'],
-    eyebrow: 'New condition report', dateLabel: 'Inspection date',
-    unit: 'room',
-    signers: { manager: 'manager', other: 'resident' },
-    disclaimer: 'Recorded observations only. Not a professional certification. Timestamps do not prove authenticity.',
-  },
-};
+const WEDGES = { ...TYPE_CONFIG, default: MANIFESTS.inspect.types.routine };
 const wedge = type => WEDGES[type] || WEDGES.default;
 // An entry is a room with no name: a thing you said plus the photos of it.
 // Numbered where it is read, never stored, so nothing claims a location that
 // was never given.
 const entryTool = type => wedge(type ?? draft?.document?.type).unit === 'entry';
 const entryLabel = (room, index) => room?.name || `Finding ${index + 1}`;
-const SIGNER_ROLES = { incident: ['manager', 'witness'], damage: ['owner', 'guest'], default: ['manager', 'resident'] };
+const SIGNER_ROLES = Object.fromEntries(Object.entries(TYPE_CONFIG).map(([id, config]) => [id, [config.signers.manager, config.signers.other]]));
+SIGNER_ROLES.default = [MANIFESTS.inspect.types.routine.signers.manager, MANIFESTS.inspect.types.routine.signers.other];
 const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
-const ROLE_LABELS = { witness: 'Witness', resident: 'Resident / tenant', owner: 'Owner / host', guest: 'Guest', manager: 'Manager / inspector' };
+const ROLE_LABELS = Object.assign({}, ...Object.values(MANIFESTS).map(item => item.roleLabels));
 const roleLabel = role => ROLE_LABELS[role] || ROLE_LABELS.manager;
 // The enum is storage. This is the name the document calls itself.
-const TYPE_LABELS = { incident: 'Incident record', damage: 'Damage report', 'check-in': 'Check-in record', 'move-in': 'Move-in report', 'move-out': 'Move-out report', routine: 'Condition report' };
+const TYPE_LABELS = Object.fromEntries(Object.entries(TYPE_CONFIG).map(([id, config]) => [id, config.label]));
 const typeLabel = type => TYPE_LABELS[type] || TYPE_LABELS.routine;
+const baselineTypeFor = type => wedge(type).can?.baseline || null;
+const toolBaselineType = () => Object.keys(MANIFESTS[toolId()].types).find(type => wedge(type).can?.photosOnly && wedge(type).can?.free) || null;
+const baselineName = type => wedge(type).baselineName || typeLabel(type).toLowerCase().replace(/ (record|report)$/, '');
+const propertyBaseline = (property, type) => property?.baselines?.[type]?.latest || (wedge(type).legacyPropertyField ? property?.[wedge(type).legacyPropertyField] : null);
 // Only Inspect offers a choice of document. The other arms were chosen by the
 // door someone came through, so a dropdown there is a question with one answer.
-const TYPED_ARMS = new Set(['incident', 'damage', 'check-in']);
+const TYPED_ARMS = new Set(Object.entries(MANIFESTS).filter(([id]) => id !== 'inspect').flatMap(([, item]) => Object.keys(item.types)));
 const COMMON_ROOMS = WEDGES.default.seeds;
 const nextRoomName = rooms => {
   const used = new Set((rooms || []).map(room => String(room.name || '').trim().toLowerCase()));
@@ -167,7 +136,7 @@ function captureFix(){
 // best-effort and neither delays the screen.
 function markLocation(which){
   if(!draft||draft.finalizedAt)return Promise.resolve();
-  if(wedge(draft.document?.type).location===false)return Promise.resolve();
+  if(wedge(draft.document?.type).can.location===false)return Promise.resolve();
   return captureFix().then(fix=>{
     if(!fix||!draft||draft.finalizedAt)return;
     draft.document.location={...(draft.document.location||{}),[which]:fix};
@@ -449,7 +418,7 @@ function updateHeader() {
   $('nav').hidden = !signedIn;
   document.documentElement.classList.toggle('inspect-authenticated',signedIn);
   const current=$('current-report');
-  if(current){const unfinished=hasUnfinishedDraft();current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'In Progress':'+ New Report';}
+  if(current){const unfinished=hasUnfinishedDraft();current.dataset.page=unfinished?'current':'new';current.textContent=unfinished?'In Progress':(sk.navTabCreate||sk.navCreate);}
   syncNativeInspectState(currentPage,true);
 }
 // ——— Dated photos ——————————————————————————————————————————————————————
@@ -587,114 +556,9 @@ function playDemo(){
 // rather than the AI: evidence must reflect what the owner actually saw, and
 // these two ideas do not belong next to each other on this page. The demo further
 // down still shows it — mentioned, not headlined.
-const SKIN = {
-  product: 'Inspect',
-  writesLabel: 'Inspect writes',
-  doc: 'report', docPlural: 'reports',
-  comparisons: true,
-  home: '/inspect/',
-  terms: 'https://bookmarketel.com/inspect/terms.html',
-  termsLabel: 'Inspect terms',
-  navList: 'Reports', navCreate: '+ New report', navPlaces: 'Properties',
-  listHeading: 'Your reports',
-  placesHeading: 'Properties', placeSingular: 'property',
-  placesLede: 'Start a fresh report, or compare a move-out with the last finalized condition report.',
-  placesEmpty: 'No properties yet. Add one, or it appears here when you save a report.',
-  propertyPrompt: 'Which property?',
-  demoBadge: 'EXAMPLE \u00b7 NOT A REAL INSPECTION',
-  documentLabel: 'MARKETEL INSPECT',
-  offerHeading: 'Keep every walkthrough on the record.',
-  offerAnchor: 'One argument about damage costs more than a year of Inspect.',
-  offerPoints: [
-    'Talk through a room and Inspect writes the note',
-    'No per-property or per-room fees',
-    'PDF export and a private share link on every report',
-    'Before and after move-out comparisons',
-  ],
-};
-const LANDING_ARMS = {
-  incident: {
-    type: 'incident',
-    demoSaid: 'The guest reported slipping near the lobby entrance at 6 pm. I put out a warning sign and called the manager.',
-    demoNote: 'Guest reported slipping near the lobby entrance at 6 pm. A warning sign was placed and the manager was called.',
-    eyebrow: 'For hotels, short-lets and venues',
-    title: 'Write the incident report<br>before anyone goes home.',
-    lede: 'What happened, where, who was involved and what you did \u2014 photographed, timed, signed by a witness, and exported as a PDF.',
-    skin: {
-      product: 'Incident',
-      writesLabel: 'it writes',
-      doc: 'record', docPlural: 'records',
-      comparisons: false,
-      home: '/incident',
-      terms: 'https://bookmarketel.com/incident/terms',
-      termsLabel: 'Incident terms',
-      navList: 'Records', navCreate: '+ New record', navPlaces: 'Locations',
-      listHeading: 'Your records',
-      placesHeading: 'Locations', placeSingular: 'location',
-      placesLede: 'Start a fresh record for a site you have logged before.',
-      placesEmpty: 'No locations yet. Add one, or it appears here when you save a record.',
-      propertyPrompt: 'Which location?',
-      demoBadge: 'EXAMPLE \u00b7 NOT A REAL INCIDENT',
-      documentLabel: 'MARKETEL INCIDENT',
-      offerHeading: 'Keep every incident on the record.',
-      offerAnchor: 'A single disputed incident costs more than a year of this subscription.',
-      offerPoints: [
-        'Talk through what happened and it writes the record',
-        'No per-site or per-record fees',
-        'Witness signature captured and timed on the record',
-        'PDF export on every record',
-      ],
-    },
-  },
-  claims: {
-    demoSaid: 'Kitchen, chipped counter edge beside the sink. Found it at checkout. I took photos before cleaning.',
-    demoNote: 'Chipped counter edge beside the kitchen sink, found at checkout. Photos taken before cleaning.',
-    eyebrow: 'For short-let and rental hosts',
-    title: 'Document the damage<br>while it is in front of you.',
-    lede: 'Room-by-room photos kept as uploaded, with a dated report you can send before the claim window closes.',
-    type: 'damage',
-    // Free to build; paid when the finished report is sent. The ask lands at
-    // the moment someone has just seen their own report, in the same session.
-    golden: {
-      headline: 'Document guest damage <span class="green">before the claim window closes.</span>',
-      sub: 'Build a dated, photo-by-photo damage report in under 3 minutes.',
-      cta: 'Build my free damage report →',
-      note: 'Free to build. Takes 3 minutes. Pay only when you send it.',
-      proof: 'Airbnb asks hosts to request reimbursement within 14 days of checkout.',
-      jobTitle: 'Which rental had the damage?',
-      jobLabel: 'Rental property / unit',
-      jobPlaceholder: 'Pine Ave · Unit 2',
-      building: 'Building your damage report',
-      reveal: 'Here is what your guest or the platform receives.',
-    },
-    skin: {
-      product: 'Claims',
-      writesLabel: 'it writes',
-      doc: 'report', docPlural: 'reports',
-      comparisons: false,
-      navList: 'Reports', navCreate: '+ New damage report', navPlaces: 'Properties',
-      propertyPrompt: 'Which rental property?',
-      placesHeading: 'Properties', placeSingular: 'property',
-      placesLede: 'Check a unit in at each turnover. Any damage report after it shows the check-in as the before.',
-      placesEmpty: 'No properties yet. Add one, or it appears here when you save a damage report.',
-      home: '/claims',
-      terms: 'https://bookmarketel.com/claims/terms',
-      termsLabel: 'Claims terms',
-      listHeading: 'Your damage reports',
-      demoBadge: 'EXAMPLE \u00b7 NOT REAL DAMAGE',
-      documentLabel: 'MARKETEL CLAIMS',
-      offerHeading: 'Document it while it is still there.',
-      offerAnchor: 'One claim you cannot evidence costs more than a year of this subscription.',
-      offerPoints: [
-        'Talk through a room and it writes the note',
-        'Every uploaded photo kept as received',
-        'No per-property or per-room fees',
-        'PDF export and a private share link on every report',
-      ],
-    },
-  },
-};
-const documentFileName = type => type === 'incident' ? 'incident-record.pdf' : type === 'damage' ? 'damage-report.pdf' : 'inspection-report.pdf';
+const SKIN = MANIFESTS.inspect.skin;
+const LANDING_ARMS = Object.fromEntries(Object.entries(MANIFESTS).filter(([id]) => id !== 'inspect').map(([id, item]) => [id, { ...item.landing, skin: item.skin }]));
+const documentFileName = type => typeConfig(type).file;
 // Root path first, then the legacy /inspect/<arm> path, then utm_campaign as a
 // fallback so links already in flight keep working. The SPA never rewrites the
 // URL, so this answer is stable for the whole session.
@@ -719,9 +583,8 @@ const landingArm = () => {
 const skin = () => ({ ...SKIN, ...(landingArm()?.skin || {}) });
 // Which document types belong to which tool. Drafts, lists and hand-offs all
 // follow it, so switching tools never shows one tool's work under another's name.
-const TOOL_TYPES = Object.freeze({ inspect: ['routine', 'move-in', 'move-out'], claims: ['damage', 'check-in'], incident: ['incident'] });
-// What each tool lists under Reports. Check-ins live with their property.
-const TOOL_LIST_TYPES = Object.freeze({ inspect: TOOL_TYPES.inspect, claims: ['damage'], incident: TOOL_TYPES.incident });
+const TOOL_TYPES = Object.fromEntries(Object.entries(MANIFESTS).map(([id, item]) => [id, Object.keys(item.types)]));
+const TOOL_LIST_TYPES = Object.fromEntries(Object.entries(MANIFESTS).map(([id, item]) => [id, item.listTypes]));
 const toolId = () => { const arm = landingArm(); return Object.keys(LANDING_ARMS).find(key => LANDING_ARMS[key] === arm) || 'inspect'; };
 const toolForType = type => Object.keys(TOOL_TYPES).find(tool => TOOL_TYPES[tool].includes(type)) || 'inspect';
 const toolTypesQuery = () => `types=${TOOL_LIST_TYPES[toolId()].join(',')}`;
@@ -732,11 +595,7 @@ const toolTypesQuery = () => `types=${TOOL_LIST_TYPES[toolId()].join(',')}`;
 // the alternative at that moment is a monthly subscription — and asking a cold
 // click for a subscription is the shape that produced nothing on the booking
 // funnel. Mirrors TOOLS in inspect.js; keep the two in step.
-const TOOL_OFFERS = Object.freeze({
-  inspect: Object.freeze({ mode: 'first-free', reportPrice: 12 }),
-  claims: Object.freeze({ mode: 'pay-at-export', reportPrice: 12 }),
-  incident: Object.freeze({ mode: 'first-free', reportPrice: 12 }),
-});
+const TOOL_OFFERS = Object.fromEntries(Object.entries(MANIFESTS).map(([id, item]) => [id, item.offer]));
 const toolOffer = () => TOOL_OFFERS[toolId()] || TOOL_OFFERS.inspect;
 const payAtExport = () => toolOffer().mode === 'pay-at-export';
 const reportPrice = () => toolOffer().reportPrice || 0;
@@ -755,7 +614,7 @@ function track(name, detail, once = true) {
 }
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
 // A document carries its own brand, whichever tool it was opened through.
-const documentLabelFor = type => type === 'damage' || type === 'check-in' ? 'MARKETEL CLAIMS' : type === 'incident' ? 'MARKETEL INCIDENT' : 'MARKETEL INSPECT';
+const documentLabelFor = type => typeConfig(type).brand;
 // ——— The simulation funnel (?sim=1) ———————————————————————————————
 // A cold click off an ad cannot photograph anything: they are in bed, at work,
 // in a car. Every funnel that asks them to build a real report fails at step
@@ -765,38 +624,7 @@ const documentLabelFor = type => type === 'damage' || type === 'check-in' ? 'MAR
 //
 // It never touches draft, IndexedDB or /reports. It paints, it sells, and it
 // dies when the tab closes.
-const SIMS = {
-  inspect: {
-    heading: 'Create your inspection report',
-    property: '123 Main Street', unit: 'Unit 4B',
-    findings: [
-      { id: 'wall', label: 'Wall scuff', room: 'Living Room', photo: 'inspect-wall',
-        said: 'scuff on the wall beside the door, paint has come off',
-        note: 'Scuffing and paint loss on the lower wall beside the door frame, approx. 30cm across. Photographed for record.' },
-      { id: 'carpet', label: 'Carpet wear', room: 'Bedroom', photo: 'inspect-carpet',
-        said: 'carpet is worn flat along the walkway to the hall',
-        note: 'Flattened pile and wear along the traffic path between the bedroom and hallway. No staining or tearing.' },
-      { id: 'grout', label: 'Grout and sealant', room: 'Bathroom', photo: 'inspect-grout',
-        said: 'grout at the bottom of the tiles is going black',
-        note: 'Discoloured grout and early mildew along the base of the tiled wall. Cleaning or resealing recommended.' },
-    ],
-  },
-  claims: {
-    heading: 'Create your damage report',
-    property: '123 Main Street', unit: 'Unit 4B',
-    findings: [
-      { id: 'wall', label: 'Wall damage', room: 'Living Room', photo: 'claims-wall',
-        said: 'hole punched right through the wall by the door',
-        note: 'Plasterboard punctured through beside the bedroom door, approx. 15cm across, paint cracked around it.' },
-      { id: 'carpet', label: 'Carpet stain', room: 'Bedroom', photo: 'claims-carpet',
-        said: 'big red wine stain soaked into the carpet by the drawers',
-        note: 'Large red wine stain soaked into the carpet beside the drawers, approx. 50cm, photographed before cleaning.' },
-      { id: 'cabinet', label: 'Broken cabinet', room: 'Kitchen', photo: 'claims-cabinet',
-        said: 'cabinet door is hanging off, the hinge tore out',
-        note: 'Cabinet door detached at the hinge, screw fixings torn out and the surrounding timber split.' },
-    ],
-  },
-};
+const SIMS = Object.fromEntries(Object.entries(MANIFESTS).filter(([, item]) => item.demo).map(([id, item]) => [id, item.demo]));
 const simTool = () => SIMS[toolId()] || null;
 // Phone-shaped only. A fake iOS camera sheet in a desktop browser reads as
 // broken, and the traffic this exists for is almost entirely mobile.
@@ -860,9 +688,11 @@ function simThanks(){
       if(where)where.textContent=r.email;
     }).catch(()=>{});
   let trial=0;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;}catch{}
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end or you send your first ${esc(sk.doc)}. We'll email you the day before.</small></p>`:''}<p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end or you send your first ${esc(sk.doc)}. We'll email you the day before.</small></p>`:''}${appLive()
+    ?`<p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button>`
+    :`<p class="muted">It works right here in your browser, on your phone or your computer. Photograph it, talk it through, send it.</p><button type="button" id="sim-signin" class="wide">Start your first ${esc(sk.doc)} →</button><p class="muted"><small>Sign in with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and we'll send you a six-digit code.</small></p>`}</section>`;
   track('SimSubscribed');
-  $('sim-get-app').onclick=()=>track('SimAppTapped');
+  if($('sim-get-app'))$('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
     document.documentElement.classList.remove('sim-mode');
     history.replaceState(null,'',location.pathname);
@@ -885,7 +715,7 @@ function simIntro(){
   simPreload(s);
   document.documentElement.classList.add('sim-mode');
   track('SimStarted');
-  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>Property</small><strong>${esc(s.property)}</strong></div><div><small>Unit</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>${esc(s.placeLabel||"Property")}</small><strong>${esc(s.property)}</strong></div><div><small>${esc(s.unitLabel||"Unit")}</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
   simRun=null;
   $('sim-signin-link').onclick=()=>{
     document.documentElement.classList.remove('sim-mode');
@@ -1161,7 +991,7 @@ function simReport({declined=false}={}){
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
   const plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the property.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(localDate())}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   const switchPlan=$('app').querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
@@ -1188,7 +1018,7 @@ function landing() {
   $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first ${esc(skin().doc)} free</button><p><small>Your first complete report across Marketel Inspect is free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button>${demoMarkup(arm)}</section>`;
   if(arm){
     $('demo-result').querySelector('.demo-note').textContent=arm.demoNote;
-    if(arm.type==='incident')$('demo-result').querySelector('.demo-badge').remove();
+    if(!wedge(arm.type).can.issueToggle)$('demo-result').querySelector('.demo-badge').remove();
     $('sign-in').textContent=`Already have ${skin().docPlural}? Sign in`;
     $('app').querySelector('.hero > p > small').textContent='Your first complete report across Inspect, Claims and Incident is free. No card.';
   }
@@ -1202,7 +1032,7 @@ function landing() {
   settleWedgeEntrance();
 }
 function demoMarkup(arm){
-  return `<article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().writesLabel)}</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF${arm?.type==='incident'?'':' or a private link'}.</small></article><p><small>${esc(wedge(arm?.type).disclaimer)}</small></p>`;
+  return `<article class="card demo" id="demo"><small class="eyebrow">${esc(skin().demoBadge)}</small><div class="demo-step"><span class="demo-label">You say</span><blockquote id="demo-said"></blockquote></div><div class="demo-arrow" aria-hidden="true">↓</div><div class="demo-step" id="demo-result"><span class="demo-label">${esc(skin().writesLabel)}</span><p class="demo-note">Small scuff on the wall beside the doorway. No other observations recorded.</p><em class="demo-badge">Issue noted</em></div><small>Add your photos, then export a PDF${wedge(arm?.type).can.shareable?' or a private link':''}.</small></article><p><small>${esc(wedge(arm?.type).disclaimer)}</small></p>`;
 }
 // The booking funnel's landing, which is what already worked: one pain, one
 // field, one button, one line of proof. The email is the lead; there is no code
@@ -1277,7 +1107,7 @@ function setupFlow(){
       // Straight into the report: restoring the list first flashed it, and the
       // tab bar with it, on the way.
       editor('rooms');
-      linkCheckIn().catch(()=>{});
+      linkBaseline().catch(()=>{});
     },event.currentTarget);
   };
   if(account?.businessName)two();else one();
@@ -1291,7 +1121,7 @@ function previewPlans(){
     const plan=PLANS[planInterval],each=plan.price/plan.reports;
     const unit=each<1?`${Math.round(each*100)}¢`:`$${each.toFixed(2)}`;
     const sub=planInterval==='year'?`$${(plan.price/12).toFixed(2)}/month, billed annually · ${plan.save}`:'Cancel renewal anytime.';
-    flow.paint(`<h2>${payAtExport()?'Prices':`Plans after your free ${esc(skin().doc)}`}</h2><p class="muted">${payAtExport()?`Building a ${esc(skin().doc)} is free. You pay only when you send it: $${reportPrice()} for a single ${esc(skin().doc)}, or a plan.`:`Finish and export your first complete ${esc(skin().doc)} before choosing anything.`}</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-property or per-room fees</li><li>${plan.reports} ${esc(skin().docPlural)} — about ${unit} each</li><li>${esc(skin().offerPoints[0])}</li><li>${esc(landingArm()?.type==='incident'?'PDF export on every record':'PDF export and a private share link')}</li></ul><button type="button" id="plan-start" class="wide">${payAtExport()?`Build my ${esc(skin().doc)} free`:`Create my first ${esc(skin().doc)} free`}</button><p><small>${payAtExport()?`Or $${reportPrice()} for a single ${esc(skin().doc)}, paid only when you send it.`:'No card for your first complete report across the three Marketel tools.'} <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
+    flow.paint(`<h2>${payAtExport()?'Prices':`Plans after your free ${esc(skin().doc)}`}</h2><p class="muted">${payAtExport()?`Building a ${esc(skin().doc)} is free. You pay only when you send it: $${reportPrice()} for a single ${esc(skin().doc)}, or a plan.`:`Finish and export your first complete ${esc(skin().doc)} before choosing anything.`}</p><div class="billing-toggle" role="radiogroup" aria-label="Billing period"><button type="button" role="radio" aria-checked="${planInterval==='year'}" data-preview-plan="year">Annual</button><button type="button" role="radio" aria-checked="${planInterval==='month'}" data-preview-plan="month">Monthly</button></div><div class="price">$${plan.price} <small>${plan.per}</small></div><p class="price-save">${sub}</p><ul class="offer-points"><li>One operator</li><li>No per-${esc(skin().placeSingular)} or per-${esc(wedge(landingArm()?.type).noun)} fees</li><li>${plan.reports} ${esc(skin().docPlural)} — about ${unit} each</li><li>${esc(skin().offerPoints[0])}</li><li>${esc(wedge(landingArm()?.type).can.shareable?'PDF export and a private share link':`PDF export on every ${skin().doc}`)}</li></ul><button type="button" id="plan-start" class="wide">${payAtExport()?`Build my ${esc(skin().doc)} free`:`Create my first ${esc(skin().doc)} free`}</button><p><small>${payAtExport()?`Or $${reportPrice()} for a single ${esc(skin().doc)}, paid only when you send it.`:`No card for your first complete ${esc(skin().doc)} across the three Marketel tools.`} <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p>`);
     document.querySelectorAll('[data-preview-plan]').forEach(button=>button.onclick=()=>{planInterval=button.dataset.previewPlan==='month'?'month':'year';paint();});
     $('plan-start').onclick=()=>{flow.restore();start();};
   };
@@ -1317,62 +1147,64 @@ async function start(propertyName = '', type) {
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
   await persist(); editor();
-  linkCheckIn().catch(() => {});
+  linkBaseline().catch(() => {});
 }
 // ——— Check-ins ——————————————————————————————————————————————————————————
-async function startCheckIn(propertyName){
-  if(!account)return ensureAuth(()=>run(()=>startCheckIn(propertyName)),'keep');
-  if(!await keepCurrentDraft('Start a check-in?','Start check-in'))return;
+async function startBaseline(propertyName){
+  const type=toolBaselineType();if(!type)return;
+  if(!account)return ensureAuth(()=>run(()=>startBaseline(propertyName)),'keep');
+  if(!await keepCurrentDraft(`Start a ${baselineName(type)}?`,`Start ${baselineName(type)}`))return;
   dismissFlow();clearURLs();
-  draft={document:newDocument(propertyName,'check-in'),files:[],serverId:null,finalizedAt:null};preview=false;
+  draft={document:newDocument(propertyName,type),files:[],serverId:null,finalizedAt:null};preview=false;
   await persist();
   if(native&&hudShell())return openNativeCamera(0);
   editor('rooms');
 }
 // Saved is final: a check-in is frozen the moment it is kept, which is what
 // makes it worth comparing against. Free, and nothing to send.
-function saveCheckIn(button){
+function saveBaseline(button){
   ensureAuth(()=>run(async()=>{
     await save();
     await api(`/reports/${draft.serverId}/finalize`,{method:'POST'});
-    const count=draft.document.rooms.reduce((total,room)=>total+room.photos.length,0);
+    const draftType=draft.document.type,count=draft.document.rooms.reduce((total,room)=>total+room.photos.length,0);
     clearURLs();draft=null;preview=false;await stored('delete');propertiesCache=null;reportsCache=null;
-    notice(`Check-in saved · ${count} dated ${count===1?'photo':'photos'}.`,'success');
+    notice(`${typeLabel(draftType)} saved · ${count} dated ${count===1?'photo':'photos'}.`,'success');
     await list('properties');
   },button),'keep');
 }
-function checkInView(){
-  enterScreen('check-in');updateHeader();setActiveNav('properties');
+function baselineView(){
+  enterScreen('baseline');updateHeader();setActiveNav('properties');
   const d=draft.document;
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">Check-in · ${esc(docDateText(d.date))}</small><button type="button" class="quiet" id="check-in-back">← Properties</button></div><article class="card"><small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)}</h1>${d.rooms.filter(room=>room.photos.length).map((room,index)=>reportRoom(room,'',index,null,true)).join('')}<p><small>${esc(wedge(d.type).disclaimer)}</small></p></article>`;
-  $('check-in-back').onclick=()=>run(()=>list('properties'));
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}</small><button type="button" class="quiet" id="baseline-back">← ${esc(skin().navPlaces)}</button></div><article class="card"><small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)}</h1>${d.rooms.filter(room=>room.photos.length).map((room,index)=>reportRoom(room,'',index,null,true)).join('')}<p><small>${esc(wedge(d.type).disclaimer)}</small></p></article>`;
+  $('baseline-back').onclick=()=>run(()=>list('properties'));
 }
 // The property's latest check-in becomes this damage report's "before".
 // Quietly: without one, the report is simply a report.
-async function linkCheckIn(){
-  if(!draft||draft.document.type!=='damage'||!account||draft.baselineId)return;
+async function linkBaseline(){
+  if(!draft||!baselineTypeFor(draft.document.type)||!account||draft.baselineId)return;
+  const baselineType=baselineTypeFor(draft.document.type);
   const name=draft.document.propertyName.trim().toLowerCase();
   if(!name)return;
   const props=propertiesCache||await api('/properties').catch(()=>null);
   if(props&&!propertiesCache)propertiesCache=props;
-  const match=props?.propertyDetails?.find(property=>property.name.trim().toLowerCase()===name&&property.latestCheckIn);
+  const match=props?.propertyDetails?.find(property=>property.name.trim().toLowerCase()===name&&propertyBaseline(property,baselineType));
   if(!match)return;
-  const payload=await api(`/reports/${match.latestCheckIn.id}/comparison`).catch(()=>null);
-  if(!payload?.report||!draft||draft.document.type!=='damage'||draft.document.propertyName.trim().toLowerCase()!==name)return;
+  const payload=await api(`/reports/${propertyBaseline(match,baselineType).id}/comparison`).catch(()=>null);
+  if(!payload?.report||!draft||baselineTypeFor(draft.document.type)!==baselineType||draft.document.propertyName.trim().toLowerCase()!==name)return;
   draft.baseline=payload.report;draft.baselineId=payload.report.id;
   await persist();
 }
-const checkInBaseline = () => draft?.baseline?.document?.type === 'check-in' ? draft.baseline : null;
+const currentBaseline = () => draft?.baseline?.document?.type === baselineTypeFor(draft?.document?.type) ? draft.baseline : null;
 // The check-in photos of the room with this name; none for any other room.
 function beforeIdsFor(name){
-  const base=checkInBaseline(),key=String(name||'').trim().toLowerCase();
+  const base=currentBaseline(),key=String(name||'').trim().toLowerCase();
   if(!base||!key)return [];
   return base.document.rooms.find(room=>room.name.trim().toLowerCase()===key)?.photos||[];
 }
 // Only the photos that are actually matched are fetched, and only once.
 const beforeLoading=new Set();
 async function ensureBeforeFiles(ids){
-  const base=checkInBaseline();
+  const base=currentBaseline();
   const missing=ids.filter(id=>!photoFile(id)&&!beforeLoading.has(id));
   if(!base||!missing.length)return false;
   missing.forEach(id=>beforeLoading.add(id));
@@ -1392,10 +1224,11 @@ async function ensureBeforeFiles(ids){
 // before the next guest checks in, whichever is first. The host sees it; the
 // report they send does not.
 function fileByText(d){
-  if(d?.type!=='damage')return '';
-  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d.checkoutDate||d.date||''));
+  const deadline=wedge(d?.type).can?.deadline;
+  if(!deadline?.days)return '';
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d[deadline.from]||d.date||''));
   if(!m)return '';
-  const day=new Date(+m[1],+m[2]-1,+m[3]+14),today=new Date();today.setHours(0,0,0,0);
+  const day=new Date(+m[1],+m[2]-1,+m[3]+deadline.days),today=new Date();today.setHours(0,0,0,0);
   return day<today?'':`File by ${day.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
 }
 // Some things are worth saying once.
@@ -1404,10 +1237,10 @@ function editor(step) {
   if (!draft) return landing();
   dismissFlow();
   updateHeader();
-  setActiveNav(draft.finalizedAt ? (draft.document.type === 'check-in' ? 'properties' : 'reports') : 'current');
+  setActiveNav(draft.finalizedAt ? (wedge(draft.document.type).can.photosOnly ? 'properties' : 'reports') : 'current');
   const d = draft.document;
   d.signatures ||= [];
-  if (draft.document.type === 'check-in' && draft.finalizedAt) return checkInView();
+  if (wedge(draft.document.type).can.photosOnly && draft.finalizedAt) return baselineView();
   if (preview || draft.finalizedAt) return reportPreview();
   // The draft decides which step opens: an unnamed report needs its details, a
   // named one is ready for the work. Returning lands on the work, not the form.
@@ -1422,23 +1255,25 @@ function editor(step) {
       // The report's date and the finalized timestamp both say when it was
       // written down. Neither says when it happened, which is the field an
       // insurer looks for first. Unknown is a real answer.
-      ? `<label class="date-field">${d.type === 'damage' ? 'Time you found it' : 'Time it happened'}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label>${d.type === 'damage' ? `<label class="date-field">Guest checked out<input type="date" id="checkout-date" value="${esc(d.checkoutDate || d.date)}"></label>` : ''}<label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
-      : `<label>Report type<select id="type">${['routine','move-in','move-out'].map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
-    if(d.type==='incident')$('property').parentElement.firstChild.textContent='Location / site name';
-    if(d.type==='damage')$('property').parentElement.firstChild.textContent='Rental property / unit name';
+      ? `<label class="date-field">${esc(w.timeLabel||'Time it happened')}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label>${w.can.deadline?.days ? `<label class="date-field">${esc(w.can.deadline.field)}<input type="date" id="checkout-date" value="${esc(d[w.can.deadline.from] || d.date)}"></label>` : ''}<label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
+      : `<label>Report type<select id="type">${Object.keys(MANIFESTS[toolId()].types).map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
+    $('property').parentElement.firstChild.textContent=w.propertyLabel||`${skin().placeSingular} name`;
     for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) if($(id)) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
-    if($('checkout-date'))$('checkout-date').oninput = event => { d.checkoutDate = event.target.value; remember(); };
+    if($('checkout-date'))$('checkout-date').oninput = event => { d[w.can.deadline.from] = event.target.value; remember(); };
     if($('event-time'))$('event-time').oninput = event => { d.eventTime = event.target.value; if($('event-time-unknown'))$('event-time-unknown').checked = false; remember(); };
     if($('event-time-unknown'))$('event-time-unknown').onchange = event => { d.eventTime = event.target.checked ? 'unknown' : ($('event-time')?.value || ''); remember(); };
-    if($('use-existing-property'))$('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
+    if($('use-existing-property')){
+      $('use-existing-property').textContent=`Use existing ${skin().placeSingular}`;
+      $('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
+    }
     $('to-rooms').onclick = () => {
-      if(!d.propertyName.trim())return notice('Enter a property or unit name first.','error');
+      if(!d.propertyName.trim())return notice(`Enter a ${skin().placeSingular} name first.`,'error');
       haptic();editor('rooms');
     };
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
-      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1&&!dragHintSeen()?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Property photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Saved' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div>${d.type==='damage'?`<div class="receipts">${(r.receipts||[]).length?`<div class="receipt-grid">${r.receipts.map(id=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>`:''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>`:''}<div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${d.type === 'incident' || d.type === 'damage' ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
+      : `<label class="button secondary">Take photo<input type="file" data-camera="${i}" accept="image/*" capture="environment" hidden></label>`}</div>${r.photos.length>1&&!dragHintSeen()?'<p class="drag-hint">Press and hold a photo to lift it, then drag it where you want it.</p>':''}<div class="photo-grid" data-photo-grid="${i}">${r.photos.map((id,p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Recorded photo ${p+1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id)?`${esc(photoClockText(photoTaken(id)))} · `:''}${draft.files.find(f=>f.id===id)?.remoteId ? 'Saved' : 'On this device'}</figcaption><details class="photo-menu"><summary aria-label="Photo actions">•••</summary><div><button class="quiet" data-move-id="${i},${esc(id)},-1">Move earlier</button><button class="quiet" data-move-id="${i},${esc(id)},1">Move later</button><button class="quiet danger" data-delete-id="${i},${esc(id)}">Remove</button></div></details></div></figure>`).join('')}</div>${w.can.receipts?`<div class="receipts">${(r.receipts||[]).length?`<div class="receipt-grid">${r.receipts.map(id=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>`:''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>`:''}<div class="note-lead"><button class="wide" data-voice="${i}">Talk through this room</button><p class="muted">Say what you see. ${esc(skin().product)} writes the note.</p></div><details class="write-own" ${r.observation.trim() ? 'open' : ''}><summary>Write it myself</summary><label>Observations<textarea maxlength="4000" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button class="quiet" data-ai="${i}">Polish typed note</button></details>${!w.can.issueToggle ? '' : `<div class="row note-tools"><label class="issue"><input data-field="issue" type="checkbox" ${r.issue ? 'checked' : ''}>Issue noted</label></div>`}${d.rooms.length>1?`<footer class="room-footer"><button class="quiet danger" data-remove-room="${i}">Remove this ${w.noun}</button></footer>`:''}</section>`).join('')}</div><button id="add-room" class="secondary">+ Add ${w.noun}</button><div class="actions row"><button id="preview">Preview ${esc(skin().doc)} →</button><button id="save" class="quiet">Save online</button></div>`;
     $('to-details').onclick = () => { haptic();editor('details'); };
     $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = field === 'issue' ? event.target.checked : event.target.value; remember(); };
     $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
@@ -1457,13 +1292,13 @@ function editor(step) {
     $('add-room').onclick = () => { if (d.rooms.length >=30) return notice(`Maximum 30 ${entryTool()?'findings':w.nounPlural}.`); d.rooms.push({name:entryTool()?'':nextRoomName(d.rooms),observation:'',issue:false,photos:[]});remember();editor('rooms'); };
     $('preview').onclick = () => { haptic();preview=true;reportPreview(); };
     $('save').onclick = event => { const button = event.currentTarget; haptic(); ensureAuth(() => run(async()=>{await save();draft.dirty=false;await persist();notice('Report saved online.','success');editor('rooms');}, button)); };
-    if(d.type==='damage')for(const figure of $('rooms').querySelectorAll('figure[data-photo-id]')){
+    if(w.can.receipts)for(const figure of $('rooms').querySelectorAll('figure[data-photo-id]')){
       if(draft.files.some(file=>file.id===figure.dataset.photoId&&file.remoteId))figure.querySelector('figcaption').textContent='Original file kept';
     }
-    if(d.type==='incident')for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent='Detail heading';
-    if(d.type==='incident'||d.type==='damage')$('app').querySelector('.screen-bar + .row .eyebrow').textContent=d.propertyName||w.eyebrow;
-    if(d.type==='incident')for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
-    if(d.type!=='routine'&&d.type!=='move-in'&&d.type!=='move-out')for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel.replace(/^./,c=>c.toUpperCase())} the note.`;
+    if(w.editorNameLabel)for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent=w.editorNameLabel;
+    if(w.unit==='entry')$('app').querySelector('.screen-bar + .row .eyebrow').textContent=d.propertyName||w.eyebrow;
+    if(w.editorTalkLabel)for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent=w.editorTalkLabel;
+    for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel.replace(/^./,c=>c.toUpperCase())} the note.`;
     bindPhotoDrag();
     // A finding is numbered, not named: the room name field has nothing to ask.
     if(entryTool()){
@@ -1486,16 +1321,16 @@ function editor(step) {
     syncPhotosSoon();
     // A check-in is photos, room by room, and a save. Nothing to write, sign
     // or send, so none of it is shown.
-    if(d.type==='check-in'){
+    if(w.can.photosOnly){
       $('app').querySelectorAll('.note-lead,.write-own,.note-tools').forEach(el=>el.remove());
       $('to-details')?.remove();
       $('save')?.remove();
       const heading=$('app').querySelector('h1'),eyebrow=$('app').querySelector('.row.spread .eyebrow');
-      if(heading)heading.textContent='Photograph each room.';
-      if(eyebrow)eyebrow.textContent=`Check-in · ${d.propertyName}`;
+      if(heading)heading.textContent=w.baselineCaptureHeading||`Photograph each ${w.noun}.`;
+      if(eyebrow)eyebrow.textContent=`${typeLabel(d.type)} · ${d.propertyName}`;
       const keep=$('preview');
-      keep.textContent='Save check-in';
-      keep.onclick=event=>{haptic();saveCheckIn(event.currentTarget);};
+      keep.textContent=w.baselineSave||`Save ${baselineName(d.type)}`;
+      keep.onclick=event=>{haptic();saveBaseline(event.currentTarget);};
     }
     if(d.rooms.some(room=>room.photos.length))track('FirstPhotoAdded');
   }
@@ -1514,7 +1349,8 @@ async function chooseExistingProperty(){
   const data=propertiesCache||await api('/properties');propertiesCache=data;
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
   if(!details.length)return notice('Saved properties appear here after you save a report.');
-  modal(`<h2>Use an existing property</h2><p class="muted">Choose the exact property or unit for this report.</p><div class="stack property-choices">${details.map((property,index)=>`<button type="button" class="secondary" data-existing-property="${index}">${esc(property.name)}</button>`).join('')}</div><button type="button" id="keep-new-property" class="quiet">Enter a new property or unit</button>`);
+  const place=skin().placeSingular;
+  modal(`<h2>Use an existing ${esc(place)}</h2><p class="muted">Choose the exact ${esc(place)} for this ${esc(skin().doc)}.</p><div class="stack property-choices">${details.map((property,index)=>`<button type="button" class="secondary" data-existing-property="${index}">${esc(property.name)}</button>`).join('')}</div><button type="button" id="keep-new-property" class="quiet">Enter a new ${esc(place)}</button>`);
   document.querySelectorAll('[data-existing-property]').forEach(button=>button.onclick=()=>{
     draft.document.propertyName=details[Number(button.dataset.existingProperty)].name;remember();$('dialog').close();editor();
   });
@@ -1534,7 +1370,7 @@ function viewPhoto(id){
   // Downloads leave the page, which WKWebView does not allow; the app would
   // need its own export handler the way the PDF has one.
   const canDownload=!native&&draft.serverId&&remoteId;
-  modal(`<h2>Photo</h2><img class="photo-full" data-photo="${esc(id)}" src="${esc(url)}" alt="Property photo">${canDownload?'<p class="muted">The uploaded file as received — resized copies appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
+  modal(`<h2>Photo</h2><img class="photo-full" data-photo="${esc(id)}" src="${esc(url)}" alt="Recorded photo">${canDownload?'<p class="muted">The uploaded file as received — resized copies appear in the report.</p>':''}<div class="row"><button type="button" id="photo-close" class="secondary">Done</button>${canDownload?'<button type="button" id="photo-original" class="quiet">Download original</button>':''}<button type="button" id="photo-remove" class="quiet danger">Remove photo</button></div>`);
   $('photo-close').onclick=()=>$('dialog').close();
   if($('photo-original'))$('photo-original').onclick=event=>run(()=>downloadOriginal(remoteId),event.currentTarget);
   $('photo-remove').onclick=()=>{
@@ -1672,7 +1508,7 @@ async function addPhotos(input) {
     } catch { notice(`${file.name} could not be opened. Export it as JPEG or take a photo.`); }
     finally {URL.revokeObjectURL(objectURL);}
   }
-  if(source==='camera'&&draft.document.type==='damage'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
+  if(source==='camera'&&wedge(draft.document.type).can.eventTime==='first-photo'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
   await persist();
   syncPhotosSoon();
   if(entryTool()&&!native&&cameraRoom===null)return entryScreen(i);
@@ -1964,12 +1800,12 @@ function remoteDocument(){
   return {...draft.document,photoTimes:times,rooms:draft.document.rooms.map(room=>({...room,photos:remote(room.photos),...(room.receipts?{receipts:remote(room.receipts)}:{})}))};
 }
 async function ensureServerDraft(){
-  if(!draft.document.propertyName.trim())throw new Error('Enter a property name first.');
+  if(!draft.document.propertyName.trim())throw new Error(`Enter a ${skin().placeSingular} name first.`);
   if(!draft.serverId){
     const body={...draft.document,rooms:draft.document.rooms.map(room=>({...room,photos:[]}))};
     // Linked to its check-in only while the property is still the same one;
     // if the server declines the link, the report is saved without it.
-    const linked=draft.baselineId&&draft.document.type==='damage'&&checkInBaseline()?.document?.propertyName?.trim().toLowerCase()===draft.document.propertyName.trim().toLowerCase();
+    const linked=draft.baselineId&&baselineTypeFor(draft.document.type)&&currentBaseline()?.document?.propertyName?.trim().toLowerCase()===draft.document.propertyName.trim().toLowerCase();
     let result;
     try{result=await api('/reports',{method:'POST',body:linked?{...body,baselineReportId:draft.baselineId}:body});}
     catch(error){
@@ -2002,6 +1838,10 @@ function syncPhotosSoon(){
   if(photoSync){photoSyncAgain=true;return;}
   const current=draft;
   photoSync=(async()=>{
+    // Let photoSync receive this promise before a zero-work pass can finish.
+    // Otherwise its finally clears null, then this assignment restores a
+    // resolved promise and every later draft waits behind it forever.
+    await Promise.resolve();
     try{
       if(!current.document.propertyName.trim())return;
       if(!current.serverId)await ensureServerDraft();
@@ -2022,7 +1862,7 @@ function markUploaded(id){
 }
 window.addEventListener('online',()=>syncPhotosSoon());
 async function save() {
-  if(!draft.document.propertyName.trim())throw new Error('Enter a property name.');
+  if(!draft.document.propertyName.trim())throw new Error(`Enter a ${skin().placeSingular} name.`);
   // A background upload finishing mid-save could be taken for a removed
   // photo, so the save waits for it.
   if(photoSync)await photoSync.catch(()=>{});
@@ -2259,7 +2099,7 @@ function signaturePreview(signature){
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label='',index=0,sample=null,photosOnly=false){
-  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&draft?.document?.type!=='damage'?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo"${sample?'':` data-photo="${esc(id)}"`} src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
+  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&wedge(draft?.document?.type).can.issueToggle?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo"${sample?'':` data-photo="${esc(id)}"`} src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -2277,18 +2117,18 @@ function reportPreview(){
   const baseline=draft.baseline?.document,baselineRooms=new Map((baseline?.rooms||[]).map(room=>[room.name.toLowerCase(),room]));
   // Against a check-in, a finding pairs only with the room of its own name,
   // and its photos arrive as they are fetched.
-  const base=checkInBaseline();
+  const base=currentBaseline();
   if(base){
     const wanted=d.rooms.flatMap(room=>beforeIdsFor(room.name));
     if(wanted.some(id=>!photoFile(id)))ensureBeforeFiles(wanted).then(loaded=>{if(loaded&&currentScreen==='preview')reportPreview();}).catch(()=>{});
   }
-  const beforeLabel=base?`Before · check-in ${docDateText(baseline.date)}`:'Previous finalized report';
+  const beforeLabel=base?`Before · ${baselineName(baseline.type)} ${docDateText(baseline.date)}`:'Previous finalized report';
   const roomMarkup=d.rooms.map((room,index)=>{const before=baselineRooms.get(room.name.toLowerCase())||(base?null:baseline?.rooms?.[index]);return `<div class="comparison-pair">${before?reportRoom(before,beforeLabel,index,null,!!base):''}${reportRoom(room,before?(base?'After':'Current report'):'',index)}</div>`;}).join('');
-  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||'Your property'}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}${d.eventTime?` · ${d.type==='damage'?'found':'occurred'} ${esc(timeText(d.eventTime))}`:''}${authorFor(d)?` · Prepared by ${esc(authorFor(d))}`:''}${!draft.finalizedAt?` <button type="button" class="quiet inline-action" id="change-author">${authorFor(d)?'Change':'Add your name'}</button>`:''}</p>${wedge(d.type).location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">${base?`Compared with the check-in on ${esc(docDateText(baseline.date))}.`:`Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(docDateText(baseline.date))}.`}</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${d.type==='damage'?'Optional. A signature is rarely available after a guest has left.':`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager,signed=d.signatures.some(sig=>sig.role===role),saved=!index&&savedSignature();
+  $('app').innerHTML=`<div class="row spread"><small class="eyebrow">${draft.finalizedAt?`Finalized ${esc(skin().doc)}`:`Your ${esc(skin().doc)} preview`}</small>${!draft.finalizedAt?'<button class="quiet" id="edit">← Edit</button>':''}</div><article class="card">${businessHeader(d)}<small>${esc(documentLabelFor(d.type))}</small><h1>${esc(d.propertyName)||`Your ${esc(skin().placeSingular)}`}</h1><p class="muted">${esc(typeLabel(d.type))} · ${esc(docDateText(d.date))}${d.eventTime?` · ${wedge(d.type).can.eventWord||'occurred'} ${esc(timeText(d.eventTime))}`:''}${authorFor(d)?` · Prepared by ${esc(authorFor(d))}`:''}${!draft.finalizedAt?` <button type="button" class="quiet inline-action" id="change-author">${authorFor(d)?'Change':'Add your name'}</button>`:''}</p>${wedge(d.type).can.location===false?'':locationPreview(d)}${baseline?`<div class="comparison-banner">${base?`Compared with the ${esc(baselineName(baseline.type))} on ${esc(docDateText(baseline.date))}.`:`Compared with the finalized ${esc(typeLabel(baseline.type))} from ${esc(docDateText(baseline.date))}.`}</div>`:''}${roomMarkup}${d.signatures.map(signaturePreview).join('')}<p><small>${esc(pw.disclaimer)}</small></p></article>${!draft.finalizedAt?`<section class="card signature-actions"><div><h2>Optional signatures</h2><p class="muted">${wedge(d.type).can.signerHint||`Add a ${esc(pw.signers.manager)} or ${esc(pw.signers.other)} sign-off before finalizing.`}</p></div><div class="row">${signerRoles(d.type).map((role,index)=>{const label=index?pw.signers.other:pw.signers.manager,signed=d.signatures.some(sig=>sig.role===role),saved=!index&&savedSignature();
       if(saved&&!signed)return `<button class="secondary" data-sign-saved="${esc(role)}">Sign as ${esc(saved.name)}</button><button type="button" class="quiet" data-sign="${esc(role)}">Draw a new one</button>`;
-      if(index&&d.type==='damage'&&!signed)return `<button type="button" class="quiet" data-sign="${esc(role)}">Guest here? Get their signature</button>`;
+      if(index&&wedge(d.type).can.signerHint&&!signed)return `<button type="button" class="quiet" data-sign="${esc(role)}">${esc(wedge(d.type).otherSignerPrompt||`${roleLabel(role)} here? Get their signature`)}</button>`;
       return `<button class="secondary" data-sign="${esc(role)}">${signed?`Replace ${esc(label)} signature`:`Add ${esc(label)} signature`}</button>`;}).join('')}</div></section>`:''}${draft.finalizedAt
-    ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${d.type==='damage'?'<button id="originals" class="secondary">Get original photos</button>':''}${d.type==='incident'?'':'<button id="share" class="secondary">Create private share link</button>'}</div>${d.type==='damage'?'<p class="muted">Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.</p>':''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
+    ? `<p class="muted">This version cannot change. Create a new ${esc(skin().doc)} for corrections.</p><div class="stack report-actions"><button id="pdf">Download PDF</button>${wedge(d.type).can.originals?'<button id="originals" class="secondary">Get original photos</button>':''}${wedge(d.type).can.shareable?'<button id="share" class="secondary">Create private share link</button>':''}</div>${wedge(d.type).can.originals?`<p class="muted">${esc(wedge(d.type).originalsHint||'Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.')}</p>`:''}<div class="next-actions"><button type="button" id="another-report" class="secondary">${esc(skin().navCreate)}</button>${account?`<button type="button" id="back-to-reports" class="quiet">← All ${esc(skin().docPlural)}</button>`:''}</div>${!native&&account&&appLive()?`<section class="card app-handoff-card"><div><small class="eyebrow">MARKETEL APP</small><h2>Keep this ${esc(skin().doc)} with you.</h2><p class="muted">We will email one secure link that signs you in and opens this ${esc(skin().doc)} in the Marketel app.</p></div><button id="send-app-handoff">Continue in the Marketel app →</button></section>`:''}`
     : `${d.rooms.some(room=>room.photos.length)?`<section class="card coverage" id="coverage-card"><div><h2>Check your photo coverage</h2><p class="muted">Inspect looks at which surfaces your photos actually show and tells you what is missing. It never comments on condition.</p></div><button type="button" id="coverage-run" class="secondary">Check photo coverage</button></section>`:''}${payAtExport()?`<div class="stack report-actions reveal-actions"><button type="button" id="send-report" class="wide">Send this ${esc(skin().doc)} →</button><button type="button" id="download-report" class="secondary wide">Download PDF</button></div>${canSend()?`<p class="muted">Sending finalizes this version. Included in your plan.</p>`:`<p class="muted">Building is free. Sending finalizes this version: $${reportPrice()} for this ${esc(skin().doc)}, or included in a plan.</p>`}`:`<div class="actions row"><button id="finalize">Save &amp; export my ${esc(skin().doc)} →</button></div><p class="muted">Finalizing freezes this version. Your first ${esc(skin().doc)} includes PDF export${skin().doc==='record'?'':' and a revocable share link'}, free.${account?'':' Exporting verifies your email once.'}</p>`}`}`;
   if(TYPED_ARMS.has(d.type))$('coverage-card')?.remove();
   paintBusinessLogo();
@@ -2436,7 +2276,7 @@ async function openShareSheetNow(){
   modal(`<h2>Your private link is ready.</h2><p class="muted">Anyone with this link can read and download this version. Making a new link turns this one off.</p><input id="share-url" readonly value="${esc(r.url)}"><button id="copy-link" class="wide">Copy link</button><button id="revoke" class="quiet danger">Turn off this link</button>`);
   $('copy-link').onclick=event=>{
     const button=event.currentTarget;
-    const copied=()=>{haptic('success');button.textContent='Copied ✓';button.classList.add('is-done');notice('Link copied. Paste it into your claim or message.','success');
+    const copied=()=>{haptic('success');button.textContent='Copied ✓';button.classList.add('is-done');notice(wedge(draft.document.type).linkCopiedMessage||'Link copied. Paste it into your message.','success');
       setTimeout(()=>{if(button.isConnected){button.textContent='Copy link';button.classList.remove('is-done');}},2400);};
     const fallback=()=>{$('share-url').select();try{if(document.execCommand('copy'))return copied();}catch{}notice('Press and hold the link above to copy it.','error');};
     if(navigator.clipboard?.writeText)navigator.clipboard.writeText(r.url).then(copied,fallback);else fallback();
@@ -2494,8 +2334,9 @@ function requestExport(action,trigger){
 }
 function originalsSheet(){
   if(native){
-    modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');
-    $('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');
+    const sk=skin();
+    modal(`<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open ${esc(sk.product)} in Safari, sign in, and open this saved ${esc(sk.doc)}.</p><button id="originals-web" class="wide">Open ${esc(sk.product)} on the web</button>`);
+    $('originals-web').onclick=()=>openExternal(`https://bookmarketel.com${sk.home}`);
     return;
   }
   const photos=draft.document.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
@@ -2516,14 +2357,14 @@ async function finishExport(action){
 // whole answer.
 function deliverySheet(preferred='share'){
   const d=draft.document,sk=skin(),doc=esc(sk.doc);
-  const canShare=d.type!=='incident';
-  const hasOriginals=d.type==='damage'&&d.rooms.some(room=>room.photos.length);
+  const canShare=!!wedge(d.type).can.shareable;
+  const hasOriginals=!!wedge(d.type).can.originals&&d.rooms.some(room=>room.photos.length);
   const order=[
     canShare?{id:'delivery-share',label:'Create a private link',hint:'Anyone with the link can read and download this version.',primary:preferred!=='pdf'}:null,
     {id:'delivery-pdf',label:'Download the PDF',hint:`The finished ${sk.doc}, ready to attach.`,primary:preferred==='pdf'||!canShare},
-    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:'The unedited originals. Some platforms ask for these.',primary:false}:null,
+    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:wedge(d.type).originalsLine,primary:false}:null,
   ].filter(Boolean).sort((a,b)=>Number(b.primary)-Number(a.primary));
-  modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p>${fileByText(d)?`<p class="deadline">${esc(fileByText(d))} — 14 days after check-out, or before the next guest arrives.</p>`:''}<div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
+  modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p>${wedge(d.type).can.deadline?.text?`<p class="deadline">${fileByText(d)?`${esc(fileByText(d))} — `:''}${esc(wedge(d.type).can.deadline.text)}.</p>`:''}<div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
   if($('delivery-share'))$('delivery-share').onclick=event=>run(()=>openShareSheetNow(),event.currentTarget);
   if($('delivery-pdf'))$('delivery-pdf').onclick=event=>run(async()=>{await downloadPdfNow();if(!native)notice(`Your ${sk.doc} was downloaded.`,'success');},event.currentTarget);
   if($('delivery-originals'))$('delivery-originals').onclick=()=>originalsSheet();
@@ -2656,16 +2497,15 @@ function purchaseSettled(){
 }
 function renderProperties(data){
   enterScreen('properties');
-  const sk=skin();
+  const sk=skin(),baselineType=toolBaselineType(),baselineLabel=baselineType?baselineName(baselineType):'';
   const details=data?.propertyDetails||data?.properties?.map(name=>({name}))||[];
-  $('app').innerHTML=`<h1>${esc(sk.placesHeading)}</h1><p class="muted">${esc(sk.placesLede)}</p><button id="new-property">+ New ${esc(sk.placeSingular)}</button>${details.length?'':`<section class="card">${esc(sk.placesEmpty)}</section>`}${details.map((property,index)=>`<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate?`<p class="muted">Last ${esc(typeLabel(property.latestType).toLowerCase())} ${esc(docDateText(property.latestDate))}</p>`:''}${toolId()==='claims'?(property.latestCheckIn?`<button type="button" class="quiet check-in-line" data-view-check-in="${esc(property.latestCheckIn.id)}">Last check-in ${esc(docDateText(property.latestCheckIn.date))} · ${property.latestCheckIn.photoCount} ${property.latestCheckIn.photoCount===1?'photo':'photos'}</button>`:'<p class="muted check-in-line">No check-in yet</p>'):''}</div><div class="row">${toolId()==='claims'?`<button type="button" class="secondary" data-check-in="${index}">Check in</button>`:''}<button class="secondary" data-property="${index}">New report</button>${sk.comparisons&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}<button type="button" class="quiet danger" data-delete-property="${index}">Delete</button></div></section>`).join('')}`;
-  if(sk.doc!=='report')for(const button of $('app').querySelectorAll('[data-property]'))button.textContent=`New ${sk.doc}`;
+  $('app').innerHTML=`<h1>${esc(sk.placesHeading)}</h1><p class="muted">${esc(sk.placesLede)}</p><button id="new-property">+ New ${esc(sk.placeSingular)}</button>${details.length?'':`<section class="card">${esc(sk.placesEmpty)}</section>`}${details.map((property,index)=>{const baseline=baselineType?propertyBaseline(property,baselineType):null;return `<section class="card property-row"><div><strong>${esc(property.name)}</strong>${property.latestDate&&TOOL_TYPES[toolId()].includes(property.latestType)?`<p class="muted">Last ${esc(typeLabel(property.latestType).toLowerCase())} ${esc(docDateText(property.latestDate))}</p>`:''}${baselineType?(baseline?`<button type="button" class="quiet check-in-line" data-view-baseline="${esc(baseline.id)}">Last ${esc(baselineLabel)} ${esc(docDateText(baseline.date))} · ${baseline.photoCount} ${baseline.photoCount===1?'photo':'photos'}</button>`:`<p class="muted check-in-line">No ${esc(baselineLabel)} yet</p>`):''}</div><div class="row">${baselineType?`<button type="button" class="secondary" data-baseline="${index}">${esc(wedge(baselineType).baselineAction||`Start ${baselineLabel}`)}</button>`:''}<button class="secondary" data-property="${index}">${esc(sk.propertyCreateLabel||`New ${sk.doc}`)}</button>${sk.comparisons&&TOOL_TYPES[toolId()].includes(property.latestType)&&property.latestFinalizedReportId?`<button data-compare="${esc(property.latestFinalizedReportId)}">Start move-out comparison</button>`:''}<button type="button" class="quiet danger" data-delete-property="${index}">Delete</button></div></section>`;}).join('')}`;
   $('new-property').onclick=()=>{haptic();newProperty();};
   document.querySelectorAll('[data-property]').forEach(button=>button.onclick=()=>start(details[Number(button.dataset.property)].name));
   document.querySelectorAll('[data-compare]').forEach(button=>button.onclick=()=>run(()=>startComparison(button.dataset.compare),button));
   document.querySelectorAll('[data-delete-property]').forEach(button=>button.onclick=()=>deleteProperty(details[Number(button.dataset.deleteProperty)],button));
-  document.querySelectorAll('[data-check-in]').forEach(button=>button.onclick=()=>{haptic();run(()=>startCheckIn(details[Number(button.dataset.checkIn)].name),button);});
-  document.querySelectorAll('[data-view-check-in]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.viewCheckIn),button));
+  document.querySelectorAll('[data-baseline]').forEach(button=>button.onclick=()=>{haptic();run(()=>startBaseline(details[Number(button.dataset.baseline)].name),button);});
+  document.querySelectorAll('[data-view-baseline]').forEach(button=>button.onclick=()=>run(()=>openReport(button.dataset.viewBaseline),button));
 }
 // A property on its own, before any report names it. Starting a whole damage
 // report used to be the only way to add one.
@@ -2691,10 +2531,10 @@ function newProperty(){
 }
 async function deleteProperty(property,button){
   if(!property)return;
-  const sk=skin(),count=Number(property.reportCount)||0,checkIns=Number(property.checkInCount)||0;
-  const parts=[count?`${count===1?`its ${sk.doc}`:`its ${count} ${sk.docPlural}`}`:'',checkIns?`${checkIns===1?'its check-in':`its ${checkIns} check-ins`}`:''].filter(Boolean);
+  const sk=skin(),count=Number(property.reportCount)||0,baselineType=toolBaselineType(),baselineCount=baselineType?Number(property.baselines?.[baselineType]?.count ?? (wedge(baselineType).legacyCountField?property[wedge(baselineType).legacyCountField]:0))||0:0,baselineLabel=baselineType?baselineName(baselineType):'';
+  const parts=[count?`${count===1?`its ${sk.doc}`:`its ${count} ${sk.docPlural}`}`:'',baselineCount?`${baselineCount===1?`its ${baselineLabel}`:`its ${baselineCount} ${baselineLabel} records`}`:''].filter(Boolean);
   const message=parts.length
-    ?`${parts.join(' and ').replace(/^i/,'I')} ${count+checkIns===1?'is':'are'} also deleted, with their photos and shared links.${count?` Your ${sk.doc} allowance will not be restored.`:''}`
+    ?`${parts.join(' and ').replace(/^i/,'I')} ${count+baselineCount===1?'is':'are'} also deleted, with their photos and shared links.${count?` Your ${sk.doc} allowance will not be restored.`:''}`
     :`It has no ${sk.docPlural}.`;
   if(!await confirmAction({title:`Delete ${property.name}?`,message,confirmLabel:count?'Delete permanently':`Delete ${sk.placeSingular}`,danger:true}))return;
   // The same fold as a report: at once on screen, back if the server refuses.
@@ -2748,7 +2588,7 @@ function renderReports(){
   const localDraft=hasUnfinishedDraft()&&!draft.serverId
     ? `<section class="card report-row"><div><strong>${esc(draft.document.propertyName)||'Untitled report'}</strong><p class="muted">${esc(docDateText(draft.document.date))} · On this device · not saved online</p></div><div class="row"><button type="button" id="open-local-draft" class="secondary">Open</button><button type="button" id="delete-local-draft" class="quiet danger">Delete</button></div></section>`
     : '';
-  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':`<section class="card empty-state"><h2>No ${esc(skin().docPlural)} yet.</h2><p class="muted">${toolId()==='claims'?'When something is damaged, start one above. Check a unit in from Properties at turnover, and the report shows it as the before.':`Start your first one above.`}</p></section>`}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(docDateText(report.document.date))} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?(report.document.type==='damage'?' · With check-in':' · Comparison'):''}${fileByText(report.document)?` · <strong class="file-by">${esc(fileByText(report.document))}</strong>`:''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
+  $('app').innerHTML=`<h1>${esc(skin().listHeading)}</h1><div class="status-line"><p class="muted">${status}</p>${canUpgrade?'<button id="plans" class="quiet">See plans →</button>':''}</div><button id="new-report">${esc(skin().navCreate)}</button>${localDraft}${reports.length||localDraft?'':`<section class="card empty-state"><h2>No ${esc(skin().docPlural)} yet.</h2><p class="muted">${esc(skin().emptyList||'Start your first one above.')}</p></section>`}${reports.map(report=>`<section class="card report-row"><div><strong>${esc(report.document.propertyName)}</strong><p class="muted">${esc(docDateText(report.document.date))} · ${report.finalizedAt?'Finalized':'Draft'}${report.baselineReportId?(baselineTypeFor(report.document.type)?` · With ${baselineName(baselineTypeFor(report.document.type))}`:' · Comparison'):''}${fileByText(report.document)?` · <strong class="file-by">${esc(fileByText(report.document))}</strong>`:''}</p></div><div class="row"><button data-open="${report.id}" class="secondary">Open</button><button data-delete-report="${report.id}" class="quiet danger">Delete</button></div></section>`).join('')}${nextReportCursor?'<button id="older" class="secondary">Load older reports</button>':''}`;
   if($('older'))$('older').onclick=event=>run(()=>list('reports',true),event.currentTarget);
   $('new-report').onclick=()=>start();if($('plans'))$('plans').onclick=offer;
   if($('open-local-draft'))$('open-local-draft').onclick=()=>{haptic();editor();};
@@ -2940,7 +2780,7 @@ function cameraAskScreen(entering){
   const others=rooms.map((item,index)=>({item,index})).filter(({item,index})=>(item.name||'').trim()&&(adding||index!==cameraRoom));
   // The check-in's rooms not yet in this report: one tap names the finding
   // exactly as its "before" is named, so the two pair with nothing typed.
-  const base=checkInBaseline(),used=new Set(rooms.map(item=>(item.name||'').trim().toLowerCase()).filter(Boolean));
+  const base=currentBaseline(),used=new Set(rooms.map(item=>(item.name||'').trim().toLowerCase()).filter(Boolean));
   const fromCheckIn=base?[...new Set(base.document.rooms.map(item=>item.name.trim()).filter(name=>name&&!used.has(name.toLowerCase())))]:[];
   $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length||fromCheckIn.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}${fromCheckIn.map(name=>`<button type="button" class="camera-room is-check-in" data-ask-name="${esc(name)}"><strong>${esc(name)}</strong><span>Before</span></button>`).join('')}</div>`:''}<h1>Which room are you in?</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="Kitchen"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
   const field=$('hud-room');
@@ -3011,7 +2851,7 @@ function cameraCompanion(entering=false){
   const beforeIds=beforeIdsFor(room.name);
   if(beforeIds.length&&beforeIds.some(id=>!photoFile(id)))ensureBeforeFiles(beforeIds).then(loaded=>{if(loaded&&cameraRoom!==null&&!cameraAsk&&!cameraBefore)cameraCompanion();}).catch(()=>{});
   const beforeThumb=beforeIds.find(id=>photoFile(id));
-  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at check-in"><img data-photo="${esc(beforeThumb)}" src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
+  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at ${esc(baselineName(currentBaseline()?.document?.type))}"><img data-photo="${esc(beforeThumb)}" src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
   const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?((item.name||'').trim()||'New'):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
   // Rooms are typed before the camera opens now, so this only asks by voice
   // for a finding from an older draft that was never given one.
@@ -3071,9 +2911,9 @@ function cameraBeforeScreen(id){
   if(hudDictation)hudTalk();
   window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraClose'});
   document.documentElement.classList.remove('camera-open');
-  const room=draft?.document?.rooms?.[cameraRoom],base=checkInBaseline(),ids=beforeIdsFor(room?.name).filter(item=>photoFile(item));
+  const room=draft?.document?.rooms?.[cameraRoom],base=currentBaseline(),ids=beforeIdsFor(room?.name).filter(item=>photoFile(item));
   enterScreen('before');
-  $('app').innerHTML=`<section class="before-page"><button type="button" id="before-back" class="quiet">← Back to camera</button><small class="eyebrow">Before · check-in ${esc(docDateText(base?.document?.date))}</small><h1>${esc(room?.name||'')}</h1><img class="before-photo" data-photo="${esc(cameraBefore)}" src="${esc(photoURL(cameraBefore))}" alt="How ${esc(room?.name||'it')} looked at check-in"><p class="muted"><small>${esc(photoCaptionText(cameraBefore))}</small></p>${ids.length>1?`<div class="before-thumbs">${ids.map(item=>`<button type="button" class="${item===cameraBefore?'is-active':''}" data-before-pick="${esc(item)}" aria-label="Another check-in photo"><img data-photo="${esc(item)}" src="${esc(photoURL(item))}" alt=""></button>`).join('')}</div>`:''}</section>`;
+  $('app').innerHTML=`<section class="before-page"><button type="button" id="before-back" class="quiet">← Back to camera</button><small class="eyebrow">Before · ${esc(baselineName(base?.document?.type))} ${esc(docDateText(base?.document?.date))}</small><h1>${esc(room?.name||'')}</h1><img class="before-photo" data-photo="${esc(cameraBefore)}" src="${esc(photoURL(cameraBefore))}" alt="How ${esc(room?.name||'it')} looked at ${esc(baselineName(base?.document?.type))}"><p class="muted"><small>${esc(photoCaptionText(cameraBefore))}</small></p>${ids.length>1?`<div class="before-thumbs">${ids.map(item=>`<button type="button" class="${item===cameraBefore?'is-active':''}" data-before-pick="${esc(item)}" aria-label="Another ${esc(baselineName(base?.document?.type))} photo"><img data-photo="${esc(item)}" src="${esc(photoURL(item))}" alt=""></button>`).join('')}</div>`:''}</section>`;
   $('before-back').onclick=()=>{const at=cameraRoom;cameraBefore=null;openNativeCamera(at);};
   document.querySelectorAll('[data-before-pick]').forEach(button=>button.onclick=()=>{haptic();cameraBefore=button.dataset.beforePick;cameraBeforeScreen();});
 }
@@ -3102,7 +2942,7 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   draft.files.push({id,blob,source:'camera',name:`camera-${id}.jpg`,takenAt:new Date().toISOString(),zone:PHONE_ZONE});
   draft.document.rooms[i].photos.push(id);
   // The time you found it is when the first photo of it was taken.
-  if(draft.document.type==='damage'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
+  if(wedge(draft.document.type).can.eventTime==='first-photo'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
   remember();await persist();
   syncPhotosSoon();
   if(cameraRoom!==null)cameraCompanion(true);

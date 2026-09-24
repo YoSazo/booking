@@ -36,7 +36,9 @@ body { min-height: 100vh; margin: 0; padding: calc(64px + env(safe-area-inset-to
 /* This is also the top edge of every web sheet. Sticky stopped participating
    once the body was scroll-locked at -scrollY, so opening Sign in near the end
    of a page could make the banner disappear. */
-header { position: fixed; z-index: 12; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 0 20px; min-height: 64px; overflow: hidden; background: #ffffffeb; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
+/* The site bar only. A bare `header` also caught the business name inside the
+   report, pinning it over the bar on the web and hiding it in the app. */
+body > header { position: fixed; z-index: 12; top: env(safe-area-inset-top); left: 0; right: 0; width: 100%; max-width: 1040px; margin: auto; padding: 0 20px; min-height: 64px; overflow: hidden; background: #ffffffeb; border: 1px solid #ffffffcc; border-top: 0; border-radius: 0 0 22px 22px; box-shadow: 0 8px 24px #2e7d5b0d; -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%); }
 .header-bar { min-height: 63px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .header-drawer { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 320ms cubic-bezier(.32,.72,0,1), opacity 180ms ease; }
 .header-drawer-clip { min-height: 0; overflow: hidden; }
@@ -216,7 +218,7 @@ html.sheet-open, html.sheet-open body { overflow: hidden; overscroll-behavior: n
    Counter that pan on the visible page pieces without turning body into a
    containing block for its fixed header. */
 html.sheet-open body { position: fixed; left: 0; right: 0; width: 100%; }
-html.sheet-open header, html.sheet-open main, html.sheet-open nav { transform: translateY(var(--viewport-pan, 0px)); }
+html.sheet-open body > header, html.sheet-open main, html.sheet-open nav { transform: translateY(var(--viewport-pan, 0px)); }
 #dialog-body { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
 /* No blur, tint or dimming behind sheets. It remains a real modal backdrop, so
    taps cannot leak into the page underneath. */
@@ -292,7 +294,7 @@ dialog:focus, dialog:focus-visible { outline: none; }
 .price { font-size: 36px; font-weight: 750; }
 blockquote { margin: 15px 0; background: #edf3ee; padding: 18px; border-radius: 10px; white-space: pre-wrap; }
 .native-inspect-shell body { padding-top: calc(82px + env(safe-area-inset-top)); padding-bottom: calc(98px + env(safe-area-inset-bottom)); }
-.native-inspect-shell header, .native-inspect-shell nav { display: none !important; }
+.native-inspect-shell body > header, .native-inspect-shell nav { display: none !important; }
 /* The glass bar floats over every app screen now, signed in or not; only the
    tab bar waits for an account. The bar is 64pt tall, 6pt below the safe area,
    so 82px leaves the same 12pt gap under it that the tab bar gets above it. */
@@ -376,7 +378,7 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .offer-option.is-selected { border-color: var(--green); background: var(--green-pale); }
 .offer-option:active, .offer-option.is-pressed { transform: scale(.99); }
 @media (max-width: 540px) {
-  header { padding: 0 15px; }
+  body > header { padding: 0 15px; }
   .header-drawer-content { padding-bottom: 18px; }
   .card { padding: 18px; }
   .grid { grid-template-columns: 1fr; }
@@ -634,7 +636,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
    every screen. The brand still signs the report card and the offer button,
    and simThanks() drops sim-mode before opening sign-in, because headerDrawer
    refuses to open against a header nobody can see. */
-.sim-mode header, .sim-mode nav { display: none; }
+.sim-mode body > header, .sim-mode nav { display: none; }
 .sim-mode body { padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: 0; }
 .sim-mode main { margin-top: 0; }
 
