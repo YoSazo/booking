@@ -11184,6 +11184,8 @@ const FUNNEL_DASHBOARD_EXCLUDED_HOTEL_IDS = [
 const FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS = [
     'bro2theno@gmail.com',
     'samatarsalahudeen@gmail.com',
+    'salahsalad100@gmail.com',
+    'support@bookmarketel.com',
 ];
 // Test runs use plus-aliases (owner+claims1@gmail.com), which are the same
 // mailbox. Normalize before matching so a test purchase never trains Meta.

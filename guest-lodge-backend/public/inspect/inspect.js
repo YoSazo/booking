@@ -252,8 +252,18 @@ function confirmSessionLost() {
   })().finally(() => { sessionCheck = null; });
   return sessionCheck;
 }
+// "Don't count my visits" from /funnel (or ?notrack=1 on any page, for an
+// in-app browser that /funnel never opens in). Same site, so same storage.
+const ownerBrowser = (() => {
+  try {
+    const asked = new URLSearchParams(location.search).get('notrack');
+    if (asked === '1') localStorage.setItem('marketel.noTrack', '1');
+    if (asked === '0') localStorage.removeItem('marketel.noTrack');
+    return localStorage.getItem('marketel.noTrack') === '1';
+  } catch { return false; }
+})();
 async function api(path, options = {}) {
-  const headers = { ...(session ? { Authorization: `Bearer ${session}` } : {}), ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) };
+  const headers = { ...(ownerBrowser ? { 'x-marketel-no-track': '1' } : {}), ...(session ? { Authorization: `Bearer ${session}` } : {}), ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) };
   // Uploads and downloads can legitimately take a while; everything else gets
   // a bound, so a request that never answers cannot hold the boot or a button.
   const controller = options.body instanceof FormData || options.blob ? null : new AbortController();
@@ -399,6 +409,7 @@ const haptic=(style='')=>{if(native)window.webkit?.messageHandlers?.marketelShel
 // before the email wall — otherwise the owners it exists to count are invisible.
 const logInspect=(name,anonymous=false)=>{
   if(!session&&!anonymous)return;
+  if(ownerBrowser)return;
   api(session?'/events':'/events/anon',{method:'POST',body:{name}}).catch(()=>{});
 };
 $('dialog-close').onclick = () => $('dialog').close();
@@ -610,6 +621,7 @@ const storedEmail = () => { try { return localStorage.getItem('inspect.email') |
 const visitorId = (() => { try { let value = localStorage.getItem('inspect.visitor') || ''; if (!/^v_[A-Za-z0-9]{8,40}$/.test(value)) { value = `v_${uid().replace(/[^A-Za-z0-9]/g, '').slice(0, 24)}`; localStorage.setItem('inspect.visitor', value); } return value; } catch { return ''; } })();
 const trackedSteps = new Set();
 function track(name, detail, once = true) {
+  if (ownerBrowser) return;
   if (once && trackedSteps.has(name)) return;
   trackedSteps.add(name);
   api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail } }).catch(() => {});
@@ -987,6 +999,7 @@ function simCheckout(email,trigger){
 // counts one per visitor. The attribution goes with it, since there is no
 // account yet to carry it.
 function simCheckoutTapped(){
+  if(ownerBrowser)return;
   api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simBuy(trigger){
@@ -1043,7 +1056,7 @@ function simKept(email){
 function simAppProof(){
   const shots=MANIFESTS?.[toolId()]?.appStore?.screens||[];
   if(!appLive()||!shots.length)return '';
-  return `<section class="sim-app-proof" id="sim-app-proof"><small class="eyebrow">The real app</small><h3>This is what you'll use.</h3><div class="sim-screens" id="sim-screens" tabindex="0" role="group" aria-label="Screens of the Marketel app">${shots.map(shot=>`<figure><img src="/inspect/sample/${esc(shot.file)}" alt="${esc(shot.caption)}" loading="lazy" decoding="async" width="480" height="928"><figcaption>${esc(shot.caption)}</figcaption></figure>`).join('')}</div><div class="sim-screens-nav"><button type="button" class="quiet" data-screens="-1" aria-label="Previous screen">←</button><button type="button" class="quiet" data-screens="1" aria-label="Next screen">→</button></div><p class="muted"><small>On the App Store for iPhone, and right here in your browser.</small></p></section>`;
+  return `<section class="sim-app-proof" id="sim-app-proof"><small class="eyebrow">The real app</small><h3>This is what you'll use.</h3><div class="sim-screens" id="sim-screens" tabindex="0" role="group" aria-label="Screens of the Marketel app">${shots.map(shot=>`<figure><img src="/inspect/sample/${esc(shot.file)}" alt="${esc(shot.caption)}" loading="lazy" decoding="async" width="480" height="1039"><figcaption>${esc(shot.caption)}</figcaption></figure>`).join('')}</div><div class="sim-screens-nav"><button type="button" class="quiet" data-screens="-1" aria-label="Previous screen">←</button><button type="button" class="quiet" data-screens="1" aria-label="Next screen">→</button></div><p class="muted"><small>On the App Store for iPhone, and right here in your browser.</small></p></section>`;
 }
 function bindAppProof(){
   const proof=$('sim-app-proof'),strip=$('sim-screens');

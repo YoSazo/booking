@@ -484,6 +484,8 @@ function registerInspect(app, {
     if (!merged || JSON.stringify(merged) === JSON.stringify(account.metaAttribution || null)) return account;
     return db.inspectAccount.update({ where: { id: account.id }, data: { metaAttribution: merged } });
   };
+  // Set by /funnel's "Don't count my visits" switch in the owner's own browser.
+  const ownerBrowser = req => String(req?.headers?.['x-marketel-no-track'] || '') === '1';
   const queueInspectCapi = async (eventName, {
     account,
     req,
@@ -494,8 +496,9 @@ function registerInspect(app, {
     eventTime,
     appPurchase = false,
   }) => {
-    // The review account is Apple testing the app, not a customer the ads found.
-    const excluded = !!account && (isCapiExcludedEmail(account.email) || isReviewAccount(account.email));
+    // The review account is Apple testing the app, not a customer the ads found,
+    // and a browser the owner switched off on /funnel is not either.
+    const excluded = (!!account && (isCapiExcludedEmail(account.email) || isReviewAccount(account.email))) || ownerBrowser(req);
     const attribution = account?.metaAttribution && typeof account.metaAttribution === 'object'
       ? account.metaAttribution
       : {};
@@ -912,6 +915,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   };
   router.post('/events/anon', guarded(async (req, res) => {
     if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown event.');
+    if (ownerBrowser(req)) return res.json({ success: true, ignored: true });
     // Automated browsers are not visitors: our own production checks run
     // headless, and counting them (or sending them to Meta) skews the funnel.
     if (/HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req.headers?.['user-agent'] || ''))) return res.json({ success: true, ignored: true });
@@ -1016,7 +1020,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
-    await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
+    if (!ownerBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
     res.json({ url: session.url, trialDays });
   }));
 
@@ -1096,6 +1100,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   ]);
   router.post('/events', guarded(async (req, res) => {
     if (!CLIENT_EVENTS.has(req.body.name)) throw fail(400, 'Unknown event.');
+    if (ownerBrowser(req)) return res.json({ success: true, ignored: true });
     const sourceId = CLIENT_EVENTS.get(req.body.name);
     if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
     await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body));

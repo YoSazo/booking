@@ -135,7 +135,10 @@ is recorded with the wedge's tool and the visitor id; server records (trial,
 first payment, cancellation) carry them too. A new step in any wedge must be
 recorded and listed in `wedge-funnel.js` before it ships. Headless browsers are
 not counted, so production checks never pollute it. The old booking and
-support dashboard is at `/funnel/legacy`.
+support dashboard is at `/funnel/legacy`. Opening `/funnel` in a browser switches that
+browser off ("Not counting this browser"): it sends no steps, every request is
+marked `x-marketel-no-track`, and the server records nothing and tells Meta
+nothing for it. `?notrack=1` on any page does the same for in-app browsers.
 
 ## 9. App Store
 

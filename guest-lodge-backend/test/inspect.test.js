@@ -2742,3 +2742,26 @@ test('Meta hears about the website, never about what happens inside the app', as
   assert.match(client, /const metadata = \{ product: 'marketel-inspect', inspectAccountId: a\.id, interval, tool, \.\.\.\(nativeReturn \? \{ source: 'app' \} : \{\}\) \};[\s\S]{0,260}metadata,\s*subscription_data: \{ metadata \}/);
   assert.match(client, /appPurchase: subscription\.metadata\?\.source === 'app'/);
 });
+
+test('a browser switched off on /funnel counts for nothing: no steps, no Meta event', async () => {
+  const visitorId = `v_${'b'.repeat(12)}`;
+  const h = moneyHarness();
+  try {
+    const send = (name, extra = {}) => request(h.app, '/api/inspect/events/anon', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com', 'x-marketel-no-track': '1' },
+      body: JSON.stringify({ name, tool: 'claims', visitorId, detail: 'month', attribution: { fbp: 'fb.1.1700000000.123' }, ...extra }) });
+    for (const name of ['SimStarted', 'SimReportShown', 'SimCheckoutTapped']) {
+      const response = await send(name);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { success: true, ignored: true });
+    }
+    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 0, 'nothing recorded');
+    assert.deepEqual(h.calls.capi, [], 'nothing sent to Meta');
+    // Unknown names are still refused, switched off or not.
+    assert.equal((await send('NotAStep')).status, 400);
+    // And an ordinary visitor still counts.
+    await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'SimStarted', tool: 'claims', visitorId, detail: 'phone' }) });
+    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId && e.name === 'SimStarted').length, 1);
+  } finally { h.registration.close(); }
+});

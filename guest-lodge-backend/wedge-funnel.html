@@ -72,6 +72,9 @@
   .feed td.detail { color: var(--muted); }
   .empty { color: var(--muted); padding: 18px 0; text-align: center; }
   .error { color: var(--danger); }
+  .track { font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--green); background: transparent; color: var(--green-dark); }
+  .track[aria-pressed="false"] { border-color: var(--danger); color: var(--danger); }
+  .track-note { color: var(--muted); font-size: 12px; margin: -8px 0 14px; }
   #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 8px 24px #0003; opacity: 0; transition: opacity .12s; max-width: 260px; }
   #tip.on { opacity: 1; }
   footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
@@ -94,11 +97,13 @@
       <button type="button" data-days="all">All time</button>
     </div>
     <span class="spacer"></span>
+    <button type="button" class="track" id="track-toggle" aria-pressed="true"></button>
     <span class="updated" id="updated"></span>
     <button type="button" class="quiet" id="refresh">Refresh</button>
     <a class="quiet" href="/funnel/legacy">Bookings &amp; support →</a>
   </header>
 
+  <p class="track-note" id="track-note"></p>
   <section class="tiles" id="tiles" aria-live="polite"></section>
 
   <section class="card">
@@ -227,6 +232,23 @@ async function load() {
   }
 }
 
+// This browser's own visits to the site are not counted once /funnel has been
+// opened here: the demo sends nothing, and the server records nothing and
+// tells Meta nothing for it. Same site as /claims, so the same storage.
+const TRACK_KEY = 'marketel.noTrack';
+function trackState() { try { return localStorage.getItem(TRACK_KEY); } catch (_) { return null; } }
+function setTrack(value) { try { localStorage.setItem(TRACK_KEY, value); } catch (_) {} paintTrack(); }
+function paintTrack() {
+  const off = trackState() === '1';
+  $('track-toggle').setAttribute('aria-pressed', String(off));
+  $('track-toggle').textContent = off ? '✓ Not counting this browser' : 'Counting this browser';
+  $('track-note').textContent = off
+    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open bookmarketel.com/claims?notrack=1 once.'
+    : 'This browser counts like a visitor. Switch it off before looking at the site yourself.';
+}
+if (trackState() === null) setTrack('1');
+paintTrack();
+$('track-toggle').onclick = () => setTrack(trackState() === '1' ? '0' : '1');
 document.querySelectorAll('.range button').forEach(button => button.onclick = () => { state.days = button.dataset.days; saveState(); load(); });
 $('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load(); };
 $('refresh').onclick = load;
