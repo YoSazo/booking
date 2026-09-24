@@ -206,6 +206,7 @@ module.exports = {
     ]
   },
   "appStore": {
+    "live": false,
     "captions": [
       "Snap the damage. Say what you see.",
       "Keep every original photo",

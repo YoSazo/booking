@@ -207,6 +207,7 @@ window.MARKETEL_WEDGES = {
       ]
     },
     "appStore": {
+      "live": false,
       "captions": [
         "Snap the damage. Say what you see.",
         "Keep every original photo",
@@ -331,6 +332,7 @@ window.MARKETEL_WEDGES = {
     },
     "demo": null,
     "appStore": {
+      "live": false,
       "captions": []
     },
     "copy": {
@@ -548,6 +550,7 @@ window.MARKETEL_WEDGES = {
       ]
     },
     "appStore": {
+      "live": false,
       "captions": []
     },
     "copy": {
@@ -765,6 +768,7 @@ window.MARKETEL_WEDGES = {
       ]
     },
     "appStore": {
+      "live": false,
       "captions": [
         "Photograph the unit room by room",
         "Compare move-in and move-out photos",

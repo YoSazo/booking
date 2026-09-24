@@ -122,3 +122,29 @@ test('the originals line on the send sheet is each wedge\'s own', () => {
   const source = require('node:fs').readFileSync(path.join(__dirname, '../../public/inspect/inspect.js'), 'utf8');
   assert.doesNotMatch(source, /Some platforms ask for these|Open Claims on the web|bookmarketel\.com\/claims'/, 'Claims copy is hard-coded in the engine');
 });
+
+// appStore.live is the switch between "use it here in the browser" and "get the
+// iPhone app" after paying. Claims stays on the web until Apple approves.
+for (const [id, live] of [['claims', false], ['fixture', true]]) {
+  test(`${id}: after paying, ${live ? 'buyers are pointed at the iPhone app' : 'buyers start in the browser and never see the App Store'}`, async () => {
+    const config = load({ fixture: true }).byId[id];
+    assert.equal(config.appStore.live, live);
+    const h = await open({ arm: id, includeFixture: id === 'fixture', signedIn: false, demo: true });
+    try {
+      await h.page.goto(`http://app.test/${id}?checkout=success`, { waitUntil: 'domcontentloaded' });
+      await h.page.waitForSelector('.sim-thanks');
+      const view = await h.page.evaluate(() => ({ appLink: !!document.querySelector('.sim-thanks a[href*="apps.apple.com"]'),
+        start: document.getElementById('sim-signin')?.textContent.trim(), text: document.querySelector('.sim-thanks').innerText }));
+      if (live) {
+        assert.ok(view.appLink, JSON.stringify(view));
+        assert.match(view.text, /Get the iPhone app/);
+      } else {
+        assert.ok(!view.appLink && !/iPhone app|App Store/i.test(view.text), JSON.stringify(view));
+        assert.match(view.start, /^Start your first /);
+        await h.page.click('#sim-signin');
+        await h.page.waitForSelector('#auth-email, #email-form, [type="email"]', { timeout: 5000 });
+      }
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}

@@ -198,6 +198,7 @@ module.exports = {
     ]
   },
   "appStore": {
+    "live": true,
     "captions": [
       "Photograph each unit",
       "Compare move-in records",

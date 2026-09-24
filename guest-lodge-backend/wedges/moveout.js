@@ -200,6 +200,7 @@ module.exports = {
     ]
   },
   "appStore": {
+    "live": false,
     "captions": [
       "Photograph the unit room by room",
       "Compare move-in and move-out photos",

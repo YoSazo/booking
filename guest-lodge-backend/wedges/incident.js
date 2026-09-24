@@ -101,6 +101,7 @@ module.exports = {
   },
   "demo": null,
   "appStore": {
+    "live": false,
     "captions": []
   },
   "copy": {

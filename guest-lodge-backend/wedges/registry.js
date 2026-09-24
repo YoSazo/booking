@@ -15,6 +15,9 @@ function validate(manifest, filename = '') {
   if (!Array.isArray(manifest.listTypes) || !manifest.listTypes.length || !manifest.types || typeof manifest.types !== 'object') bad('types and listTypes are required');
   if (!manifest.skin || !manifest.landing || !manifest.appStore || typeof manifest.chooser !== 'string') bad('skin, landing, appStore and chooser are required');
   if (!manifest.roleLabels || typeof manifest.roleLabels !== 'object') bad('role labels are required');
+  // Whether the approved iPhone app carries this wedge. Until it does, buyers stay
+  // on the web app; flipping it to true is the whole switch once Apple approves.
+  if (typeof manifest.appStore?.live !== 'boolean') bad('appStore.live must be true or false');
   if (manifest.id !== 'inspect' && (!manifest.webTitle || !manifest.skin.home || !manifest.skin.terms)) bad('web title, home and terms are required');
   if (!['single', 'select'].includes(manifest.selection)) bad('selection must be single or select');
   if (manifest.id !== 'inspect' && (!manifest.landing.type || !manifest.types[manifest.landing.type])) bad('landing type must exist');

@@ -110,6 +110,14 @@ owner/test emails with normalized plus aliases, and excludes app purchases
 the US storefront. Outside the US, show no prices, purchase links, or “need a
 plan” language. The Stripe billing portal is US only.
 
+**App switch.** Each wedge's `appStore.live` says whether the approved iPhone
+app carries it. While it is `false`, the web funnel keeps buyers in the
+browser: the page after paying says it works right here and starts the first
+report, and no App Store link or "open in the app" card appears. Ads can run
+before Apple approves. Once Apple approves a build that carries the wedge, set
+`appStore.live: true`, run `npm run wedges:build`, and push; the funnel then
+points buyers at the app.
+
 ## 9. App Store
 
 The listing, review notes and privacy labels live under
