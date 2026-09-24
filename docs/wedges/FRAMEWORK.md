@@ -126,6 +126,14 @@ before Apple approves. Once Apple approves a build that carries the wedge, set
 `appStore.live: true`, run `npm run wedges:build`, and push; the funnel then
 points buyers at the app.
 
+**Funnel dashboard.** `/funnel` shows each live, in-app wedge from the ad to
+paying (`wedge-funnel.js` reads `inspectEvent`). Every step a visitor can take
+is recorded with the wedge's tool and the visitor id; server records (trial,
+first payment, cancellation) carry them too. A new step in any wedge must be
+recorded and listed in `wedge-funnel.js` before it ships. Headless browsers are
+not counted, so production checks never pollute it. The old booking and
+support dashboard is at `/funnel/legacy`.
+
 ## 9. App Store
 
 The listing, review notes and privacy labels live under

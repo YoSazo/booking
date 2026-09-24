@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eff4f0">
+<meta name="robots" content="noindex">
+<title>Marketel · Funnel</title>
+<link rel="manifest" href="/manifest-funnel.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eff4f0; --card: #ffffff; --subtle: #f4f8f5; --border: #d8e4dc; --border-soft: #e6eee9;
+    --text: #1a2b22; --soft: #4b5d52; --muted: #6b7d72; --green: #2e7d5b; --green-dark: #245f46; --track: #e3ece6;
+    --danger: #aa382b; --shadow: 0 1px 2px #173b2310, 0 8px 24px #173b230d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101a15; --card: #17241d; --subtle: #1c2b23; --border: #2a3d33; --border-soft: #22342a;
+      --text: #e7f0ea; --soft: #b8c9be; --muted: #8fa497; --green: #5fb58a; --green-dark: #7cc9a1; --track: #22342a;
+      --danger: #e0806f; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.3px; }
+  h1 small { color: var(--muted); font-weight: 500; }
+  .spacer { flex: 1 1 auto; }
+  select, button { font: inherit; }
+  select { padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  .range { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .range button { border: 0; background: transparent; color: var(--soft); padding: 6px 11px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .range button[aria-pressed="true"] { background: var(--green); color: #fff; }
+  .quiet { border: 0; background: transparent; color: var(--green); font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; text-decoration: none; font-size: 13px; }
+  .quiet:hover { background: var(--subtle); }
+  .quiet.danger { color: var(--danger); }
+  .updated { color: var(--muted); font-size: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile, .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); }
+  .tile { padding: 14px 16px; }
+  .tile small { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .tile strong { display: block; font-size: 30px; line-height: 1.1; letter-spacing: -.6px; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--soft); font-size: 12px; }
+  .card { padding: 16px 18px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 4px; font-size: 16px; }
+  .card > p.muted { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .ladder { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .ladder th { text-align: right; color: var(--muted); font-size: 12px; font-weight: 600; padding: 0 0 8px 10px; }
+  .ladder th:first-child, .ladder th:nth-child(2) { text-align: left; padding-left: 0; }
+  .ladder td { padding: 5px 0 5px 10px; text-align: right; white-space: nowrap; font-size: 14px; }
+  .ladder td.step { text-align: left; padding-left: 0; white-space: normal; color: var(--text); width: 30%; }
+  .ladder td.bar { width: 40%; padding-left: 12px; }
+  .ladder tr:hover td { background: var(--subtle); }
+  .ladder td.muted { color: var(--muted); }
+  .track { position: relative; height: 14px; background: var(--track); border-radius: 4px; }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 4px; min-width: 2px; }
+  .flag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--danger); color: var(--danger); font-size: 11px; font-weight: 700; }
+  .split { display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; color: var(--soft); }
+  .split b { color: var(--text); font-size: 18px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+  .branches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .branches .card { margin: 0; }
+  .branches ul { list-style: none; margin: 8px 0 0; padding: 0; }
+  .branches li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: 1px solid var(--border-soft); font-size: 13px; color: var(--soft); }
+  .branches li b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .feed { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .feed td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border-soft); vertical-align: top; }
+  .feed td.when { color: var(--muted); white-space: nowrap; width: 90px; }
+  .feed td.who { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; width: 70px; }
+  .feed td.detail { color: var(--muted); }
+  .empty { color: var(--muted); padding: 18px 0; text-align: center; }
+  .error { color: var(--danger); }
+  #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 8px 24px #0003; opacity: 0; transition: opacity .12s; max-width: 260px; }
+  #tip.on { opacity: 1; }
+  footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+  @media (max-width: 820px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .branches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ladder td.bar { display: none; } .ladder th:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Funnel <small id="wedge-name"></small></h1>
+    <select id="wedge" aria-label="Wedge"></select>
+    <div class="range" role="group" aria-label="Date range">
+      <button type="button" data-days="1">Today</button>
+      <button type="button" data-days="7">7 days</button>
+      <button type="button" data-days="30">30 days</button>
+      <button type="button" data-days="all">All time</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="updated" id="updated"></span>
+    <button type="button" class="quiet" id="refresh">Refresh</button>
+    <a class="quiet" href="/funnel/legacy">Bookings &amp; support →</a>
+  </header>
+
+  <section class="tiles" id="tiles" aria-live="polite"></section>
+
+  <section class="card">
+    <h2>From the ad to paying</h2>
+    <p class="muted">People at each step. "Of the step before" is the share who went on from the previous row. Hover a row for details.</p>
+    <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>Of the step before</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Where they started the demo</h2>
+    <div class="split" id="split"></div>
+  </section>
+
+  <section class="branches" id="branches"></section>
+
+  <section class="card">
+    <h2>Latest activity</h2>
+    <p class="muted">Newest first. Visitors are an anonymous id until they sign in; owner and App Review accounts are left out.</p>
+    <table class="feed" id="feed"><tbody></tbody></table>
+    <button type="button" class="quiet" id="feed-more" hidden>Show more</button>
+  </section>
+
+  <footer>
+    <span class="updated">Refreshes every minute.</span>
+    <button type="button" class="quiet danger" id="reset">Reset visitor steps…</button>
+  </footer>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
+let adminToken = '';
+try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
+let state = { tool: '', days: '7' };
+let feedAll = false, lastData = null;
+try { Object.assign(state, JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}')); } catch (_) {}
+const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
+
+// Same token as the old dashboard, asked for once and kept.
+async function adminFetch(url, options = {}, retry = true) {
+  if (!adminToken) {
+    adminToken = (window.prompt('Enter the Marketel admin token') || '').trim();
+    if (!adminToken) throw new Error('Admin token required');
+    try { localStorage.setItem('marketelAdminToken', adminToken); } catch (_) {}
+  }
+  const headers = new Headers(options.headers || {});
+  headers.set('x-admin-token', adminToken);
+  const response = await fetch(url, { ...options, headers });
+  if (response.status === 401 && retry) {
+    try { localStorage.removeItem('marketelAdminToken'); } catch (_) {}
+    adminToken = '';
+    return adminFetch(url, options, false);
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.message || 'Could not load the funnel.');
+  return body;
+}
+
+function ago(iso) {
+  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function render(data) {
+  $('wedge').innerHTML = (data.wedges || []).map(w => `<option value="${esc(w.id)}"${w.id === data.tool ? ' selected' : ''}>${esc(w.product)}</option>`).join('');
+  $('wedge').hidden = (data.wedges || []).length < 2;
+  $('wedge-name').textContent = data.tool ? `· Marketel ${(data.wedges.find(w => w.id === data.tool) || {}).product || data.tool}` : '· no live wedges';
+  document.querySelectorAll('.range button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.days === state.days)));
+  if (!data.tool) { $('tiles').innerHTML = ''; return; }
+  const step = key => data.steps.find(s => s.key === key) || { people: 0, ofLanded: null };
+  const tiles = [['Landed', 'landed'], ['Finished the demo', 'report'], ['Tapped start free', 'tapped'], ['Started a trial', 'trial'], ['Paid', 'paid']];
+  $('tiles').innerHTML = tiles.map(([label, key], i) => {
+    const s = step(key);
+    return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : 'people from the ad'}</span></div>`;
+  }).join('');
+  // The biggest drop between two steps, once there are enough people to mean something.
+  let worst = null;
+  data.steps.forEach((s, i) => { if (i && data.steps[i - 1].people >= 5 && s.ofPrevious !== null && (!worst || s.ofPrevious < worst.ofPrevious)) worst = s; });
+  const top = data.steps[0].people || 0;
+  $('ladder').querySelector('tbody').innerHTML = data.steps.map((s, i) => `<tr data-i="${i}">
+      <td class="step">${esc(s.label)}${worst && worst.key === s.key ? '<span class="flag">Biggest drop</span>' : ''}</td>
+      <td class="bar"><div class="track"><div class="fill" style="width:${top ? Math.max(0.5, s.people / top * 100) : 0}%"></div></div></td>
+      <td><b>${s.people}</b></td>
+      <td class="${i ? '' : 'muted'}">${i ? pct(s.ofPrevious) : '—'}</td>
+      <td class="muted">${pct(s.ofLanded)}</td></tr>`).join('');
+  $('ladder').querySelectorAll('tbody tr').forEach(row => {
+    const s = data.steps[Number(row.dataset.i)], prev = data.steps[Number(row.dataset.i) - 1];
+    row.onmousemove = e => tip(e, `<b>${esc(s.label)}</b><br>${s.people} ${s.people === 1 ? 'person' : 'people'}${prev ? `<br>${pct(s.ofPrevious)} of the ${prev.people} who ${esc(prev.label.toLowerCase())}` : ''}<br>${pct(s.ofLanded)} of everyone who landed`);
+    row.onmouseleave = () => $('tip').classList.remove('on');
+  });
+  const split = data.split || {};
+  const started = (split.phone || 0) + (split.desktop || 0) + (split.unknown || 0);
+  const share = n => started ? ` (${Math.round(n / started * 100)}%)` : '';
+  $('split').innerHTML = `<span><b>${split.phone || 0}</b>on a phone${share(split.phone || 0)}</span><span><b>${split.desktop || 0}</b>on a computer${share(split.desktop || 0)}</span>${split.unknown ? `<span><b>${split.unknown}</b>before this was recorded</span>` : ''}`;
+  $('branches').innerHTML = data.branches.map(b => `<div class="card"><h2>${esc(b.label)}</h2><ul>${b.steps.map(s => `<li><span>${esc(s.label)}</span><b>${s.people}</b></li>`).join('')}</ul></div>`).join('');
+  const shown = feedAll ? data.recent : data.recent.slice(0, 25);
+  $('feed-more').hidden = feedAll || data.recent.length <= 25;
+  $('feed').querySelector('tbody').innerHTML = shown.length
+    ? shown.map(e => `<tr><td class="when" title="${esc(new Date(e.at).toLocaleString())}">${esc(ago(e.at))}</td><td>${esc(e.label)}</td><td class="detail">${esc(e.detail || '')}</td><td class="who">${esc(e.who)}</td></tr>`).join('')
+    : '<tr><td class="empty" colspan="4">Nothing in this range yet.</td></tr>';
+  $('updated').textContent = `Updated ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function tip(event, html) {
+  const t = $('tip');
+  t.innerHTML = html; t.classList.add('on');
+  const x = Math.min(event.clientX + 14, window.innerWidth - t.offsetWidth - 8), y = Math.min(event.clientY + 14, window.innerHeight - t.offsetHeight - 8);
+  t.style.left = `${x}px`; t.style.top = `${y}px`;
+}
+
+async function load() {
+  try {
+    const params = new URLSearchParams({ days: state.days });
+    if (state.tool) params.set('tool', state.tool);
+    const data = await adminFetch(`/api/funnel/wedge?${params}`);
+    if (data.tool && data.tool !== state.tool) { state.tool = data.tool; saveState(); }
+    lastData = data;
+    render(data);
+  } catch (error) {
+    $('tiles').innerHTML = `<div class="tile error">${esc(error.message)}</div>`;
+  }
+}
+
+document.querySelectorAll('.range button').forEach(button => button.onclick = () => { state.days = button.dataset.days; saveState(); load(); });
+$('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load(); };
+$('refresh').onclick = load;
+$('feed-more').onclick = () => { feedAll = true; if (lastData) render(lastData); };
+$('reset').onclick = async () => {
+  const typed = window.prompt(`This clears every visitor step for ${state.tool || 'this wedge'} (demo, landing and setup taps). Trials, payments and sign-ins stay. Type RESET to continue.`);
+  if (typed !== 'RESET') return;
+  try {
+    const result = await adminFetch('/api/funnel/wedge/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: state.tool, confirm: 'RESET' }) });
+    window.alert(`Cleared ${result.deleted} visitor steps.`);
+    load();
+  } catch (error) { window.alert(error.message); }
+};
+load();
+setInterval(() => { if (document.visibilityState === 'visible') load(); }, 60000);
+</script>
+</body>
+</html>

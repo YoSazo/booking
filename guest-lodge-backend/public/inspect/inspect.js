@@ -651,7 +651,7 @@ function simFrame(){
   if(!framed||$('sim-frame-back'))return;
   const back=document.createElement('button');
   back.type='button';back.id='sim-frame-back';back.className='quiet';back.textContent='← Back';
-  back.onclick=()=>{simUnframe();history.replaceState(null,'',location.pathname);landing();};
+  back.onclick=()=>{track('SimBackTapped',undefined,false);simUnframe();history.replaceState(null,'',location.pathname);landing();};
   document.body.insertBefore(back,$('app'));
 }
 function simUnframe(){document.documentElement.classList.remove('sim-mode','sim-framed','sim-split');$('sim-frame-back')?.remove();$('sim-side')?.remove();}
@@ -743,6 +743,7 @@ function simThanks(){
   track('SimSubscribed');
   if($('sim-get-app'))$('sim-get-app').onclick=()=>track('SimAppTapped');
   $('sim-signin').onclick=()=>{
+    track('SimWebStarted');
     simUnframe();
     history.replaceState(null,'',location.pathname);
     ensureAuth(()=>run(()=>openAccountHome()),'paid');
@@ -764,7 +765,7 @@ function simIntro(){
   const s=simTool(),sk=skin();
   simPreload(s);
   document.documentElement.classList.add('sim-mode');
-  track('SimStarted');
+  track('SimStarted',phoneWidth()?'phone':'desktop');
   $('app').innerHTML=`<section class="sim sim-intro"><h1>${esc(s.heading)}<br><span class="green">in under 20 seconds</span></h1><p class="muted">See how it works. We've filled in the details for you.</p><div class="sim-fields"><div><small>${esc(s.placeLabel||"Property")}</small><strong>${esc(s.property)}</strong></div><div><small>${esc(s.unitLabel||"Unit")}</small><strong>${esc(s.unit)}</strong></div></div><h2 class="sim-prompt">Pick something to document.</h2><div class="sim-picks">${s.findings.map(f=>`<button type="button" class="sim-pick" data-sim-pick="${esc(f.id)}"><img src="${esc(simPhoto(f.photo,true))}" alt=""><span>${esc(f.label)}</span></button>`).join('')}</div><p class="sim-foot"><small>These are samples. In the real thing they are your photos.</small></p><button type="button" id="sim-signin-link" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></section>`;
   simRun=null;
   simSide('intro');
@@ -1113,7 +1114,7 @@ function goldenLanding(arm){
   };
   $('lead-email').oninput=()=>$('lead-email').classList.remove('invalid');
   if($('see-demo'))$('see-demo').onclick=()=>{haptic();history.replaceState(null,'',`${location.pathname}?sim=1`);simResume();};
-  if($('real-report'))$('real-report').onclick=()=>{$('real-report').hidden=true;$('lead-form').hidden=false;document.querySelector('.lead-note').hidden=false;$('lead-email').focus();};
+  if($('real-report'))$('real-report').onclick=()=>{track('SimRealReportTapped');$('real-report').hidden=true;$('lead-form').hidden=false;document.querySelector('.lead-note').hidden=false;$('lead-email').focus();};
   $('see-plans').onclick=previewPlans;
   $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
 }
@@ -1789,7 +1790,7 @@ function ensureAuth(after, intent='keep') {
       // bring it back. The flag alone prevents a second submit.
       verifying=true;lastTried=code;
       run(async()=>{
-        const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution}});
+        const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution,tool:toolId()}});
         session=result.token;localStorage.setItem('inspect.session',session);account=result;signedInAt=Date.now();updateHeader();prefetchLists();drawer.restore();
       },null).then(()=>{
         verifying=false;
@@ -1839,7 +1840,7 @@ window.marketelInspectAuthVerify=raw=>{
   const code=String(raw||'').replace(/\D/g,'').slice(0,6);
   if(!nativeAuth||code.length!==6)return;
   const pending=nativeAuth;
-  api('/auth/verify',{method:'POST',body:{email:pending.email,code,attribution:inspectAttribution}})
+  api('/auth/verify',{method:'POST',body:{email:pending.email,code,attribution:inspectAttribution,tool:toolId()}})
     .then(result=>{
       if(nativeAuth!==pending)return;
       nativeAuth=null;

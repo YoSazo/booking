@@ -12000,7 +12000,67 @@ app.get('/api/meta-insights', adminAuth, async (req, res) => {
 });
 
 // Serve the dashboard shell; its data/control APIs require ADMIN_TOKEN.
+// ——— The wedge funnel (/funnel) ———————————————————————————————————————
+// Every step from the ad to paying, per wedge, read from inspectEvent. The old
+// booking and support dashboard lives on at /funnel/legacy.
+const wedgeFunnel = require('./wedge-funnel');
+const wedgeRegistry = require('./wedges/registry');
+// On the dashboard: wedges that are live and in the approved app. Claims today.
+const dashboardWedges = () => wedgeRegistry.load().all
+    .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
+    .map(wedge => ({ id: wedge.id, product: wedge.product }));
+function wedgeFunnelRange(query) {
+    if (query.from && query.to) {
+        const since = new Date(`${query.from}T00:00:00.000Z`), until = new Date(`${query.to}T23:59:59.999Z`);
+        return isNaN(since) || isNaN(until) ? null : { since, until };
+    }
+    const until = new Date();
+    if (query.days === 'all') return { since: new Date('2020-01-01T00:00:00.000Z'), until };
+    const since = new Date(until.getTime() - Math.max(1, Math.min(365, parseInt(query.days, 10) || 7)) * 86400000);
+    return { since, until };
+}
+app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
+    try {
+        const wedges = dashboardWedges();
+        const tool = wedges.some(wedge => wedge.id === req.query.tool) ? req.query.tool : wedges[0]?.id;
+        if (!tool) return res.json({ wedges, tool: null });
+        const range = wedgeFunnelRange(req.query);
+        if (!range) return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+        const excluded = await wedgeFunnel.excludedAccountIds(prisma, [...FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS, process.env.INSPECT_REVIEW_EMAIL]);
+        const events = await withRetry(() => prisma.inspectEvent.findMany({
+            where: { tool, createdAt: { gte: range.since, lte: range.until },
+                ...(excluded.length ? { OR: [{ accountId: null }, { accountId: { notIn: excluded } }] } : {}) },
+            orderBy: { createdAt: 'desc' },
+            take: 20000,
+            select: { id: true, name: true, detail: true, visitorId: true, accountId: true, createdAt: true },
+        }));
+        res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), ...wedgeFunnel.buildWedgeFunnel(events) });
+    } catch (e) {
+        console.error('Wedge funnel error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load the funnel.' });
+    }
+});
+// Clears a wedge's visitor steps only. Server records (trials, payments, a
+// reminder already sent) keep the product from doing things twice and stay.
+app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
+    try {
+        if (String(req.body?.confirm || '') !== 'RESET') return res.status(400).json({ success: false, message: 'Send confirm: "RESET".' });
+        const tool = String(req.body?.tool || '');
+        if (!wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
+        const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.VISITOR_EVENTS] } } });
+        console.log(`wedge funnel reset: removed ${deleted.count} ${tool} visitor steps`);
+        res.json({ success: true, deleted: deleted.count });
+    } catch (e) {
+        console.error('Wedge funnel reset error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not reset.' });
+    }
+});
 app.get('/funnel', (req, res) => {
+    // Links from push notifications for bookings and support still say /funnel.
+    if (req.query.view) return res.redirect(`/funnel/legacy?${new URLSearchParams(req.query)}`);
+    res.sendFile(path.join(__dirname, 'wedge-funnel.html'));
+});
+app.get('/funnel/legacy', (req, res) => {
     res.sendFile(path.join(__dirname, 'funnel.html'));
 });
 
@@ -13103,7 +13163,7 @@ async function sendAdminPush(eventName, context = {}) {
         title: trigger.title,
         body: trigger.body(context),
         tag: `marketel-${eventName}`,
-        url: eventName === 'SupportMessage' ? '/funnel?view=support' : '/funnel',
+        url: eventName === 'SupportMessage' ? '/funnel/legacy?view=support' : '/funnel/legacy',
     });
     await Promise.all(subscriptions.filter((s) => adminPushWants(s, eventName)).map(async (s) => {
         try {

@@ -690,7 +690,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       return account;
     });
     if (!result) throw fail(401, 'Invalid or expired code. Request another code.');
-    await recordBestEffort(result.id, 'AccountVerified');
+    await recordBestEffort(result.id, 'AccountVerified', undefined, req.body?.tool ? { tool: toolOf(req.body.tool) } : {});
     // Signing in is the first moment a buyer who paid from the simulation
     // proves the email the subscription was bought with. If the webhook has
     // not linked it yet — slow, or failing mid key-switch — do it now, or they
@@ -874,7 +874,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   const eventExtra = body => ({
@@ -912,6 +912,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   };
   router.post('/events/anon', guarded(async (req, res) => {
     if (!ANON_EVENTS.has(req.body?.name)) throw fail(400, 'Unknown event.');
+    // Automated browsers are not visitors: our own production checks run
+    // headless, and counting them (or sending them to Meta) skews the funnel.
+    if (/HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req.headers?.['user-agent'] || ''))) return res.json({ success: true, ignored: true });
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
     await record(null, req.body.name, undefined, eventExtra(req.body));
     if (req.body.name === 'SimCheckoutTapped') {
@@ -1574,7 +1577,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   router.post('/reports/:id/finalize', guarded(async (req, res) => {
     // Set inside the transaction, acted on after it commits: the offer says
     // billing starts with the first report, and this is that moment.
-    let endTrialFor = null, freeBaseline = false;
+    let endTrialFor = null, freeBaseline = false, trialTool = null;
     const result = await prisma.$transaction(async tx => {
       const a = await lockAccount(tx, req.inspect.id);
       endTrialFor = a.subscriptionStatus === 'trialing' ? a.stripeSubscriptionId : null;
@@ -1594,6 +1597,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(a.email) } });
       const access = entitlement({ ...a, freeReportUsed: a.freeReportUsed || !!priorFreeClaim });
       const tool = TOOLS[toolForType(document.type)];
+      trialTool = toolForType(document.type);
       // The lifetime free report first where the tool offers one, then the
       // plan's allowance, then a single-report purchase.
       const spend = tool.offerMode === 'first-free' && access.freeAvailable ? { freeReportUsed: true }
@@ -1639,7 +1643,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // a retry costs nothing.
     if (endTrialFor && stripe) {
       await stripe.subscriptions.update(endTrialFor, { trial_end: 'now' })
-        .then(() => recordBestEffort(req.inspect.id, 'TrialConverted', `inspect-trial-converted:${req.inspect.id}`, {}))
+        .then(() => recordBestEffort(req.inspect.id, 'TrialConverted', `inspect-trial-converted:${req.inspect.id}`, trialTool ? { tool: trialTool } : {}))
         .catch(error => console.error('Inspect trial conversion failed:', error.message));
     }
     res.json(serialize(result));
@@ -1648,18 +1652,20 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     rate(`pdf:${req.inspect.id}`, 30, 3600000);
     const r = await owned(prisma, req.inspect.id, req.params.id);
     if (!r.finalizedAt) throw fail(409, 'Finalize the report first.');
-    await recordBestEffort(req.inspect.id, 'ReportExported', `inspect-export:${r.id}`); await pdf(r, res);
+    await recordBestEffort(req.inspect.id, 'ReportExported', `inspect-export:${r.id}`, { tool: toolForType(r.document?.type) }); await pdf(r, res);
   }));
   router.post('/reports/:id/share', guarded(async (req, res) => {
     const value = token();
+    let sharedTool = null;
     await prisma.$transaction(async tx => {
       await lockAccount(tx, req.inspect.id);
       const r = await owned(tx, req.inspect.id, req.params.id);
+      sharedTool = toolForType(r.document?.type);
       if (!r.finalizedAt) throw fail(409, 'Finalize the report first.');
       if (!typeConfig(r.document?.type).can.shareable) throw fail(409, `${typeLabel(r.document.type)}s are not shareable by link. Download the PDF and send it to the people who need it.`);
       await tx.inspectReport.update({ where: { id: r.id }, data: { shareHash: hash(value) } });
     });
-    await recordBestEffort(req.inspect.id, 'ReportShared', `inspect-share:${req.params.id}`);
+    await recordBestEffort(req.inspect.id, 'ReportShared', `inspect-share:${req.params.id}`, sharedTool ? { tool: sharedTool } : {});
     res.json({ url: `${origin}/api/inspect/shared/${value}` });
   }));
   router.delete('/reports/:id/share', guarded(async (req, res) => {
@@ -1984,7 +1990,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // and Stripe does not promise which of the two notices arrives first.
     const interval = session.metadata?.interval === 'year' ? 'year' : 'month';
     if (Number(session.amount_total) === 0) {
-      await recordBestEffort(account.id, 'TrialStarted', `inspect-trial:${session.id}`, { tool, detail: interval });
+      await recordBestEffort(account.id, 'TrialStarted', `inspect-trial:${session.id}`, { tool, detail: interval, visitorId: visitorOf(session.metadata?.visitorId) });
       await queueInspectCapi('StartTrial', { account, req, eventId: `inspect-trial.${session.id}`, contentName: `${TOOLS[tool].label} trial` })
         .catch(error => console.error('Inspect StartTrial CAPI queue failed:', error.message));
     } else if (session.invoice) {
@@ -2021,6 +2027,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       if (subscription.metadata?.product === 'marketel-inspect' && subscription.metadata?.inspectAccountId) {
         const synced = await syncSubscription(subscription);
         const invoice = event.data.object;
+        // The funnel's last steps. Each is recorded once per subscription.
+        const life = { tool: toolOf(subscription.metadata?.tool), visitorId: visitorOf(subscription.metadata?.visitorId) };
+        const lifeAccount = subscription.metadata.inspectAccountId;
+        if (synced && event.type === 'invoice.paid' && invoice.amount_paid > 0)
+          await recordBestEffort(lifeAccount, 'FirstPayment', `inspect-first-payment:${subscription.id}`, { ...life, detail: subscription.metadata?.interval === 'year' ? 'year' : 'month' });
+        if (event.type === 'customer.subscription.updated' && subscription.cancel_at_period_end)
+          await recordBestEffort(lifeAccount, 'CancellationScheduled', `inspect-cancel:${subscription.id}:${subscription.cancel_at || ''}`, { ...life, detail: subscription.status === 'trialing' ? 'trial' : 'paid' });
+        if (event.type === 'customer.subscription.deleted')
+          await recordBestEffort(lifeAccount, 'SubscriptionEnded', `inspect-ended:${subscription.id}`, { ...life, detail: subscription.trial_end && subscription.canceled_at && subscription.canceled_at <= subscription.trial_end ? 'trial' : 'paid' });
         if (synced && event.type === 'invoice.paid' && invoice.amount_paid > 0) {
           const accountId = subscription.metadata.inspectAccountId;
           await record(accountId, 'PaymentSucceeded', `inspect-invoice:${invoice.id}`, { tool: toolOf(subscription.metadata?.tool), detail: subscription.metadata?.interval === 'year' ? 'year' : 'month' });
