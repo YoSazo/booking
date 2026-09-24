@@ -8,6 +8,9 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
+    "test:browser": "node --test test/browser/*.test.js && node test/browser/plans.js",
+    "test:browser:prod": "node test/browser/prod-smoke.js",
+    "test:browser:review": "node test/browser/review-walk.mjs",
     "qa:release:auto": "npm test && node scripts/release-qa.js",
     "qa:release:database": "node scripts/release-qa.js",
     "stripe:domains:sync": "node scripts/register-stripe-payment-domains.js",
@@ -40,6 +43,7 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "playwright-core": "^1.27.1",
     "prisma": "^6.19.3"
   },
   "overrides": {

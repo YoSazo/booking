@@ -17,13 +17,16 @@ const call = async (path, opts = {}) => {
   return { status: r.status, type, body };
 };
 const jpeg = fs.readFileSync(new URL('../../public/inspect/sample/claims-wall-thumb.jpg', import.meta.url));
+// Property deletion removes every report under the same name. Isolate each
+// production walk so cleanup cannot touch a previous walk or a real report.
+const propertyName = `Review Walkthrough ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const photo = async (id, kind) => { const f = new FormData(); f.append('photo', new Blob([jpeg], { type: 'image/jpeg' }), 'photo.jpg'); f.append('source', 'camera'); f.append('takenAt', new Date().toISOString()); f.append('zone', 'America/Chicago'); if (kind) f.append('kind', kind); return call(`/reports/${id}/photos`, { method: 'POST', body: f }); };
 const today = new Date().toISOString().slice(0, 10);
-const doc = (type, photos = [], extra = {}) => ({ propertyName: 'Review Walkthrough Rental', type, date: today, author: 'App Review', rooms: [{ name: 'Bathroom', observation: type === 'check-in' ? '' : 'Toilet paper holder torn off the wall.', issue: false, photos }], signatures: [], ...extra });
+const doc = (type, photos = [], extra = {}) => ({ propertyName, type, date: today, author: 'App Review', rooms: [{ name: 'Bathroom', observation: type === 'check-in' ? '' : 'Toilet paper holder torn off the wall.', issue: false, photos }], signatures: [], ...extra });
 const made = [];
 try {
   const acct = await call('/account'); step('signed in as the review account', acct.status === 200 && acct.body.credits >= 1, `credits ${acct.body.credits}`);
-  const prop = await call('/properties', { method: 'POST', json: { name: 'Review Walkthrough Rental' } }); step('add a property', prop.status === 200, String(prop.status));
+  const prop = await call('/properties', { method: 'POST', json: { name: propertyName } }); step('add a property', prop.status === 200, String(prop.status));
   // Check-in first, so the damage report has a "before".
   const ci = await call('/reports', { method: 'POST', json: doc('check-in') }); made.push(ci.body.id); step('start a check-in', ci.status === 200, String(ci.status));
   const cp = await photo(ci.body.id); step('upload a check-in photo', cp.status === 200, String(cp.status));
@@ -40,7 +43,7 @@ try {
   const after = await call('/account'); step('a credit was used', after.body.credits === acct.body.credits - 1, `${acct.body.credits} → ${after.body.credits}`);
   const sh = await call(`/reports/${dr.body.id}/share`, { method: 'POST' }); step('create a private link', sh.status === 200 && /\/shared\//.test(sh.body.url), sh.body.url ? 'ok' : JSON.stringify(sh.body));
   const page = await fetch(sh.body.url); const html = await page.text();
-  step('the link opens the report', page.status === 200 && /Review Walkthrough Rental/.test(html), String(page.status));
+  step('the link opens the report', page.status === 200 && html.includes(propertyName), String(page.status));
   step('with dated photo captions', /Taken [A-Z][a-z]{2} \d{1,2}, \d{4} at \d{1,2}:\d{2}/.test(html));
   step('the check-in shown as the before', /Before · check-in/.test(html));
   step('and receipts under their own heading', /Receipts &amp; estimates|Receipts & estimates/.test(html));
@@ -48,12 +51,12 @@ try {
   const pdf = await call(`/reports/${dr.body.id}/pdf`); step('download the PDF', pdf.status === 200 && /pdf/.test(pdf.type) && pdf.body.length > 5000, `${pdf.type} ${pdf.body.length} bytes`);
   const img = await call(`/reports/${dr.body.id}/photos/${dp.body.id}`); step('the dated photo copy loads', img.status === 200 && /image/.test(img.type), `${img.type} ${img.body.length} bytes`);
   const list = await call('/reports?types=damage'); step('it appears under Reports', list.status === 200 && list.body.reports.some(r => r.id === dr.body.id));
-  const props = await call('/properties'); const row = props.body.propertyDetails.find(p => p.name === 'Review Walkthrough Rental');
+  const props = await call('/properties'); const row = props.body.propertyDetails.find(p => p.name === propertyName);
   step('Properties shows the last check-in and report', !!row?.latestCheckIn && row.latestType === 'damage', JSON.stringify({ checkIn: !!row?.latestCheckIn, latestType: row?.latestType }));
 } catch (e) { out.push('STOPPED: ' + e.message.slice(0, 300)); }
 finally {
   // Leave the account empty for the reviewer.
-  const del = await call('/properties', { method: 'DELETE', json: { name: 'Review Walkthrough Rental' } }).catch(e => ({ status: e.message }));
+  const del = await call('/properties', { method: 'DELETE', json: { name: propertyName } }).catch(e => ({ status: e.message }));
   for (const id of made) await call(`/reports/${id}`, { method: 'DELETE' }).catch(() => {});
   const left = await call('/reports'); const props = await call('/properties');
   out.push(`cleanup: property delete ${del.status}; reports left ${left.body.reports?.length ?? '?'}; properties left ${props.body.properties?.length ?? '?'}`);
