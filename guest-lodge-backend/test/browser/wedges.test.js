@@ -86,3 +86,39 @@ test('a saved unit does not show another wedge\'s latest report as its own', asy
     h.assertClean();
   } finally { await h.close(); }
 });
+
+// The business name belongs inside the report. A bare `header` CSS rule used to
+// pin it over the site bar on the web and hide it entirely in the app.
+for (const native of [false, true]) {
+  test(`${native ? 'app' : 'web'}: the business name sits inside the report preview`, async () => {
+    const h = await open({ arm: 'claims', native, accountData: { businessName: 'Unit Firm', active: true, remaining: 5, freeAvailable: false }, properties: ['Pine Ave'] });
+    try {
+      await h.page.waitForSelector('#new-report');
+      if (native) await h.page.evaluate(() => window.marketelInspectNativeSelectTab('properties'));
+      else await h.page.click('[data-page="properties"]');
+      await h.page.waitForSelector('[data-property]');
+      await h.page.click('[data-property]');
+      await h.page.waitForSelector('#preview');
+      await h.page.click('#preview');
+      await h.page.waitForSelector('.biz-header', { state: 'attached' });
+      const biz = await h.page.evaluate(() => { const el = document.querySelector('.biz-header'), style = getComputedStyle(el), box = el.getBoundingClientRect(), card = el.closest('article')?.getBoundingClientRect();
+        return { position: style.position, shown: style.display !== 'none' && box.height > 0, inside: !!card && box.top >= card.top && box.bottom <= card.bottom, text: el.innerText.trim() }; });
+      assert.equal(biz.position, 'static', JSON.stringify(biz));
+      assert.ok(biz.shown && biz.inside && biz.text === 'Unit Firm', JSON.stringify(biz));
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
+// Each wedge's send sheet speaks for itself: the originals line comes from its
+// manifest, so a landlord never reads Claims' "Some platforms ask for these."
+test('the originals line on the send sheet is each wedge\'s own', () => {
+  const registry = load({ fixture: true });
+  const offered = registry.all.flatMap(wedge => Object.entries(wedge.types).filter(([, type]) => type.can.originals).map(([id, type]) => ({ wedge: wedge.id, id, line: type.originalsLine })));
+  assert.ok(offered.length >= 2, JSON.stringify(offered));
+  for (const item of offered) assert.ok(item.line && item.line.trim(), `${item.wedge}/${item.id} needs an originalsLine`);
+  const moveout = offered.find(item => item.wedge === 'moveout');
+  assert.doesNotMatch(moveout.line, /platform/i);
+  const source = require('node:fs').readFileSync(path.join(__dirname, '../../public/inspect/inspect.js'), 'utf8');
+  assert.doesNotMatch(source, /Some platforms ask for these|Open Claims on the web|bookmarketel\.com\/claims'/, 'Claims copy is hard-coded in the engine');
+});

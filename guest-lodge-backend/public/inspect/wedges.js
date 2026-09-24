@@ -73,7 +73,8 @@ window.MARKETEL_WEDGES = {
         "signatureFallback": "when this document was finalized",
         "otherSignerPrompt": "Guest here? Get their signature",
         "linkCopiedMessage": "Link copied. Paste it into your claim or message.",
-        "originalsHint": "Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim."
+        "originalsHint": "Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.",
+        "originalsLine": "The unedited originals. Some platforms ask for these."
       },
       "check-in": {
         "voiceInstruction": "You format a spoken damage note for a report that may be sent to a platform or an insurer. ${SHARED_VOICE_RULES} Never estimate repair or replacement cost, assign blame, or state a cause: record only the damage as observed and what the speaker said about when it was found. issueMentioned is true only when the speaker explicitly reports damage, breakage, staining or a missing item. Return the required JSON only.",
@@ -252,6 +253,8 @@ window.MARKETEL_WEDGES = {
         "voiceInstruction": "You format a spoken incident note for a record that may be read by an insurer. ${SHARED_VOICE_RULES} Never diagnose, characterise or speculate about injury, medical condition or severity, and never name a cause: record only what the speaker said was reported or observed. Attribute statements to whoever made them. issueMentioned is true only when the speaker explicitly reports harm, damage, a hazard or a security concern. Return the required JSON only.",
         "noun": "detail",
         "nounPlural": "details",
+        "editorNameLabel": "Detail heading",
+        "editorTalkLabel": "Talk through this detail",
         "seeds": [
           "What happened",
           "Where it happened",
@@ -628,7 +631,8 @@ window.MARKETEL_WEDGES = {
         "timeLabel": "Time you observed it",
         "signatureFallback": "when this document was finalized",
         "otherSignerPrompt": "Tenant here? Get their signature",
-        "originalsHint": "Original uploaded files are kept as received. The PDF and private link use dated display copies."
+        "originalsHint": "Original uploaded files are kept as received. The PDF and private link use dated display copies.",
+        "originalsLine": "The unedited originals, kept exactly as uploaded."
       },
       "landlord-move-in": {
         "voiceInstruction": "You format a spoken unit condition note at tenant move-out. ${SHARED_VOICE_RULES} Record observed condition only. Do not assign blame, decide a deposit deduction or state a legal deadline. Return the required JSON only.",

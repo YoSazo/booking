@@ -87,7 +87,11 @@ and the server’s `typeLabel`, `documentIdentity`, `disclaimerFor` are the
 reference. No other product’s noun belongs on a rendered page. Say what
 Marketel produces: evidence and a report, never a guaranteed outcome or a
 claim filed on a platform. Every document type carries its disclaimer.
-`wedge:check` scans both manifest copy and rendered pages.
+`wedge:check` scans both manifest copy and rendered pages: another wedge's
+nouns, and any sentence of five or more words from another wedge's manifest
+(unless the engine builds it from a template around this wedge's own noun).
+Copy that differs by wedge lives in the manifest, never in the engine; the
+send sheet's originals line is `originalsLine` on the report type.
 
 ## 8. Funnel, plan and Meta
 
@@ -166,4 +170,8 @@ from `requestStorefront`; re-render US-only choices when it does. Stripe is
 live, and card 4242 is declined; verify checkout mode by its `cs_live_` URL
 without charging. This development machine’s clock can run ahead of the
 server, so production API tests must not send local future timestamps as
-camera taken times.
+camera taken times. Never style a bare element selector that report content
+also uses: a global `header` rule pinned the business name over the site bar
+on the web and hid it in the app; site chrome is `body > header`. Chromium
+does not expose the body of an upload that carries a file, so the browser
+harness reads each photo in the page and keys it to the upload URL.

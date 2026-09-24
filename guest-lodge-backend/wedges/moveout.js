@@ -66,7 +66,8 @@ module.exports = {
       "timeLabel": "Time you observed it",
       "signatureFallback": "when this document was finalized",
       "otherSignerPrompt": "Tenant here? Get their signature",
-      "originalsHint": "Original uploaded files are kept as received. The PDF and private link use dated display copies."
+      "originalsHint": "Original uploaded files are kept as received. The PDF and private link use dated display copies.",
+      "originalsLine": "The unedited originals, kept exactly as uploaded."
     },
     "landlord-move-in": {
       "voiceInstruction": "You format a spoken unit condition note at tenant move-out. ${SHARED_VOICE_RULES} Record observed condition only. Do not assign blame, decide a deposit deduction or state a legal deadline. Return the required JSON only.",

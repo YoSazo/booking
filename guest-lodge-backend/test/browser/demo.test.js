@@ -20,10 +20,17 @@ test('demo moves from sample photo and dictation to the real offer', async () =>
     await h.page.waitForSelector('#sim-buy');
     const text = await h.body();
     assert.match(text, /\$25/);
-    assert.match(text, /Start 3 days free|3 days free/i);
+    assert.equal(await h.page.locator('#sim-buy').innerText(), 'Start 3 days free →');
+    assert.match(text, /\$0 today\. \$25\/month from [A-Z][a-z]{2} \d{1,2}/);
+    assert.match(text, /Cancel before then and you pay nothing/);
     await h.page.click('#sim-keep');
     await h.page.waitForSelector('#sim-keep-form');
-    assert.match(await h.body(), /Building .* is always free/i);
+    assert.match(await h.body(), /Building a report is always free\. When you need to send one, it's \$12, or \$25\/month for unlimited/);
+    await h.page.fill('#sim-keep-field', 'host@example.test');
+    await h.page.click('#sim-keep-go');
+    await h.page.waitForSelector('.sim-thanks');
+    assert.match(await h.body(), /host@example\.test/);
+    assert.ok(h.events.some(event => event.name === 'SimKeptFree'));
     h.assertClean();
   } finally { await h.close(); }
 });

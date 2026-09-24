@@ -23,6 +23,8 @@ module.exports = {
       "voiceInstruction": "You format a spoken incident note for a record that may be read by an insurer. ${SHARED_VOICE_RULES} Never diagnose, characterise or speculate about injury, medical condition or severity, and never name a cause: record only what the speaker said was reported or observed. Attribute statements to whoever made them. issueMentioned is true only when the speaker explicitly reports harm, damage, a hazard or a security concern. Return the required JSON only.",
       "noun": "detail",
       "nounPlural": "details",
+      "editorNameLabel": "Detail heading",
+      "editorTalkLabel": "Talk through this detail",
       "seeds": [
         "What happened",
         "Where it happened",

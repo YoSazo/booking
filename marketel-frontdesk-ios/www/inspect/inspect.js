@@ -1290,9 +1290,9 @@ function editor(step) {
     if(w.can.receipts)for(const figure of $('rooms').querySelectorAll('figure[data-photo-id]')){
       if(draft.files.some(file=>file.id===figure.dataset.photoId&&file.remoteId))figure.querySelector('figcaption').textContent='Original file kept';
     }
-    if(w.unit==='entry'&&!w.can.receipts)for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent='Detail heading';
+    if(w.editorNameLabel)for(const label of $('rooms').querySelectorAll('.room-card > label:first-child'))label.firstChild.textContent=w.editorNameLabel;
     if(w.unit==='entry')$('app').querySelector('.screen-bar + .row .eyebrow').textContent=d.propertyName||w.eyebrow;
-    if(w.unit==='entry'&&!w.can.receipts)for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent='Talk through this detail';
+    if(w.editorTalkLabel)for(const button of $('rooms').querySelectorAll('[data-voice]'))button.textContent=w.editorTalkLabel;
     for(const label of $('rooms').querySelectorAll('.note-lead .muted'))label.textContent=`Say what you see. ${skin().writesLabel.replace(/^./,c=>c.toUpperCase())} the note.`;
     bindPhotoDrag();
     // A finding is numbered, not named: the room name field has nothing to ask.
@@ -2329,8 +2329,9 @@ function requestExport(action,trigger){
 }
 function originalsSheet(){
   if(native){
-    modal('<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open Claims in Safari, sign in, and open this saved report.</p><button id="originals-web" class="wide">Open Claims on the web</button>');
-    $('originals-web').onclick=()=>openExternal('https://bookmarketel.com/claims');
+    const sk=skin();
+    modal(`<h2>Get your original photos</h2><p>Original photo downloads are available on the web. Open ${esc(sk.product)} in Safari, sign in, and open this saved ${esc(sk.doc)}.</p><button id="originals-web" class="wide">Open ${esc(sk.product)} on the web</button>`);
+    $('originals-web').onclick=()=>openExternal(`https://bookmarketel.com${sk.home}`);
     return;
   }
   const photos=draft.document.rooms.flatMap(room=>room.photos.map(id=>({id,room:room.name}))).filter(item=>draft.files.some(file=>file.id===item.id&&file.remoteId));
@@ -2356,7 +2357,7 @@ function deliverySheet(preferred='share'){
   const order=[
     canShare?{id:'delivery-share',label:'Create a private link',hint:'Anyone with the link can read and download this version.',primary:preferred!=='pdf'}:null,
     {id:'delivery-pdf',label:'Download the PDF',hint:`The finished ${sk.doc}, ready to attach.`,primary:preferred==='pdf'||!canShare},
-    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:'The unedited originals. Some platforms ask for these.',primary:false}:null,
+    hasOriginals?{id:'delivery-originals',label:'Get the original photos',hint:wedge(d.type).originalsLine,primary:false}:null,
   ].filter(Boolean).sort((a,b)=>Number(b.primary)-Number(a.primary));
   modal(`<h2>Your ${doc} is built.</h2><p class="muted">Choose how to send it. This version is frozen — you can come back to it from ${esc(sk.docPlural)} at any time.</p>${wedge(d.type).can.deadline?.text?`<p class="deadline">${fileByText(d)?`${esc(fileByText(d))} — `:''}${esc(wedge(d.type).can.deadline.text)}.</p>`:''}<div class="stack">${order.map(option=>`<button type="button" id="${option.id}" class="${option.primary?'wide':'secondary wide'}">${esc(option.label)}</button><p class="muted delivery-hint">${esc(option.hint)}</p>`).join('')}</div><button type="button" id="delivery-later" class="quiet">I'll send it later</button>`);
   if($('delivery-share'))$('delivery-share').onclick=event=>run(()=>openShareSheetNow(),event.currentTarget);

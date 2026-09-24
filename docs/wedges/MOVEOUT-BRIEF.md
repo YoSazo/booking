@@ -33,3 +33,12 @@ The checker writes phone-sized screenshots and a demo recording to `artifacts/we
 **Headline:** Move-out photos in one report
 
 **Description:** Room-by-room evidence, ready to share.
+
+## Timing
+
+The brief-to-green authoring time for Moveout was not recorded when it was
+built, so it is not claimed here. Measured on September 24, 2026: the full
+`npm run wedge:check -- all` (manifests, rendered copy, 295 backend tests,
+the browser suites, iOS release checks, and screenshots plus a walkthrough
+for each draft wedge) runs in about 2 minutes. Record the authoring time on
+the next real wedge, from the owner's brief to a green `wedge:check`.

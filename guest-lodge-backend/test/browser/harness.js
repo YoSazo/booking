@@ -13,18 +13,39 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const JPEG = fs.readFileSync(path.join(WEB, 'sample/claims-wall-thumb.jpg'));
 const token = 't'.repeat(43);
 const fixtureManifest = require('../../wedges/_fixture');
+// Every wedge's own page (/claims, /moveout, …), read from the manifests.
+const WEDGE_PAGE = new RegExp(`^/(${require('../../wedges/registry').load({ fixture: true }).all.map(wedge => wedge.id).filter(id => id !== 'inspect').join('|')})/?$`);
 const account = (extra = {}) => ({ token, email: 'owner@example.test', active: false, freeAvailable: true, remaining: 0, credits: 0, plans: ['month', 'year'], businessName: '', ...extra });
 const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage', author: 'A. Host', type, date: '2026-09-23', rooms: [{ name: type === 'damage' ? '' : 'Kitchen', observation: '', issue: false, photos: [] }], signatures: [], ...extra });
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null } = {}) {
+async function open({ native = false, arm = 'claims', demo = false, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [];
   const fallbackPhoto = photoFallback ? fs.readFileSync(photoFallback) : JPEG;
   const data = { reports: [...reports], properties: [...properties], account: account(accountData), photoCount: 0, photoBytes: new Map() };
   await context.exposeBinding('__shell', (_, message) => shell.push(message));
+  // Chromium does not hand test code the body of an upload that carries a file,
+  // so each photo is read in the page, stored here by key, and the upload URL
+  // carries the key. Without this every photo came back as the fallback.
+  const uploadedPhotos = new Map();
+  await context.exposeBinding('__storePhoto', (_, key, base64) => { uploadedPhotos.set(key, Buffer.from(base64, 'base64')); });
+  await context.addInitScript(() => {
+    const realFetch = window.fetch;
+    let seq = 0;
+    window.fetch = async (url, options = {}) => {
+      const photo = options?.body instanceof FormData ? options.body.get('photo') : null;
+      if (typeof url === 'string' && /\/api\/inspect\/reports\/[^/?]+\/photos$/.test(url) && photo instanceof Blob) {
+        const key = `photo-key-${++seq}`;
+        const base64 = await new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1] || ''); reader.readAsDataURL(photo); });
+        await window.__storePhoto(key, base64);
+        url = `${url}?photoKey=${key}`;
+      }
+      return realFetch(url, options);
+    };
+  });
   await context.addInitScript(({ native, signedIn, token, arm, country }) => {
     if (signedIn) localStorage.setItem('inspect.session', token);
     if (native) localStorage.setItem('marketel.product', arm);
@@ -42,10 +63,11 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
   page.on('pageerror', error => errors.push(error.message));
   await page.route('http://app.test/**', route => {
     const url = new URL(route.request().url());
-    let rel = /^\/(claims|incident|moveout|fixture)\/?$/.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/inspect\/?/, '');
+    let rel = WEDGE_PAGE.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/inspect\/?/, '');
     if (!rel || rel.endsWith('/')) rel += 'index.html';
-    const root = native ? APP : WEB;
+    const root = native ? appRoot : webRoot;
     let filename = path.resolve(root, rel);
+    if (url.pathname.startsWith('/frontdesk/')) filename = path.resolve(root, '..', url.pathname.slice(1));
     if (/^\/(marketel\.svg|marketel-frontdesk-icon\.png)$/.test(url.pathname)) filename = path.resolve(root, '..', url.pathname.slice(1));
     if ((!filename.startsWith(root + path.sep) && !filename.startsWith(path.resolve(root, '..') + path.sep)) || !fs.existsSync(filename)) return route.fulfill({ status: 404, body: '' });
     let body = fs.readFileSync(filename);
@@ -102,14 +124,21 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
       if (tail === '/finalize' && method === 'POST') { row.finalizedAt = new Date().toISOString(); return json(row); }
       if (tail === '/photos' && method === 'POST') {
         const id = `photo-${++data.photoCount}`, raw = request.postDataBuffer(), start = raw?.indexOf(Buffer.from([0xff, 0xd8, 0xff]));
-        const end = start >= 0 ? raw.indexOf(Buffer.from([0xff, 0xd9]), start) : -1;
-        if (end > start) data.photoBytes.set(id, raw.subarray(start, end + 2));
+        // Cut at the multipart boundary, not the first end-of-image marker: a
+        // JPEG with an embedded thumbnail has an earlier one, and the truncated
+        // photo made every sent report show the fallback picture.
+        const boundary = (String(request.headers()['content-type'] || '').match(/boundary=([^;]+)/) || [])[1];
+        const cut = boundary && start >= 0 ? raw.indexOf(Buffer.from(`\r\n--${boundary}`), start) : -1;
+        const end = cut > start ? cut - 2 : start >= 0 ? raw.lastIndexOf(Buffer.from([0xff, 0xd9])) : -1;
+        const keyed = uploadedPhotos.get(new URL(request.url()).searchParams.get('photoKey') || '');
+        if (keyed) data.photoBytes.set(id, keyed);
+        else if (end > start) data.photoBytes.set(id, raw.subarray(start, end + 2));
         row.attachments.push({ id, source: 'camera', createdAt: new Date().toISOString() });
         return json({ id, source: 'camera', createdAt: new Date().toISOString() });
       }
-      if (/^\/photos\/[^/]+/.test(tail)) return route.fulfill({ status: 200, body: data.photoBytes.get(tail.split('/')[2]) || fallbackPhoto, headers: { 'content-type': 'image/jpeg', 'access-control-allow-origin': '*' } });
+      if (/^\/photos\/[^/]+/.test(tail)) return route.fulfill({ status: 200, body: row.finalizedAt && sentPhoto ? fs.readFileSync(sentPhoto) : data.photoBytes.get(tail.split('/')[2]) || fallbackPhoto, headers: { 'content-type': 'image/jpeg', 'access-control-allow-origin': '*' } });
       if (tail === '/coverage' && method === 'POST') return json({ rooms: [] });
-      if (tail === '/rewrite' && method === 'POST') return json({ suggestion: 'The fixture wording.' });
+      if (tail === '/rewrite' && method === 'POST') { if (slowRewrite) await wait(slowRewrite); return json({ suggestion: 'The fixture wording.' }); }
       if (tail === '/share' && method === 'POST') return json({ url: 'https://bookmarketel.com/api/inspect/shared/test' });
       if (tail === '/pdf' && method === 'GET') return route.fulfill({ status: 200, body: '%PDF-1.4 fixture', headers: { 'content-type': 'application/pdf' } });
     }

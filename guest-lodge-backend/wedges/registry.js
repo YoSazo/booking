@@ -30,6 +30,7 @@ function validate(manifest, filename = '') {
     if (type.can.deadline && (typeof type.can.deadline.text !== 'string' || !type.can.deadline.text.trim()
       || (type.can.deadline.days !== undefined && (!Number.isInteger(type.can.deadline.days) || type.can.deadline.days < 1 || !type.can.deadline.from || !type.can.deadline.field)))) bad(`invalid deadline for ${id}`);
     if (type.can.photosOnly && !type.can.free) bad(`photos-only baseline ${id} must be free`);
+    if (type.can.originals && (typeof type.originalsLine !== 'string' || !type.originalsLine.trim())) bad(`originals line missing for ${id}`);
   }
   if (manifest.demo && (!Array.isArray(manifest.demo.findings) || manifest.demo.findings.length !== 3
     || manifest.demo.findings.some(finding => !finding.photo || !finding.said || !finding.note))) bad('demo needs three complete findings');

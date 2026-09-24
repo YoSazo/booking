@@ -72,7 +72,8 @@ module.exports = {
       "signatureFallback": "when this document was finalized",
       "otherSignerPrompt": "Guest here? Get their signature",
       "linkCopiedMessage": "Link copied. Paste it into your claim or message.",
-      "originalsHint": "Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim."
+      "originalsHint": "Original uploaded files are kept as received. PDF and share links use resized copies; no platform is guaranteed to accept a claim.",
+      "originalsLine": "The unedited originals. Some platforms ask for these."
     },
     "check-in": {
       "voiceInstruction": "You format a spoken damage note for a report that may be sent to a platform or an insurer. ${SHARED_VOICE_RULES} Never estimate repair or replacement cost, assign blame, or state a cause: record only the damage as observed and what the speaker said about when it was found. issueMentioned is true only when the speaker explicitly reports damage, breakage, staining or a missing item. Return the required JSON only.",

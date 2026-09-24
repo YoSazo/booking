@@ -58,12 +58,44 @@ function checkManifest(wedge) {
     }
   }
 }
+// Sentences of five or more words that belong to another wedge's manifest and
+// not to this one. The engine rendering one of them in this wedge means copy
+// is hard-coded somewhere it should come from the manifest.
+function foreignPhrases(wedge) {
+  const own = JSON.stringify(wedge);
+  const phrases = new Set();
+  const walk = value => {
+    if (typeof value === 'string') {
+      for (const sentence of value.split(/(?<=[.!?])\s+/)) {
+        const text = sentence.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (text.split(' ').length >= 5 && !text.includes('${') && !own.includes(text)) phrases.add(text);
+      }
+    } else if (value && typeof value === 'object') Object.values(value).forEach(walk);
+  };
+  for (const other of registry.all) if (other.id !== wedge.id) walk({ ...other, copy: undefined });
+  return [...phrases];
+}
+// A phrase another wedge also uses is fine when the engine builds it from a
+// template around this wedge's own noun ("PDF export on every ${doc}" renders
+// "…every record" for any wedge whose document is a record). A phrase with none
+// of this wedge's nouns in it is a real leak.
+const engineSource = fs.readFileSync(path.join(root, 'public/inspect/inspect.js'), 'utf8');
+function engineTemplate(wedge, phrase) {
+  const nouns = [...(wedge.copy.nouns || []), wedge.skin?.doc, wedge.skin?.docPlural, wedge.skin?.placeSingular].filter(Boolean);
+  const used = nouns.filter(noun => wordPattern(noun).test(phrase));
+  if (!used.length) return false;
+  const around = phrase.split(new RegExp(`\\b(?:${used.map(noun => noun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'i'))
+    .map(part => part.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, '')).filter(part => part.length >= 3);
+  return around.length > 0 && around.every(part => engineSource.includes(part));
+}
+async function scanCopy(wedge, page, label) {
+  const visible = (await page.evaluate(() => document.body.innerText + ' ' + [...document.querySelectorAll('img[alt]')].filter(img => img.getClientRects().length).map(img => img.alt).join(' '))).replace(/\s+/g, ' ');
+  for (const forbidden of wedge.copy.forbidden) if (wordPattern(forbidden).test(visible)) fail(`${wedge.id} ${label}: rendered copy contains ${forbidden}`);
+  for (const phrase of foreignPhrases(wedge)) if (visible.includes(phrase) && !engineTemplate(wedge, phrase)) fail(`${wedge.id} ${label}: shows another wedge's copy "${phrase}"`);
+}
 async function renderedCopy(wedge) {
   const fixture = wedge.id === 'fixture';
-  const check = async (page, label) => {
-    const visible = await page.evaluate(() => document.body.innerText + ' ' + [...document.querySelectorAll('img[alt]')].filter(img => img.getClientRects().length).map(img => img.alt).join(' '));
-    for (const forbidden of wedge.copy.forbidden) if (wordPattern(forbidden).test(visible)) fail(`${wedge.id} ${label}: rendered copy contains ${forbidden}`);
-  };
+  const check = (page, label) => scanCopy(wedge, page, label);
   const landing = await open({ arm: wedge.id, includeFixture: fixture, signedIn: false, demo: !!wedge.demo });
   try {
     await landing.page.waitForSelector(wedge.demo ? '[data-sim-pick]' : '#start');
@@ -108,14 +140,23 @@ async function artifacts(wedge) {
   }
   const fixture = wedge.id === 'fixture';
   const options = { arm: wedge.id, includeFixture: fixture, viewport: { width: 430, height: 932 }, deviceScaleFactor: 3 };
+  const shot = async (page, file) => {
+    await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].filter(image => image.getClientRects().length).map(image => image.decode().catch(() => {}))); });
+    if (await page.locator('main#app').count()) {
+      const loaded = await page.evaluate(() => document.fonts.check('400 16px "DM Sans"'));
+      if (!loaded) fail(`${wedge.id}: DM Sans did not load before ${file}`);
+    }
+    await page.waitForTimeout(450);
+    await page.screenshot({ path: path.join(dest, file), animations: 'disabled' });
+  };
   const demo = await open({ ...options, signedIn: false, demo: true, videoDir: dest });
   let rawVideo;
   try {
     await demo.page.waitForSelector('[data-sim-pick]');
-    await demo.page.screenshot({ path: path.join(dest, 'opening-frame.png') });
+    await shot(demo.page, 'opening-frame.png');
     await demo.page.locator('[data-sim-pick]').first().click();
     await demo.page.waitForSelector('#sim-mic-button');
-    await demo.page.screenshot({ path: path.join(dest, 'camera.png') });
+    await shot(demo.page, 'camera.png');
     await demo.page.click('#sim-mic-button');
     await demo.page.waitForSelector('#sim-shutter:not([disabled])', { timeout: 10000 });
     await demo.page.click('#sim-shutter');
@@ -139,22 +180,34 @@ async function artifacts(wedge) {
     if (await chip.count()) await chip.click();
     else if (await app.page.locator('#setup-property').count()) { await app.page.fill('#setup-property', 'Unit A'); await app.page.click('#setup-build'); }
     await app.page.waitForSelector('#preview');
-    await app.page.screenshot({ path: path.join(dest, 'capture.png') });
-    await app.page.setInputFiles('[data-files]', path.join(root, 'public/inspect/sample', wedge.demo.findings[0].photo + '-thumb.jpg'));
-    await app.page.waitForSelector('[data-photo-id]');
+    for (let index = 0; index < wedge.demo.findings.length; index++) {
+      const finding = wedge.demo.findings[index];
+      if (index) await app.page.click('#add-room');
+      const room = app.page.locator(`[data-room="${index}"]`);
+      await room.locator('[data-field="name"]').fill(wedge.types[wedge.listTypes[0]].unit === 'entry' ? finding.label : finding.room);
+      await room.locator('.write-own summary').click();
+      await room.locator('[data-field="observation"]').fill(finding.note);
+      await room.locator('[data-files]').setInputFiles(path.join(root, 'public/inspect/sample', finding.photo + '.jpg'));
+      await app.page.waitForFunction(count => document.querySelectorAll('[data-photo-id]').length >= count, index + 1);
+    }
+    await shot(app.page, 'capture.png');
     await app.page.click('#preview');
     await app.page.waitForSelector(wedge.offer.mode === 'pay-at-export' ? '#send-report' : '#finalize');
-    await app.page.screenshot({ path: path.join(dest, 'preview.png') });
+    for (const finding of wedge.demo.findings) if (!(await app.body()).includes(finding.note)) fail(`${wedge.id}: screenshot preview is missing ${finding.id} note`);
+    await scanCopy(wedge, app.page, 'preview');
+    await shot(app.page, 'preview.png');
     await app.page.click(wedge.offer.mode === 'pay-at-export' ? '#send-report' : '#finalize');
     await app.page.waitForSelector('#delivery-pdf');
-    await app.page.screenshot({ path: path.join(dest, 'send-sheet.png') });
+    await scanCopy(wedge, app.page, 'send sheet');
+    await shot(app.page, 'send-sheet.png');
     if (wedge.types[wedge.listTypes[0]].can.shareable) {
       await app.page.click('#delivery-share');
       await app.page.waitForSelector('#share-url');
-      await app.page.screenshot({ path: path.join(dest, 'share-sheet.png') });
+      await shot(app.page, 'share-sheet.png');
       await app.page.goto('http://app.test/api/inspect/shared/test');
       await app.page.waitForSelector('figure img');
-      await app.page.screenshot({ path: path.join(dest, 'private-link.png') });
+      await scanCopy(wedge, app.page, 'private link');
+      await shot(app.page, 'private-link.png');
     }
     app.assertClean();
   } finally { await app.close(); }
