@@ -18,6 +18,8 @@ const { chromium } = require('playwright-core');
     await page.locator('#sim-shutter').click();
     await page.waitForSelector('#sim-see');
     await page.locator('#sim-see').click();
+    await page.waitForSelector('#sim-next');
+    await page.locator('#sim-next').click();
     await page.waitForSelector('#sim-buy');
     assert.match(await page.locator('#sim-offer').innerText(), /\$25/);
     assert.deepEqual(failures, []);

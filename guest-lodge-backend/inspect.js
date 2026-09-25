@@ -877,7 +877,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   // A step taken inside the iOS app says so: the app's own start screen is not
@@ -890,19 +890,25 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail)
       : LADDER_EVENTS.includes(body?.name) && body?.name !== 'OfferDeclined' ? (fromAppOrigin(req) ? 'app' : 'web') : null,
   });
-  // The tap on the demo's start button — from the card or the pay bar, on
-  // either plan — is what Meta optimizes for at launch: there are enough of
-  // them early, before an email or a trial exists. There is no account yet, so
-  // it goes with the browser's Meta ids and the visitor id, counted once per
-  // visitor however often they tap. Never from the app.
-  const queueCheckoutTap = async req => {
+  // The demo's three signals Meta can optimize for, from the shallowest with
+  // the most volume to the deepest: the report seen (ViewContent), "Get this"
+  // (AddToCart), and the start-free tap (InitiateCheckout). There is no
+  // account yet, so each goes with the browser's Meta ids and the visitor id,
+  // counted once per visitor however often it happens. Never from the app.
+  const SIM_SIGNALS = Object.freeze({
+    SimReportShown: { event: 'ViewContent', id: 'inspect-sim-report', what: 'demo report' },
+    SimGetThisTapped: { event: 'AddToCart', id: 'inspect-sim-getthis', what: 'plan' },
+    SimCheckoutTapped: { event: 'InitiateCheckout', id: 'inspect-sim-tap', what: 'plan' },
+  });
+  const queueSimSignal = async req => {
+    const signal = SIM_SIGNALS[req.body?.name];
     const visitor = visitorOf(req.body?.visitorId);
     const fromApp = /^(capacitor|ionic):\/\//.test(String(req.headers?.origin || ''));
-    if (!capiConfigured || typeof queueCapi !== 'function' || !visitor || fromApp) return;
+    if (!signal || !capiConfigured || typeof queueCapi !== 'function' || !visitor || fromApp) return;
     const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const tool = toolOf(req.body?.tool);
-    const plan = inspectPlan(req.body?.detail === 'year' ? 'year' : 'month');
-    await queueCapi('InitiateCheckout', {
+    const plan = inspectPlan(req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'year' ? 'year' : 'month');
+    await queueCapi(signal.event, {
       product: 'marketel-inspect',
       hotelId: `inspect-visitor:${visitor}`,
       externalId: `inspect-visitor:${visitor}`,
@@ -913,8 +919,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       fbc: attribution.fbc || '',
       value: plan.amount / 100,
       currency: 'USD',
-      eventId: `inspect-sim-tap.${visitor}`,
-      contentName: `${TOOLS[tool].label} ${plan.interval} plan`,
+      eventId: `${signal.id}.${visitor}`,
+      contentName: signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
     });
   };
   router.post('/events/anon', guarded(async (req, res) => {
@@ -925,8 +931,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (/HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req.headers?.['user-agent'] || ''))) return res.json({ success: true, ignored: true });
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
     await record(null, req.body.name, undefined, eventExtra(req.body, req));
-    if (req.body.name === 'SimCheckoutTapped') {
-      await queueCheckoutTap(req).catch(error => console.error('Inspect checkout-tap CAPI queue failed:', error.message));
+    if (SIM_SIGNALS[req.body.name]) {
+      await queueSimSignal(req).catch(error => console.error('Inspect demo signal CAPI queue failed:', error.message));
     }
     res.json({ success: true });
   }));

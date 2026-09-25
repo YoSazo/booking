@@ -2183,7 +2183,7 @@ test('"keep it free" emails the link once, and only when asked', async () => {
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
   assert.match(client, /api\('\/leads',\{method:'POST',body:\{email,tool:toolId\(\),visitorId,attribution:inspectAttribution,keep:true\}\}\)/);
   assert.match(client, /id="sim-keep" class="\$\{declined\?'secondary wide':'quiet'\}"/);
-  assert.match(client, /state==='cancelled'&&simPicked\)\{[\s\S]{0,120}simReport\(\{declined:true\}\)/);
+  assert.match(client, /state==='cancelled'&&simPicked\)\{[\s\S]{0,120}simOfferPage\(\{declined:true\}\)/);
   assert.match(client, /cta:`Start \$\{SIM_TRIAL_DAYS\} days free →`/);
   assert.match(client, /terms:`\$0 today\. \$\$\{plan\.price\}\$\{plan\.per\} from \$\{from\}, or from your first \$\{sk\.doc\} if sooner\./);
 });
@@ -2775,5 +2775,28 @@ test('landing and setup steps say whether they came from the website or the app'
       const row = h.calls.events.filter(e => e.name === 'LandingViewed').pop();
       assert.equal(row.detail, want);
     }
+  } finally { h.registration.close(); }
+});
+
+test('the report seen and "Get this" reach Meta as ViewContent and AddToCart, once per visitor, never from the app', async () => {
+  const visitorId = `v_${'c'.repeat(12)}`;
+  const send = (h, name, origin = 'https://bookmarketel.com') => request(h.app, '/api/inspect/events/anon', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: origin },
+    body: JSON.stringify({ name, tool: 'claims', visitorId, attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' } }) });
+  const h = moneyHarness();
+  try {
+    assert.equal((await send(h, 'SimReportShown')).status, 200);
+    assert.equal((await send(h, 'SimGetThisTapped')).status, 200);
+    assert.deepEqual(h.calls.capi, [
+      { name: 'ViewContent', value: 25, contentName: 'Marketel Claims demo report', eventId: `inspect-sim-report.${visitorId}` },
+      { name: 'AddToCart', value: 25, contentName: 'Marketel Claims month plan', eventId: `inspect-sim-getthis.${visitorId}` },
+    ]);
+    assert.ok(h.calls.events.some(e => e.name === 'SimGetThisTapped' && e.visitorId === visitorId), 'our own ladder counts "Get this" too');
+    // A step that is not one of the three signals never reaches Meta.
+    await send(h, 'SimOfferViewed');
+    assert.equal(h.calls.capi.length, 2);
+    // From inside the app: our ladder only.
+    await send(h, 'SimGetThisTapped', 'capacitor://localhost');
+    assert.equal(h.calls.capi.length, 2);
   } finally { h.registration.close(); }
 });

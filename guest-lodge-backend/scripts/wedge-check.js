@@ -113,6 +113,7 @@ async function renderedCopy(wedge) {
       await landing.page.click('#sim-shutter');
       await landing.page.waitForSelector('#sim-see', { timeout: 10000 });
       await landing.page.click('#sim-see');
+      await landing.page.waitForSelector('#sim-next'); await landing.page.click('#sim-next');
       await landing.page.waitForSelector('#sim-buy');
       await check(landing.page, 'demo report');
     }
@@ -168,6 +169,7 @@ async function artifacts(wedge) {
     await demo.page.click('#sim-shutter');
     await demo.page.waitForSelector('#sim-see', { timeout: 10000 });
     await demo.page.click('#sim-see');
+    await demo.page.waitForSelector('#sim-next'); await demo.page.click('#sim-next');
     await demo.page.waitForSelector('#sim-buy');
     rawVideo = await demo.page.video().path();
     demo.assertClean();

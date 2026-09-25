@@ -38,7 +38,7 @@
   .quiet:hover { background: var(--subtle); }
   .quiet.danger { color: var(--danger); }
   .updated { color: var(--muted); font-size: 12px; }
-  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
   .tile, .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); }
   .tile { padding: 14px 16px; }
   .tile small { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -186,7 +186,7 @@ function render(data) {
     : `Counting from your reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Show everything</button>`) : '';
   if ($('since-toggle')) $('since-toggle').onclick = () => { state.everything = !state.everything; saveState(); load(); };
   const step = key => data.steps.find(s => s.key === key) || { people: 0, ofLanded: null };
-  const tiles = [['Landed', 'landed'], ['Finished the demo', 'report'], ['Tapped start free', 'tapped'], ['Started a trial', 'trial'], ['Paid', 'paid']];
+  const tiles = [['Landed', 'landed'], ['Finished the demo', 'report'], ['Tapped "Get this"', 'getthis'], ['Tapped start free', 'tapped'], ['Started a trial', 'trial'], ['Paid', 'paid']];
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
     const s = step(key);
     return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : 'people from the ad'}</span></div>`;

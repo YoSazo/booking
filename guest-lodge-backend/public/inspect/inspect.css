@@ -802,3 +802,10 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .sim-dot.is-on::after { width: 20px; background: var(--green); }
 @media (prefers-reduced-motion: reduce) { .sim-dot::after { transition: none; } }
 @media (hover: hover) and (pointer: fine) { .sim-screens-arrow:hover { background: #fff; color: var(--green); } .sim-dot:hover { background: transparent; } .sim-dot:hover::after { background: var(--green-light); } }
+
+/* The demo's report page ends in one way on (simReport); the offer is its own page. */
+.sim-next { margin-top: 16px; text-align: center; }
+.sim-next p { margin: 6px 0 0; }
+.sim-nextbar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; }
+.sim-back-report { margin: 0 0 4px -12px; }
+.sim-offer-page { padding-bottom: 96px; }

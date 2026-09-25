@@ -84,6 +84,7 @@ for (const [width, split] of [[1280, true], [800, false]]) {
         assert.match(await h.page.textContent('#sim-side'), /File by /);
       }
       await h.page.click('#sim-see');
+      await h.page.waitForSelector('#sim-next'); await h.page.click('#sim-next');
       await h.page.waitForSelector('#sim-buy');
       const where = await h.page.evaluate(() => ({ inSide: !!document.querySelector('#sim-side #sim-buy'), inPhone: !!document.querySelector('#app #sim-buy'),
         paybar: getComputedStyle(document.getElementById('sim-paybar')).display, date: document.querySelector('.sim-doc .muted')?.textContent || '' }));
@@ -108,6 +109,7 @@ for (const [arm, width, expect] of [['claims', 390, 'phone'], ['claims', 1280, '
       await h.page.click('#sim-shutter');
       await h.page.waitForSelector('#sim-see', { timeout: 10000 });
       await h.page.click('#sim-see');
+      await h.page.waitForSelector('#sim-next'); await h.page.click('#sim-next');
       await h.page.waitForSelector('#sim-buy');
       const proof = await h.page.evaluate(() => { const p = document.getElementById('sim-app-proof'); return p ? { inSide: !!p.closest('#sim-side'), inPhone: !!p.closest('#app'), afterOffer: !!(document.getElementById('sim-offer').compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING), shots: p.querySelectorAll('figure img').length, captions: [...p.querySelectorAll('figcaption')].map(f => f.textContent) } : null; });
       if (expect === 'none') { assert.equal(proof, null); return h.assertClean(); }
@@ -131,6 +133,44 @@ for (const [arm, width, expect] of [['claims', 390, 'phone'], ['claims', 1280, '
       assert.equal(await shown('.sim-screens-arrow.is-next'), false, 'no way on from the last screen');
       await h.page.click('.sim-screens-arrow.is-prev');
       await h.page.waitForFunction(() => document.querySelectorAll('.sim-dot')[2].classList.contains('is-on'), null, { timeout: 3000 });
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
+// The report is its own page, with one way on; the price is the next page.
+for (const [width, desktop] of [[390, false], [1280, true]]) {
+  test(`${desktop ? 'desktop' : 'phone'}: the report comes first with no price, then "Get this" opens the offer`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, demo: !desktop, viewport: { width, height: 844 } });
+    try {
+      if (desktop) { await h.page.waitForSelector('#see-demo'); await h.page.click('#see-demo'); }
+      await h.page.locator('[data-sim-pick]').first().click();
+      await h.page.waitForSelector('#sim-mic-button');
+      await h.page.click('#sim-mic-button');
+      await h.page.waitForSelector('#sim-shutter:not([disabled])', { timeout: 10000 });
+      await h.page.click('#sim-shutter');
+      await h.page.waitForSelector('#sim-see', { timeout: 10000 });
+      await h.page.click('#sim-see');
+      await h.page.waitForSelector('#sim-next');
+      const report = await h.page.evaluate(() => ({ price: !!document.getElementById('sim-buy'), offer: !!document.getElementById('sim-offer'), text: document.body.innerText }));
+      assert.deepEqual({ price: report.price, offer: report.offer }, { price: false, offer: false }, 'no price on the report page');
+      assert.match(report.text, /Get this for my property/);
+      await h.page.click(desktop ? '#sim-next-side' : '#sim-next');
+      await h.page.waitForSelector('#sim-buy');
+      if (desktop) {
+        const where = await h.page.evaluate(() => ({ offerInSide: !!document.querySelector('#sim-side #sim-buy'), phoneStillReport: !!document.querySelector('#app .sim-report') }));
+        assert.deepEqual(where, { offerInSide: true, phoneStillReport: true });
+      } else {
+        assert.equal(await h.page.isVisible('.sim-report'), false, 'the offer is its own page');
+        await h.page.waitForTimeout(150);
+        const top = await h.page.evaluate(() => ({ scroll: window.scrollY, price: document.querySelector('#sim-offer .price').getBoundingClientRect().top }));
+        assert.ok(top.scroll < 5 && top.price < 700, `the offer opens at the top, price in view: ${JSON.stringify(top)}`);
+        await h.page.click('#sim-back-report');
+        await h.page.waitForSelector('#sim-next');
+        assert.equal(!!(await h.page.$('#sim-buy')), false, 'back on the report, still no price');
+      }
+      const steps = h.events.map(e => e.name);
+      assert.ok(steps.includes('SimReportShown') && steps.includes('SimGetThisTapped') && steps.indexOf('SimGetThisTapped') < steps.indexOf('SimOfferViewed'), JSON.stringify(steps));
       h.assertClean();
     } finally { await h.close(); }
   });

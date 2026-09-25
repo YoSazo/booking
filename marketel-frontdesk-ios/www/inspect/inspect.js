@@ -624,7 +624,8 @@ function track(name, detail, once = true) {
   if (ownerBrowser) return;
   if (once && trackedSteps.has(name)) return;
   trackedSteps.add(name);
-  api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail } }).catch(() => {});
+  const signal = name === 'SimReportShown' || name === 'SimGetThisTapped';
+  api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail, ...(signal ? { attribution: inspectAttribution } : {}) } }).catch(() => {});
 }
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
 // A document carries its own brand, whichever tool it was opened through.
@@ -670,7 +671,7 @@ function simUnframe(){document.documentElement.classList.remove('sim-mode','sim-
 // Desktop only: beside the phone, the report builds as they go (the note as
 // it is said, the dated photo the moment it is taken), and when it is done the
 // offer sits next to it instead of below it in the phone.
-function simSide(stage){
+function simSide(stage,options={}){
   const root=document.documentElement;
   let panel=$('sim-side');
   // Below about 880px there is no room for both; the phone alone, offer inside.
@@ -678,15 +679,17 @@ function simSide(stage){
   if(!panel){panel=document.createElement('aside');panel.id='sim-side';panel.className='sim-side';panel.setAttribute('aria-label',`Your ${skin().doc}, as it builds`);$('app').after(panel);}
   root.classList.add('sim-split');
   const s=simTool(),sk=skin(),arm=landingArm(),row=simRun?.[0],f=row?.finding||simPicked||s.findings[0];
-  const done=stage==='report'||stage==='done';
+  const done=stage==='report'||stage==='offer'||stage==='done';
   const at=done?3:stage==='intro'?0:!row?.note?0:!row?.photo?1:2;
   const steps=['Say what you see','Snap the photo',`${sk.doc[0].toUpperCase()+sk.doc.slice(1)} ready`];
   const stepLine=`<ol class="sim-side-steps">${steps.map((label,i)=>`<li class="${i<at?'is-done':i===at?'is-now':''}">${esc(label)}</li>`).join('')}</ol>`;
   if(stage==='report'){
-    panel.innerHTML=`${stepLine}<h2 class="sim-side-ready">Your ${esc(sk.doc)} is ready.</h2><p class="muted">Scroll it on the phone. That is what gets sent.</p><div id="sim-side-offer"></div>`;
-    const offer=$('sim-offer'),proof=$('sim-app-proof');
-    if(offer)$('sim-side-offer').replaceWith(offer);
-    if(proof)panel.appendChild(proof);
+    panel.innerHTML=`${stepLine}<h2 class="sim-side-ready">Your ${esc(sk.doc)} is ready.</h2><p class="muted">Scroll it on the phone. That is what gets sent.</p><button type="button" id="sim-next-side" class="wide">Get this for my ${esc(sk.placeSingular)} →</button>`;
+    $('sim-next-side').onclick=()=>simGetThis();
+    return;
+  }
+  if(stage==='offer'){
+    panel.innerHTML=`${stepLine}<h2 class="sim-side-ready">Your ${esc(sk.doc)} is ready.</h2><p class="muted">Scroll it on the phone. That is what gets sent.</p>${simOfferMarkup(options)}${simAppProof()}`;
     return;
   }
   const now=new Date(),dl=wedge(arm?.type).can?.deadline;
@@ -770,7 +773,7 @@ function simResume(){
   let picked=null;
   try{picked=sessionStorage.getItem('inspect.sim.pick');}catch{}
   simPicked=s.findings.find(f=>f.id===picked)||null;
-  if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simReport({declined:true});return;}
+  if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simOfferPage({declined:true});return;}
   simIntro();
 }
 function simIntro(){
@@ -949,18 +952,18 @@ function simOffer(plan=PLANS[planInterval]||PLANS.month){
 }
 function simPrices(){
   const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year',copy=simOffer(plan);
-  const set=(selector,text)=>{const el=$('app').querySelector(selector);if(el)el.textContent=text;};
+  const set=(selector,text)=>{const el=document.querySelector(selector);if(el)el.textContent=text;};
   set('.sim-offer .price',`$${plan.price} `);
-  const per=$('app').querySelector('.sim-offer .price small');
+  const per=document.querySelector('.sim-offer .price small');
   if(per)per.textContent=plan.per; else {
-    const price=$('app').querySelector('.sim-offer .price');
+    const price=document.querySelector('.sim-offer .price');
     if(price)price.insertAdjacentHTML('beforeend',`<small>${esc(plan.per)}</small>`);
   }
   set('.sim-offer .price-save',copy.save);
   set('.sim-offer .offer-reversal small',copy.terms);
   set('#sim-paybar strong',copy.bar);
   set('#sim-paybar small',copy.barSmall);
-  const switchPlan=$('app').querySelector('[data-sim-plan]');
+  const switchPlan=document.querySelector('[data-sim-plan]');
   if(switchPlan){
     switchPlan.dataset.simPlan=year?'month':'year';
     switchPlan.textContent=year?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${PLANS.year.save}`;
@@ -1011,7 +1014,7 @@ function simBuy(trigger){
   // Not focused on arrival: the keyboard would cover the price and the button
   // before they have read what this screen is for. One tap brings it up.
   field.oninput=()=>field.classList.remove('invalid');
-  $('sim-email-back').onclick=()=>simReport();
+  $('sim-email-back').onclick=()=>simOfferPage();
   $('sim-email-form').onsubmit=event=>{
     event.preventDefault();
     const value=field.value.trim();
@@ -1033,7 +1036,7 @@ function simKeep(){
   $('app').innerHTML=`<section class="sim sim-email sim-keep-screen"><h1>Keep Marketel for when you need it.</h1><p class="muted">Building a ${esc(sk.doc)} is always free. ${esc(send)} We'll email you the link.</p><form id="sim-keep-form" novalidate><input id="sim-keep-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-keep-go" class="wide">Email me the link →</button></form><button type="button" id="sim-keep-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
   const field=$('sim-keep-field');
   field.oninput=()=>field.classList.remove('invalid');
-  $('sim-keep-back').onclick=()=>simReport();
+  $('sim-keep-back').onclick=()=>simOfferPage();
   $('sim-keep-form').onsubmit=event=>{
     event.preventDefault();
     const email=field.value.trim();
@@ -1080,7 +1083,9 @@ function bindAppProof(){
     seen.observe(proof);
   }
 }
-function simReport({declined=false}={}){
+// The report, on its own: what they would send, and one way on. Seeing it is
+// the demo's first signal Meta can learn from; the price waits for the next page.
+function simReport(){
   enterScreen('sim');
   const s=simTool(),sk=skin();
   simPreload(s);
@@ -1090,25 +1095,61 @@ function simReport({declined=false}={}){
   const ordered=[...lead,...s.findings.filter(f=>!lead.includes(f))];
   const sample={srcFor:photo=>simPhoto(photo),sourceLabel:'Camera capture'};
   const rooms=ordered.map(f=>({name:f.room,observation:f.note,photos:[f.photo],issue:false}));
-  const plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>${simAppProof()}</section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
-  const switchPlan=$('app').querySelector('[data-sim-plan]');
+  const next=`Get this for my ${sk.placeSingular} →`;
+  $('app').innerHTML=`<section class="sim sim-report"><small class="eyebrow">Your ${esc(sk.doc)}, as it would be sent.</small><article class="card sim-doc"><div class="sim-stamp">SAMPLE</div><small>${esc(documentLabelFor(landingArm()?.type||'routine'))}</small><h1>${esc(s.property)}</h1><p class="muted">${esc(s.unit)} · ${esc(docDateText(localDate()))}</p>${rooms.map((room,index)=>reportRoom(room,'',index,sample)).join('')}<p><small>Sample document. Real ${esc(sk.docPlural)} use your photos and your voice, and export as PDF.</small></p></article><div class="sim-next" id="sim-next-box"><button type="button" id="sim-next" class="wide">${esc(next)}</button><p class="muted"><small>Your photos, your voice, your ${esc(sk.doc)}.</small></p></div></section><aside class="sim-paybar sim-nextbar" id="sim-paybar"><button type="button" id="sim-paybar-next">${esc(next)}</button></aside>`;
+  $('sim-next').onclick=()=>simGetThis();
+  $('sim-paybar-next').onclick=()=>simGetThis();
+  simSide('report');
+  // The bar steps down while the button at the end of the report is in view.
+  const box=$('sim-next-box'),bar=$('sim-paybar');
+  if(typeof IntersectionObserver==='function'){
+    const watch=new IntersectionObserver(entries=>{bar.classList.toggle('is-stood-down',entries.some(entry=>entry.isIntersecting));},{threshold:0.3});
+    watch.observe(box);
+  }
+}
+// "I want this": the deeper signal, and the way to the price.
+function simGetThis(){
+  haptic();
+  track('SimGetThisTapped');
+  simOfferPage();
+}
+function simOfferMarkup({declined=false}={}){
+  const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
+  return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
+}
+// The offer, on its own page: the price, three days free, the real app. On a
+// wide screen the phone keeps the report and the offer takes the side panel.
+function simOfferPage({declined=false}={}){
+  const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
+  const split=document.documentElement.classList.contains('sim-framed')&&window.matchMedia?.('(min-width: 880px)')?.matches;
+  if(split){
+    // Coming back from the email or keep-free step, the phone shows the report again.
+    if(!$('app').querySelector('.sim-report'))simReport();
+    simSide('offer',{declined});
+  }else{
+    // Its own screen, so it opens at the top: arriving at the report's scroll
+    // position landed people below the price.
+    enterScreen('sim-offer');
+    $('app').innerHTML=`<section class="sim sim-offer-page"><button type="button" class="quiet sim-back-report" id="sim-back-report">← Back to the ${esc(sk.doc)}</button>${simOfferMarkup({declined})}${simAppProof()}</section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+    $('sim-back-report').onclick=()=>simReport();
+  }
+  bindSimOffer();
+  track('SimOfferViewed');
+}
+function bindSimOffer(){
+  const switchPlan=document.querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
   $('sim-keep').onclick=()=>{haptic();simKeep();};
-  $('sim-paybar-buy').onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
-  bindAppProof();
-  simSide('report');
-  // The price is on screen from the moment the report is, so the offer really
-  // has been seen by now — it is no longer something they scroll down to find.
-  track('SimOfferViewed');
-  const offer=$('sim-offer'),bar=$('sim-paybar');
-  if(typeof IntersectionObserver==='function'){
-    const watch=new IntersectionObserver(entries=>{
-      bar.classList.toggle('is-stood-down',entries.some(entry=>entry.isIntersecting));
-    },{threshold:0.3});
-    watch.observe(offer);
+  const offer=$('sim-offer'),bar=$('sim-paybar'),barBuy=$('sim-paybar-buy');
+  if(barBuy){
+    barBuy.onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
+    if(typeof IntersectionObserver==='function'){
+      const watch=new IntersectionObserver(entries=>{bar.classList.toggle('is-stood-down',entries.some(entry=>entry.isIntersecting));},{threshold:0.3});
+      watch.observe(offer);
+    }
   }
+  bindAppProof();
 }
 function landing() {
   enterScreen('landing');

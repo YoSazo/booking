@@ -25,6 +25,7 @@ test('a browser switched off on /funnel goes through the whole demo without coun
     await h.page.click('#sim-shutter');
     await h.page.waitForSelector('#sim-see', { timeout: 10000 });
     await h.page.click('#sim-see');
+    await h.page.waitForSelector('#sim-next'); await h.page.click('#sim-next');
     await h.page.waitForSelector('#sim-buy');
     await h.page.waitForTimeout(300);
     assert.equal(h.events.length, before, 'no demo step was sent');

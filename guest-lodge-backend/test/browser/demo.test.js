@@ -17,6 +17,7 @@ test('demo moves from sample photo and dictation to the real offer', async () =>
     await h.page.click('#sim-shutter');
     await h.page.waitForSelector('#sim-see', { timeout: 8000 });
     await h.page.click('#sim-see');
+    await h.page.waitForSelector('#sim-next'); await h.page.click('#sim-next');
     await h.page.waitForSelector('#sim-buy');
     const text = await h.body();
     assert.match(text, /\$25/);
@@ -46,6 +47,7 @@ test('the sample purchase CTA records intent before checkout', async () => {
     await h.page.click('#sim-shutter');
     await h.page.waitForSelector('#sim-see', { timeout: 8000 });
     await h.page.click('#sim-see');
+    await h.page.waitForSelector('#sim-next'); await h.page.click('#sim-next');
     await h.page.click('#sim-buy');
     await h.page.waitForSelector('#sim-email-field');
     await h.page.fill('#sim-email-field', 'owner@example.test');

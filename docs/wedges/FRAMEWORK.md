@@ -118,6 +118,13 @@ they go (`simSide`: the note as it is said, the dated photo, the filing date),
 and the offer moves out of the phone to sit next to it. Starting a real report stays one quiet link below. Phones get
 the simulation directly.
 
+**Report, then offer.** The demo's report is its own page with one button,
+"Get this for my {place} →"; the price is the next page (on desktop, the side
+panel beside the report). Three demo steps go to Meta for optimizing, each
+once per visitor and never from the app or an owner's browser: report seen
+(ViewContent), "Get this" (AddToCart), start free (InitiateCheckout). Optimize
+for the deepest one with enough weekly volume, and move down as it grows.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first

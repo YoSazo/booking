@@ -11,6 +11,7 @@ const STEPS = Object.freeze([
   { key: 'note', label: 'Watched the note get written', names: ['SimNoteWritten'] },
   { key: 'photo', label: 'Took the photo', names: ['SimPhotoTaken'] },
   { key: 'report', label: 'Saw the report', names: ['SimReportShown'] },
+  { key: 'getthis', label: 'Tapped "Get this"', names: ['SimGetThisTapped'] },
   { key: 'offer', label: 'Saw the offer', names: ['SimOfferViewed'] },
   { key: 'tapped', label: 'Tapped start free', names: ['SimCheckoutTapped'] },
   { key: 'email', label: 'Gave their email', names: ['SimEmailGiven'] },
@@ -38,7 +39,7 @@ const BRANCHES = Object.freeze([
 const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
-  'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped',
+  'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);
