@@ -197,6 +197,22 @@ both `index.html` asset versions together. `verify:release` checks the app;
 For the first proof wedge, read `docs/wedges/MOVEOUT-BRIEF.md` before changing
 its offer or deadline copy. It records the research and intended limits.
 
+### Launch playbook: the ads
+
+Every wedge goes through three stages, and only spends more once it passes.
+
+| Stage | Spend | Creative | Judge on | Pass line |
+|---|---|---|---|---|
+| 1. Does the hook land? | $10–20/day, 2–3 days | Screen recording of the demo (`artifacts/wedges/<id>/demo-walkthrough.mp4` from `wedge:check`) with AI voice and subtitles | Link CTR, cost per landed visitor (`/funnel`) | Link CTR above ~3%, under ~$1 per landed visitor |
+| 2. Does it convert? | $50 UGC creator on the same script, then $20/day for 7 days | Creator video | Cost per finished demo, then cost per trial | Trials under ~$50 each once there are ~10 |
+| 3. Scale or kill | Revenue funds it | Fresh UGC faces when frequency climbs | Cost per paying customer against what a customer brings in | Scale at 2× or better; otherwise fix the weakest `/funnel` step or kill |
+
+Optimize Meta for the deepest demo signal with enough weekly volume (report
+seen → "Get this" → start free). Judge on cost per link click, not CTR (all).
+One wedge at $20/day until the machine is proven end to end; then two at
+$10/day. A killed wedge is a few days and a few hundred dollars: move to the
+next brief, and keep the next one ready before you need it.
+
 ### Gotchas
 
 Chromium once passed while iPhone failed on button focus, `:active`, notices
