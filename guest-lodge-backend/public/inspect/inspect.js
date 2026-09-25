@@ -1056,13 +1056,25 @@ function simKept(email){
 function simAppProof(){
   const shots=MANIFESTS?.[toolId()]?.appStore?.screens||[];
   if(!appLive()||!shots.length)return '';
-  return `<section class="sim-app-proof" id="sim-app-proof"><small class="eyebrow">The real app</small><h3>This is what you'll use.</h3><div class="sim-screens" id="sim-screens" tabindex="0" role="group" aria-label="Screens of the Marketel app">${shots.map(shot=>`<figure><img src="/inspect/sample/${esc(shot.file)}" alt="${esc(shot.caption)}" loading="lazy" decoding="async" width="480" height="1039"><figcaption>${esc(shot.caption)}</figcaption></figure>`).join('')}</div><div class="sim-screens-nav"><button type="button" class="quiet" data-screens="-1" aria-label="Previous screen">←</button><button type="button" class="quiet" data-screens="1" aria-label="Next screen">→</button></div><p class="muted"><small>On the App Store for iPhone, and right here in your browser.</small></p></section>`;
+  return `<section class="sim-app-proof" id="sim-app-proof"><small class="eyebrow">The real app</small><h3>This is what you'll use.</h3><div class="sim-screens-wrap"><div class="sim-screens" id="sim-screens" tabindex="0" role="group" aria-label="Screens of the Marketel app">${shots.map((shot,index)=>`<figure data-screen="${index}"><img src="/inspect/sample/${esc(shot.file)}" alt="${esc(shot.caption)}" loading="lazy" decoding="async" width="480" height="1039"><figcaption>${esc(shot.caption)}</figcaption></figure>`).join('')}</div><button type="button" class="sim-screens-arrow is-prev" data-screens="-1" aria-label="Previous screen" hidden>‹</button><button type="button" class="sim-screens-arrow is-next" data-screens="1" aria-label="Next screen">›</button></div><div class="sim-screens-dots">${shots.map((shot,index)=>`<button type="button" class="sim-dot${index?'':' is-on'}" data-screen-dot="${index}" aria-label="Screen ${index+1} of ${shots.length}"></button>`).join('')}</div><p class="muted"><small>On the App Store for iPhone, and right here in your browser.</small></p></section>`;
 }
 function bindAppProof(){
   const proof=$('sim-app-proof'),strip=$('sim-screens');
   if(!proof||!strip)return;
-  strip.addEventListener('scroll',()=>track('SimScreensSwiped'),{once:true,passive:true});
-  proof.querySelectorAll('[data-screens]').forEach(button=>button.onclick=()=>strip.scrollBy({left:Number(button.dataset.shots)*strip.clientWidth*0.66,behavior:simReduced()?'auto':'smooth'}));
+  // A carousel people can see is one: arrows, dots, and a tap on the screen
+  // peeking in from the side all move it; swiping still works.
+  const figures=[...strip.querySelectorAll('figure')],dots=[...proof.querySelectorAll('[data-screen-dot]')];
+  const step=()=>figures.length>1?figures[1].offsetLeft-figures[0].offsetLeft:strip.clientWidth;
+  const atEnd=()=>strip.scrollLeft+strip.clientWidth>=strip.scrollWidth-4;
+  const current=()=>atEnd()?figures.length-1:Math.max(0,Math.min(figures.length-1,Math.round(strip.scrollLeft/step())));
+  const goTo=index=>strip.scrollTo({left:Math.max(0,Math.min(figures.length-1,index))*step(),behavior:simReduced()?'auto':'smooth'});
+  let frame=0;
+  const paint=()=>{frame=0;const at=current();dots.forEach((dot,index)=>dot.classList.toggle('is-on',index===at));proof.querySelector('.is-prev').hidden=at===0;proof.querySelector('.is-next').hidden=atEnd();};
+  strip.addEventListener('scroll',()=>{track('SimScreensSwiped');if(!frame)frame=requestAnimationFrame(paint);},{passive:true});
+  proof.querySelectorAll('[data-screens]').forEach(button=>button.onclick=()=>goTo(current()+Number(button.dataset.screens)));
+  dots.forEach(dot=>dot.onclick=()=>goTo(Number(dot.dataset.screenDot)));
+  figures.forEach((figure,index)=>figure.onclick=()=>{if(index!==current())goTo(index);});
+  strip.onkeydown=event=>{if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();goTo(current()+(event.key==='ArrowRight'?1:-1));}};
   if(typeof IntersectionObserver==='function'){
     const seen=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){track('SimScreensViewed');seen.disconnect();}},{threshold:0.4});
     seen.observe(proof);

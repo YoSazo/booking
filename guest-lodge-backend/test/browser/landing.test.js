@@ -117,6 +117,20 @@ for (const [arm, width, expect] of [['claims', 390, 'phone'], ['claims', 1280, '
       assert.ok(!proof.captions.some(c => /book directly/i.test(c)), 'no booking-engine captions');
       await h.page.locator('#sim-app-proof').scrollIntoViewIfNeeded();
       await h.page.waitForFunction(() => [...document.querySelectorAll('#sim-app-proof img')].slice(0, 1).every(img => img.complete && img.naturalWidth > 0), null, { timeout: 5000 });
+      // It reads as a carousel: an arrow to go on, dots that follow, a way back.
+      const onDot = () => h.page.evaluate(() => [...document.querySelectorAll('.sim-dot')].findIndex(dot => dot.classList.contains('is-on')));
+      const shown = selector => h.page.evaluate(s => !document.querySelector(s).hidden, selector);
+      assert.equal(await onDot(), 0);
+      assert.equal(await shown('.sim-screens-arrow.is-prev'), false, 'no way back from the first screen');
+      assert.equal(await shown('.sim-screens-arrow.is-next'), true);
+      await h.page.click('.sim-screens-arrow.is-next');
+      await h.page.waitForFunction(() => document.querySelectorAll('.sim-dot')[1].classList.contains('is-on'), null, { timeout: 3000 });
+      assert.equal(await shown('.sim-screens-arrow.is-prev'), true);
+      await h.page.click('.sim-dot:nth-child(4)');
+      await h.page.waitForFunction(() => document.querySelectorAll('.sim-dot')[3].classList.contains('is-on'), null, { timeout: 3000 });
+      assert.equal(await shown('.sim-screens-arrow.is-next'), false, 'no way on from the last screen');
+      await h.page.click('.sim-screens-arrow.is-prev');
+      await h.page.waitForFunction(() => document.querySelectorAll('.sim-dot')[2].classList.contains('is-on'), null, { timeout: 3000 });
       h.assertClean();
     } finally { await h.close(); }
   });
