@@ -5,7 +5,7 @@
 // share between two steps reads "of those who reached the step before".
 
 const STEPS = Object.freeze([
-  { key: 'landed', label: 'Landed from the ad', names: ['SimStarted', 'LandingViewed'] },
+  { key: 'landed', label: 'Landed from the ad', names: ['SimStarted', 'LandingViewed:!app'] },
   { key: 'demo', label: 'Started the demo', names: ['SimStarted'] },
   { key: 'picked', label: 'Picked a finding', names: ['SimFindingPicked'] },
   { key: 'note', label: 'Watched the note get written', names: ['SimNoteWritten'] },
@@ -53,10 +53,13 @@ const LABELS = Object.freeze(Object.fromEntries([
 ]));
 
 const personOf = event => event.visitorId || (event.accountId ? `account:${event.accountId}` : `event:${event.id}`);
-// "CancellationScheduled:trial" matches that event with that detail.
+// "CancellationScheduled:trial" matches that event with that detail;
+// "LandingViewed:!app" matches it with any other detail.
 const matches = (event, names) => names.some(name => {
   const [eventName, detail] = name.split(':');
-  return event.name === eventName && (!detail || event.detail === detail);
+  if (event.name !== eventName) return false;
+  if (!detail) return true;
+  return detail.startsWith('!') ? event.detail !== detail.slice(1) : event.detail === detail;
 });
 const people = (events, names) => new Set(events.filter(event => matches(event, names)).map(personOf)).size;
 
@@ -95,4 +98,13 @@ async function excludedAccountIds(prisma, emails) {
   return rows.map(row => row.id);
 }
 
-module.exports = { STEPS, BRANCHES, VISITOR_EVENTS, LABELS, buildWedgeFunnel, excludedAccountIds };
+// A reset leaves a marker row, never deleted, and the dashboard counts from the
+// latest one: server records from before it (trials, payments, test runs)
+// stay in the database and out of the numbers.
+const RESET_EVENT = 'FunnelReset';
+async function countingSince(prisma, tool) {
+  const marker = await prisma.inspectEvent.findFirst({ where: { tool, name: RESET_EVENT }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } });
+  return marker ? new Date(marker.createdAt) : null;
+}
+
+module.exports = { STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince };

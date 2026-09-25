@@ -72,8 +72,8 @@
   .feed td.detail { color: var(--muted); }
   .empty { color: var(--muted); padding: 18px 0; text-align: center; }
   .error { color: var(--danger); }
-  .track { font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--green); background: transparent; color: var(--green-dark); }
-  .track[aria-pressed="false"] { border-color: var(--danger); color: var(--danger); }
+  .count-toggle { font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--green); background: transparent; color: var(--green-dark); }
+  .count-toggle[aria-pressed="false"] { border-color: var(--danger); color: var(--danger); }
   .track-note { color: var(--muted); font-size: 12px; margin: -8px 0 14px; }
   #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 8px 24px #0003; opacity: 0; transition: opacity .12s; max-width: 260px; }
   #tip.on { opacity: 1; }
@@ -97,13 +97,14 @@
       <button type="button" data-days="all">All time</button>
     </div>
     <span class="spacer"></span>
-    <button type="button" class="track" id="track-toggle" aria-pressed="true"></button>
+    <button type="button" class="count-toggle" id="track-toggle" aria-pressed="true"></button>
     <span class="updated" id="updated"></span>
     <button type="button" class="quiet" id="refresh">Refresh</button>
     <a class="quiet" href="/funnel/legacy">Bookings &amp; support →</a>
   </header>
 
   <p class="track-note" id="track-note"></p>
+  <p class="track-note" id="since-note" hidden></p>
   <section class="tiles" id="tiles" aria-live="polite"></section>
 
   <section class="card">
@@ -139,7 +140,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
 let adminToken = '';
 try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
-let state = { tool: '', days: '7' };
+let state = { tool: '', days: '7', everything: false };
 let feedAll = false, lastData = null;
 try { Object.assign(state, JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}')); } catch (_) {}
 const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
@@ -178,6 +179,12 @@ function render(data) {
   $('wedge-name').textContent = data.tool ? `· Marketel ${(data.wedges.find(w => w.id === data.tool) || {}).product || data.tool}` : '· no live wedges';
   document.querySelectorAll('.range button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.days === state.days)));
   if (!data.tool) { $('tiles').innerHTML = ''; return; }
+  const since = data.countingSince ? new Date(data.countingSince).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  $('since-note').hidden = !since;
+  $('since-note').innerHTML = since ? (data.everything
+    ? `Showing everything, including before the reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Count from the reset</button>`
+    : `Counting from your reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Show everything</button>`) : '';
+  if ($('since-toggle')) $('since-toggle').onclick = () => { state.everything = !state.everything; saveState(); load(); };
   const step = key => data.steps.find(s => s.key === key) || { people: 0, ofLanded: null };
   const tiles = [['Landed', 'landed'], ['Finished the demo', 'report'], ['Tapped start free', 'tapped'], ['Started a trial', 'trial'], ['Paid', 'paid']];
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
@@ -221,7 +228,7 @@ function tip(event, html) {
 
 async function load() {
   try {
-    const params = new URLSearchParams({ days: state.days });
+    const params = new URLSearchParams({ days: state.days, ...(state.everything ? { everything: '1' } : {}) });
     if (state.tool) params.set('tool', state.tool);
     const data = await adminFetch(`/api/funnel/wedge?${params}`);
     if (data.tool && data.tool !== state.tool) { state.tool = data.tool; saveState(); }
@@ -254,7 +261,7 @@ $('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load()
 $('refresh').onclick = load;
 $('feed-more').onclick = () => { feedAll = true; if (lastData) render(lastData); };
 $('reset').onclick = async () => {
-  const typed = window.prompt(`This clears every visitor step for ${state.tool || 'this wedge'} (demo, landing and setup taps). Trials, payments and sign-ins stay. Type RESET to continue.`);
+  const typed = window.prompt(`This starts the count again from now for ${state.tool || 'this wedge'}: visitor steps are cleared, and earlier trials, payments and sign-ins stay stored but out of the numbers. Type RESET to continue.`);
   if (typed !== 'RESET') return;
   try {
     const result = await adminFetch('/api/funnel/wedge/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: state.tool, confirm: 'RESET' }) });

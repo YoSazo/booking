@@ -60,3 +60,21 @@ test('owner accounts, their plus-aliases and App Review are left out', async () 
   assert.deepEqual(where.OR[2], { email: 'appreview@bookmarketel.com' });
   assert.deepEqual(await excludedAccountIds(prisma, []), []);
 });
+
+test('the app\'s own start screen is not a visit from an ad', () => {
+  const events = [ev('LandingViewed', 'v_web1', { detail: 'web' }), ev('LandingViewed', 'v_app1', { detail: 'app' }), ev('LandingViewed', 'v_old1')];
+  const f = buildWedgeFunnel(events);
+  assert.equal(f.steps.find(s => s.key === 'landed').people, 2, 'web and untagged older visits count; the app does not');
+});
+
+test('a reset marks where counting starts, from the latest marker', async () => {
+  const { countingSince, RESET_EVENT } = require('../wedge-funnel');
+  let where;
+  const at = new Date('2026-09-24T19:05:00Z');
+  const prisma = { inspectEvent: { findFirst: async args => { where = args; return { createdAt: at }; } } };
+  assert.deepEqual(await countingSince(prisma, 'claims'), at);
+  assert.deepEqual(where.where, { tool: 'claims', name: RESET_EVENT });
+  assert.deepEqual(where.orderBy, { createdAt: 'desc' });
+  assert.equal(await countingSince({ inspectEvent: { findFirst: async () => null } }, 'claims'), null);
+  assert.ok(!VISITOR_EVENTS.includes(RESET_EVENT), 'a reset never deletes its own marker');
+});

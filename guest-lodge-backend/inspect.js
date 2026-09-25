@@ -880,11 +880,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
-  const eventExtra = body => ({
+  // A step taken inside the iOS app says so: the app's own start screen is not
+  // a visit from an ad, and /funnel must not count it as one.
+  const fromAppOrigin = req => /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
+  const eventExtra = (body, req) => ({
     tool: toolOf(body?.tool),
     visitorId: visitorOf(body?.visitorId),
     detail: body?.name === 'OfferDeclined' && DECLINE_REASONS.includes(body?.detail) ? body.detail
-      : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail) : null,
+      : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail)
+      : LADDER_EVENTS.includes(body?.name) && body?.name !== 'OfferDeclined' ? (fromAppOrigin(req) ? 'app' : 'web') : null,
   });
   // The tap on the demo's start button — from the card or the pay bar, on
   // either plan — is what Meta optimizes for at launch: there are enough of
@@ -920,7 +924,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // headless, and counting them (or sending them to Meta) skews the funnel.
     if (/HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req.headers?.['user-agent'] || ''))) return res.json({ success: true, ignored: true });
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
-    await record(null, req.body.name, undefined, eventExtra(req.body));
+    await record(null, req.body.name, undefined, eventExtra(req.body, req));
     if (req.body.name === 'SimCheckoutTapped') {
       await queueCheckoutTap(req).catch(error => console.error('Inspect checkout-tap CAPI queue failed:', error.message));
     }
@@ -1103,7 +1107,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (ownerBrowser(req)) return res.json({ success: true, ignored: true });
     const sourceId = CLIENT_EVENTS.get(req.body.name);
     if (!sourceId) rate(`inspect-events:${req.inspect.id}`, 120, 3600000);
-    await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body));
+    await record(req.inspect.id, req.body.name, sourceId ? sourceId(req.inspect.id) : undefined, eventExtra(req.body, req));
     // The deepest identified step before payment: a finished report, and a
     // request to send it. Meta has no Purchase history to learn from at this
     // budget, so this is the event worth optimising on when Purchase cannot

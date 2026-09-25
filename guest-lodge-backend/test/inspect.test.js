@@ -1713,7 +1713,7 @@ test('the AI is the path, and the note is never hidden once written', () => {
     // exists to count are exactly the ones who have not signed in yet.
     const anon = server.slice(server.indexOf('const ANON_EVENTS'), server.indexOf('router.use((req, res, next) => {\n    const raw'));
     assert.match(anon, /ANON_EVENTS = new Set\(\['VoiceNoteRecorded', \.\.\.LADDER_EVENTS/);
-    assert.match(anon, /record\(null, req\.body\.name, undefined, eventExtra\(req\.body\)\)/);
+    assert.match(anon, /record\(null, req\.body\.name, undefined, eventExtra\(req\.body, req\)\)/);
     assert.match(anon, /rate\(`inspect-anon-events:/);
     assert.ok(server.indexOf("router.post('/events/anon'") < server.indexOf('Please sign in again.'),
         'the anonymous event route is below the auth boundary and can never fire');
@@ -2763,5 +2763,17 @@ test('a browser switched off on /funnel counts for nothing: no steps, no Meta ev
     await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'SimStarted', tool: 'claims', visitorId, detail: 'phone' }) });
     assert.equal(h.calls.events.filter(e => e.visitorId === visitorId && e.name === 'SimStarted').length, 1);
+  } finally { h.registration.close(); }
+});
+
+test('landing and setup steps say whether they came from the website or the app', async () => {
+  const h = moneyHarness();
+  try {
+    for (const [origin, want] of [['https://bookmarketel.com', 'web'], ['capacitor://localhost', 'app']]) {
+      await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin },
+        body: JSON.stringify({ name: 'LandingViewed', tool: 'claims', visitorId: `v_${want.repeat(4)}abcd`, detail: 'ignored' }) });
+      const row = h.calls.events.filter(e => e.name === 'LandingViewed').pop();
+      assert.equal(row.detail, want);
+    }
   } finally { h.registration.close(); }
 });

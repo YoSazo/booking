@@ -12028,6 +12028,8 @@ app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
         if (!tool) return res.json({ wedges, tool: null });
         const range = wedgeFunnelRange(req.query);
         if (!range) return res.status(400).json({ success: false, message: 'Invalid date format. Use YYYY-MM-DD.' });
+        const since = await wedgeFunnel.countingSince(prisma, tool);
+        if (since && req.query.everything !== '1' && since > range.since) range.since = since;
         const excluded = await wedgeFunnel.excludedAccountIds(prisma, [...FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS, process.env.INSPECT_REVIEW_EMAIL]);
         const events = await withRetry(() => prisma.inspectEvent.findMany({
             where: { tool, createdAt: { gte: range.since, lte: range.until },
@@ -12036,7 +12038,8 @@ app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
             take: 20000,
             select: { id: true, name: true, detail: true, visitorId: true, accountId: true, createdAt: true },
         }));
-        res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), ...wedgeFunnel.buildWedgeFunnel(events) });
+        res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), countingSince: since ? since.toISOString() : null,
+            everything: req.query.everything === '1', ...wedgeFunnel.buildWedgeFunnel(events.filter(event => event.name !== wedgeFunnel.RESET_EVENT)) });
     } catch (e) {
         console.error('Wedge funnel error:', e.message);
         res.status(500).json({ success: false, message: 'Could not load the funnel.' });
@@ -12050,6 +12053,7 @@ app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
         const tool = String(req.body?.tool || '');
         if (!wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
         const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.VISITOR_EVENTS] } } });
+        await prisma.inspectEvent.create({ data: { name: wedgeFunnel.RESET_EVENT, tool } });
         console.log(`wedge funnel reset: removed ${deleted.count} ${tool} visitor steps`);
         res.json({ success: true, deleted: deleted.count });
     } catch (e) {
