@@ -38,6 +38,11 @@ test('phone: an ad visitor gets the video, the price and start free', async () =
     // Free for the whole three days, so the bar can say it; the price after it keeps its dollar sign.
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /Free for 3 days\s*then \$25\/month\s*Start free/);
     assert.doesNotMatch(await h.body(), /first report if sooner/);
+    // The terms sit under the price, so the button keeps its one line and the bar stays short.
+    const bar = await h.page.evaluate(() => { const box = el => document.querySelector(el).getBoundingClientRect();
+      return { button: box('#sim-paybar-buy').height, price: box('#sim-paybar strong').bottom, terms: box('#sim-paybar small').top }; });
+    assert.ok(bar.button <= 56, JSON.stringify(bar));
+    assert.ok(bar.terms >= bar.price - 1, 'then $25/month sits under Free for 3 days');
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
