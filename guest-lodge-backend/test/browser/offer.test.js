@@ -35,6 +35,9 @@ test('phone: an ad visitor gets the video, the price and start free', async () =
     assert.match(text, /38 seconds/);
     assert.match(text, /Try it free for 3 days\./);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
+    // Free for the whole three days, so the bar can say it; the price after it keeps its dollar sign.
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /Free for 3 days\s*then \$25\/month\s*Start free/);
+    assert.doesNotMatch(await h.body(), /first report if sooner/);
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');

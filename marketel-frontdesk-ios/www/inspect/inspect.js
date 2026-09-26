@@ -753,7 +753,7 @@ function simThanks(){
       if(where)where.textContent=r.email;
     }).catch(()=>{});
   let trial=0;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;}catch{}
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end or you send your first ${esc(sk.doc)}. We'll email you the day before.</small></p>`:''}${appLive()
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end. We'll email you the day before.</small></p>`:''}${appLive()
     ?`<p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button>`
     :`<p class="muted">It works right here in your browser, on your phone or your computer. Photograph it, talk it through, send it.</p><button type="button" id="sim-signin" class="wide">Start your first ${esc(sk.doc)} →</button><p class="muted"><small>Sign in with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and we'll send you a six-digit code.</small></p>`}</section>`;
   track('SimSubscribed');
@@ -944,9 +944,9 @@ function simOffer(plan=PLANS[planInterval]||PLANS.month){
   return {
     // One line on a phone: the terms below already say how cancelling works.
     save:`Free for ${SIM_TRIAL_DAYS} days · ${plan===PLANS.year?PLANS.year.save:`Unlimited ${sk.docPlural}`}`,
-    terms:`$0 today. $${plan.price}${plan.per} from ${from}, or from your first ${sk.doc} if sooner. Cancel before then and you pay nothing.`,
+    terms:`$0 today. $${plan.price}${plan.per} from ${from}. Cancel before then and you pay nothing. We'll email you the day before.`,
     cta:`Start ${SIM_TRIAL_DAYS} days free →`,
-    bar:'$0 today',barSmall:`then $${plan.price}${plan.per}`,barCta:'Start free →',
+    bar:`Free for ${SIM_TRIAL_DAYS} days`,barSmall:`then $${plan.price}${plan.per}`,barCta:'Start free →',
     lede:'One address for your receipt and for signing in. Nothing is charged today.',go:'Continue →',
     small:`$0 today, then $${plan.price}${plan.per} from ${from}. Apple Pay or card on the next screen.`,
   };

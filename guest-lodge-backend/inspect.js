@@ -205,8 +205,8 @@ const INSPECT_PLANS = Object.freeze({
 const inspectPlan = value => (value === 'year' ? INSPECT_PLANS.year : INSPECT_PLANS.month);
 // The demo's checkout starts with three free days, card taken upfront: cold
 // traffic has no damage in front of it, so "$0 today" is what the trial is for.
-// The plan starts when the days run out or at the first report sent, whichever
-// is first — finalize ends a trial early — and the sweep emails the day before.
+// The plan starts when the free days run out, whatever is sent in them: the offer
+// says "Free for 3 days", so it is. The sweep emails the day before.
 // Zero turns it off. The copy in public/inspect/inspect.js moves with it; a
 // test keeps the two equal.
 const SIM_TRIAL_DAYS = 3;
@@ -1596,12 +1596,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }
   }));
   router.post('/reports/:id/finalize', guarded(async (req, res) => {
-    // Set inside the transaction, acted on after it commits: the offer says
-    // billing starts with the first report, and this is that moment.
-    let endTrialFor = null, freeBaseline = false, trialTool = null;
+    let freeBaseline = false;
     const result = await prisma.$transaction(async tx => {
       const a = await lockAccount(tx, req.inspect.id);
-      endTrialFor = a.subscriptionStatus === 'trialing' ? a.stripeSubscriptionId : null;
       const r = await owned(tx, a.id, req.params.id);
       if (r.finalizedAt) return r;
       const document = validateDocument(r.document);
@@ -1618,7 +1615,6 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(a.email) } });
       const access = entitlement({ ...a, freeReportUsed: a.freeReportUsed || !!priorFreeClaim });
       const tool = TOOLS[toolForType(document.type)];
-      trialTool = toolForType(document.type);
       // The lifetime free report first where the tool offers one, then the
       // plan's allowance, then a single-report purchase.
       const spend = tool.offerMode === 'first-free' && access.freeAvailable ? { freeReportUsed: true }
@@ -1658,15 +1654,6 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       eventId: `inspect-registration.${req.inspect.id}`,
       contentName: 'Marketel Inspect first report finalized',
     }).catch(error => console.error('Inspect registration CAPI queue failed:', error.message));
-    // Outside the transaction and best-effort, both on purpose: a Stripe
-    // hiccup must never roll back a finalized report or hold up an export
-    // someone is waiting on, and ending an already-ended trial is a no-op, so
-    // a retry costs nothing.
-    if (endTrialFor && stripe) {
-      await stripe.subscriptions.update(endTrialFor, { trial_end: 'now' })
-        .then(() => recordBestEffort(req.inspect.id, 'TrialConverted', `inspect-trial-converted:${req.inspect.id}`, trialTool ? { tool: trialTool } : {}))
-        .catch(error => console.error('Inspect trial conversion failed:', error.message));
-    }
     res.json(serialize(result));
   }));
   router.get('/reports/:id/pdf', guarded(async (req, res) => {
@@ -2078,16 +2065,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }
     res.json({ received: true });
   }));
-  // Nobody should meet a charge for something they never opened. Anyone still
-  // on trial with the cap in sight and no report to their name hears from us
-  // once, while there is still time to use it — which is also a re-engagement
-  // note at the only moment it could land.
+  // Nobody should meet a charge they were not warned of. Everyone still on
+  // trial with the end in sight hears from us once, reports sent or not: the
+  // offer promised the email, and for someone who never opened it, it is also
+  // a re-engagement note at the only moment it could land.
   const remindTrials = async () => {
     if (!mail) return;
     // The day before a short trial ends; three days before a long one.
     const soon = new Date(Date.now() + (SIM_TRIAL_DAYS <= 7 ? 1 : 3) * 86400000);
     const waiting = await prisma.inspectAccount.findMany({
-      where: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: { lt: soon, gt: new Date() } },
+      where: { subscriptionStatus: 'trialing', periodEnd: { lt: soon, gt: new Date() } },
       take: 200,
     });
     for (const account of waiting) {
@@ -2103,7 +2090,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       try {
         await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: account.email,
           subject: 'You have not been charged yet',
-          text: `Your free days with Marketel end on ${ends}, and you have not been charged anything.\n\nYour plan starts on ${ends} at ${price}, or when you send your first report if that comes first. There is nothing to do to keep it.\n\nTo cancel before then, open ${toolReturn(tool, 'sim=0')}, sign in with this email, open your account and tap Manage subscription. Cancel before ${ends} and you pay nothing.\n\nQuestions? Reply to this email.` });
+          text: `Your free days with Marketel end on ${ends}, and you have not been charged anything.\n\nYour plan starts on ${ends} at ${price}. There is nothing to do to keep it.\n\nTo cancel before then, open ${toolReturn(tool, 'sim=0')}, sign in with this email, open your account and tap Manage subscription. Cancel before ${ends} and you pay nothing.\n\nQuestions? Reply to this email.` });
         await recordBestEffort(account.id, 'TrialReminderSent', sourceId, {});
       } catch (error) { console.error('Inspect trial reminder failed:', error.message); }
     }

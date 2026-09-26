@@ -102,7 +102,9 @@ $199/year, with fair use of 300 reports per billing period. No per-wedge
 Stripe product. `pay-at-export` lets someone build for free and asks for a
 plan when sending; Claims uses it. `first-free` grants one lifetime free
 complete report. The web simulation leads to an email wall and a three-day
-trial for accounts that never subscribed; server and client copy agree.
+trial for accounts that never subscribed; server and client copy agree. The
+trial is the full three days (the price bar says "Free for 3 days"): nothing
+sent in them ends it early, and every trialist is emailed the day before.
 `SimCheckoutTapped` fires Meta InitiateCheckout on the CTA tap with a
 deduplicating event ID. The server sends StartTrial and Purchase, excludes
 owner/test emails with normalized plus aliases, and excludes app purchases

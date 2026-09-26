@@ -2185,7 +2185,11 @@ test('"keep it free" emails the link once, and only when asked', async () => {
   assert.match(client, /id="sim-keep" class="\$\{declined\?'secondary wide':'quiet'\}"/);
   assert.match(client, /state==='cancelled'&&simPicked\)\{[\s\S]{0,120}simOfferPage\(\{declined:true\}\)/);
   assert.match(client, /cta:`Start \$\{SIM_TRIAL_DAYS\} days free →`/);
-  assert.match(client, /terms:`\$0 today\. \$\$\{plan\.price\}\$\{plan\.per\} from \$\{from\}, or from your first \$\{sk\.doc\} if sooner\./);
+  // Free for the whole three days: nothing sent in them ends the trial early,
+  // so the bar can say so and the terms never mention a first report.
+  assert.match(client, /terms:`\$0 today\. \$\$\{plan\.price\}\$\{plan\.per\} from \$\{from\}\. Cancel before then and you pay nothing\. We'll email you the day before\.`/);
+  assert.match(client, /bar:`Free for \$\{SIM_TRIAL_DAYS\} days`/);
+  assert.doesNotMatch(client, /if sooner|or you send your first/);
 });
 
 test('a simulation purchase creates the account from the email Stripe collected', async () => {
@@ -2536,7 +2540,7 @@ test('the demo starts with three free days, card upfront, once per person', asyn
   } finally { paid.registration.close(); }
 });
 
-test('finalizing the first report is what starts the billing', async () => {
+test('sending reports in the free days never ends the trial early', async () => {
   const updates = [];
   const trialStripe = () => ({ subscriptions: { update: async (id, params) => { updates.push({ id, params }); return { id }; } } });
   const document = { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-21', eventTime: 'unknown', author: 'Sam',
@@ -2550,8 +2554,9 @@ test('finalizing the first report is what starts the billing', async () => {
   try {
     const response = await request(trial.app, '/api/inspect/reports/rep_1/finalize', { method: 'POST', headers: trial.headers, body: '{}' });
     assert.equal(response.status, 200);
-    assert.deepEqual(updates, [{ id: 'sub_trial', params: { trial_end: 'now' } }]);
-    assert.ok(trial.calls.events.some(event => event.name === 'TrialConverted'));
+    // The offer says free for three days, so a report sent in them is free.
+    assert.deepEqual(updates, []);
+    assert.ok(!trial.calls.events.some(event => event.name === 'TrialConverted'));
   } finally { trial.registration.close(); }
 
   // An account already paying is left alone.
@@ -2580,7 +2585,7 @@ test('finalizing the first report is what starts the billing', async () => {
   } finally { broken.registration.close(); }
 });
 
-test('a trial about to bill for nothing gets a warning, once', async () => {
+test('every trial about to bill gets a warning, once', async () => {
   const soon = new Date(Date.now() + 20 * 3600000);
   const h = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 0, periodEnd: soon.toISOString(), email: 'owner@example.com' } });
   try {
@@ -2591,7 +2596,8 @@ test('a trial about to bill for nothing gets a warning, once', async () => {
     // It has to say the thing that stops a dispute: nothing has been taken.
     assert.match(sent.subject, /not been charged/i);
     assert.match(sent.text, /you have not been charged anything/i);
-    assert.match(sent.text, /\$25 a month, or when you send your first report/);
+    assert.match(sent.text, /Your plan starts on .+ at \$25 a month\. There is nothing to do to keep it\./);
+    assert.doesNotMatch(sent.text, /first report/);
     assert.match(sent.text, /https:\/\/bookmarketel\.com\/claims\?sim=0[\s\S]*Manage subscription[\s\S]*Cancel before/);
     assert.doesNotMatch(`${sent.from} ${sent.text}`, /Inspect/);
     // And never twice, however often the sweep runs.
@@ -2617,11 +2623,12 @@ test('a trial about to bill for nothing gets a warning, once', async () => {
     assert.equal(fresh.calls.mail.length, 0);
   } finally { fresh.registration.close(); }
 
-  // Someone who has actually used it is converting on their own terms.
+  // Someone who has sent reports in the free days is still on trial, and the
+  // offer promised them the email too.
   const using = moneyHarness({ account: { subscriptionStatus: 'trialing', reportsUsed: 2, periodEnd: soon.toISOString() } });
   try {
     await using.registration.sweep();
-    assert.equal(using.calls.mail.length, 0);
+    assert.equal(using.calls.mail.length, 1);
   } finally { using.registration.close(); }
 
   // And a trial with weeks left is not chased.
