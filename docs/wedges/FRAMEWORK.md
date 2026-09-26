@@ -225,6 +225,9 @@ without charging. This development machine’s clock can run ahead of the
 server, so production API tests must not send local future timestamps as
 camera taken times. Never style a bare element selector that report content
 also uses: a global `header` rule pinned the business name over the site bar
-on the web and hid it in the app; site chrome is `body > header`. Chromium
+on the web and hid it in the app; site chrome is `body > header`. Any rule
+that sets `display` overrides the `hidden` attribute, so `inspect.css` makes
+`[hidden]` win with `!important`; without it the demo camera's Done showed
+from the start and let visitors skip the note and the photo. Chromium
 does not expose the body of an upload that carries a file, so the browser
 harness reads each photo in the page and keys it to the upload URL.

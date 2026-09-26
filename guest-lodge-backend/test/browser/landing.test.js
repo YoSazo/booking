@@ -95,6 +95,27 @@ for (const [width, split] of [[1280, true], [800, false]]) {
   });
 }
 
+// A hidden control must be gone, not just marked: the demo camera's Done once
+// showed from the start, and tapping it skipped the note and the photo.
+test('phone demo: the camera\'s Done appears only once the note and photo are done', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, demo: true, viewport: { width: 390, height: 844 } });
+  try {
+    await h.page.waitForSelector('[data-sim-pick]');
+    await h.page.locator('[data-sim-pick]').first().click();
+    await h.page.waitForSelector('#sim-mic-button');
+    assert.equal(await h.page.isVisible('#sim-done'), false);
+    const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
+    assert.deepEqual(shown, [], 'every hidden element is off screen');
+    await h.page.click('#sim-mic-button');
+    await h.page.waitForSelector('#sim-shutter:not([disabled])', { timeout: 10000 });
+    assert.equal(await h.page.isVisible('#sim-done'), false, 'still hidden before the photo');
+    await h.page.click('#sim-shutter');
+    await h.page.waitForSelector('#sim-see', { timeout: 10000 });
+    assert.equal(await h.page.isVisible('#sim-done'), true);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
 // Under the offer, screens of the real app: in the phone on a phone, beside it
 // on a wide screen, and not at all for a wedge the approved app does not carry.
 for (const [arm, width, expect] of [['claims', 390, 'phone'], ['claims', 1280, 'side'], ['moveout', 390, 'none']]) {
