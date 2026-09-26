@@ -11,8 +11,8 @@ test('the funnel counts people, not taps, and reads each step against the one be
   const events = [
     ev('OfferLanded', 'v_a', { detail: 'phone' }), ev('OfferLanded', 'v_a', { detail: 'phone' }), // a reload is one person
     ev('OfferLanded', 'v_b', { detail: 'desktop' }), ev('SimStarted', 'v_d', { detail: 'phone' }), ev('LandingViewed', 'v_c'),
-    ev('OfferVideoQuarter', 'v_a'), ev('OfferVideoQuarter', 'v_b'),
-    ev('OfferVideoHalf', 'v_a'),
+    ev('OfferEngaged', 'v_a'), ev('OfferEngaged', 'v_b'),
+    ev('OfferVideoQuarter', 'v_a'),
     ev('SimFindingPicked', 'v_d'),
     ev('SimCheckoutTapped', 'v_a'), ev('SimCheckoutTapped', 'v_a'),
     ev('TrialStarted', 'acct1', { visitorId: 'v_a' }),
@@ -23,9 +23,9 @@ test('the funnel counts people, not taps, and reads each step against the one be
   const step = key => f.steps.find(s => s.key === key);
   assert.equal(f.steps.length, STEPS.length);
   assert.equal(step('landed').people, 4, 'the video landing, the try-it demo and the desktop page all count as landing');
-  assert.equal(step('quarter').people, 2);
-  assert.equal(step('half').people, 1);
-  assert.equal(step('half').ofPrevious, 0.5);
+  assert.equal(step('engaged').people, 2);
+  assert.equal(step('engaged').ofPrevious, 0.5);
+  assert.equal(f.branches.find(b => b.key === 'video').steps.find(s => s.label === 'Watched a quarter').people, 1, 'the video is its own card');
   assert.equal(step('tapped').people, 1, 'tapping twice is one person');
   assert.equal(step('trial').people, 1);
   assert.equal(step('paid').people, 1);
@@ -50,7 +50,7 @@ test('a reset can only clear visitor steps, never the server records that preven
   for (const kept of ['TrialStarted', 'FirstPayment', 'PaymentSucceeded', 'TrialReminderSent', 'KeptFree', 'AccountVerified', 'ReportFinalized', 'SimCheckoutStarted', 'SimPurchased'])
     assert.ok(!VISITOR_EVENTS.includes(kept), `${kept} must never be reset`);
   assert.ok(VISITOR_EVENTS.includes('SimStarted') && VISITOR_EVENTS.includes('SimCheckoutTapped'));
-  assert.ok(['OfferLanded', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].every(name => VISITOR_EVENTS.includes(name)), 'a reset clears the video landing too');
+  assert.ok(['OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].every(name => VISITOR_EVENTS.includes(name)), 'a reset clears the video landing too');
 });
 
 test('owner accounts, their plus-aliases and App Review are left out', async () => {

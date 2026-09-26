@@ -6,11 +6,10 @@
 
 const STEPS = Object.freeze([
   { key: 'landed', label: 'Landed from the ad', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
-  // The video landing: everyone sees the price, so how much of the video they
-  // watched is the step between arriving and deciding.
-  { key: 'quarter', label: 'Watched a quarter of the video', names: ['OfferVideoQuarter'] },
-  { key: 'half', label: 'Watched half the video', names: ['OfferVideoHalf'] },
-  { key: 'full', label: 'Watched it to the end', names: ['OfferVideoEnded'] },
+  // The video landing: everyone sees the price, so the step between arriving
+  // and deciding is staying: twenty seconds, or tapping start free sooner.
+  // It is Meta's ViewContent, and it always includes everyone who tapped.
+  { key: 'engaged', label: 'Stayed 20 seconds or tapped start free', names: ['OfferEngaged'] },
   { key: 'tapped', label: 'Tapped start free', names: ['SimCheckoutTapped'] },
   { key: 'email', label: 'Gave their email', names: ['SimEmailGiven'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
@@ -24,6 +23,7 @@ const STEPS = Object.freeze([
 
 // Paths off the main line, each worth watching on its own.
 const BRANCHES = Object.freeze([
+  { key: 'video', label: 'The video', steps: [['Watched a quarter', ['OfferVideoQuarter']], ['Watched half', ['OfferVideoHalf']], ['Watched to the end', ['OfferVideoEnded']]] },
   // The try-it simulation, now at ?sim=1: where the earlier weeks' visitors went.
   { key: 'demo', label: 'The try-it demo', steps: [['Started the demo', ['SimStarted']], ['Picked a finding', ['SimFindingPicked']], ['Watched the note get written', ['SimNoteWritten']], ['Took the photo', ['SimPhotoTaken']], ['Saw the report', ['SimReportShown']], ['Tapped "Get this"', ['SimGetThisTapped']], ['Saw the offer', ['SimOfferViewed']]] },
   { key: 'kept', label: 'Kept it free', steps: [['Opened keep it free', ['SimKeepFreeOpened']], ['Left their email', ['SimKeptFree', 'KeptFree']]] },
@@ -40,7 +40,7 @@ const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
-  'OfferLanded', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
+  'OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);

@@ -5,6 +5,18 @@ const { open } = require('./harness');
 
 const phone = { width: 390, height: 844 };
 const count = (h, name) => h.events.filter(event => event.name === name).length;
+// The page's one-second clock at fifty times speed, and a switch for whether
+// the tab is on screen, so twenty seconds takes under half a second here.
+const fastClock = async (h, { hidden = false } = {}) => {
+  await h.context.addInitScript(startHidden => {
+    const real = window.setInterval.bind(window);
+    window.setInterval = (fn, ms, ...rest) => real(fn, Math.max(1, (ms || 0) / 50), ...rest);
+    window.__hidden = startHidden;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (window.__hidden ? 'hidden' : 'visible') });
+  }, hidden);
+  await h.page.reload({ waitUntil: 'domcontentloaded' });
+  await h.page.waitForSelector('#offer-video');
+};
 
 // An ad visitor arrives without ?sim: the headline the ad promised, the real
 // app making a report, and the offer under it. No simulation stands between
@@ -44,17 +56,14 @@ test('phone: an ad visitor gets the video, the price and start free', async () =
 });
 
 // Watching is counted in seconds actually played while on screen, once per
-// step; half the video is the ViewContent Meta optimizes for, so it carries
-// the visitor's Meta ids.
-test('the video counts a quarter, half and the end once each, and half carries the Meta ids', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone });
+// step, for our own ladder.
+test('the video counts a quarter, half and the end once each', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
     for (let i = 0; i < 60 && !count(h, 'OfferVideoEnded'); i++) await h.page.waitForTimeout(200);
     await h.page.waitForTimeout(1500);
     assert.deepEqual(['OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].map(name => count(h, name)), [1, 1, 1]);
-    const half = h.events.find(event => event.name === 'OfferVideoHalf');
-    assert.match(String(half.attribution?.fbc || ''), /test-click/);
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -103,4 +112,39 @@ test('without a landing video, with ?sim=1, or signed in, nothing changes', asyn
     assert.equal(await owner.page.$('#offer-video'), null);
     owner.assertClean();
   } finally { await owner.close(); }
+});
+
+// Meta's ViewContent on the video landing: twenty seconds with the page on
+// screen, or tapping start free sooner, once per visit, with the Meta ids.
+test('twenty seconds on screen is engaged, once, with the Meta ids; a hidden tab does not count', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone });
+  try {
+    await h.page.waitForSelector('#offer-video');
+    await fastClock(h, { hidden: true });
+    await h.page.waitForTimeout(1200);
+    assert.equal(count(h, 'OfferEngaged'), 0, 'a minute behind other tabs is not engaged');
+    await h.page.evaluate(() => { window.__hidden = false; });
+    for (let i = 0; i < 30 && !count(h, 'OfferEngaged'); i++) await h.page.waitForTimeout(100);
+    await h.page.waitForTimeout(600);
+    assert.equal(count(h, 'OfferEngaged'), 1);
+    assert.match(String(h.events.find(event => event.name === 'OfferEngaged').attribution?.fbc || ''), /test-click/);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('tapping start free before twenty seconds is engaged at once, and only once', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
+  try {
+    await h.page.waitForSelector('#offer-video');
+    await h.page.click('#sim-buy');
+    await h.page.waitForSelector('#sim-email-field');
+    await h.page.waitForTimeout(100);
+    assert.deepEqual([count(h, 'OfferEngaged'), count(h, 'SimCheckoutTapped')], [1, 1]);
+    await h.page.click('#sim-email-back');
+    await h.page.waitForSelector('#offer-video');
+    await h.page.click('#sim-buy');
+    await h.page.waitForTimeout(100);
+    assert.equal(count(h, 'OfferEngaged'), 1, 'once per visit');
+    h.assertClean();
+  } finally { await h.close(); }
 });

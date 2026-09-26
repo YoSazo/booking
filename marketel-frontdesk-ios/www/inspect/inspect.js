@@ -624,7 +624,7 @@ function track(name, detail, once = true) {
   if (ownerBrowser) return;
   if (once && trackedSteps.has(name)) return;
   trackedSteps.add(name);
-  const signal = name === 'SimReportShown' || name === 'SimGetThisTapped' || name === 'OfferVideoHalf';
+  const signal = name === 'SimReportShown' || name === 'SimGetThisTapped' || name === 'OfferEngaged';
   api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail, ...(signal ? { attribution: inspectAttribution } : {}) } }).catch(() => {});
 }
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
@@ -1004,6 +1004,8 @@ function simCheckout(email,trigger){
 // account yet to carry it.
 function simCheckoutTapped(){
   if(ownerBrowser)return;
+  // On the video landing, tapping start free is also staying engaged.
+  if(offerOnVideo)track('OfferEngaged');
   api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simBuy(trigger){
@@ -1176,8 +1178,24 @@ function videoLanding({declined=false}={}){
   $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(v.sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
+  watchEngagement();
   $('offer-sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   track('OfferLanded',phoneWidth()?'phone':'desktop');
+}
+// Engaged is Meta's ViewContent on this page: twenty seconds with it on their
+// screen (a tab left open behind others does not count), or tapping start free,
+// whichever comes first. Once per visit, however often the page is redrawn.
+const OFFER_ENGAGED_SECONDS=20;
+let engagedTimer=null;
+function watchEngagement(){
+  if(engagedTimer)return;
+  let seen=0;
+  engagedTimer=setInterval(()=>{
+    if(document.visibilityState!=='visible')return;
+    if(++seen<OFFER_ENGAGED_SECONDS)return;
+    clearInterval(engagedTimer);
+    track('OfferEngaged');
+  },1000);
 }
 // Plays only while it is on screen, so "watched" means someone could see it,
 // and counts seconds actually played: the loop restarts the playhead.

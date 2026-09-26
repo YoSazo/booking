@@ -131,9 +131,11 @@ the offer first: the ad's headline, a real-time recording of the real app
 making a report, and the offer card with its pinned price bar under it. The ad
 already showed how it works, so every paid visitor meets the price and each
 week answers whether they start a trial. The simulation stays at `?sim=1`;
-Stripe returns and signed-in owners are untouched. Watching a quarter, half and
-all of it is counted in seconds actually played on screen; half is Meta's
-ViewContent. The page's content policy allows media from Cloudinary only.
+Stripe returns and signed-in owners are untouched. Meta's ViewContent there is
+twenty seconds with the page on screen, or tapping start free, whichever comes
+first, so the visitor who gets it in ten seconds counts too. How much of the
+video they watch (seconds actually played on screen) is on `/funnel` only. The
+page's content policy allows media from Cloudinary only.
 Record it in real time and never speed it up: the page says how long it took.
 
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
