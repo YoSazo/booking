@@ -1263,7 +1263,7 @@ function inspectGate(req, res, next) {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://res.cloudinary.com; media-src 'self' https://res.cloudinary.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     // Same empty-allowlist trap as the microphone: geolocation=() disables it
     // for every origin including this one, so navigator.geolocation was dead
     // on arrival in Chrome. A report says where it was made now.

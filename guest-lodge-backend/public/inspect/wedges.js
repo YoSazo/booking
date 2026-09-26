@@ -173,6 +173,13 @@ window.MARKETEL_WEDGES = {
         "jobPlaceholder": "Pine Ave · Unit 2",
         "building": "Building your damage report",
         "reveal": "Here is what your guest or the platform receives."
+      },
+      "video": {
+        "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_720,q_auto,fps_30,ac_none/v1790452950/ScreenRecording_09-23-2026_15-24-34_1_cfwdjy.mp4",
+        "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_720,q_auto/v1790452950/ScreenRecording_09-23-2026_15-24-34_1_cfwdjy.jpg",
+        "seconds": 38,
+        "sub": "A real damage report, made start to finish in 38 seconds.",
+        "label": "A damage report being made in the Marketel Claims app"
       }
     },
     "demo": {

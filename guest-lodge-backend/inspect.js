@@ -877,7 +877,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped'];
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
+    // The video landing: arriving, then how much of the video they watched.
+    'OfferLanded', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   // A step taken inside the iOS app says so: the app's own start screen is not
@@ -890,12 +892,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       : SIM_EVENTS.includes(body?.name) ? simDetail(body?.detail)
       : LADDER_EVENTS.includes(body?.name) && body?.name !== 'OfferDeclined' ? (fromAppOrigin(req) ? 'app' : 'web') : null,
   });
-  // The demo's three signals Meta can optimize for, from the shallowest with
+  // The signals Meta can optimize for. On the video landing, watching half the
+  // video is ViewContent: everyone there sees the price, so seeing it tells
+  // Meta nothing. Otherwise the demo's three, from the shallowest with
   // the most volume to the deepest: the report seen (ViewContent), "Get this"
   // (AddToCart), and the start-free tap (InitiateCheckout). There is no
   // account yet, so each goes with the browser's Meta ids and the visitor id,
   // counted once per visitor however often it happens. Never from the app.
   const SIM_SIGNALS = Object.freeze({
+    OfferVideoHalf: { event: 'ViewContent', id: 'inspect-video-half', what: 'video' },
     SimReportShown: { event: 'ViewContent', id: 'inspect-sim-report', what: 'demo report' },
     SimGetThisTapped: { event: 'AddToCart', id: 'inspect-sim-getthis', what: 'plan' },
     SimCheckoutTapped: { event: 'InitiateCheckout', id: 'inspect-sim-tap', what: 'plan' },

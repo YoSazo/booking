@@ -125,6 +125,17 @@ once per visitor and never from the app or an owner's browser: report seen
 (ViewContent), "Get this" (AddToCart), start free (InitiateCheckout). Optimize
 for the deepest one with enough weekly volume, and move down as it grows.
 
+**Video landing.** A wedge with `landing.video` (a Cloudinary `.mp4`, a
+`.jpg` poster, whole `seconds`, a `sub` line and a `label`) gives ad visitors
+the offer first: the ad's headline, a real-time recording of the real app
+making a report, and the offer card with its pinned price bar under it. The ad
+already showed how it works, so every paid visitor meets the price and each
+week answers whether they start a trial. The simulation stays at `?sim=1`;
+Stripe returns and signed-in owners are untouched. Watching a quarter, half and
+all of it is counted in seconds actually played on screen; half is Meta's
+ViewContent. The page's content policy allows media from Cloudinary only.
+Record it in real time and never speed it up: the page says how long it took.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first

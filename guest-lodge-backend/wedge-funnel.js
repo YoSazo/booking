@@ -5,14 +5,12 @@
 // share between two steps reads "of those who reached the step before".
 
 const STEPS = Object.freeze([
-  { key: 'landed', label: 'Landed from the ad', names: ['SimStarted', 'LandingViewed:!app'] },
-  { key: 'demo', label: 'Started the demo', names: ['SimStarted'] },
-  { key: 'picked', label: 'Picked a finding', names: ['SimFindingPicked'] },
-  { key: 'note', label: 'Watched the note get written', names: ['SimNoteWritten'] },
-  { key: 'photo', label: 'Took the photo', names: ['SimPhotoTaken'] },
-  { key: 'report', label: 'Saw the report', names: ['SimReportShown'] },
-  { key: 'getthis', label: 'Tapped "Get this"', names: ['SimGetThisTapped'] },
-  { key: 'offer', label: 'Saw the offer', names: ['SimOfferViewed'] },
+  { key: 'landed', label: 'Landed from the ad', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
+  // The video landing: everyone sees the price, so how much of the video they
+  // watched is the step between arriving and deciding.
+  { key: 'quarter', label: 'Watched a quarter of the video', names: ['OfferVideoQuarter'] },
+  { key: 'half', label: 'Watched half the video', names: ['OfferVideoHalf'] },
+  { key: 'full', label: 'Watched it to the end', names: ['OfferVideoEnded'] },
   { key: 'tapped', label: 'Tapped start free', names: ['SimCheckoutTapped'] },
   { key: 'email', label: 'Gave their email', names: ['SimEmailGiven'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
@@ -26,6 +24,8 @@ const STEPS = Object.freeze([
 
 // Paths off the main line, each worth watching on its own.
 const BRANCHES = Object.freeze([
+  // The try-it simulation, now at ?sim=1: where the earlier weeks' visitors went.
+  { key: 'demo', label: 'The try-it demo', steps: [['Started the demo', ['SimStarted']], ['Picked a finding', ['SimFindingPicked']], ['Watched the note get written', ['SimNoteWritten']], ['Took the photo', ['SimPhotoTaken']], ['Saw the report', ['SimReportShown']], ['Tapped "Get this"', ['SimGetThisTapped']], ['Saw the offer', ['SimOfferViewed']]] },
   { key: 'kept', label: 'Kept it free', steps: [['Opened keep it free', ['SimKeepFreeOpened']], ['Left their email', ['SimKeptFree', 'KeptFree']]] },
   { key: 'real', label: 'Desktop: started a real report', steps: [['Tapped start a real report', ['SimRealReportTapped']], ['Started setup', ['SetupStarted']], ['Finished setup', ['SetupCompleted']], ['Added a photo', ['FirstPhotoAdded']], ['Saw their report', ['ReportRevealed']], ['Saw the offer', ['ExportOfferViewed']]] },
   { key: 'shots', label: 'App screenshots', steps: [['Saw them under the offer', ['SimScreensViewed']], ['Swiped through', ['SimScreensSwiped']]] },
@@ -40,6 +40,7 @@ const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
+  'OfferLanded', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);
@@ -77,7 +78,7 @@ function buildWedgeFunnel(events) {
   });
   const branches = BRANCHES.map(branch => ({ key: branch.key, label: branch.label,
     steps: branch.steps.map(([label, names]) => ({ label, people: people(events, names) })) }));
-  const starts = events.filter(event => event.name === 'SimStarted');
+  const starts = events.filter(event => event.name === 'SimStarted' || event.name === 'OfferLanded');
   const split = { phone: new Set(starts.filter(e => e.detail === 'phone').map(personOf)).size,
     desktop: new Set(starts.filter(e => e.detail === 'desktop').map(personOf)).size,
     unknown: new Set(starts.filter(e => e.detail !== 'phone' && e.detail !== 'desktop').map(personOf)).size };

@@ -21,6 +21,14 @@ function validate(manifest, filename = '') {
   // Screens of the real app, shown under the demo's offer once the app is live.
   if (manifest.appStore.screens !== undefined && (!Array.isArray(manifest.appStore.screens)
     || manifest.appStore.screens.some(shot => !/^[a-z0-9-]+\.(webp|jpg|png)$/.test(String(shot?.file || '')) || typeof shot.caption !== 'string' || !shot.caption.trim()))) bad('appStore.screens must be files with captions');
+  // A landing video replaces the simulation for ad visitors. The page's content
+  // policy allows media from Cloudinary only, so any other host would be blank.
+  const video = manifest.landing.video;
+  const cloudinary = /^https:\/\/res\.cloudinary\.com\/[a-z0-9_-]+\/video\/upload\/[^\s"'<>]+$/;
+  if (video !== undefined && (!video || !cloudinary.test(String(video.src || '')) || !/\.mp4$/.test(video.src)
+    || (video.poster !== undefined && !(cloudinary.test(String(video.poster)) && /\.jpg$/.test(video.poster)))
+    || !Number.isInteger(video.seconds) || video.seconds < 1 || typeof video.sub !== 'string' || !video.sub.trim()
+    || typeof video.label !== 'string' || !video.label.trim())) bad('landing.video needs a Cloudinary .mp4 src, an optional .jpg poster, whole seconds, a sub line and a label');
   if (manifest.id !== 'inspect' && (!manifest.webTitle || !manifest.skin.home || !manifest.skin.terms)) bad('web title, home and terms are required');
   if (!['single', 'select'].includes(manifest.selection)) bad('selection must be single or select');
   if (manifest.id !== 'inspect' && (!manifest.landing.type || !manifest.types[manifest.landing.type])) bad('landing type must exist');

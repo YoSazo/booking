@@ -2800,3 +2800,19 @@ test('the report seen and "Get this" reach Meta as ViewContent and AddToCart, on
     assert.equal(h.calls.capi.length, 2);
   } finally { h.registration.close(); }
 });
+
+// On the video landing everyone sees the price, so watching half the video is
+// the ViewContent; arriving and the other watch marks stay on our ladder only.
+test('half the landing video reaches Meta as ViewContent; arriving and the other marks do not', async () => {
+  const visitorId = `v_${'d'.repeat(12)}`;
+  const send = (h, name, detail) => request(h.app, '/api/inspect/events/anon', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' },
+    body: JSON.stringify({ name, tool: 'claims', visitorId, detail, attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' } }) });
+  const h = moneyHarness();
+  try {
+    for (const [name, detail] of [['OfferLanded', 'phone'], ['OfferVideoQuarter'], ['OfferVideoHalf'], ['OfferVideoEnded']]) assert.equal((await send(h, name, detail)).status, 200);
+    assert.deepEqual(h.calls.capi, [{ name: 'ViewContent', value: 25, contentName: 'Marketel Claims video', eventId: `inspect-video-half.${visitorId}` }]);
+    assert.equal(h.calls.events.find(e => e.name === 'OfferLanded')?.detail, 'phone');
+    assert.ok(['OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].every(name => h.calls.events.some(e => e.name === name && e.visitorId === visitorId)));
+  } finally { h.registration.close(); }
+});

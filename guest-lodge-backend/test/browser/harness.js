@@ -20,7 +20,7 @@ const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
+async function open({ native = false, arm = 'claims', demo = false, query = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [];
@@ -147,7 +147,15 @@ async function open({ native = false, arm = 'claims', demo = false, signedIn = t
     if (p === '/billing/refresh') return json(data.account);
     return json({ success: true });
   });
-  await page.goto(native ? `http://app.test/inspect/index.html?arm=${arm}` : `http://app.test/${arm === 'inspect' ? 'inspect/' : arm}?sim=${demo ? '1' : '0'}`, { waitUntil: 'domcontentloaded' });
+  // The landing video comes from Cloudinary in production; here a small local
+  // one stands in (Chromium here plays WebM, not the H.264 the CDN sends).
+  await page.route('https://res.cloudinary.com/**', route => route.request().url().endsWith('.jpg')
+    ? route.fulfill({ status: 200, body: JPEG, headers: { 'content-type': 'image/jpeg' } })
+    : route.fulfill({ status: 200, body: fs.readFileSync(path.join(__dirname, 'fixtures/offer-video.webm')), headers: { 'content-type': 'video/webm' } }));
+  // query: null keeps the demo switch; a string opens the page exactly as an ad
+  // visitor does ("") or with the given parameters.
+  const search = query === null ? `?sim=${demo ? '1' : '0'}` : query ? `?${query}` : '';
+  await page.goto(native ? `http://app.test/inspect/index.html?arm=${arm}` : `http://app.test/${arm === 'inspect' ? 'inspect/' : arm}${search}`, { waitUntil: 'domcontentloaded' });
   const close = async () => { await context.close(); await browser.close(); };
   const body = () => page.locator('body').innerText();
   const assertClean = () => assert.deepEqual(errors, []);

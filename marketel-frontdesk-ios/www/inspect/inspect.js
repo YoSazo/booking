@@ -624,7 +624,7 @@ function track(name, detail, once = true) {
   if (ownerBrowser) return;
   if (once && trackedSteps.has(name)) return;
   trackedSteps.add(name);
-  const signal = name === 'SimReportShown' || name === 'SimGetThisTapped';
+  const signal = name === 'SimReportShown' || name === 'SimGetThisTapped' || name === 'OfferVideoHalf';
   api(session ? '/events' : '/events/anon', { method: 'POST', body: { name, tool: toolId(), visitorId, detail, ...(signal ? { attribution: inspectAttribution } : {}) } }).catch(() => {});
 }
 const DECLINE_REASONS = [['too_expensive', 'Too expensive'], ['only_needed_one', 'I only needed one'], ['missing_something', 'It is missing something I need'], ['just_looking', 'Just looking']];
@@ -774,6 +774,7 @@ function simResume(){
   try{picked=sessionStorage.getItem('inspect.sim.pick');}catch{}
   simPicked=s.findings.find(f=>f.id===picked)||null;
   if(state==='cancelled'&&simPicked){history.replaceState(null,'',`${location.pathname}?sim=1`);simOfferPage({declined:true});return;}
+  if(state==='cancelled'&&offerVideo()){history.replaceState(null,'',location.pathname);videoLanding({declined:true});return;}
   simIntro();
 }
 function simIntro(){
@@ -1009,7 +1010,7 @@ function simBuy(trigger){
   simCheckoutTapped();
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
   enterScreen('sim');
-  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">${esc(copy.lede)}</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">${esc(copy.go)}</button></form><p class="muted"><small>${esc(copy.small)}</small></p><button type="button" id="sim-email-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">${esc(copy.lede)}</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">${esc(copy.go)}</button></form><p class="muted"><small>${esc(copy.small)}</small></p><button type="button" id="sim-email-back" class="quiet">${offerOnVideo?'← Back':`← Back to the ${esc(sk.doc)}`}</button></section>`;
   const field=$('sim-email-field');
   // Not focused on arrival: the keyboard would cover the price and the button
   // before they have read what this screen is for. One tap brings it up.
@@ -1033,7 +1034,7 @@ function simKeep(){
   enterScreen('sim');
   track('SimKeepFreeOpened');
   const send=payAtExport()?`When you need to send one, it's $${reportPrice()}, or $${PLANS.month.price}/month for unlimited.`:`Your first finished ${sk.doc} is free.`;
-  $('app').innerHTML=`<section class="sim sim-email sim-keep-screen"><h1>Keep Marketel for when you need it.</h1><p class="muted">Building a ${esc(sk.doc)} is always free. ${esc(send)} We'll email you the link.</p><form id="sim-keep-form" novalidate><input id="sim-keep-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-keep-go" class="wide">Email me the link →</button></form><button type="button" id="sim-keep-back" class="quiet">← Back to the ${esc(sk.doc)}</button></section>`;
+  $('app').innerHTML=`<section class="sim sim-email sim-keep-screen"><h1>Keep Marketel for when you need it.</h1><p class="muted">Building a ${esc(sk.doc)} is always free. ${esc(send)} We'll email you the link.</p><form id="sim-keep-form" novalidate><input id="sim-keep-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-keep-go" class="wide">Email me the link →</button></form><button type="button" id="sim-keep-back" class="quiet">${offerOnVideo?'← Back':`← Back to the ${esc(sk.doc)}`}</button></section>`;
   const field=$('sim-keep-field');
   field.oninput=()=>field.classList.remove('invalid');
   $('sim-keep-back').onclick=()=>simOfferPage();
@@ -1113,13 +1114,14 @@ function simGetThis(){
   track('SimGetThisTapped');
   simOfferPage();
 }
-function simOfferMarkup({declined=false}={}){
+function simOfferMarkup({declined=false,heading='That was a sample. Make real ones.'}={}){
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>That was a sample. Make real ones.</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
+  return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
 }
 // The offer, on its own page: the price, three days free, the real app. On a
 // wide screen the phone keeps the report and the offer takes the side panel.
 function simOfferPage({declined=false}={}){
+  if(offerOnVideo)return videoLanding({declined});
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
   const split=document.documentElement.classList.contains('sim-framed')&&window.matchMedia?.('(min-width: 880px)')?.matches;
   if(split){
@@ -1150,6 +1152,53 @@ function bindSimOffer(){
     }
   }
   bindAppProof();
+}
+// ——— The video landing ——————————————————————————————————————————
+// The ad already showed how it works, so an ad visitor gets what it promised:
+// the real app making a real report, and the offer under it. Every visitor
+// meets the price, so each week answers "will they start a trial" instead of
+// "will they play a demo". The simulation stays at ?sim=1.
+let offerOnVideo=false;
+const offerVideo = () => landingArm()?.video || null;
+function videoActive(){
+  if(native||session||!offerVideo())return false;
+  const params=new URLSearchParams(location.search);
+  // A return from Stripe goes to the page that handles it, never back here.
+  return !params.has('sim')&&!params.has('arm')&&!params.has('checkout');
+}
+function videoLanding({declined=false}={}){
+  enterScreen('offer');
+  offerOnVideo=true;
+  simUnframe();
+  updateHeader();
+  const v=offerVideo(),arm=landingArm(),g=arm.golden||{},sk=skin(),copy=simOffer();
+  const heading=SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
+  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(v.sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  bindSimOffer();
+  bindOfferVideo();
+  $('offer-sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
+  track('OfferLanded',phoneWidth()?'phone':'desktop');
+}
+// Plays only while it is on screen, so "watched" means someone could see it,
+// and counts seconds actually played: the loop restarts the playhead.
+function bindOfferVideo(){
+  const video=$('offer-video');
+  if(!video)return;
+  const marks=[[0.25,'OfferVideoQuarter'],[0.5,'OfferVideoHalf'],[0.97,'OfferVideoEnded']];
+  let watched=0,last=0;
+  video.addEventListener('timeupdate',()=>{
+    const at=video.currentTime,length=video.duration;
+    if(at>last&&at-last<1.5)watched+=at-last;
+    last=at;
+    if(!length||!Number.isFinite(length))return;
+    for(const [share,name] of marks)if(watched>=share*length)track(name);
+  });
+  // Where the browser refuses to start it, the controls let them.
+  const play=()=>video.play()?.catch(()=>{video.controls=true;});
+  if(simReduced()){video.controls=true;return;}
+  if(typeof IntersectionObserver==='function')
+    new IntersectionObserver(([entry])=>{if(!video.isConnected)return;if(entry.isIntersecting)play();else video.pause();},{threshold:0.5}).observe(video);
+  else play();
 }
 function landing() {
   enterScreen('landing');
@@ -3217,7 +3266,8 @@ function renderRecovery(){
   if($('recovery-tools'))$('recovery-tools').onclick=()=>location.replace('../index.html?choose=1');
 }
 const bootWatchdog=setTimeout(()=>{if(!booted)renderRecovery();},12000);
-if(simActive()){clearTimeout(bootWatchdog);booted=true;simResume();}
+if(videoActive()){clearTimeout(bootWatchdog);booted=true;videoLanding();}
+else if(simActive()){clearTimeout(bootWatchdog);booted=true;simResume();}
 else try{
   if(session)reportsSkeleton();else $('app').innerHTML=`<section class="loading">Opening Marketel ${esc(skin().product)}…</section>`;
   // Storage gets one bounded chance. If it does not answer, open without the
