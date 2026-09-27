@@ -214,19 +214,44 @@ its offer or deadline copy. It records the research and intended limits.
 
 ### Launch playbook: the ads
 
-Every wedge goes through three stages, and only spends more once it passes.
+Every wedge gets the same test on the video landing (§8), and spends more only
+once it passes. The budget is $300 a week of the owner's money: two wedges at
+$20/day while testing. At $10/day a verdict takes twice as long for the same
+money, and Meta learns from half the events.
 
-| Stage | Spend | Creative | Judge on | Pass line |
-|---|---|---|---|---|
-| 1. Does the hook land? | $10–20/day, 2–3 days | Screen recording of the demo (`artifacts/wedges/<id>/demo-walkthrough.mp4` from `wedge:check`) with AI voice and subtitles | Link CTR, cost per landed visitor (`/funnel`) | Link CTR above ~3%, under ~$1 per landed visitor |
-| 2. Does it convert? | $50 UGC creator on the same script, then $20/day for 7 days | Creator video | Cost per finished demo, then cost per trial | Trials under ~$50 each once there are ~10 |
-| 3. Scale or kill | Revenue funds it | Fresh UGC faces when frequency climbs | Cost per paying customer against what a customer brings in | Scale at 2× or better; otherwise fix the weakest `/funnel` step or kill |
+| Stage | Spend | Creative | Pass line |
+|---|---|---|---|
+| 1. Does the hook land? | First 2–3 days | Real-time screen recording of the real app, with AI voice and subtitles, or the creator video | Link CTR above ~3% (link clicks, not CTR (all)); under ~$2 per landed visitor on `/funnel` |
+| 2. Do they want it? | 1–2 weeks at $20/day (~$150–300) | Same | The checkpoints below |
+| 3. Scale or kill | Revenue funds it | Fresh UGC faces when frequency climbs | Keep while a paying customer costs under ~$150 (about six months to pay back); scale when it is under ~$75 |
 
-Optimize Meta for the deepest demo signal with enough weekly volume (report
-seen → "Get this" → start free). Judge on cost per link click, not CTR (all).
-One wedge at $20/day until the machine is proven end to end; then two at
-$10/day. A killed wedge is a few days and a few hundred dollars: move to the
-next brief, and keep the next one ready before you need it.
+**Checkpoints.** Judge on people who landed, never on a day: Meta can spend
+most of a day's budget in one burst. Each row is a `/funnel` row.
+
+| Checkpoint | Judge once there are | Healthy | Otherwise |
+|---|---|---|---|
+| Stayed 20 seconds or tapped start free | 100 landed | 25% or more | Under 15%: the ad and the page do not match. Fix the headline or the video once before judging the wedge. |
+| Tapped start free | 100 landed | 3 or more | 0–1: kill. 2: one more week. |
+| Gave their email | 5 taps | 60% of taps | The email step scares people: fix it, do not kill the wedge. |
+| Opened Stripe, then started a trial | 5 opened Stripe | 50–70% | Checkout friction, shared by every wedge: fix it once for all. |
+| Started a trial | 200 landed | 3 or more (1.5%) | 0–1: kill. 2: one more week. |
+
+The minimums keep a good wedge from being killed by bad luck: one where 5 in
+100 really tap shows 0–1 taps in 100 visitors about 4% of the time, and one
+where 2 in 100 really start a trial shows none in 100 visitors 13% of the time
+but in 200 only about 2%.
+
+**Fixing.** One change a week, at the step losing the most people. A wedge
+gets at most two fix weeks after its first read; still under the line, kill
+it. Fix only what one change can close: a step that must double can be fixed,
+a step that must grow five times cannot. Run at most four wedges at once and
+move money to the one whose paying customer costs least.
+
+**Meta.** On the video landing, ViewContent is twenty seconds on the page or
+tapping start free. Move the ads to InitiateCheckout (start free) once it
+reaches about 20 a week. A killed wedge is a week or two and a few hundred
+dollars: move to the next brief, and keep the next one ready before you need
+it.
 
 ### Gotchas
 
