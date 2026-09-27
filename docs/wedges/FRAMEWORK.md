@@ -194,6 +194,10 @@ both `index.html` asset versions together. `verify:release` checks the app;
    `baselineReportId` then use it without engine edits. A deadline with only
    `text` displays guidance and computes no “File by” date. Add `days`,
    `from` and `field` only when one rule truly applies to the whole audience.
+   When what is photographed is not a room, give the type `capture` words
+   (`ask`, `another`, `missing`, such as "Which part of the car?"); its
+   first seed is the camera's placeholder. Walk every screen and read it: the
+   copy scan cannot know which of the engine's defaults sound wrong.
 3. Provide three real demo photos and thumbnails.
 4. Run `npm run wedge:check -- <id>`. Review its screenshots at phone size and
    the demo recording by eye, including the wording on every rendered page.

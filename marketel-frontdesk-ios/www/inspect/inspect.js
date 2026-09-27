@@ -86,6 +86,9 @@ const wedge = type => WEDGES[type] || WEDGES.default;
 // was never given.
 const entryTool = type => wedge(type ?? draft?.document?.type).unit === 'entry';
 const entryLabel = (room, index) => room?.name || `Finding ${index + 1}`;
+// What the camera calls the thing being photographed: a room in a rental, a
+// part of the car for a detailer. A type's own words, or the rental ones.
+const captureWords = type => ({ ask: 'Which room are you in?', another: 'another room', missing: 'Type which room this is.', ...(wedge(type).capture || {}) });
 const SIGNER_ROLES = Object.fromEntries(Object.entries(TYPE_CONFIG).map(([id, config]) => [id, [config.signers.manager, config.signers.other]]));
 SIGNER_ROLES.default = [MANIFESTS.inspect.types.routine.signers.manager, MANIFESTS.inspect.types.routine.signers.other];
 const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
@@ -1302,7 +1305,7 @@ function setupFlow(){
     };
   };
   const two=()=>{
-    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add rooms, photos and notes next.</p>${savedPropertyChips()}<label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
+    flow.paint(`<p class="setup-step">Step ${account?.businessName?'1 of 1':'2 of 2'}</p><h2>${esc(g.jobTitle||sk.propertyPrompt)}</h2><p class="muted">Just enough to start. You add ${esc(w.nounPlural||'rooms')}, photos and notes next.</p>${savedPropertyChips()}<label>${esc(g.jobLabel||'Property / unit name')}<input id="setup-property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" placeholder="${esc(g.jobPlaceholder||'Oak Street · Unit 2')}"></label><label class="date-field">${esc(w.dateLabel)}<input type="date" id="setup-date" value="${esc(localDate())}"></label><button type="button" id="setup-build" class="wide">Build my ${esc(sk.doc)} →</button>${account?.businessName?'':'<button type="button" id="setup-back" class="quiet">← Back</button>'}`);
     if($('setup-back'))$('setup-back').onclick=one;
     document.querySelectorAll('[data-pick-property]').forEach(button=>button.onclick=()=>{haptic();$('setup-property').value=button.dataset.pickProperty;$('setup-build').click();});
     // Saved properties arrive a moment later on a cold start; show them when they do.
@@ -2998,7 +3001,7 @@ function cameraAskScreen(entering){
   // exactly as its "before" is named, so the two pair with nothing typed.
   const base=currentBaseline(),used=new Set(rooms.map(item=>(item.name||'').trim().toLowerCase()).filter(Boolean));
   const fromCheckIn=base?[...new Set(base.document.rooms.map(item=>item.name.trim()).filter(name=>name&&!used.has(name.toLowerCase())))]:[];
-  $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length||fromCheckIn.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}${fromCheckIn.map(name=>`<button type="button" class="camera-room is-check-in" data-ask-name="${esc(name)}"><strong>${esc(name)}</strong><span>Before</span></button>`).join('')}</div>`:''}<h1>Which room are you in?</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="Kitchen"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
+  $('app').innerHTML=`<section class="camera-companion camera-ask${entering?' is-entering':''}">${others.length||fromCheckIn.length?`<div class="camera-rooms">${others.map(({item,index})=>`<button type="button" class="camera-room" data-ask-room="${index}"><strong>${esc(item.name.trim())}</strong><span>${item.photos.length}</span></button>`).join('')}${fromCheckIn.map(name=>`<button type="button" class="camera-room is-check-in" data-ask-name="${esc(name)}"><strong>${esc(name)}</strong><span>Before</span></button>`).join('')}</div>`:''}<h1>${esc(captureWords(draft.document.type).ask)}</h1><form id="hud-room-form" novalidate><input id="hud-room" maxlength="100" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="${esc(wedge(draft.document.type).seeds?.[0]||'Kitchen')}"><button type="submit" class="wide">Done →</button></form><p class="muted"><small>The camera opens next.</small></p><button type="button" id="hud-room-back" class="quiet">← Back to the ${esc(skin().doc)}</button></section>`;
   const field=$('hud-room');
   // Synchronous focus inside the gesture that opened this, so the keyboard
   // comes up with the screen rather than after it.
@@ -3013,7 +3016,7 @@ function cameraAskScreen(entering){
   $('hud-room-back').onclick=()=>{haptic();leaveCameraAsk();};
   const named=raw=>{
     const value=String(raw||'').trim().slice(0,100);
-    if(!value)return notice('Type which room this is.','error');
+    if(!value)return notice(captureWords(draft?.document?.type).missing,'error');
     if(adding){
       if(rooms.length>=30)return notice('Maximum 30 findings.');
       rooms.push({name:value,observation:'',issue:false,photos:[]});
@@ -3077,7 +3080,7 @@ function cameraCompanion(entering=false){
     ? (talking?'Listening…':'Tap the mic and say the room.')
     : (talking?'Listening…':'Tap the mic and say what you are looking at.');
   const body=asking==='name'?'':note;
-  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another room</button></div>${asking==='name'?`<h1>${heading}</h1>`:''}${photosOnly?'':`<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div>`}<div class="camera-strip">${strip||`<p class="muted"><small>Shots land here, each one dated.</small></p>`}</div><div class="hud-actions">${hudShell()&&!photosOnly?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ ${esc(captureWords(draft.document.type).another)}</button></div>${asking==='name'?`<h1>${heading}</h1>`:''}${photosOnly?'':`<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div>`}<div class="camera-strip">${strip||`<p class="muted"><small>Shots land here, each one dated.</small></p>`}</div><div class="hud-actions">${hudShell()&&!photosOnly?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
 
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   $('hud-next').onclick=()=>{

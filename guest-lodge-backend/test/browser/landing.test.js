@@ -19,7 +19,8 @@ for (const arm of ['claims', 'inspect', 'incident']) {
         await h.page.click('#start');
       } else await h.page.click('#start');
       if (arm === 'claims') await h.page.waitForSelector('#setup-business, #setup-property', { timeout: 5000 });
-      else assert.match(await h.body(), /Which property\?|Which location\?/);
+      // Wait for the setup screen to draw: reading the page straight after the tap raced it under load.
+      else await h.page.waitForFunction(() => /Which property\?|Which location\?/.test(document.body.innerText), null, { timeout: 5000 });
       h.assertClean();
     } finally { await h.close(); }
   });

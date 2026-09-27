@@ -45,6 +45,8 @@ function validate(manifest, filename = '') {
       || (type.can.deadline.days !== undefined && (!Number.isInteger(type.can.deadline.days) || type.can.deadline.days < 1 || !type.can.deadline.from || !type.can.deadline.field)))) bad(`invalid deadline for ${id}`);
     if (type.can.photosOnly && !type.can.free) bad(`photos-only baseline ${id} must be free`);
     if (type.can.originals && (typeof type.originalsLine !== 'string' || !type.originalsLine.trim())) bad(`originals line missing for ${id}`);
+    // The camera's own words for what is photographed; defaults are a rental's rooms.
+    if (type.capture !== undefined && (!type.capture || ['ask', 'another', 'missing'].some(key => typeof type.capture[key] !== 'string' || !type.capture[key].trim()))) bad(`capture needs ask, another and missing for ${id}`);
   }
   if (manifest.demo && (!Array.isArray(manifest.demo.findings) || manifest.demo.findings.length !== 3
     || manifest.demo.findings.some(finding => !finding.photo || !finding.said || !finding.note))) bad('demo needs three complete findings');

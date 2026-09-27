@@ -246,7 +246,7 @@ test('an incident record does not misstate anything to an insurer', () => {
 
     // type is the wedge discriminator and needs no migration, but the three
     // existing types must keep working.
-    assert.deepEqual(require('../wedges/registry').load().all.flatMap(w => Object.keys(w.types)).sort(), ['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in', 'landlord-move-out', 'landlord-move-in'].sort());
+    assert.deepEqual(require('../wedges/registry').load().all.flatMap(w => Object.keys(w.types)).sort(), ['routine', 'move-in', 'move-out', 'incident', 'damage', 'check-in', 'landlord-move-out', 'landlord-move-in', 'vehicle-intake'].sort());
 
     // date is when it was written down; neither it nor finalizedAt says when
     // the thing happened. Optional, and unknown is a real answer.
@@ -323,7 +323,7 @@ test('each wedge is a root path, skinned per arm, and still attributed for free'
     // A slug has to survive the root namespace, which it shares with Booking's
     // own pages and with express.static(public) serving every file in there.
     const slugs = require('../wedges/registry').load().all.filter(w => w.id !== 'inspect').map(w => w.id);
-    assert.deepEqual(slugs, ['claims', 'incident', 'moveout']);
+    assert.deepEqual(slugs, ['claims', 'incident', 'intake', 'moveout']);
     const taken = new Set([...server.matchAll(/app\.(?:get|post|use|all)\('\/([a-z0-9-]+)'/g)].map(m => m[1]));
     for (const slug of slugs) {
         assert.ok(!taken.has(slug), `/${slug} collides with an existing route`);
@@ -1231,7 +1231,9 @@ test('a damage report is findings, and the capture screen is the recording', () 
   assert.match(companion, /id="hud-talk"/);
   // Adding one is a chip beside the rooms now, not a wide button, and nothing
   // in the capture screen invents a "Finding 2" to label it with.
-  assert.match(companion, /id="hud-next" class="camera-room is-add">\+ another room/);
+  // Its words are the report type's: "another room" in a rental, "another part" on a car.
+  assert.match(companion, /id="hud-next" class="camera-room is-add">\+ \$\{esc\(captureWords\(draft\.document\.type\)\.another\)\}/);
+  assert.match(client, /const captureWords = type => \(\{ ask: 'Which room are you in\?', another: 'another room', missing: 'Type which room this is\.'/);
   assert.doesNotMatch(companion, /Next \$\{esc\(entries/);
   // Dictation writes the speaker's own words, with nothing uploaded from here.
   assert.match(client, /if\(hudDictation&&draft\?\.document\?\.rooms\[hudDictation\.index\]/);
@@ -1427,7 +1429,7 @@ test('every tool sells a single report, and the free first one survives it', () 
     const manifests=require('../wedges/registry').load().all;
     assert.match(server, /WEDGE_REGISTRY\.all\.map/);
     assert.match(client, /Object\.entries\(MANIFESTS\)\.map/);
-    assert.deepEqual(Object.fromEntries(manifests.map(w=>[w.id,w.offer.mode])), {claims:'pay-at-export',incident:'first-free',inspect:'first-free',moveout:'pay-at-export'});
+    assert.deepEqual(Object.fromEntries(manifests.map(w=>[w.id,w.offer.mode])), {claims:'pay-at-export',incident:'first-free',inspect:'first-free',intake:'pay-at-export',moveout:'pay-at-export'});
     assert.ok(manifests.every(w=>w.offer.reportPrice===12));
 
     // offerMode is independent of the price. A first-free tool still gives the

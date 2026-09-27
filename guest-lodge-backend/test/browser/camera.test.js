@@ -53,3 +53,31 @@ test('native camera keeps room chips, dated shots and the matching Before photo 
     h.assertClean();
   } finally { await h.close(); }
 });
+
+// The camera speaks the report type's words: a rental has rooms, a detailer's
+// car has parts. Claims above keeps "Which room are you in?".
+test('intake: the camera asks for a part of the car, never a room', async () => {
+  const h = await open({ native: true, arm: 'intake', properties: ['White Tacoma'], accountData: { businessName: 'Shine Mobile Detailing' } });
+  try {
+    await h.page.waitForSelector('#new-report');
+    await h.page.click('#new-report');
+    await h.page.waitForSelector('[data-pick-property="White Tacoma"]');
+    assert.match(await h.body(), /You add areas, photos and notes next\./);
+    await h.page.click('[data-pick-property="White Tacoma"]');
+    await h.page.waitForSelector('[data-native-camera]');
+    await h.page.click('[data-native-camera]');
+    await h.page.waitForSelector('#hud-room');
+    assert.match(await h.body(), /Which part of the car\?/);
+    assert.equal(await h.page.getAttribute('#hud-room', 'placeholder'), 'Front bumper');
+    await h.page.click('#hud-room-form button[type="submit"]');
+    await h.page.waitForTimeout(150);
+    assert.match(await h.body(), /Type which part of the car this is\./);
+    await h.page.fill('#hud-room', 'Front bumper');
+    await h.page.click('#hud-room-form button[type="submit"]');
+    await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
+    await h.page.waitForSelector('#hud-next');
+    assert.equal((await h.page.textContent('#hud-next')).trim(), '+ another part');
+    assert.doesNotMatch(await h.body(), /\broom\b/i);
+    h.assertClean();
+  } finally { await h.close(); }
+});
