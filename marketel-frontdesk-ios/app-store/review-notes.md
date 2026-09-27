@@ -39,6 +39,18 @@ credits, so a report can be sent without a purchase.
 7. The **•••** menu holds Account, Manage subscription, Privacy, Terms,
    Support and **Delete account**.
 
+**Intake** (the second choice on first launch, or via the product name at the
+top) is the same report tool for vehicle detailers: a dated record of a car's
+visible condition at drop-off, signed by the customer. The same account,
+plan and credits apply.
+
+1. From the chooser, pick **Intake**, then tap **New Report**, type any vehicle
+   (for example "White Tacoma"), and tap **Build my report**.
+2. Tap **Take photo**; the camera asks "Which part of the car?". Pick or type a
+   part, photograph it, and tap the mic to describe what you see.
+3. Build, preview, add the customer's signature if you like, and send it as a
+   private link or PDF.
+
 Camera, photo library and microphone are requested only when the reviewer
 chooses to add a photo or tap the mic. Voice is transcribed to text and the
 audio is not kept.

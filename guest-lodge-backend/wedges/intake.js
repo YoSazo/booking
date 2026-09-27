@@ -8,7 +8,7 @@ module.exports = {
   "id": "intake",
   "product": "Intake",
   "webTitle": "Marketel Intake — Record the car before you start",
-  "status": "draft",
+  "status": "live",
   "roleLabels": {
     "detailer": "Detailer",
     "customer": "Customer"
