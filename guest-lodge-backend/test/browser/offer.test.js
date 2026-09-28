@@ -48,7 +48,11 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$99 once\s*Ends in 1d 18:5\d:\d\d\s*Get it/);
+    // The bar is what a phone visitor keeps seeing: the plan it replaces, the
+    // price, and when it becomes $199.
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199\/yr \$99 once\s*Then \$199 in 1d 18:5\d:\d\d\s*Get it/);
+    assert.equal(await h.page.textContent('#sim-paybar s'), '$199/yr');
+    assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
     // It ticks.
     const before = await h.page.textContent('[data-launch-left]');
     await h.page.waitForTimeout(1300);

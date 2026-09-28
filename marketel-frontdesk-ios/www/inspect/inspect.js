@@ -622,6 +622,8 @@ const reportPrice = () => toolOffer().reportPrice || 0;
 const launchOffer = () => { const launch = toolOffer().launch; return launch && Date.now() < Date.parse(launch.until) ? launch : null; };
 const lifetimePrice = () => launchOffer()?.price || toolOffer().lifetime || 0;
 const launchEnds = () => { const launch = toolOffer().launch; return launch ? `${new Date(Date.parse(launch.until)).toLocaleString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} PT` : ''; };
+// The pinned bar's second line during a launch: the price after it and when.
+const launchBarLine = () => `Then $${toolOffer().lifetime} in ${launchLeft()}`;
 function launchLeft(){
   const launch=launchOffer();
   if(!launch)return '';
@@ -970,7 +972,8 @@ function simOffer(plan=PLANS[planInterval]||PLANS.month){
     const price=lifetimePrice(),launch=launchOffer();
     return {save:`Unlimited ${sk.docPlural} · No monthly fees`,
       terms:`One payment of $${price}. No subscription, and nothing renews. Unlimited ${sk.docPlural} within fair use.${launch?` Launch price until ${launchEnds()}, then $${toolOffer().lifetime}.`:''}`,
-      cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:launch?`Ends in ${launchLeft()}`:'No subscription',barCta:'Get it →',
+      cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:launch?launchBarLine():'No subscription',barCta:'Get it →',
+      barHtml:launch?`<s class="bar-was">$${PLANS.year.price}/yr</s> $${price} once`:'',barClock:!!launch,
       lede:'One address for your receipt and for signing in. Payment is on the next screen.',go:'Continue to payment →',
       small:`$${price} once. Apple Pay or card on the next screen.`};
   }
@@ -1220,7 +1223,7 @@ function videoLanding({declined=false}={}){
   const heading=payOnce()?'Pay once. Keep it for good.':SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
   const title=payOnce()?`$${lifetimePrice()} once.<br><span class="green">Unlimited ${esc(wedge(arm.type).label.toLowerCase())}s.</span>`:(g.headline||arm.title);
   const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
-  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
@@ -1242,7 +1245,7 @@ function tickLaunch(){
     const left=launchLeft();
     clock.textContent=left;
     const bar=document.querySelector('#sim-paybar small');
-    if(bar)bar.textContent=`Ends in ${left}`;
+    if(bar)bar.textContent=launchBarLine();
   },1000);
 }
 // Engaged is Meta's ViewContent on this page: twenty seconds with it on their
