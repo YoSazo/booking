@@ -156,6 +156,16 @@ On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
 ad must say the same thing: an ad promising "free to try" that lands on "$99
 once" is the mismatch that sinks a week.
 
+**Launch price.** `offer.launch` (`price` below `offer.lifetime`, and a fixed
+UTC `until`) shows the lower price with a live countdown to that moment, the
+same for everyone, and "Instead of ~~$199 every year~~" (the real annual plan).
+At `until` the page redraws at the full price and checkout charges it; the
+registry refuses a launch that is not lower or not a fixed time. Urgency here
+is always real: published tests show real deadlines lifting sales (median
++9%) and fake or resetting ones lowering them, and the FTC names baseless
+timers as deceptive. A new launch price later is a real price change, never a
+reset. "Only N left" waits until real sales make the number true.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first

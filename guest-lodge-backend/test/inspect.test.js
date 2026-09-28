@@ -2863,7 +2863,11 @@ const onceSession = (overrides = {}) => ({
 const sendWebhook = (h, object, type = 'checkout.session.completed') => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
   headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify({ type, created: 1760000000, data: { object } }) });
 
-test('paying once is one $99 payment with no subscription, and it carries the ad click to Stripe', async () => {
+// The launch price's end is fixed, so these tests fix the clock either side of it.
+const atTime = async (iso, run) => { const real = Date.now; Date.now = () => Date.parse(iso); try { return await run(); } finally { Date.now = real; } };
+const DURING_LAUNCH = '2026-09-30T12:00:00Z', AFTER_LAUNCH = '2026-10-02T07:00:00Z';
+
+test('paying once is one $99 payment with no subscription, and it carries the ad click to Stripe', () => atTime(DURING_LAUNCH, async () => {
   const h = moneyHarness();
   const buy = body => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', interval: 'month', tool: 'claims', visitorId: `v_${'a'.repeat(12)}`,
@@ -2899,6 +2903,34 @@ test('paying once is one $99 payment with no subscription, and it carries the ad
     assert.equal(response.status, 409);
     assert.equal(had.calls.sessions.length, 0);
   } finally { had.registration.close(); }
+}));
+
+test('the launch price really ends: from its fixed moment checkout charges $199 for everyone', async () => {
+  const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: 'lifetime', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` }) });
+  await atTime(DURING_LAUNCH, async () => {
+    const h = moneyHarness();
+    try {
+      assert.equal((await buy(h)).status, 200);
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 9900);
+      assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
+    } finally { h.registration.close(); }
+  });
+  await atTime(AFTER_LAUNCH, async () => {
+    const h = moneyHarness();
+    try {
+      assert.equal((await buy(h)).status, 200);
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 19900);
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews.');
+    } finally { h.registration.close(); }
+  });
+  // A launch price the registry would accept is lower than the full price and
+  // ends at a fixed UTC moment; a vague or reversed one never loads.
+  const { validate } = require('../wedges/registry');
+  const claims = require('../wedges/claims');
+  const withLaunch = launch => ({ ...claims, offer: { ...claims.offer, launch } });
+  assert.throws(() => validate(withLaunch({ price: 249, until: '2026-10-02T06:59:59Z' })), /offer\.launch/);
+  assert.throws(() => validate(withLaunch({ price: 99, until: 'next week' })), /offer\.launch/);
 });
 
 test('paying once grants the plan for good, exactly once, and Meta hears the sale', async () => {
@@ -2991,7 +3023,7 @@ test('paid once is a plan for good: unlimited, nothing renews, nothing more to b
   } finally { h.registration.close(); }
 });
 
-test('a tap on pay once reaches Meta at its own price', async () => {
+test('a tap on pay once reaches Meta at its own price', () => atTime(DURING_LAUNCH, async () => {
   const visitorId = `v_${'b'.repeat(12)}`;
   const h = moneyHarness();
   try {
@@ -3001,4 +3033,4 @@ test('a tap on pay once reaches Meta at its own price', async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 99, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-tap.${visitorId}` }]);
   } finally { h.registration.close(); }
-});
+}));

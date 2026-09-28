@@ -616,8 +616,19 @@ const toolOffer = () => TOOL_OFFERS[toolId()] || TOOL_OFFERS.inspect;
 const payAtExport = () => toolOffer().mode === 'pay-at-export';
 const reportPrice = () => toolOffer().reportPrice || 0;
 // Pay once, for good: what the video landing sells, where the wedge sets a
-// price for it, instead of a subscription trial. Mirrors TOOLS' lifetimePrice.
-const lifetimePrice = () => toolOffer().lifetime || 0;
+// price for it, instead of a subscription trial. A launch price is real: it
+// ends at one fixed moment for everyone, and checkout charges the full price
+// after it (lifetimeCents on the server). Date.now only, so tests can set it.
+const launchOffer = () => { const launch = toolOffer().launch; return launch && Date.now() < Date.parse(launch.until) ? launch : null; };
+const lifetimePrice = () => launchOffer()?.price || toolOffer().lifetime || 0;
+const launchEnds = () => { const launch = toolOffer().launch; return launch ? `${new Date(Date.parse(launch.until)).toLocaleString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} PT` : ''; };
+function launchLeft(){
+  const launch=launchOffer();
+  if(!launch)return '';
+  const s=Math.max(0,Math.floor((Date.parse(launch.until)-Date.now())/1000)),pad=n=>String(n).padStart(2,'0');
+  const days=Math.floor(s/86400);
+  return `${days?`${days}d `:''}${pad(Math.floor(s%86400/3600))}:${pad(Math.floor(s%3600/60))}:${pad(s%60)}`;
+}
 const payOnce = () => offerOnVideo && lifetimePrice() > 0;
 // Plans are unlimited; this is only ever seen at the fair-use ceiling.
 const FAIR_USE_REACHED = 'You have reached this plan\'s fair-use limit for this billing period. Email support@bookmarketel.com and we will lift it.';
@@ -956,10 +967,10 @@ const SIM_TRIAL_DAYS = 3;
 function simOffer(plan=PLANS[planInterval]||PLANS.month){
   const sk=skin();
   if(payOnce()){
-    const price=lifetimePrice();
+    const price=lifetimePrice(),launch=launchOffer();
     return {save:`Unlimited ${sk.docPlural} · No monthly fees`,
-      terms:`One payment of $${price}. No subscription, and nothing renews. Unlimited ${sk.docPlural} within fair use.`,
-      cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:'No subscription',barCta:'Get it →',
+      terms:`One payment of $${price}. No subscription, and nothing renews. Unlimited ${sk.docPlural} within fair use.${launch?` Launch price until ${launchEnds()}, then $${toolOffer().lifetime}.`:''}`,
+      cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:launch?`Ends in ${launchLeft()}`:'No subscription',barCta:'Get it →',
       lede:'One address for your receipt and for signing in. Payment is on the next screen.',go:'Continue to payment →',
       small:`$${price} once. Apple Pay or card on the next screen.`};
   }
@@ -1149,7 +1160,7 @@ function simGetThis(){
 }
 function simOfferMarkup({declined=false,heading='That was a sample. Make real ones.'}={}){
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  if(payOnce())return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${lifetimePrice()} <small>once</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section>`;
+  if(payOnce())return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p>${launchOffer()?`<p class="price-anchor">Instead of <s>$${PLANS.year.price} every year</s></p>`:''}<div class="price">$${lifetimePrice()} <small>once</small></div><p class="price-save">${esc(copy.save)}</p>${launchOffer()?`<p class="launch-clock">Launch price ends in <strong data-launch-left>${launchLeft()}</strong> · then $${toolOffer().lifetime}</p>`:''}<button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section>`;
   return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
 }
 // The offer, on its own page: the price, three days free, the real app. On a
@@ -1213,8 +1224,26 @@ function videoLanding({declined=false}={}){
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
+  tickLaunch();
   $('offer-sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   track('OfferLanded',phoneWidth()?'phone':'desktop');
+}
+// The launch clock, once a second. When it reaches zero the price really
+// changes, so the page redraws at the full price rather than showing a price
+// that checkout would no longer charge.
+let launchTimer=null;
+function tickLaunch(){
+  clearInterval(launchTimer);launchTimer=null;
+  if(!payOnce()||!launchOffer())return;
+  launchTimer=setInterval(()=>{
+    const clock=document.querySelector('[data-launch-left]');
+    if(!clock||!offerOnVideo){clearInterval(launchTimer);launchTimer=null;return;}
+    if(!launchOffer()){clearInterval(launchTimer);launchTimer=null;videoLanding();return;}
+    const left=launchLeft();
+    clock.textContent=left;
+    const bar=document.querySelector('#sim-paybar small');
+    if(bar)bar.textContent=`Ends in ${left}`;
+  },1000);
 }
 // Engaged is Meta's ViewContent on this page: twenty seconds with it on their
 // screen (a tab left open behind others does not count), or tapping start free,

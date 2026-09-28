@@ -15,6 +15,12 @@ function validate(manifest, filename = '') {
   // Pay once, for good, in whole dollars: what the video landing sells instead
   // of a subscription trial when it is set.
   if (manifest.offer.lifetime !== undefined && (!Number.isInteger(manifest.offer.lifetime) || manifest.offer.lifetime < 19 || manifest.offer.lifetime > 999)) bad('offer.lifetime must be whole dollars from 19 to 999');
+  // A launch price is real: lower than the price after it, and it ends at a
+  // fixed moment, the same for everyone, after which checkout charges the full
+  // price. Never a timer that resets.
+  const launch = manifest.offer.launch;
+  if (launch !== undefined && (!manifest.offer.lifetime || !Number.isInteger(launch?.price) || launch.price < 19 || launch.price >= manifest.offer.lifetime
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(launch.until || '')) || !Number.isFinite(Date.parse(launch.until)))) bad('offer.launch needs a whole-dollar price below offer.lifetime and a fixed UTC until (YYYY-MM-DDTHH:MM:SSZ)');
   if (!Array.isArray(manifest.listTypes) || !manifest.listTypes.length || !manifest.types || typeof manifest.types !== 'object') bad('types and listTypes are required');
   if (!manifest.skin || !manifest.landing || !manifest.appStore || typeof manifest.chooser !== 'string') bad('skin, landing, appStore and chooser are required');
   if (!manifest.roleLabels || typeof manifest.roleLabels !== 'object') bad('role labels are required');

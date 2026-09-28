@@ -20,13 +20,16 @@ const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
+async function open({ native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [];
   const fallbackPhoto = photoFallback ? fs.readFileSync(photoFallback) : JPEG;
   const data = { reports: [...reports], properties: [...properties], account: account(accountData), photoCount: 0, photoBytes: new Map() };
   await context.exposeBinding('__shell', (_, message) => shell.push(message));
+  // The page's clock at a fixed moment that keeps ticking from there, for
+  // offers that change at a set time (a launch price ending).
+  if (now) await context.addInitScript(at => { const offset = at - Date.now(); const real = Date.now.bind(Date); Date.now = () => real() + offset; }, Date.parse(now));
   // Chromium does not hand test code the body of an upload that carries a file,
   // so each photo is read in the page, stored here by key, and the upload URL
   // carries the key. Without this every photo came back as the fallback.

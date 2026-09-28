@@ -4,6 +4,9 @@ const assert = require('node:assert/strict');
 const { open } = require('./harness');
 
 const phone = { width: 390, height: 844 };
+// The Claims launch price ends at a fixed moment (2026-10-02T06:59:59Z); pages
+// that show it are pinned before that, so they read the same any day they run.
+const DURING_LAUNCH = '2026-09-30T12:00:00Z';
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
@@ -22,7 +25,7 @@ const fastClock = async (h, { hidden = false } = {}) => {
 // making a report, and one offer under it. No simulation stands between them
 // and the price, and no subscription is in it: Claims is paid once.
 test('phone: an ad visitor gets $99 once as the headline, the video, and one button', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
     const video = await h.page.evaluate(() => { const v = document.getElementById('offer-video'); return { muted: v.muted, loop: v.loop, inline: v.playsInline, src: v.getAttribute('src'), poster: v.getAttribute('poster') }; });
@@ -36,16 +39,24 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.match(text, /38 seconds/);
     assert.match(text, /Pay once\. Keep it for good\./);
     assert.match(text, /One payment of \$99\. No subscription, and nothing renews\./);
+    // The launch price: the real plan it replaces, and the real moment it ends.
+    assert.match(text, /Instead of \$199 every year/);
+    assert.match(text, /Launch price ends in 1d 18:5\d:\d\d · then \$199/);
+    assert.match(text, /Launch price until Thu, Oct 1, 11:59 PM PT, then \$199\./);
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$99 once\s*No subscription\s*Get it/);
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$99 once\s*Ends in 1d 18:5\d:\d\d\s*Get it/);
+    // It ticks.
+    const before = await h.page.textContent('[data-launch-left]');
+    await h.page.waitForTimeout(1300);
+    assert.notEqual(await h.page.textContent('[data-launch-left]'), before);
     const bar = await h.page.evaluate(() => { const box = el => document.querySelector(el).getBoundingClientRect();
       return { button: box('#sim-paybar-buy').height, price: box('#sim-paybar strong').bottom, terms: box('#sim-paybar small').top }; });
     assert.ok(bar.button <= 56, JSON.stringify(bar));
-    assert.ok(bar.terms >= bar.price - 1, 'No subscription sits under $99 once');
+    assert.ok(bar.terms >= bar.price - 1, 'the clock sits under $99 once');
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
@@ -61,6 +72,28 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.equal(count(h, 'SimEmailGiven'), 0);
     h.assertClean();
   } finally { await h.close(); }
+});
+
+test('the launch price ends for real: at its moment the page redraws at $199, and after it there is no clock', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: '2026-10-02T06:59:57Z' });
+  try {
+    await h.page.waitForSelector('[data-launch-left]');
+    assert.match(await h.page.textContent('h1'), /^\$99 once\./);
+    for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
+    assert.match((await h.page.textContent('h1')).trim(), /^\$199 once\.\s*Unlimited damage reports\.$/);
+    const text = await h.body();
+    assert.doesNotMatch(text, /Launch price|Instead of|\$99/);
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199 once\s*No subscription\s*Get it/);
+    h.assertClean();
+  } finally { await h.close(); }
+
+  const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: '2026-10-05T12:00:00Z' });
+  try {
+    await after.page.waitForSelector('#offer-video');
+    assert.match(await after.page.textContent('#sim-offer'), /Get it for \$199/);
+    assert.equal(await after.page.$('[data-launch-left]'), null);
+    after.assertClean();
+  } finally { await after.close(); }
 });
 
 test('after paying once, the thank-you page says it is theirs and nothing renews', async () => {

@@ -145,7 +145,14 @@ const REPORT_TYPES = Object.freeze(Object.keys(TYPE_CONFIG));
 // finalized report. A 'pay-at-export' tool is free to build and asks at the
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
-const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetimePrice: (item.offer.lifetime || 0) * 100, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
+const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetime: (item.offer.lifetime || 0) * 100, launch: item.offer.launch ? Object.freeze({ price: item.offer.launch.price * 100, until: Date.parse(item.offer.launch.until) }) : null, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
+// The pay-once price right now, in cents: the launch price until its fixed end,
+// the same moment for everyone, then the full price. Zero where there is none.
+const lifetimeCents = (tool, now = Date.now()) => {
+  const offer = TOOLS[tool];
+  if (!offer?.lifetime) return 0;
+  return offer.launch && now < offer.launch.until ? offer.launch.price : offer.lifetime;
+};
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
 const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
 const DECLINE_REASONS = Object.freeze(['too_expensive', 'only_needed_one', 'missing_something', 'just_looking']);
@@ -923,7 +930,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const tool = toolOf(req.body?.tool);
     const plan = inspectPlan(req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'year' ? 'year' : 'month');
     // A tap on "pay once" is worth the one price, where the wedge sells it.
-    const once = req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'lifetime' && TOOLS[tool].lifetimePrice > 0;
+    const once = req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'lifetime' && lifetimeCents(tool) > 0;
     await queueCapi(signal.event, {
       product: 'marketel-inspect',
       hotelId: `inspect-visitor:${visitor}`,
@@ -933,7 +940,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       sourceUrl: attribution.sourceUrl || `${origin}${TOOLS[tool].home}`,
       fbp: attribution.fbp || '',
       fbc: attribution.fbc || '',
-      value: (once ? TOOLS[tool].lifetimePrice : plan.amount) / 100,
+      value: (once ? lifetimeCents(tool) : plan.amount) / 100,
       currency: 'USD',
       eventId: `${signal.id}.${visitor}`,
       contentName: once ? `${TOOLS[tool].label} paid once` : signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
@@ -996,8 +1003,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // price for it. One payment and no subscription, so there are no free days to
   // give and nothing to remind anyone of; the webhook grants it (adoptLifetime).
   async function lifetimeCheckout(req, res, tool) {
-    const amount = TOOLS[tool].lifetimePrice;
+    const amount = lifetimeCents(tool);
     if (!amount) throw fail(400, 'That offer is not available.');
+    const atLaunch = amount < TOOLS[tool].lifetime;
     const visitor = visitorOf(req.body?.visitorId);
     const email = req.body?.email ? emailOf(req.body.email) : '';
     if (email) {
@@ -1019,7 +1027,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
-        product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`, description: 'No subscription. Nothing renews.' } } }],
+        product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`,
+          description: atLaunch ? `Launch price. No subscription. Nothing renews.` : 'No subscription. Nothing renews.' } } }],
       ...(email ? { customer_email: email } : {}),
       metadata, payment_intent_data: { metadata },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
