@@ -11,7 +11,6 @@ const STEPS = Object.freeze([
   // It is Meta's ViewContent, and it always includes everyone who tapped.
   { key: 'engaged', label: 'Stayed 20 seconds or tapped start free', names: ['OfferEngaged'] },
   { key: 'tapped', label: 'Tapped start free', names: ['SimCheckoutTapped'] },
-  { key: 'email', label: 'Gave their email', names: ['SimEmailGiven'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
   { key: 'trial', label: 'Started a trial', names: ['TrialStarted', 'SimPurchased'] },
   { key: 'welcome', label: 'Saw the welcome page', names: ['SimSubscribed'] },
@@ -26,6 +25,8 @@ const BRANCHES = Object.freeze([
   { key: 'video', label: 'The video', steps: [['Watched a quarter', ['OfferVideoQuarter']], ['Watched half', ['OfferVideoHalf']], ['Watched to the end', ['OfferVideoEnded']]] },
   // The try-it simulation, now at ?sim=1: where the earlier weeks' visitors went.
   { key: 'demo', label: 'The try-it demo', steps: [['Started the demo', ['SimStarted']], ['Picked a finding', ['SimFindingPicked']], ['Watched the note get written', ['SimNoteWritten']], ['Took the photo', ['SimPhotoTaken']], ['Saw the report', ['SimReportShown']], ['Tapped "Get this"', ['SimGetThisTapped']], ['Saw the offer', ['SimOfferViewed']]] },
+  // The try-it demo still asks for an email before Stripe; the video landing goes straight there.
+  { key: 'email', label: 'Email before Stripe (demo only)', steps: [['Gave their email', ['SimEmailGiven']]] },
   { key: 'kept', label: 'Kept it free', steps: [['Opened keep it free', ['SimKeepFreeOpened']], ['Left their email', ['SimKeptFree', 'KeptFree']]] },
   { key: 'real', label: 'Desktop: started a real report', steps: [['Tapped start a real report', ['SimRealReportTapped']], ['Started setup', ['SetupStarted']], ['Finished setup', ['SetupCompleted']], ['Added a photo', ['FirstPhotoAdded']], ['Saw their report', ['ReportRevealed']], ['Saw the offer', ['ExportOfferViewed']]] },
   { key: 'shots', label: 'App screenshots', steps: [['Saw them under the offer', ['SimScreensViewed']], ['Swiped through', ['SimScreensSwiped']]] },

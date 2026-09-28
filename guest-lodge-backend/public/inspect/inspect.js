@@ -754,6 +754,15 @@ function simThanks(){
       try{localStorage.setItem('inspect.email',r.email);}catch{}
       const where=$('sim-paid-email');
       if(where)where.textContent=r.email;
+      // They already pay: the webhook cancels this new plan before it charges.
+      if(r.alreadyHad){
+        const heading=$('app').querySelector('.sim-thanks h1');
+        if(heading)heading.textContent='You already have Marketel.';
+        const note=$('app').querySelector('.sim-trial-note');
+        const words='<small>Nothing was charged for this one. Sign in to keep using your plan.</small>';
+        if(note)note.innerHTML=words;
+        else heading?.insertAdjacentHTML('afterend',`<p class="sim-trial-note">${words}</p>`);
+      }
     }).catch(()=>{});
   let trial=0;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;}catch{}
   $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end. We'll email you the day before.</small></p>`:''}${appLive()
@@ -1013,6 +1022,10 @@ function simCheckoutTapped(){
 }
 function simBuy(trigger){
   simCheckoutTapped();
+  // On the video landing, Stripe's page asks for the email (Apple Pay fills it
+  // in) and the thank-you page shows it for signing in: one screen fewer, at
+  // the step where a tap once turned into a dead end.
+  if(offerOnVideo)return simCheckout(storedEmail(),trigger);
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
   enterScreen('sim');
   $('app').innerHTML=`<section class="sim sim-email"><h1>Where should your ${esc(sk.docPlural)} go?</h1><p class="muted">${esc(copy.lede)}</p><form id="sim-email-form" novalidate><input id="sim-email-field" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" aria-label="Your email" value="${esc(storedEmail())}"><button type="submit" id="sim-email-go" class="wide">${esc(copy.go)}</button></form><p class="muted"><small>${esc(copy.small)}</small></p><button type="button" id="sim-email-back" class="quiet">${offerOnVideo?'← Back':`← Back to the ${esc(sk.doc)}`}</button></section>`;

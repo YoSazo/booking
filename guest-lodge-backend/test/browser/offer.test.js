@@ -47,18 +47,14 @@ test('phone: an ad visitor gets the video, the price and start free', async () =
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
     assert.deepEqual({ tool: landed?.tool, detail: landed?.detail }, { tool: 'claims', detail: 'phone' });
+    // Start free goes straight to Stripe, whose page takes the email: no
+    // screen of ours in between, where a tap once turned into a dead end.
     await h.page.click('#sim-paybar-buy');
-    await h.page.waitForSelector('#sim-email-field');
+    for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
     assert.equal(count(h, 'SimCheckoutTapped'), 1, 'start free is InitiateCheckout');
-    assert.equal((await h.page.textContent('#sim-email-back')).trim(), '← Back');
-    await h.page.click('#sim-email-back');
-    await h.page.waitForSelector('#offer-video');
-    await h.page.click('#sim-buy');
-    await h.page.fill('#sim-email-field', 'host@example.test');
-    await h.page.click('#sim-email-go');
-    await h.page.waitForTimeout(100);
-    assert.ok(h.events.some(event => event.name === 'SimEmailGiven'));
     assert.equal(h.purchases[0]?.tool, 'claims');
+    assert.ok(!('email' in h.purchases[0]), 'Stripe asks for the email, not us');
+    assert.equal(count(h, 'SimEmailGiven'), 0);
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -140,19 +136,29 @@ test('twenty seconds on screen is engaged, once, with the Meta ids; a hidden tab
   } finally { await h.close(); }
 });
 
-test('tapping start free before twenty seconds is engaged at once, and only once', async () => {
+test('tapping start free before twenty seconds is engaged at once', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
     await h.page.click('#sim-buy');
-    await h.page.waitForSelector('#sim-email-field');
-    await h.page.waitForTimeout(100);
-    assert.deepEqual([count(h, 'OfferEngaged'), count(h, 'SimCheckoutTapped')], [1, 1]);
-    await h.page.click('#sim-email-back');
-    await h.page.waitForSelector('#offer-video');
-    await h.page.click('#sim-buy');
-    await h.page.waitForTimeout(100);
-    assert.equal(count(h, 'OfferEngaged'), 1, 'once per visit');
+    for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
+    assert.deepEqual([count(h, 'OfferEngaged'), count(h, 'SimCheckoutTapped'), h.purchases.length], [1, 1, 1]);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+// Someone already paying who checked out again: the webhook cancels the new
+// plan while it is free, and the thank-you page says so.
+test('the thank-you page tells someone who already pays that nothing was charged', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: 'sim=1&checkout=success&session=cs_test_a1GoodSessionIdentifier000001',
+    simEmail: { email: 'payer@example.com', alreadyHad: true }, viewport: phone });
+  try {
+    await h.page.waitForSelector('.sim-thanks');
+    for (let i = 0; i < 30 && !/already have Marketel/.test(await h.body()); i++) await h.page.waitForTimeout(100);
+    const text = await h.body();
+    assert.match(text, /You already have Marketel\./);
+    assert.match(text, /Nothing was charged for this one\./);
+    assert.match(text, /payer@example\.com/);
     h.assertClean();
   } finally { await h.close(); }
 });

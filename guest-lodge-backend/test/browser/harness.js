@@ -20,7 +20,7 @@ const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, query = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
+async function open({ native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [];
@@ -142,6 +142,8 @@ async function open({ native = false, arm = 'claims', demo = false, query = null
       if (tail === '/share' && method === 'POST') return json({ url: 'https://bookmarketel.com/api/inspect/shared/test' });
       if (tail === '/pdf' && method === 'GET') return route.fulfill({ status: 200, body: '%PDF-1.4 fixture', headers: { 'content-type': 'application/pdf' } });
     }
+    // What the thank-you page learns from the Stripe session id.
+    if (p === '/checkout/sim/email') return json(simEmail || { email: '' });
     if (p === '/checkout' || p === '/checkout/sim') { purchases.push(JSON.parse(request.postData() || '{}')); return json({ url: 'https://checkout.stripe.com/c/pay/cs_live_fixture' }); }
     if (p.startsWith('/events')) { events.push(JSON.parse(request.postData() || '{}')); return json({ success: true }); }
     if (p === '/billing/refresh') return json(data.account);

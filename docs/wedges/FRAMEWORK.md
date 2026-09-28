@@ -101,8 +101,11 @@ one subscription and one report allowance span the wedges: $25/month or
 $199/year, with fair use of 300 reports per billing period. No per-wedge
 Stripe product. `pay-at-export` lets someone build for free and asks for a
 plan when sending; Claims uses it. `first-free` grants one lifetime free
-complete report. The web simulation leads to an email wall and a three-day
-trial for accounts that never subscribed; server and client copy agree. The
+complete report. The video landing goes straight to Stripe, whose page takes
+the email (Apple Pay fills it in); a checkout without an address gets the three
+free days, and the webhook cancels a second plan for someone who already pays,
+while it is still free, and records a repeat trial. The try-it simulation still
+asks for the email first. Server and client copy agree. The
 trial is the full three days (the price bar says "Free for 3 days"): nothing
 sent in them ends it early, and every trialist is emailed the day before.
 `SimCheckoutTapped` fires Meta InitiateCheckout on the CTA tap with a

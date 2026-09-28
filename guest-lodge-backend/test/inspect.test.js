@@ -2239,15 +2239,22 @@ test('a simulation purchase creates the account from the email Stripe collected'
 
   // But never onto a second subscription beside a live one: that is a double
   // charge to sort out by hand, not a switch of who is billed.
+  const cancelled = [];
   const already = moneyHarness({
     account: { stripeCustomerId: 'cus_live', stripeSubscriptionId: 'sub_live', subscriptionStatus: 'active' },
-    stripe: { subscriptions: { update: async () => { throw new Error('must not restamp'); }, retrieve: async id => ({ id, metadata: {} }) } },
+    stripe: { subscriptions: { update: async () => { throw new Error('must not restamp'); }, retrieve: async id => ({ id, metadata: {} }),
+      cancel: async id => { cancelled.push(id); return { id, status: 'canceled' }; } } },
   });
   try {
     const response = await request(already.app, '/api/inspect-stripe-webhook', { method: 'POST',
       headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify(event) });
     assert.equal(response.status, 200);
     assert.ok(!already.calls.accountUpdates.some(update => update.stripeCustomerId === 'cus_sim'));
+    // With no address to check before Stripe, a second checkout by someone who
+    // already pays is cancelled while still free, and never counted as a sale.
+    assert.deepEqual(cancelled, ['sub_sim']);
+    assert.ok(already.calls.events.some(e => e.name === 'DuplicateCheckoutCancelled'));
+    assert.ok(!already.calls.events.some(e => e.name === 'SimPurchased' || e.name === 'TrialStarted'));
   } finally { already.registration.close(); }
 });
 
@@ -2462,6 +2469,17 @@ test('the address that paid can be recovered, and only by whoever holds the chec
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'whatever' }) });
     assert.equal(junk.status, 400);
   } finally { h.registration.close(); }
+
+  // Someone already paying who checked out again is told so, not welcomed to free days.
+  const paying = moneyHarness({
+    account: { email: 'payer@example.com', stripeSubscriptionId: 'sub_live', subscriptionStatus: 'active', periodStart: new Date().toISOString(), periodEnd: new Date(Date.now() + 20 * 86400000).toISOString() },
+    stripe: { checkout: { sessions: { retrieve: async () => ({ ...sessions.cs_test_a1GoodSessionIdentifier000001, subscription: 'sub_new' }) } } },
+  });
+  try {
+    const response = await request(paying.app, '/api/inspect/checkout/sim/email', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'cs_test_a1GoodSessionIdentifier000001' }) });
+    assert.deepEqual(await response.json(), { email: 'payer@example.com', alreadyHad: true });
+  } finally { paying.registration.close(); }
 });
 
 // ——— Free until your first report ————————————————————————————————
@@ -2509,11 +2527,16 @@ test('the demo starts with three free days, card upfront, once per person', asyn
     assert.ok(!('payment_method_collection' in h.calls.sessions[0].params));
   } finally { h.registration.close(); }
 
-  // No address, no trial: there is nobody to hold to "once".
+  // No address from us (the video landing goes straight to Stripe): the free
+  // days are given, Stripe's page takes the email, and who paid is checked
+  // when the webhook arrives.
   h = moneyHarness({ stripe });
   try {
-    assert.equal((await (await sim(h, {})).json()).trialDays, 0);
-    assert.ok(!('trial_period_days' in h.calls.sessions[0].params.subscription_data));
+    assert.equal((await (await sim(h, {})).json()).trialDays, 3);
+    const params = h.calls.sessions[0].params;
+    assert.equal(params.subscription_data.trial_period_days, 3);
+    assert.equal(params.payment_method_collection, 'always');
+    assert.ok(!('customer_email' in params));
   } finally { h.registration.close(); }
 
   // The page's copy and the server's trial are one number.

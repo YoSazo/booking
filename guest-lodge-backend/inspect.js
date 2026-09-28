@@ -998,9 +998,11 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // even when the card is never reached, which Stripe's own page would not
     // have given us.
     const email = req.body?.email ? emailOf(req.body.email) : '';
-    // Only a first subscription starts free, so the same address cannot take a
-    // new trial every time. No address, no trial.
-    let trialDays = 0;
+    // A first subscription starts free. An address we already have is held to
+    // "once" here. The video landing sends none: Stripe's own page takes it
+    // (Apple Pay fills it in), so the free days are given, and who paid is
+    // checked when the webhook arrives (adoptSimCheckout).
+    let trialDays = email ? 0 : SIM_TRIAL_DAYS;
     if (email) {
       const account = await prisma.$transaction(async tx => {
         const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
@@ -1054,7 +1056,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // paid for it. Anything else answers with nothing rather than an error,
     // because the screen behind this reads fine without it.
     if (!session || session.metadata?.sim !== '1' || session.status !== 'complete') return res.json({ email: '' });
-    res.json({ email: String(session.customer_details?.email || '') });
+    const email = String(session.customer_details?.email || '');
+    // Paid again while already subscribed: the webhook cancels the new plan, and
+    // the page says so rather than welcoming them to free days they don't need.
+    let alreadyHad = false;
+    try {
+      const account = await prisma.inspectAccount.findUnique({ where: { email: emailOf(email) } });
+      alreadyHad = !!account?.stripeSubscriptionId && account.stripeSubscriptionId !== String(session.subscription || '') && entitlement(account).active;
+    } catch {}
+    res.json({ email, ...(alreadyHad ? { alreadyHad: true } : {}) });
   }));
 
   router.use((req, res, next) => {
@@ -1988,6 +1998,24 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       return tx.inspectAccount.upsert({ where: { email },
         create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
     });
+    // Someone who already pays came through checkout again, with no address
+    // for us to check first. The new plan is still in its free days, so
+    // cancelling it now costs them nothing; the thank-you page tells them to
+    // sign in to the plan they have (/checkout/sim/email).
+    const liveElsewhere = account.stripeSubscriptionId && account.stripeSubscriptionId !== String(session.subscription)
+      && ['active', 'trialing', 'past_due'].includes(account.subscriptionStatus || '');
+    if (liveElsewhere) {
+      await Promise.resolve().then(() => stripe.subscriptions.cancel(String(session.subscription)))
+        .catch(error => console.error('Inspect duplicate sim subscription cancel failed:', error.message));
+      if (Number(session.amount_total) > 0) console.error('Inspect duplicate sim checkout was charged; refund by hand:', session.id);
+      await recordBestEffort(account.id, 'DuplicateCheckoutCancelled', `inspect-duplicate:${session.id}`, { tool, visitorId: visitorOf(session.metadata?.visitorId) });
+      return account;
+    }
+    // An address that had a plan before gets free days again here, where it
+    // could not be checked first. Recorded, so a pattern shows up on /funnel.
+    if (Number(session.amount_total) === 0 && (account.stripeSubscriptionId || account.subscriptionStatus)) {
+      await recordBestEffort(account.id, 'RepeatTrial', `inspect-repeat-trial:${session.id}`, { tool });
+    }
     await linkSimSubscription(account,
       { id: String(session.subscription), customer: String(session.customer), metadata: session.metadata || {} },
       { interval: session.metadata?.interval, tool });
