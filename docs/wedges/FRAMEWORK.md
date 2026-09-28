@@ -183,9 +183,22 @@ both `index.html` asset versions together. `verify:release` checks the app;
 
 ## 11. Building a wedge
 
-1. Get a brief: audience, villain, deadline or clock, one-line job, and offer
-   mode. Research real complaints and competitor reviews. Stay within what
-   the report engine can honestly do.
+**Finding one: unbundle a bloated incumbent.** Start from demand, not from
+our engines. Look for a product many people already pay for that does far
+too much, where its App Store reviews, Reddit threads and price changes say
+"too complicated", "too expensive", "I only use one thing", or "fees on
+clients who were already mine". The wedge is that one job: simpler, cheaper
+($25/month or less), in a well-designed iPhone app. It does not have to fit
+an existing engine if the one job is simple enough to build in days. It
+must fill every part of the winning script (identity, the money they lose
+to someone, the fast fix, one sentence on how, the detail that kills the
+objection, free to try, the injustice close), and it wins on distribution
+and simplicity, because every such incumbent already has cheap rivals.
+`WEDGE-UNBUNDLE-PROMPT.md` at the repo root is the research brief.
+
+1. Get a brief: incumbent and its price, audience, villain, deadline or
+   clock, one-line job, and offer mode. Research real complaints and
+   competitor reviews.
 2. Run `npm run wedge:new -- <id>`. Fill its manifest: copy, document types,
    seeds, capabilities, disclaimer, demo findings and App Store captions.
    Use a type name unique across all wedges. A photos-only baseline is a type
