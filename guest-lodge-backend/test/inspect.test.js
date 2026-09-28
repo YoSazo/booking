@@ -534,6 +534,8 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       update: async ({ data }) => {
         calls.accountUpdates.push(data);
         if ('stripeCustomerId' in data) account.stripeCustomerId = data.stripeCustomerId;
+        if ('lifetimeSince' in data) account.lifetimeSince = data.lifetimeSince;
+        if ('metaAttribution' in data) account.metaAttribution = data.metaAttribution;
         if (typeof data.reportCredits === 'number') account.reportCredits = data.reportCredits;
         if (data.reportCredits?.increment) account.reportCredits += data.reportCredits.increment;
         if (data.reportCredits?.decrement) account.reportCredits -= data.reportCredits.decrement;
@@ -2159,7 +2161,7 @@ test('the demo start-button tap reaches Meta as InitiateCheckout, once per visit
 
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
   assert.match(client, /function simBuy\(trigger\)\{\n  simCheckoutTapped\(\);/);
-  assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:planInterval,attribution:inspectAttribution/);
+  assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:payOnce\(\)\?'lifetime':planInterval,attribution:inspectAttribution/);
 });
 
 test('"keep it free" emails the link once, and only when asked', async () => {
@@ -2847,5 +2849,155 @@ test('staying on the video landing reaches Meta as ViewContent; arriving and the
     assert.deepEqual(h.calls.capi, [{ name: 'ViewContent', value: 25, contentName: 'Marketel Claims landing', eventId: `inspect-offer-engaged.${visitorId}` }]);
     assert.equal(h.calls.events.find(e => e.name === 'OfferLanded')?.detail, 'phone');
     assert.ok(['OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].every(name => h.calls.events.some(e => e.name === name && e.visitorId === visitorId)));
+  } finally { h.registration.close(); }
+});
+
+// ——— Pay once ————————————————————————————————————————————————————————
+const onceSession = (overrides = {}) => ({
+  id: 'cs_once_1234', mode: 'payment', status: 'complete', payment_status: 'paid', amount_total: 9900, currency: 'usd',
+  customer: 'cus_once', payment_intent: 'pi_once', customer_details: { email: 'Buyer@Example.com ' },
+  metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime', tool: 'claims', visitorId: `v_${'a'.repeat(12)}`,
+    ad_fbp: 'fb.1.1700000000.123', ad_fbc: 'fb.1.1700000000.abc', ad_ip: '203.0.113.9', ad_ua: 'Mozilla/5.0 (iPhone)' },
+  ...overrides,
+});
+const sendWebhook = (h, object, type = 'checkout.session.completed') => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify({ type, created: 1760000000, data: { object } }) });
+
+test('paying once is one $99 payment with no subscription, and it carries the ad click to Stripe', async () => {
+  const h = moneyHarness();
+  const buy = body => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: 'lifetime', interval: 'month', tool: 'claims', visitorId: `v_${'a'.repeat(12)}`,
+      attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc', sourceUrl: 'https://bookmarketel.com/claims' }, ...body }) });
+  try {
+    const response = await buy({});
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).lifetime, true);
+    const { params } = h.calls.sessions[0];
+    assert.equal(params.mode, 'payment');
+    assert.equal(params.customer_creation, 'always');
+    assert.ok(!('subscription_data' in params), 'nothing renews');
+    assert.deepEqual(params.line_items[0].price_data.unit_amount, 9900);
+    assert.equal(params.line_items[0].price_data.currency, 'usd');
+    assert.match(params.line_items[0].price_data.product_data.name, /^Marketel Claims: unlimited reports, paid once$/);
+    assert.equal(params.metadata.plan, 'lifetime');
+    assert.equal(params.metadata.ad_fbc, 'fb.1.1700000000.abc');
+    assert.equal(params.metadata.ad_fbp, 'fb.1.1700000000.123');
+    assert.deepEqual(params.payment_intent_data.metadata, params.metadata);
+    assert.ok(Object.values(params.metadata).every(value => String(value).length <= 500), "within Stripe's metadata limit");
+    assert.equal(params.success_url, 'https://bookmarketel.com/claims?sim=1&checkout=success&session={CHECKOUT_SESSION_ID}');
+    assert.ok(h.calls.events.some(event => event.name === 'SimCheckoutStarted' && event.detail === 'lifetime'));
+    // A tool with no pay-once price does not sell one.
+    assert.equal((await buy({ tool: 'incident' })).status, 400);
+  } finally { h.registration.close(); }
+
+  // An address that already has Marketel is sent to sign in, not charged.
+  const had = moneyHarness({ account: { lifetimeSince: new Date('2026-09-01') } });
+  try {
+    const response = await request(had.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: 'lifetime', tool: 'claims', email: 'owner@example.com' }) });
+    assert.equal(response.status, 409);
+    assert.equal(had.calls.sessions.length, 0);
+  } finally { had.registration.close(); }
+});
+
+test('paying once grants the plan for good, exactly once, and Meta hears the sale', async () => {
+  const h = moneyHarness({ account: { stripeCustomerId: null } });
+  try {
+    assert.equal((await sendWebhook(h, onceSession())).status, 200);
+    const granted = h.calls.accountUpdates.find(update => update.lifetimeSince);
+    assert.ok(granted.lifetimeSince instanceof Date);
+    assert.equal(granted.stripeCustomerId, 'cus_once');
+    assert.ok(h.calls.events.some(event => event.name === 'LifetimePurchased' && event.tool === 'claims' && event.visitorId === `v_${'a'.repeat(12)}`));
+    // The click came through Stripe, so the sale is attributed although the
+    // account did not exist when they tapped.
+    assert.deepEqual(h.calls.capi.map(event => [event.name, event.eventId, event.value]), [['Purchase', 'inspect-purchase.cs_once_1234', 99]]);
+    assert.equal(h.account.metaAttribution.fbc, 'fb.1.1700000000.abc');
+    assert.equal(h.account.metaAttribution.ipAddress, '203.0.113.9');
+    // Stripe retries, and the thank-you page asks too: still one grant, one sale.
+    assert.equal((await sendWebhook(h, onceSession())).status, 200);
+    assert.equal(h.calls.accountUpdates.filter(update => update.lifetimeSince).length, 1);
+    assert.equal(h.calls.capi.length, 1);
+  } finally { h.registration.close(); }
+
+  // Not paid yet (a bank debit still clearing): nothing is granted until it is.
+  const pending = moneyHarness();
+  try {
+    assert.equal((await sendWebhook(pending, onceSession({ payment_status: 'unpaid' }))).status, 200);
+    assert.ok(!pending.calls.accountUpdates.some(update => update.lifetimeSince));
+    assert.equal((await sendWebhook(pending, onceSession(), 'checkout.session.async_payment_succeeded')).status, 200);
+    assert.ok(pending.calls.accountUpdates.some(update => update.lifetimeSince));
+  } finally { pending.registration.close(); }
+});
+
+test('paying once again is refunded, and paying once over a subscription cancels it', async () => {
+  const refunds = [];
+  const again = moneyHarness({ account: { lifetimeSince: new Date('2026-09-01') },
+    stripe: { refunds: { create: async (params, options) => { refunds.push({ params, options }); return { id: 're_1' }; } } } });
+  try {
+    assert.equal((await sendWebhook(again, onceSession())).status, 200);
+    assert.deepEqual(refunds.map(refund => refund.params), [{ payment_intent: 'pi_once' }]);
+    assert.equal(refunds[0].options.idempotencyKey, 'inspect-lifetime-refund:cs_once_1234');
+    assert.ok(again.calls.events.some(event => event.name === 'LifetimeRefunded'));
+    assert.ok(!again.calls.events.some(event => event.name === 'LifetimePurchased'));
+    assert.equal(again.calls.capi.length, 0, 'a refunded payment is no sale');
+  } finally { again.registration.close(); }
+
+  const cancelled = [];
+  const trialing = moneyHarness({ account: { stripeSubscriptionId: 'sub_trial', subscriptionStatus: 'trialing' },
+    stripe: { subscriptions: { cancel: async id => { cancelled.push(id); return { id, status: 'canceled' }; } } } });
+  try {
+    assert.equal((await sendWebhook(trialing, onceSession())).status, 200);
+    assert.deepEqual(cancelled, ['sub_trial'], 'the trial never turns into a $25 charge');
+    assert.ok(trialing.calls.accountUpdates.some(update => update.lifetimeSince));
+  } finally { trialing.registration.close(); }
+});
+
+test('the thank-you page does not wait on the webhook, and says when a second payment was refunded', async () => {
+  const stripe = { checkout: { sessions: { retrieve: async () => onceSession(), create: async () => ({}) } },
+    refunds: { create: async () => ({ id: 're_1' }) } };
+  const ask = h => request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: 'cs_once_1234' }) });
+  let h = moneyHarness({ stripe });
+  try {
+    const response = await ask(h);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { email: 'Buyer@Example.com ' });
+    assert.ok(h.calls.accountUpdates.some(update => update.lifetimeSince), 'granted before the webhook');
+  } finally { h.registration.close(); }
+
+  h = moneyHarness({ account: { lifetimeSince: new Date('2026-09-01') }, stripe });
+  try {
+    const body = await (await ask(h)).json();
+    assert.equal(body.alreadyHad, true);
+    assert.equal(body.refunded, true);
+  } finally { h.registration.close(); }
+});
+
+test('paid once is a plan for good: unlimited, nothing renews, nothing more to buy', async () => {
+  const h = moneyHarness({ account: { lifetimeSince: new Date('2026-09-01'), stripeCustomerId: null, subscriptionStatus: 'canceled', periodEnd: new Date('2026-01-01') } });
+  try {
+    const response = await request(h.app, '/api/inspect/billing/refresh', { method: 'POST', headers: h.headers, body: '{}' });
+    assert.equal(response.status, 200);
+    const plan = await response.json();
+    assert.equal(plan.active, true, 'an old cancelled subscription does not take it away');
+    assert.equal(plan.lifetime, true);
+    assert.equal(plan.interval, 'lifetime');
+    assert.equal(plan.periodEnd, null);
+    assert.equal(plan.cancellationScheduled, false);
+    assert.ok(plan.remaining > 0);
+    const subscribe = await request(h.app, '/api/inspect/checkout', { method: 'POST', headers: h.headers, body: JSON.stringify({ interval: 'month', tool: 'claims' }) });
+    assert.equal(subscribe.status, 409);
+  } finally { h.registration.close(); }
+});
+
+test('a tap on pay once reaches Meta at its own price', async () => {
+  const visitorId = `v_${'b'.repeat(12)}`;
+  const h = moneyHarness();
+  try {
+    const response = await request(h.app, '/api/inspect/events/anon', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' },
+      body: JSON.stringify({ name: 'SimCheckoutTapped', tool: 'claims', visitorId, detail: 'lifetime', attribution: { fbp: 'fb.1.1700000000.123' } }) });
+    assert.equal(response.status, 200);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 99, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-tap.${visitorId}` }]);
   } finally { h.registration.close(); }
 });

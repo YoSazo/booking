@@ -81,3 +81,16 @@ test('a reset marks where counting starts, from the latest marker', async () => 
   assert.equal(await countingSince({ inspectEvent: { findFirst: async () => null } }, 'claims'), null);
   assert.ok(!VISITOR_EVENTS.includes(RESET_EVENT), 'a reset never deletes its own marker');
 });
+
+test('paying once is paid on the spot: it counts as the purchase step and as paid', () => {
+  const events = [
+    ev('OfferLanded', 'v_p', { detail: 'phone' }), ev('OfferEngaged', 'v_p'), ev('SimCheckoutTapped', 'v_p', { detail: 'lifetime' }),
+    ev('SimCheckoutStarted', 'v_p'), ev('LifetimePurchased', 'acctP', { visitorId: 'v_p' }),
+  ];
+  const f = buildWedgeFunnel(events);
+  const step = key => f.steps.find(s => s.key === key);
+  assert.equal(step('trial').people, 1);
+  assert.equal(step('paid').people, 1);
+  assert.equal(step('paid').ofLanded, 1);
+  assert.equal(f.recent[0].label, 'Paid once');
+});

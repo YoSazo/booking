@@ -143,6 +143,19 @@ video they watch (seconds actually played on screen) is on `/funnel` only. The
 page's content policy allows media from Cloudinary only.
 Record it in real time and never speed it up: the page says how long it took.
 
+**Pay once.** A wedge with `offer.lifetime` (whole dollars, 19 to 999) sells
+that on its video landing instead of a trial: the price is the headline
+("$99 once. Unlimited damage reports."), one button, no plan switch and no
+"keep it free". Checkout is one Stripe payment with no subscription; the
+webhook (and the thank-you page, whichever is first) sets the account's
+`lifetimeSince`, which keeps the plan active whatever any subscription does.
+Paying once again is refunded automatically, and paying once over a live
+subscription cancels it. The ad click rides on the checkout's metadata, so
+Meta hears the Purchase although the account is created after the payment.
+On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
+ad must say the same thing: an ad promising "free to try" that lands on "$99
+once" is the mismatch that sinks a week.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first

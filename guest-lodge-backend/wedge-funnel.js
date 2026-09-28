@@ -7,17 +7,19 @@
 const STEPS = Object.freeze([
   { key: 'landed', label: 'Landed from the ad', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
   // The video landing: everyone sees the price, so the step between arriving
-  // and deciding is staying: twenty seconds, or tapping start free sooner.
+  // and deciding is staying: twenty seconds, or tapping the button sooner.
   // It is Meta's ViewContent, and it always includes everyone who tapped.
-  { key: 'engaged', label: 'Stayed 20 seconds or tapped start free', names: ['OfferEngaged'] },
-  { key: 'tapped', label: 'Tapped start free', names: ['SimCheckoutTapped'] },
+  { key: 'engaged', label: 'Stayed 20 seconds or tapped the button', names: ['OfferEngaged'] },
+  // The button is "pay once" where the wedge sells that, "start free" otherwise.
+  { key: 'tapped', label: 'Tapped the button', names: ['SimCheckoutTapped'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
-  { key: 'trial', label: 'Started a trial', names: ['TrialStarted', 'SimPurchased'] },
+  { key: 'trial', label: 'Paid once or started a trial', names: ['TrialStarted', 'SimPurchased', 'LifetimePurchased'] },
   { key: 'welcome', label: 'Saw the welcome page', names: ['SimSubscribed'] },
   { key: 'next', label: 'Got the app or started on the web', names: ['SimAppTapped', 'SimWebStarted'] },
   { key: 'signin', label: 'Signed in', names: ['AccountVerified'] },
   { key: 'sent', label: 'Sent a report', names: ['ReportFinalized'] },
-  { key: 'paid', label: 'Paid', names: ['FirstPayment'] },
+  // Paying once is paid on the spot; a trial is paid at its first invoice.
+  { key: 'paid', label: 'Paid', names: ['FirstPayment', 'LifetimePurchased'] },
 ]);
 
 // Paths off the main line, each worth watching on its own.
@@ -52,7 +54,7 @@ const LABELS = Object.freeze(Object.fromEntries([
   ['SimStarted', 'Started the demo'], ['LandingViewed', 'Landed on the page'], ['SimPurchased', 'Bought without a trial'],
   ['PaymentSucceeded', 'Payment'], ['TrialConverted', 'Trial ended by a report'], ['ReportExported', 'Downloaded a PDF'],
   ['ReportShared', 'Made a private link'], ['LeadCaptured', 'Email captured'], ['CheckoutStarted', 'Opened Stripe from the app'],
-  ['TrialReminderSent', 'Trial reminder sent'], ['VoiceNoteDrafted', 'Voice note drafted'], ['VoiceNoteRecorded', 'Recorded a voice note'],
+  ['TrialReminderSent', 'Trial reminder sent'], ['LifetimePurchased', 'Paid once'], ['LifetimeRefunded', 'Paid once again: refunded'], ['VoiceNoteDrafted', 'Voice note drafted'], ['VoiceNoteRecorded', 'Recorded a voice note'],
 ]));
 
 const personOf = event => event.visitorId || (event.accountId ? `account:${event.accountId}` : `event:${event.id}`);

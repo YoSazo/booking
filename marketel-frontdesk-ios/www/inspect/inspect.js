@@ -615,6 +615,10 @@ const TOOL_OFFERS = Object.fromEntries(Object.entries(MANIFESTS).map(([id, item]
 const toolOffer = () => TOOL_OFFERS[toolId()] || TOOL_OFFERS.inspect;
 const payAtExport = () => toolOffer().mode === 'pay-at-export';
 const reportPrice = () => toolOffer().reportPrice || 0;
+// Pay once, for good: what the video landing sells, where the wedge sets a
+// price for it, instead of a subscription trial. Mirrors TOOLS' lifetimePrice.
+const lifetimePrice = () => toolOffer().lifetime || 0;
+const payOnce = () => offerOnVideo && lifetimePrice() > 0;
 // Plans are unlimited; this is only ever seen at the fair-use ceiling.
 const FAIR_USE_REACHED = 'You have reached this plan\'s fair-use limit for this billing period. Email support@bookmarketel.com and we will lift it.';
 const canSend = () => !!account && ((account.active && account.remaining > 0) || account.credits > 0 || (!payAtExport() && account.freeAvailable));
@@ -759,13 +763,15 @@ function simThanks(){
         const heading=$('app').querySelector('.sim-thanks h1');
         if(heading)heading.textContent='You already have Marketel.';
         const note=$('app').querySelector('.sim-trial-note');
-        const words='<small>Nothing was charged for this one. Sign in to keep using your plan.</small>';
+        const words=r.refunded?'<small>We refunded this payment. Sign in to keep using the one you have.</small>':'<small>Nothing was charged for this one. Sign in to keep using your plan.</small>';
         if(note)note.innerHTML=words;
         else heading?.insertAdjacentHTML('afterend',`<p class="sim-trial-note">${words}</p>`);
       }
     }).catch(()=>{});
-  let trial=0;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;}catch{}
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`}</h1>${trial?`<p class="sim-trial-note"><small>Nothing is charged until they end. We'll email you the day before.</small></p>`:''}${appLive()
+  let trial=0,once=false;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;once=sessionStorage.getItem('inspect.sim.once')==='1';}catch{}
+  const thanksHeading=once?`Marketel ${esc(sk.product)} is yours.`:trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`;
+  const thanksNote=once?'Paid once. No subscription, and nothing renews.':trial?`Nothing is charged until they end. We'll email you the day before.`:'';
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${thanksHeading}</h1>${thanksNote?`<p class="sim-trial-note"><small>${thanksNote}</small></p>`:''}${appLive()
     ?`<p class="muted">The app is where you actually use this — talking through a ${esc(sk.doc)} while you are standing in the property, with the camera in your hand.</p><a class="button wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the iPhone app →</a><p class="muted"><small>Sign in there with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and it will send you a six-digit code.</small></p><button type="button" id="sim-signin" class="quiet">Or start in this browser</button>`
     :`<p class="muted">It works right here in your browser, on your phone or your computer. Photograph it, talk it through, send it.</p><button type="button" id="sim-signin" class="wide">Start your first ${esc(sk.doc)} →</button><p class="muted"><small>Sign in with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and we'll send you a six-digit code.</small></p>`}</section>`;
   track('SimSubscribed');
@@ -949,6 +955,14 @@ const SIM_TRIAL_DAYS = 3;
 // plan starts is the real one.
 function simOffer(plan=PLANS[planInterval]||PLANS.month){
   const sk=skin();
+  if(payOnce()){
+    const price=lifetimePrice();
+    return {save:`Unlimited ${sk.docPlural} · No monthly fees`,
+      terms:`One payment of $${price}. No subscription, and nothing renews. Unlimited ${sk.docPlural} within fair use.`,
+      cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:'No subscription',barCta:'Get it →',
+      lede:'One address for your receipt and for signing in. Payment is on the next screen.',go:'Continue to payment →',
+      small:`$${price} once. Apple Pay or card on the next screen.`};
+  }
   const save=plan===PLANS.year?`${PLANS.year.save} · $16.58/month`:`Unlimited ${sk.docPlural} · Cancel anytime`;
   if(!SIM_TRIAL_DAYS)return {save,terms:plan.terms,cta:`Start Marketel ${sk.product} →`,bar:`$${plan.price}`,barSmall:plan.per,barCta:`Start Marketel ${sk.product} →`,
     lede:'One address for your receipt and for signing in. Payment is on the next screen.',go:'Continue to payment →',small:`$${plan.price}${plan.per}. Apple Pay or card on the next screen.`};
@@ -964,6 +978,7 @@ function simOffer(plan=PLANS[planInterval]||PLANS.month){
   };
 }
 function simPrices(){
+  if(payOnce())return;
   const plan=PLANS[planInterval]||PLANS.month,sk=skin(),year=planInterval==='year',copy=simOffer(plan);
   const set=(selector,text)=>{const el=document.querySelector(selector);if(el)el.textContent=text;};
   set('.sim-offer .price',`$${plan.price} `);
@@ -987,7 +1002,7 @@ function simCheckout(email,trigger){
     haptic();
     let r;
     try{
-      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:'lifetime'}:{}),tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
     }catch(error){
       // Already paying, from a second ad or another device: charging them
       // again is the one thing that must not happen, and getting them into
@@ -999,7 +1014,7 @@ function simCheckout(email,trigger){
       return ensureAuth(()=>run(()=>openAccountHome()),'paid');
     }
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
-    try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));}catch{}
+    try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));sessionStorage.setItem('inspect.sim.once',r.lifetime?'1':'');}catch{}
     openPurchase(r.url);
   },trigger);
 }
@@ -1018,7 +1033,7 @@ function simCheckoutTapped(){
   if(ownerBrowser)return;
   // On the video landing, tapping start free is also staying engaged.
   if(offerOnVideo)track('OfferEngaged');
-  api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:planInterval,attribution:inspectAttribution}}).catch(()=>{});
+  api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:payOnce()?'lifetime':planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simBuy(trigger){
   simCheckoutTapped();
@@ -1134,6 +1149,7 @@ function simGetThis(){
 }
 function simOfferMarkup({declined=false,heading='That was a sample. Make real ones.'}={}){
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
+  if(payOnce())return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${lifetimePrice()} <small>once</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section>`;
   return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
 }
 // The offer, on its own page: the price, three days free, the real app. On a
@@ -1160,7 +1176,7 @@ function bindSimOffer(){
   const switchPlan=document.querySelector('[data-sim-plan]');
   if(switchPlan)switchPlan.onclick=()=>{planInterval=switchPlan.dataset.simPlan==='year'?'year':'month';simPrices();};
   $('sim-buy').onclick=event=>simBuy(event.currentTarget);
-  $('sim-keep').onclick=()=>{haptic();simKeep();};
+  if($('sim-keep'))$('sim-keep').onclick=()=>{haptic();simKeep();};
   const offer=$('sim-offer'),bar=$('sim-paybar'),barBuy=$('sim-paybar-buy');
   if(barBuy){
     barBuy.onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
@@ -1190,8 +1206,10 @@ function videoLanding({declined=false}={}){
   simUnframe();
   updateHeader();
   const v=offerVideo(),arm=landingArm(),g=arm.golden||{},sk=skin(),copy=simOffer();
-  const heading=SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
-  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${g.headline||arm.title}</h1><p class="muted">${esc(v.sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  const heading=payOnce()?'Pay once. Keep it for good.':SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
+  const title=payOnce()?`$${lifetimePrice()} once.<br><span class="green">Unlimited ${esc(wedge(arm.type).label.toLowerCase())}s.</span>`:(g.headline||arm.title);
+  const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
+  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><figure class="offer-video"><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time · ${v.seconds} seconds</figcaption></figure><div class="offer-buy">${simOfferMarkup({declined,heading})}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul><button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${esc(copy.bar)}</strong><small>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
@@ -2932,7 +2950,8 @@ $('account-button').onclick=async()=>{
   // What this account can actually do, in the order it matters. Claims has no
   // free report, so promising one there was false — and a review account
   // holding credits was being told the same.
-  const standing=account.active
+  const standing=account.lifetime ? `Unlimited ${esc(sk.docPlural)}. Paid once; nothing renews.`
+    : account.active
     ? `${account.remaining>0?`Unlimited ${esc(sk.docPlural)}.`:esc(FAIR_USE_REACHED)}${account.periodEnd&&!Number.isNaN(new Date(account.periodEnd).getTime())?` ${account.cancellationScheduled?'Access ends':'Renews'} ${new Date(account.periodEnd).toLocaleDateString()}.`:''}`
     : account.credits>0 ? `${account.credits} ${esc(account.credits===1?sk.doc:sk.docPlural)} ready to send.`
     : payAtExport() ? `No plan yet. Building a ${esc(sk.doc)} is always free, and your ${esc(sk.docPlural)} stay here.`
@@ -2940,7 +2959,7 @@ $('account-button').onclick=async()=>{
   // Managing a subscription needs one to exist; offering it to an account
   // without one opened an error. Front Desk is not part of this product, so
   // it is no longer a button here — its own customers still open straight in.
-  const manageable=(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
+  const manageable=!account.lifetime&&(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
   modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}${mayBuy()?'<button id="see-plans">See plans</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openPurchase((await api('/billing',{method:'POST',body:{native}})).url));
@@ -2949,7 +2968,7 @@ $('account-button').onclick=async()=>{
   $('delete-account').onclick=async()=>{
     $('dialog').close();
     await new Promise(resolve=>requestAnimationFrame(resolve));
-    if(!await confirmAction({title:`Delete your ${skin().product} account?`,message:`This permanently deletes ${skin().product} reports and photos and cancels its subscription. Booking properties are unaffected.`,confirmLabel:'Delete account permanently',danger:true}))return;
+    if(!await confirmAction({title:`Delete your ${skin().product} account?`,message:`This permanently deletes ${skin().product} reports and photos and ${account?.lifetime?'ends the plan you paid for once':'cancels its subscription'}. Booking properties are unaffected.`,confirmLabel:'Delete account permanently',danger:true}))return;
     run(async()=>{await api('/account',{method:'DELETE',body:{confirm:'DELETE'}});await logout();notice(`Your ${skin().product} account and its ${skin().docPlural} were deleted.`,'success');});
   };
 };

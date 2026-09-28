@@ -12,6 +12,9 @@ function validate(manifest, filename = '') {
   if (!manifest || !ID.test(manifest.id) || typeof manifest.product !== 'string' || !manifest.product.trim()) bad('id and product are required');
   if (!STATUSES.has(manifest.status)) bad('unknown status');
   if (!OFFERS.has(manifest.offer?.mode) || !Number.isInteger(manifest.offer.reportPrice) || manifest.offer.reportPrice < 0) bad('invalid offer');
+  // Pay once, for good, in whole dollars: what the video landing sells instead
+  // of a subscription trial when it is set.
+  if (manifest.offer.lifetime !== undefined && (!Number.isInteger(manifest.offer.lifetime) || manifest.offer.lifetime < 19 || manifest.offer.lifetime > 999)) bad('offer.lifetime must be whole dollars from 19 to 999');
   if (!Array.isArray(manifest.listTypes) || !manifest.listTypes.length || !manifest.types || typeof manifest.types !== 'object') bad('types and listTypes are required');
   if (!manifest.skin || !manifest.landing || !manifest.appStore || typeof manifest.chooser !== 'string') bad('skin, landing, appStore and chooser are required');
   if (!manifest.roleLabels || typeof manifest.roleLabels !== 'object') bad('role labels are required');

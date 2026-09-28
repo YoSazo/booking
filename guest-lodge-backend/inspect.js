@@ -145,7 +145,7 @@ const REPORT_TYPES = Object.freeze(Object.keys(TYPE_CONFIG));
 // finalized report. A 'pay-at-export' tool is free to build and asks at the
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
-const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
+const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetimePrice: (item.offer.lifetime || 0) * 100, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
 const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
 const DECLINE_REASONS = Object.freeze(['too_expensive', 'only_needed_one', 'missing_something', 'just_looking']);
@@ -314,6 +314,14 @@ function accountPlan(account) {
 }
 
 function entitlement(account, now = Date.now()) {
+  // Paid once: a plan for good, whatever a subscription on the account is
+  // doing. Fair use (300 a month) is in the terms and handled by hand; there
+  // is no billing period here to count it against.
+  if (account.lifetimeSince) {
+    return { active: true, lifetime: true, freeAvailable: !account.freeReportUsed, remaining: LIMITS.reports,
+      credits: Math.max(0, Number(account.reportCredits) || 0), businessName: account.businessName || '', hasLogo: !!account.logoKey,
+      periodEnd: null, cancellationScheduled: false, price: null, interval: 'lifetime', limits: { ...LIMITS } };
+  }
   const active = ['active', 'trialing'].includes(account.subscriptionStatus) && new Date(account.periodEnd).getTime() > now;
   const plan = accountPlan(account);
   return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
@@ -914,6 +922,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const tool = toolOf(req.body?.tool);
     const plan = inspectPlan(req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'year' ? 'year' : 'month');
+    // A tap on "pay once" is worth the one price, where the wedge sells it.
+    const once = req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'lifetime' && TOOLS[tool].lifetimePrice > 0;
     await queueCapi(signal.event, {
       product: 'marketel-inspect',
       hotelId: `inspect-visitor:${visitor}`,
@@ -923,10 +933,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       sourceUrl: attribution.sourceUrl || `${origin}${TOOLS[tool].home}`,
       fbp: attribution.fbp || '',
       fbc: attribution.fbc || '',
-      value: plan.amount / 100,
+      value: (once ? TOOLS[tool].lifetimePrice : plan.amount) / 100,
       currency: 'USD',
       eventId: `${signal.id}.${visitor}`,
-      contentName: signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
+      contentName: once ? `${TOOLS[tool].label} paid once` : signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
     });
   };
   router.post('/events/anon', guarded(async (req, res) => {
@@ -982,10 +992,44 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // cost more than the subscription is worth at this price, so Stripe collects
   // the email on its own page — one tap with Apple Pay — and the account is
   // created from it when the webhook comes back.
+  // Pay once, for good: the video landing's offer where the wedge sets a
+  // price for it. One payment and no subscription, so there are no free days to
+  // give and nothing to remind anyone of; the webhook grants it (adoptLifetime).
+  async function lifetimeCheckout(req, res, tool) {
+    const amount = TOOLS[tool].lifetimePrice;
+    if (!amount) throw fail(400, 'That offer is not available.');
+    const visitor = visitorOf(req.body?.visitorId);
+    const email = req.body?.email ? emailOf(req.body.email) : '';
+    if (email) {
+      const account = await prisma.inspectAccount.findUnique({ where: { email } });
+      if (account && entitlement(account).active) throw fail(409, 'You already have Marketel. Sign in with this email to use it.');
+    }
+    // The ad click rides along on the checkout: the account is only created
+    // when the payment comes back, and without the click Meta would never hear
+    // about the purchase it paid for. Stripe caps each value at 500 characters.
+    const click = sanitizeInspectAttribution(req.body?.attribution, req) || {};
+    const carried = Object.fromEntries(Object.entries({ fbp: click.fbp, fbc: click.fbc, src: click.sourceUrl, ip: click.ipAddress, ua: click.userAgent,
+      campaign: click.utmCampaign, content: click.utmContent }).filter(([, value]) => value).map(([key, value]) => [`ad_${key}`, String(value).slice(0, 500)]));
+    const metadata = { product: 'marketel-inspect', sim: '1', plan: 'lifetime', tool, visitorId: visitor || '', ...carried };
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      // A customer, so the receipt and the billing page have somewhere to live.
+      customer_creation: 'always',
+      line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
+        product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`, description: 'No subscription. Nothing renews.' } } }],
+      ...(email ? { customer_email: email } : {}),
+      metadata, payment_intent_data: { metadata },
+      success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
+      cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
+    });
+    if (!ownerBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: 'lifetime' });
+    res.json({ url: session.url, trialDays: 0, lifetime: true });
+  }
   router.post('/checkout/sim', guarded(async (req, res) => {
     requireBilling();
     rate(`inspect-sim-checkout:${req.ip}`, 12, 3600000);
     const tool = toolOf(req.body?.tool);
+    if (req.body?.plan === 'lifetime') return lifetimeCheckout(req, res, tool);
     const interval = req.body?.interval === 'year' ? 'year' : 'month';
     const plan = inspectPlan(interval);
     const priceId = env[plan.priceEnv];
@@ -1057,6 +1101,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // because the screen behind this reads fine without it.
     if (!session || session.metadata?.sim !== '1' || session.status !== 'complete') return res.json({ email: '' });
     const email = String(session.customer_details?.email || '');
+    if (session.metadata?.plan === 'lifetime') {
+      // Granted here as well as by the webhook, whichever comes first, so the
+      // sign-in they are about to do finds it. A second purchase is refunded.
+      const outcome = await adoptLifetime(session, req).catch(error => { console.error('Inspect pay-once grant failed:', error.message); return null; });
+      return res.json({ email, ...(outcome?.duplicate ? { alreadyHad: true, refunded: true } : {}) });
+    }
     // Paid again while already subscribed: the webhook cancels the new plan, and
     // the page says so rather than welcoming them to free days they don't need.
     let alreadyHad = false;
@@ -1789,6 +1839,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // Serialize creation and use Stripe idempotency to survive network retries.
     const checkout = await prisma.$transaction(async tx => {
       let a = await lockAccount(tx, req.inspect.id);
+      if (a.lifetimeSince) throw fail(409, 'You already have Marketel for good. There is nothing to buy.');
       if (a.stripeSubscriptionId) {
         // Same tolerance as the customer above: a subscription this Stripe mode
         // cannot see does not block a new checkout.
@@ -1976,6 +2027,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (!stripe || !account || entitlement(account).active) return false;
     const customers = await stripe.customers.list({ email: account.email, limit: 10 });
     for (const customer of customers.data || []) {
+      // Never in the way of the subscription search below.
+      const sessions = await Promise.resolve().then(() => stripe.checkout.sessions.list({ customer: customer.id, status: 'complete', limit: 10 })).catch(() => ({ data: [] }));
+      const paidOnce = (sessions.data || []).find(s => s.metadata?.plan === 'lifetime' && s.payment_status === 'paid');
+      if (paidOnce) return !!(await adoptLifetime(paidOnce, null));
       const subscriptions = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 10 });
       const mine = (subscriptions.data || []).find(s => s.metadata?.product === 'marketel-inspect' && s.metadata?.sim === '1'
         && !['canceled', 'incomplete_expired'].includes(s.status)
@@ -2038,6 +2093,53 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }
     return account;
   };
+  // A pay-once buyer, like a simulation one, pays before they have an account.
+  // Granted once per checkout: the event row is the lock, so the webhook and
+  // the thank-you page can both call this. A second purchase for an account
+  // that already has it is refunded, and a subscription the purchase replaces
+  // is cancelled so it never charges again.
+  const adoptLifetime = async (session, req) => {
+    if (session?.mode !== 'payment' || session.metadata?.plan !== 'lifetime' || session.payment_status !== 'paid') return null;
+    let email;
+    try { email = emailOf(session.customer_details?.email || session.customer_email); }
+    catch { return null; }
+    const tool = toolOf(session.metadata?.tool);
+    const visitorId = visitorOf(session.metadata?.visitorId);
+    const sourceId = `inspect-lifetime:${session.id}`;
+    const outcome = await prisma.$transaction(async tx => {
+      const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
+      const row = await tx.inspectAccount.upsert({ where: { email }, create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
+      const a = await lockAccount(tx, row.id);
+      const seen = await tx.inspectEvent.findUnique({ where: { sourceId } });
+      if (seen) return { account: a, duplicate: seen.name === 'LifetimeRefunded', fresh: false };
+      const duplicate = !!a.lifetimeSince;
+      await tx.inspectEvent.create({ data: { accountId: a.id, name: duplicate ? 'LifetimeRefunded' : 'LifetimePurchased', sourceId, tool, visitorId } });
+      if (duplicate) return { account: a, duplicate, fresh: true };
+      const account = await tx.inspectAccount.update({ where: { id: a.id }, data: { lifetimeSince: new Date(),
+        ...(a.stripeCustomerId || !session.customer ? {} : { stripeCustomerId: String(session.customer) }) } });
+      return { account, duplicate, fresh: true, replaces: ['active', 'trialing', 'past_due'].includes(a.subscriptionStatus || '') ? a.stripeSubscriptionId : null };
+    });
+    if (!outcome.fresh) return outcome;
+    if (outcome.duplicate) {
+      await Promise.resolve().then(() => stripe.refunds.create({ payment_intent: String(session.payment_intent) }, { idempotencyKey: `inspect-lifetime-refund:${session.id}` }))
+        .catch(error => console.error('Inspect duplicate pay-once refund failed; refund by hand:', session.id, error.message));
+      return outcome;
+    }
+    if (outcome.replaces) {
+      await Promise.resolve().then(() => stripe.subscriptions.cancel(outcome.replaces))
+        .catch(error => console.error('Inspect subscription replaced by pay-once was not cancelled; cancel by hand:', outcome.replaces, error.message));
+    }
+    const m = session.metadata || {};
+    const account = await saveAttribution(outcome.account,
+      { fbp: m.ad_fbp, fbc: m.ad_fbc, sourceUrl: m.ad_src, utmCampaign: m.ad_campaign, utmContent: m.ad_content },
+      { ip: m.ad_ip, headers: { 'user-agent': m.ad_ua } }).catch(() => outcome.account);
+    await queueInspectCapi('Purchase', {
+      account, req, eventId: `inspect-purchase.${session.id}`,
+      value: Number(session.amount_total) / 100, currency: String(session.currency || 'usd').toUpperCase(),
+      contentName: `${TOOLS[tool].label} paid once`,
+    }).catch(error => console.error('Inspect pay-once Purchase CAPI queue failed:', error.message));
+    return outcome;
+  };
   app.post('/api/inspect-stripe-webhook', guarded(async (req, res) => {
     if (!enabled || !stripe || !env.STRIPE_INSPECT_WEBHOOK_SECRET) return res.sendStatus(503);
     let event;
@@ -2045,6 +2147,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     catch { return res.sendStatus(400); }
     if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.product === 'marketel-inspect-report') {
       await grantReportPurchase(event, req);
+      return res.json({ received: true });
+    }
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type) && event.data.object?.metadata?.plan === 'lifetime') {
+      await adoptLifetime(event.data.object, req);
       return res.json({ received: true });
     }
     if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.sim === '1') {

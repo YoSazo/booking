@@ -21,6 +21,9 @@ model InspectAccount {
   periodEnd            DateTime?
   cancelAtPeriodEnd    Boolean          @default(false)
   reportsUsed          Int              @default(0)
+  // Paid once, for good (the pay-once offer). Active whatever any subscription
+  // on the account is doing; nothing renews and nothing expires it.
+  lifetimeSince        DateTime?
   // Single-report purchases not yet spent on a finalized report.
   reportCredits        Int              @default(0)
   // What a report is sent under. Snapshotted into each finalized document.

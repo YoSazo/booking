@@ -18,10 +18,10 @@ const fastClock = async (h, { hidden = false } = {}) => {
   await h.page.waitForSelector('#offer-video');
 };
 
-// An ad visitor arrives without ?sim: the headline the ad promised, the real
-// app making a report, and the offer under it. No simulation stands between
-// them and the price.
-test('phone: an ad visitor gets the video, the price and start free', async () => {
+// An ad visitor arrives without ?sim: the price as the headline, the real app
+// making a report, and one offer under it. No simulation stands between them
+// and the price, and no subscription is in it: Claims is paid once.
+test('phone: an ad visitor gets $99 once as the headline, the video, and one button', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
@@ -30,31 +30,73 @@ test('phone: an ad visitor gets the video, the price and start free', async () =
     assert.match(video.src, /^https:\/\/res\.cloudinary\.com\/.+\.mp4$/);
     assert.match(video.poster, /^https:\/\/res\.cloudinary\.com\/.+\.jpg$/);
     assert.equal(await h.page.$('[data-sim-pick]'), null, 'no simulation');
+    assert.match((await h.page.textContent('h1')).trim(), /^\$99 once\.\s*Unlimited damage reports\.$/);
     const text = await h.body();
-    assert.match(text, /Document guest damage/);
+    assert.match(text, /No subscription\. Nothing renews\./);
     assert.match(text, /38 seconds/);
-    assert.match(text, /Try it free for 3 days\./);
+    assert.match(text, /Pay once\. Keep it for good\./);
+    assert.match(text, /One payment of \$99\. No subscription, and nothing renews\./);
+    // No trial, no monthly price, no plan to switch, no $12-a-report side door.
+    assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
+    assert.equal(await h.page.$('[data-sim-plan]'), null);
+    assert.equal(await h.page.$('#sim-keep'), null);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
-    // Free for the whole three days, so the bar can say it; the price after it keeps its dollar sign.
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /Free for 3 days\s*then \$25\/month\s*Start free/);
-    assert.doesNotMatch(await h.body(), /first report if sooner/);
-    // The terms sit under the price, so the button keeps its one line and the bar stays short.
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$99 once\s*No subscription\s*Get it/);
     const bar = await h.page.evaluate(() => { const box = el => document.querySelector(el).getBoundingClientRect();
       return { button: box('#sim-paybar-buy').height, price: box('#sim-paybar strong').bottom, terms: box('#sim-paybar small').top }; });
     assert.ok(bar.button <= 56, JSON.stringify(bar));
-    assert.ok(bar.terms >= bar.price - 1, 'then $25/month sits under Free for 3 days');
+    assert.ok(bar.terms >= bar.price - 1, 'No subscription sits under $99 once');
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
     assert.deepEqual({ tool: landed?.tool, detail: landed?.detail }, { tool: 'claims', detail: 'phone' });
-    // Start free goes straight to Stripe, whose page takes the email: no
-    // screen of ours in between, where a tap once turned into a dead end.
+    // The button goes straight to Stripe, whose page takes the email.
     await h.page.click('#sim-paybar-buy');
     for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
-    assert.equal(count(h, 'SimCheckoutTapped'), 1, 'start free is InitiateCheckout');
+    assert.equal(count(h, 'SimCheckoutTapped'), 1, 'the tap is InitiateCheckout');
+    assert.equal(h.events.find(event => event.name === 'SimCheckoutTapped').detail, 'lifetime');
     assert.equal(h.purchases[0]?.tool, 'claims');
+    assert.equal(h.purchases[0]?.plan, 'lifetime');
     assert.ok(!('email' in h.purchases[0]), 'Stripe asks for the email, not us');
     assert.equal(count(h, 'SimEmailGiven'), 0);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('after paying once, the thank-you page says it is theirs and nothing renews', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: 'sim=1&checkout=success&session=cs_test_a1GoodSessionIdentifier000001',
+    simEmail: { email: 'buyer@example.com' }, viewport: phone });
+  try {
+    await h.context.addInitScript(() => { try { sessionStorage.setItem('inspect.sim.once', '1'); sessionStorage.setItem('inspect.sim.trial', '0'); } catch {} });
+    await h.page.reload({ waitUntil: 'domcontentloaded' });
+    await h.page.waitForSelector('.sim-thanks');
+    const text = await h.body();
+    assert.match(text, /Marketel Claims is yours\./);
+    assert.match(text, /Paid once\. No subscription, and nothing renews\./);
+    assert.doesNotMatch(text, /free days|subscribed/i);
+    h.assertClean();
+  } finally { await h.close(); }
+
+  // Paid once again: the second payment is refunded, and the page says so.
+  const again = await open({ arm: 'claims', signedIn: false, query: 'sim=1&checkout=success&session=cs_test_a1GoodSessionIdentifier000001',
+    simEmail: { email: 'buyer@example.com', alreadyHad: true, refunded: true }, viewport: phone });
+  try {
+    await again.page.waitForSelector('.sim-thanks');
+    for (let i = 0; i < 30 && !/already have Marketel/.test(await again.body()); i++) await again.page.waitForTimeout(100);
+    assert.match(await again.body(), /We refunded this payment\./);
+    again.assertClean();
+  } finally { await again.close(); }
+});
+
+test('a paid-once account says nothing renews, and has no subscription to manage', async () => {
+  const h = await open({ arm: 'claims', signedIn: true, accountData: { active: true, lifetime: true, interval: 'lifetime', periodEnd: null, remaining: 300 }, viewport: phone });
+  try {
+    await h.page.waitForSelector('#new-report');
+    await h.page.click('#account-button');
+    await h.page.waitForSelector('#logout');
+    const text = await h.page.textContent('#dialog');
+    assert.match(text, /Unlimited reports\. Paid once; nothing renews\./);
+    assert.equal(await h.page.$('#manage'), null);
     h.assertClean();
   } finally { await h.close(); }
 });
