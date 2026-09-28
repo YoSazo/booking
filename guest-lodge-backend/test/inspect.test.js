@@ -2875,6 +2875,7 @@ test('paying once is one $99 payment with no subscription, and it carries the ad
     const { params } = h.calls.sessions[0];
     assert.equal(params.mode, 'payment');
     assert.equal(params.customer_creation, 'always');
+    assert.deepEqual(params.payment_method_types, ['card'], 'paid now, never a debit that clears days later');
     assert.ok(!('subscription_data' in params), 'nothing renews');
     assert.deepEqual(params.line_items[0].price_data.unit_amount, 9900);
     assert.equal(params.line_items[0].price_data.currency, 'usd');

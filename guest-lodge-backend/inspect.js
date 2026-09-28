@@ -1015,6 +1015,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       mode: 'payment',
       // A customer, so the receipt and the billing page have somewhere to live.
       customer_creation: 'always',
+      // Card only, which includes Apple Pay and Google Pay. A bank debit takes
+      // days to clear, and the page after paying says it is theirs now.
+      payment_method_types: ['card'],
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
         product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`, description: 'No subscription. Nothing renews.' } } }],
       ...(email ? { customer_email: email } : {}),
