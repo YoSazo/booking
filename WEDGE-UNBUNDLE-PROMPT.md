@@ -64,6 +64,30 @@ This search adds a second kind of money villain to part 2: overpaying for
 bloated software, or platform fees and commissions on customers who were
 already yours.
 
+## 2b. The low-customer-cost test (a hard filter)
+
+Proof that people pay is not enough: the wedge must be cheap to win from a
+cold ad. At about $1.30 a visitor, a paying customer under ~$50 needs roughly
+3 in 100 visitors to end up paying. Keep a candidate only if it passes all
+four:
+
+1. **The need is there this week** for most people with the identity: a
+   weekly or daily job, not an occasional emergency.
+2. **The first use pays off the same day** in money: a job won, a payment
+   received, a review posted, a fee avoided. Not just "more professional".
+3. **No free substitute that's good enough.** Check Venmo, texting a link,
+   the platform's own free AI tool, and apps that are free forever, such as
+   Joist.
+4. **No switching.** It replaces paper, texts or nothing; it doesn't ask
+   them to leave software their business runs on.
+
+Add these outside signals of cheap customers:
+
+- App Store rating counts for simple, low-price apps in the category. For
+  example, Invoice Simple has 123,000 ratings at $7–22 a month, which shows
+  that category can be sold cheaply at scale.
+- Meta Ad Library advertisers in the category whose ads have run for months.
+
 ## 3. What to find: at least 30 incumbents
 
 For each one, record:
