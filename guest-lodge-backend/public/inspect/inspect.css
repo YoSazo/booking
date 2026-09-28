@@ -457,7 +457,6 @@ html.wedge-enter .hero > :nth-child(n+6) { animation-delay: 200ms; }
 .camera-strip figure.is-before button { display: block; width: 46px; height: 46px; min-height: 0; padding: 0; border: 2px solid var(--green); border-radius: 14px; background: none; overflow: hidden; }
 .camera-strip figure.is-before img { border-radius: 11px; }
 .camera-strip figure.is-before small { color: var(--green-dark); font-weight: 700; }
-.camera-room.is-check-in span { color: var(--green-dark); font-weight: 650; }
 /* The before page: the check-in photo large, and one tap back to the camera. */
 .before-page { padding: 4px 0 28px; }
 .before-page #before-back { display: block; margin: 0 0 10px; }
@@ -725,6 +724,10 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
    blinking, because the sheet below it never moved. */
 .camera-companion.is-entering { animation: hud-in .34s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes hud-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* The shot just taken lands in the strip with a small pop, so a photo taken
+   is a photo seen. Only the new one moves; the page does not blink. */
+.camera-strip figure.is-fresh { animation: photo-pop .44s cubic-bezier(.2,.9,.3,1.25) both; }
+@keyframes photo-pop { 0% { opacity: 0; transform: scale(.3) translateY(18px); } 55% { opacity: 1; transform: scale(1.1); } 100% { opacity: 1; transform: none; } }
 /* The button was always a tap-to-toggle calling itself "Hold to talk". It is a
    microphone, so it looks like one, and it says what it is doing while it is on. */
 .hud-mic { flex: 0 0 auto; width: 66px; height: 66px; padding: 0; border-radius: 50%; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
@@ -732,13 +735,9 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 @keyframes hud-mic-live { 0%, 100% { box-shadow: 0 0 0 0 #b3261e52; } 60% { box-shadow: 0 0 0 12px #b3261e00; } }
 @media (prefers-reduced-motion: reduce) {
   .camera-companion.is-entering { animation: none; }
+  .camera-strip figure.is-fresh { animation: none; }
   .hud-mic.is-live { animation: none; }
 }
-
-/* Which room, typed, before the camera arrives. */
-.camera-ask h1 { font-size: 24px; margin: 4px 0 12px; letter-spacing: -.6px; }
-.camera-ask input { width: 100%; min-height: 54px; margin-bottom: 12px; padding: 14px 16px; font-family: inherit; font-size: 17px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; }
-.camera-ask input:focus { outline: none; border-color: var(--green); }
 
 /* Desktop: the landing leads with the simulation (goldenLanding). */
 /* `display: flex` on .lead-box would otherwise beat the hidden attribute. */

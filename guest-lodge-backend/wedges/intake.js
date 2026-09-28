@@ -3,12 +3,13 @@
 // you don't have dated photos from before you started, you're paying for it
 // yourself." One report, made at drop-off and signed by the customer there, so
 // the argument never starts. No simulation: the landing is a real-time video
-// of the app (landing.video) once it is recorded.
+// of the app (landing.video) once it is recorded. Hidden for now: off the app's
+// menu, still reachable at /intake; set status back to "live" to offer it.
 module.exports = {
   "id": "intake",
   "product": "Intake",
   "webTitle": "Marketel Intake — Record the car before you start",
-  "status": "live",
+  "status": "hidden",
   "roleLabels": {
     "detailer": "Detailer",
     "customer": "Customer"
@@ -61,11 +62,6 @@ module.exports = {
         "eventTime": "first-photo",
         "eventWord": "photographed",
         "signerHint": "Optional. The customer signs to show they saw this record before work started."
-      },
-      "capture": {
-        "ask": "Which part of the car?",
-        "another": "another part",
-        "missing": "Type which part of the car this is."
       },
       "propertyLabel": "Vehicle / job",
       "timeLabel": "Time photographed",

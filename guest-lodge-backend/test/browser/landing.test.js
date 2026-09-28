@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { open } = require('./harness');
+const { open, newAppReport } = require('./harness');
 
 for (const arm of ['claims', 'inspect', 'incident']) {
   test(`${arm}: landing names its own product and leads to setup`, async () => {
@@ -26,14 +26,14 @@ for (const arm of ['claims', 'inspect', 'incident']) {
   });
 }
 
-test('saved property is one tap from the signed-in setup card', async () => {
+test('a saved property is one tap once the camera closes', async () => {
   const h = await open({ native: true, accountData: { businessName: 'Pine Stays' }, properties: ['Pine Cottage'] });
   try {
-    await h.page.waitForSelector('#new-report');
-    await h.page.click('#new-report');
+    await newAppReport(h);
     assert.match(await h.body(), /Which rental/);
     await h.page.click('[data-pick-property="Pine Cottage"]');
-    await h.page.waitForSelector('#preview');
+    await h.page.waitForSelector('#send-report');
+    assert.match(await h.body(), /Pine Cottage/);
     assert.match(await h.body(), /Finding 1/);
     h.assertClean();
   } finally { await h.close(); }

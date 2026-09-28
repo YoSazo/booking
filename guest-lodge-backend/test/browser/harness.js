@@ -167,4 +167,32 @@ async function open({ native = false, arm = 'claims', demo = false, query = null
   return { browser, context, page, shell, events, purchases, errors, data, body, close, assertClean };
 }
 
-module.exports = { open, account, document, report, wait, JPEG };
+// The app's camera as the shell drives it: a shot arrives, the words arrive
+// (a hold on the shutter, captions, then the recording ends), the sheet closes.
+const cameraShot = (page, room = 0) => page.evaluate(({ room, dataUrl }) => window.marketelInspectPhotoCaptured(JSON.stringify({ room, dataUrl })),
+  { room, dataUrl: `data:image/jpeg;base64,${JPEG.toString('base64')}` });
+const cameraSay = async (page, text) => {
+  await page.evaluate(() => window.marketelInspectHold('start'));
+  await page.evaluate(spoken => window.marketelInspectDictationText(JSON.stringify({ text: spoken })), text);
+  await page.evaluate(() => window.marketelInspectAudioCaptured(JSON.stringify({ dataUrl: '' })));
+};
+const cameraDone = page => page.evaluate(() => window.marketelInspectCameraClosed());
+// A new report in the app: the camera opens at once, a shot (and some words)
+// are added, the camera closes, and the details step asks for the property,
+// which is one tap when it is saved.
+async function newAppReport(h, { property = null, said = '', shots = 1 } = {}) {
+  await h.page.waitForSelector('#new-report');
+  await h.page.click('#new-report');
+  await h.page.waitForSelector('.camera-companion');
+  await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
+  for (let i = 0; i < shots; i++) await cameraShot(h.page);
+  if (said) await cameraSay(h.page, said);
+  await cameraDone(h.page);
+  await h.page.waitForSelector('#property');
+  if (property) {
+    await h.page.click(`[data-pick-property="${property}"]`);
+    await h.page.waitForSelector('#send-report');
+  }
+}
+
+module.exports = { open, account, document, report, wait, JPEG, cameraShot, cameraSay, cameraDone, newAppReport };

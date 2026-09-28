@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { open, report, wait } = require('./harness');
+const { open, report, wait, newAppReport, cameraShot, cameraDone } = require('./harness');
 const path = require('node:path');
 const sample = name => path.join(__dirname, '../../public/inspect/sample', name);
 
@@ -12,9 +12,10 @@ test('saved session starts on Reports without a sign-in flash; a tap beats slow 
     assert.match(await h.body(), /reports/i);
     assert.doesNotMatch(await h.body(), /\bLoading…\b/);
     await h.page.click('#new-report');
-    await h.page.waitForSelector('#setup-property');
+    await h.page.waitForSelector('.camera-companion');
     await wait(1100);
-    assert.ok(await h.page.locator('#setup-property').count(), 'startup must not redraw over setup');
+    assert.ok(await h.page.locator('.camera-companion').count(), 'startup must not redraw over the camera page');
+    assert.ok(h.shell.some(message => message.type === 'inspectCamera' && message.room === 0), 'the camera is asked for at once');
     assert.ok(h.shell.some(message => message.type === 'inspectState' && message.authenticated === true));
     h.assertClean();
   } finally { await h.close(); }
@@ -107,16 +108,15 @@ test('Claims uploads while editing, computes the filing date, sends dated photos
   const h = await open({ native: true, accountData: { businessName: 'Pine Stays', active: true, remaining: 5 },
     properties: ['Pine Cottage'], sentPhoto: sample('claims-carpet-thumb.jpg') });
   try {
-    await h.page.waitForSelector('#new-report');
-    await h.page.click('#new-report');
-    await h.page.click('[data-pick-property="Pine Cottage"]');
-    await h.page.waitForSelector('[data-files]', { state: 'attached' });
-    await h.page.click('#to-details');
+    await newAppReport(h);
+    // The details step opened by the camera has the filing date on it.
     await h.page.fill('#checkout-date', '2026-09-25');
-    await h.page.click('#to-rooms');
-    await h.page.setInputFiles('[data-files]', sample('claims-wall-thumb.jpg'));
+    await h.page.click('[data-pick-property="Pine Cottage"]');
+    await h.page.waitForSelector('#send-report');
+    await h.page.click('#edit');
     await h.page.waitForSelector('[data-photo-id] figcaption');
-    await h.page.waitForFunction(() => [...document.querySelectorAll('[data-photo-id] figcaption')].some(el => el.textContent.includes('Saved')));
+    // It started uploading the moment the property was named, so by now it is saved.
+    await h.page.waitForFunction(() => [...document.querySelectorAll('[data-photo-id] figcaption')].some(el => /Saved|Original file kept/.test(el.textContent)));
     assert.equal(h.data.photoCount, 1, 'photo uploads before Send');
     const beforeBytes = await h.page.locator('[data-photo-id] img').first().evaluate(async image => (await (await fetch(image.src)).blob()).size);
     await h.page.click('#preview');
@@ -143,11 +143,11 @@ test('Claims uploads while editing, computes the filing date, sends dated photos
     assert.ok(noticeAbove, 'copy confirmation is visible over the open share sheet');
     await h.page.click('#dialog-close');
     await h.page.click('#another-report');
-    await h.page.waitForSelector('#setup-property');
-    assert.equal(await h.page.inputValue('#setup-property'), '', 'new report starts with a fresh property');
-    await h.page.click('#flow-cancel');
-    await h.page.waitForSelector('#pdf');
-    assert.ok(await h.page.locator('.report-photo').count(), 'closing setup returns to sent report with its photo');
+    await h.page.waitForSelector('.camera-companion');
+    // Closing the camera with nothing in it leaves nothing behind: back to Reports.
+    await cameraDone(h.page);
+    await h.page.waitForSelector('#new-report');
+    assert.ok(await h.page.locator('[data-open]').count(), 'the sent report is in the list');
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -164,10 +164,8 @@ test('a dead photo blob repairs from storage and a slow tap has feedback without
     assert.ok(pressed, 'pointerdown dips the button');
     await h.page.evaluate(() => document.querySelector('#new-report').dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 })));
     await h.page.waitForFunction(() => !document.querySelector('#new-report').classList.contains('is-pressed'));
-    await h.page.click('#new-report');
-    await h.page.click('[data-pick-property="Pine Cottage"]');
-    await h.page.waitForSelector('[data-files]', { state: 'attached' });
-    await h.page.setInputFiles('[data-files]', sample('claims-wall-thumb.jpg'));
+    await newAppReport(h, { property: 'Pine Cottage' });
+    await h.page.click('#edit');
     await h.page.waitForSelector('[data-photo-id] img');
     const id = await h.page.locator('[data-photo-id]').first().getAttribute('data-photo-id');
     await h.page.locator('[data-photo-id] img').first().evaluate(image => { image.src = 'blob:http://app.test/dead-photo'; });
@@ -210,13 +208,13 @@ test('a saved signature is one tap on the next report', async () => {
     assert.equal(await h.page.locator('#name-field').count(), 0, 'remembered signer name avoids a second prompt');
     await h.page.click('#delivery-later');
     await h.page.click('#another-report');
-    await h.page.waitForSelector('#setup-business');
-    await h.page.fill('#setup-business', 'Pine Stays');
-    await h.page.click('#setup-next');
-    await h.page.fill('#setup-property', 'Second Cottage');
-    await h.page.click('#setup-build');
-    await h.page.waitForSelector('#preview');
-    await h.page.click('#preview');
+    await h.page.waitForSelector('.camera-companion');
+    await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
+    await cameraShot(h.page);
+    await cameraDone(h.page);
+    await h.page.waitForSelector('#property');
+    await h.page.fill('#property', 'Second Cottage');
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('[data-sign-saved="owner"]');
     assert.match(await h.body(), /Sign as Alex Host/);
     await h.page.click('[data-sign-saved="owner"]');

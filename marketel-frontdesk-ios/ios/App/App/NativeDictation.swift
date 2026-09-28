@@ -46,6 +46,10 @@ final class MarketelDictation {
     }
 
     private func begin(captions: Bool) {
+        // Asking for permission takes as long as the person takes. If they let
+        // go in the meantime the recording is already over, and starting it now
+        // would leave the microphone open with nobody to stop it.
+        guard !settled else { return }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: [.duckOthers])

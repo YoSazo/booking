@@ -1269,6 +1269,24 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
         })
     }
 
+    // Holding the camera's shutter records for as long as it is held. It is the
+    // same recorder the microphone button uses, so this only decides when it
+    // starts and stops, and stops it only if the hold is what started it: a
+    // recording begun from the button is never cut short by a finger lifting.
+    private var holdStartedDictation = false
+
+    private func handleInspectHold(_ began: Bool) {
+        if began {
+            guard !dictation.isRunning else { return }
+            holdStartedDictation = true
+            callWeb(function: "marketelInspectHold", argument: "start")
+            presentInspectDictation()
+        } else if holdStartedDictation {
+            holdStartedDictation = false
+            dictation.stop()
+        }
+    }
+
     private func sendDictation(function: String, payload: [String: Any]) {
         guard
             let json = try? JSONSerialization.data(withJSONObject: payload),
@@ -1299,6 +1317,7 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             self.setShellVisible(true, animated: true)
             self.callWeb(function: "marketelInspectCameraClosed", argument: "")
         }
+        camera.onHold = { [weak self] began in self?.handleInspectHold(began) }
         camera.modalPresentationStyle = .pageSheet
         if let sheet = camera.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
@@ -2093,7 +2112,6 @@ final class MarketelBridgeViewController: CAPBridgeViewController, UITabBarDeleg
             // Retarget the open camera from the room list showing above it.
             if let camera = presentedViewController as? MarketelInspectCameraViewController {
                 camera.room = payload["room"] as? Int ?? camera.room
-                camera.roomName = payload["name"] as? String ?? ""
             }
         case "inspectHaptic":
             // "success" marks something finished (a link made, a PDF shared);

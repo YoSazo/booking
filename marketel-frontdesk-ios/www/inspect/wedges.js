@@ -601,7 +601,7 @@ window.MARKETEL_WEDGES = {
     "id": "intake",
     "product": "Intake",
     "webTitle": "Marketel Intake — Record the car before you start",
-    "status": "live",
+    "status": "hidden",
     "roleLabels": {
       "detailer": "Detailer",
       "customer": "Customer"
@@ -654,11 +654,6 @@ window.MARKETEL_WEDGES = {
           "eventTime": "first-photo",
           "eventWord": "photographed",
           "signerHint": "Optional. The customer signs to show they saw this record before work started."
-        },
-        "capture": {
-          "ask": "Which part of the car?",
-          "another": "another part",
-          "missing": "Type which part of the car this is."
         },
         "propertyLabel": "Vehicle / job",
         "timeLabel": "Time photographed",

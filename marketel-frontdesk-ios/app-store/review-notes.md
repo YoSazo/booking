@@ -29,30 +29,20 @@ credits, so a report can be sent without a purchase.
 
 1. On first launch, choose **Claims**.
 2. Tap **Sign in** (top right), enter the review email, then the 6-digit code.
-3. Tap **New Report**, type any rental name, and tap **Build my report**.
-4. Tap **Take photo** (camera) or **Add photos** (library). While the camera is
-   open, tap the mic and describe what you see; the words become the note.
-5. Tap **Build my report** to preview, then **Send this report**. Choose
-   **Create a private link** or **Download the PDF** (iOS share sheet).
+3. Tap **New Report**. The camera opens at once.
+4. Tap the shutter for a photo. Hold it to describe what you see; the words
+   become the note (the mic button beside the photos does the same by tapping).
+   Tap **+ another** for a second finding, then **Done**.
+5. Type any rental name (or tap a saved one) and tap **Build my report** to
+   preview, then **Send this report**. Choose **Create a private link** or
+   **Download the PDF** (iOS share sheet).
 6. **Properties**: add a property, tap **Check in** and take a photo. A damage
    report for that property then shows it as the "before".
 7. The **•••** menu holds Account, Manage subscription, Privacy, Terms,
    Support and **Delete account**.
 
-**Intake** (the second choice on first launch, or via the product name at the
-top) is the same report tool for vehicle detailers: a dated record of a car's
-visible condition at drop-off, signed by the customer. The same account,
-plan and credits apply.
-
-1. From the chooser, pick **Intake**, then tap **New Report**, type any vehicle
-   (for example "White Tacoma"), and tap **Build my report**.
-2. Tap **Take photo**; the camera asks "Which part of the car?". Pick or type a
-   part, photograph it, and tap the mic to describe what you see.
-3. Build, preview, add the customer's signature if you like, and send it as a
-   private link or PDF.
-
 Camera, photo library and microphone are requested only when the reviewer
-chooses to add a photo or tap the mic. Voice is transcribed to text and the
+opens the camera, adds a photo, holds the shutter or taps the mic. Voice is transcribed to text and the
 audio is not kept.
 
 The app's HTML, JavaScript, CSS, fonts and icons are packaged inside the

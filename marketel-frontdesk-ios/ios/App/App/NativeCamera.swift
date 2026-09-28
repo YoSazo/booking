@@ -3,6 +3,10 @@ import UIKit
 
 // A half-sheet camera, so photographing a room never leaves the report.
 //
+// One control does both jobs. A tap on the shutter is a photo, taken the
+// moment the finger lands. Holding it talks: the shell records while it is held,
+// so a finding is one gesture, a photo and the words that go with it.
+//
 // This is native rather than a web viewfinder on purpose: iOS caps
 // getUserMedia at 720p inside a WKWebView and offers no ImageCapture, which
 // would put every photo below the 1600px the upload pipeline already keeps —
@@ -10,9 +14,11 @@ import UIKit
 final class MarketelInspectCameraViewController: UIViewController {
     private let onCapture: (String, Int) -> Void
     private let onDismiss: () -> Void
+    // Told when a hold on the shutter begins (true) and ends (false). The shell
+    // owns the recorder; this only says when.
+    var onHold: ((Bool) -> Void)?
     // Read at capture time, not bound at present time.
-    var room: Int { didSet { if room != oldValue { updateMessage() } } }
-    var roomName: String = "" { didSet { updateMessage() } }
+    var room: Int
     private let session = AVCaptureSession()
     private let output = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "com.bookmarketel.inspect.camera")
@@ -22,7 +28,12 @@ final class MarketelInspectCameraViewController: UIViewController {
     private let stripScroll = UIScrollView()
     private let shutter = UIButton(type: .custom)
     private let message = UILabel()
-    private var captured = 0
+    private let flash = UIView()
+    // The one instruction on this screen.
+    private let hint = "Tap for a photo · hold to talk"
+    private var pressing = false
+    private var holding = false
+    private var holdTimer: Timer?
 
     init(room: Int, onCapture: @escaping (String, Int) -> Void, onDismiss: @escaping () -> Void) {
         self.room = room
@@ -47,19 +58,19 @@ final class MarketelInspectCameraViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        // A recording must never outlive the screen it belongs to.
+        holdTimer?.invalidate()
+        holdTimer = nil
+        pressing = false
+        if holding { endHold() }
         sessionQueue.async { [session] in
             if session.isRunning { session.stopRunning() }
         }
         if isBeingDismissed { onDismiss() }
     }
 
-    // Says where the next shot lands, because the room can now be changed
-    // from the list showing above the sheet while this stays open.
     private func updateMessage() {
-        let name = roomName.trimmingCharacters(in: .whitespacesAndNewlines)
-        message.text = name.isEmpty
-            ? "Photos are added to this room as you take them."
-            : "Photos are being added to \(name)."
+        message.text = holding ? "Listening…" : hint
     }
 
     private func buildInterface() {
@@ -84,7 +95,7 @@ final class MarketelInspectCameraViewController: UIViewController {
         message.font = .systemFont(ofSize: 13, weight: .medium)
         message.textAlignment = .center
         message.numberOfLines = 2
-        message.text = "Photos are added to this room as you take them."
+        message.text = hint
         message.layer.shadowColor = UIColor.black.cgColor
         message.layer.shadowOpacity = 0.5
         message.layer.shadowRadius = 3
@@ -100,8 +111,23 @@ final class MarketelInspectCameraViewController: UIViewController {
         shutter.layer.cornerRadius = 33
         shutter.layer.borderWidth = 4
         shutter.layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
-        shutter.addTarget(self, action: #selector(capture), for: .touchUpInside)
+        // The photo is taken at touch-down; a finger still down a moment later
+        // is a hold, and talks until it lifts.
+        shutter.addTarget(self, action: #selector(pressBegan), for: .touchDown)
+        for event: UIControl.Event in [.touchUpInside, .touchUpOutside, .touchCancel] {
+            shutter.addTarget(self, action: #selector(pressEnded), for: event)
+        }
+        shutter.isAccessibilityElement = true
+        shutter.accessibilityLabel = "Take photo"
+        shutter.accessibilityHint = "Hold to record a voice note."
         shutter.isEnabled = false
+
+        // A white blink over the viewfinder on every shot, under the controls.
+        flash.backgroundColor = .white
+        flash.alpha = 0
+        flash.isUserInteractionEnabled = false
+        flash.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(flash)
 
         for subview in [done, stripScroll, shutter, message] {
             subview.translatesAutoresizingMaskIntoConstraints = false
@@ -114,6 +140,11 @@ final class MarketelInspectCameraViewController: UIViewController {
             previewContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             previewContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             previewContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            flash.topAnchor.constraint(equalTo: view.topAnchor),
+            flash.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            flash.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            flash.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             done.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             done.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -18),
@@ -193,12 +224,73 @@ final class MarketelInspectCameraViewController: UIViewController {
         shutter.isEnabled = true
     }
 
-    @objc private func capture() {
+    @objc private func pressBegan() {
+        guard shutter.isEnabled, !pressing else { return }
+        pressing = true
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.shutter.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        }
+        takePhoto()
+        holdTimer?.invalidate()
+        holdTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: false) { [weak self] _ in
+            self?.beginHold()
+        }
+    }
+
+    @objc private func pressEnded() {
+        guard pressing else { return }
+        pressing = false
+        holdTimer?.invalidate()
+        holdTimer = nil
+        if holding { endHold() }
+        settleShutter()
+    }
+
+    private func takePhoto() {
         guard shutter.isEnabled else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        flash.layer.removeAllAnimations()
+        flash.alpha = 0.55
+        UIView.animate(withDuration: 0.24, delay: 0, options: [.curveEaseOut, .allowUserInteraction]) {
+            self.flash.alpha = 0
+        }
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+        }
+    }
+
+    private func beginHold() {
+        holdTimer = nil
+        guard pressing, !holding else { return }
+        holding = true
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        updateMessage()
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+            self.shutter.transform = CGAffineTransform(scaleX: 1.14, y: 1.14)
+            self.shutter.backgroundColor = UIColor(red: 0.85, green: 0.22, blue: 0.18, alpha: 1)
+        }, completion: { _ in
+            guard self.holding else { return }
+            UIView.animate(withDuration: 0.8, delay: 0, options: [.autoreverse, .repeat, .allowUserInteraction, .curveEaseInOut]) {
+                self.shutter.transform = CGAffineTransform(scaleX: 1.22, y: 1.22)
+            }
+        })
+        onHold?(true)
+    }
+
+    private func endHold() {
+        guard holding else { return }
+        holding = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        updateMessage()
+        onHold?(false)
+    }
+
+    private func settleShutter() {
+        shutter.layer.removeAllAnimations()
+        UIView.animate(withDuration: 0.34, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.8, options: [.allowUserInteraction]) {
+            self.shutter.transform = .identity
+            self.shutter.backgroundColor = .white
         }
     }
 
@@ -206,21 +298,43 @@ final class MarketelInspectCameraViewController: UIViewController {
         dismiss(animated: true)
     }
 
+    // The photo you just took flies from the shutter into the strip and lands
+    // there, so a shot taken is a shot seen. The tile is in place from the
+    // start, hidden, so the strip never jumps when it arrives.
     private func addThumbnail(_ image: UIImage) {
         let tile = UIImageView(image: image)
         tile.contentMode = .scaleAspectFill
         tile.clipsToBounds = true
         tile.layer.cornerRadius = 8
+        tile.alpha = 0
         tile.translatesAutoresizingMaskIntoConstraints = false
         tile.widthAnchor.constraint(equalToConstant: 48).isActive = true
         tile.heightAnchor.constraint(equalToConstant: 48).isActive = true
         strip.addArrangedSubview(tile)
-        captured += 1
-        message.text = captured == 1 ? "1 photo added to this room." : "\(captured) photos added to this room."
-        DispatchQueue.main.async { [stripScroll, strip] in
-            let right = max(0, strip.bounds.width - stripScroll.bounds.width)
-            stripScroll.setContentOffset(CGPoint(x: right, y: 0), animated: true)
+
+        view.layoutIfNeeded()
+        let right = max(0, strip.bounds.width - stripScroll.bounds.width)
+        stripScroll.setContentOffset(CGPoint(x: right, y: 0), animated: false)
+        view.layoutIfNeeded()
+
+        let flyer = UIImageView(image: image)
+        flyer.contentMode = .scaleAspectFill
+        flyer.clipsToBounds = true
+        flyer.layer.cornerRadius = 33
+        flyer.frame = CGRect(x: shutter.center.x - 33, y: shutter.center.y - 33, width: 66, height: 66)
+        view.addSubview(flyer)
+
+        let landing = tile.convert(tile.bounds, to: view)
+        let arrive = {
+            tile.alpha = 1
+            flyer.removeFromSuperview()
         }
+        UIView.animate(withDuration: 0.46, delay: 0, usingSpringWithDamping: 0.78, initialSpringVelocity: 0.5, options: [.curveEaseOut], animations: {
+            flyer.frame = landing
+            flyer.layer.cornerRadius = 8
+        }, completion: { _ in arrive() })
+        // If anything interrupts the flight, the photo still shows.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { arrive() }
     }
 
     // Matched to the server's own resize so nothing is sent that would only be
@@ -253,6 +367,7 @@ extension MarketelInspectCameraViewController: AVCapturePhotoCaptureDelegate {
         else {
             DispatchQueue.main.async { [weak self] in
                 self?.message.text = "That photo did not save. Try again."
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { self?.updateMessage() }
             }
             return
         }

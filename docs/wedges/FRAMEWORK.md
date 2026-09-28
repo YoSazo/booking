@@ -71,7 +71,13 @@ use `autocorrect="off" spellcheck="false" autocapitalize="words"`.
 
 `openNativeCamera`, `cameraCompanion`, `syncPhotosSoon`, `stampPhoto` and
 `photoCaption` are the reference. The camera and voice are the center of
-capture; do not add checklists, prompts and toggles to that screen. Upload
+capture; do not add checklists, prompts and toggles to that screen. In the
+app a new report for an entry-based wedge opens the camera and asks nothing
+first (`startCameraFirst`): a tap on the shutter is a photo, holding it talks
+(the shell records while it is held), and the property, date and the rest are
+asked once the camera closes, on the details step. Findings are unnamed until
+then; `nameFindingsFromNotes` names one after the first known room its own
+words mention, and a finding nobody photographed or spoke for is dropped. Upload
 photos in the background and keep offline capture usable. Store taken and
 received moments in `document.photoTimes`; stamp a dated display copy on the
 server, but leave the original bytes intact. Receipt images are not stamped.
@@ -233,10 +239,8 @@ and simplicity, because every such incumbent already has cheap rivals.
    `baselineReportId` then use it without engine edits. A deadline with only
    `text` displays guidance and computes no “File by” date. Add `days`,
    `from` and `field` only when one rule truly applies to the whole audience.
-   When what is photographed is not a room, give the type `capture` words
-   (`ask`, `another`, `missing`, such as "Which part of the car?"); its
-   first seed is the camera's placeholder. Walk every screen and read it: the
-   copy scan cannot know which of the engine's defaults sound wrong.
+   Walk every screen and read it: the copy scan cannot know which of the
+   engine's defaults sound wrong.
 3. Provide three real demo photos and thumbnails.
 4. Run `npm run wedge:check -- <id>`. Review its screenshots at phone size and
    the demo recording by eye, including the wording on every rendered page.

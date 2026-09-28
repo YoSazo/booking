@@ -839,8 +839,7 @@ test('the app dates photos, keeps check-ins with their property, and shows the b
   assert.match(client, /data-baseline="\$\{index\}"/);
   assert.equal(require('../wedges/claims').types['check-in'].baselineSave, 'Save check-in');
   assert.match(client, /baselineReportId:draft\.baselineId/);
-  assert.match(client, /data-ask-name="\$\{esc\(name\)\}"/);
-  assert.match(client, /if\(cameraAsk\|\|cameraBefore\)return;/);
+  assert.match(client, /if\(cameraBefore\)return;/);
   assert.match(client, /hudShell\(\)&&!photosOnly\?/);
   assert.match(client, /Shots land here, each one dated\./);
 });
@@ -1233,9 +1232,8 @@ test('a damage report is findings, and the capture screen is the recording', () 
   assert.match(companion, /id="hud-talk"/);
   // Adding one is a chip beside the rooms now, not a wide button, and nothing
   // in the capture screen invents a "Finding 2" to label it with.
-  // Its words are the report type's: "another room" in a rental, "another part" on a car.
-  assert.match(companion, /id="hud-next" class="camera-room is-add">\+ \$\{esc\(captureWords\(draft\.document\.type\)\.another\)\}/);
-  assert.match(client, /const captureWords = type => \(\{ ask: 'Which room are you in\?', another: 'another room', missing: 'Type which room this is\.'/);
+  assert.match(companion, /id="hud-next" class="camera-room is-add">\+ another<\/button>/);
+  assert.doesNotMatch(client, /captureWords/);
   assert.doesNotMatch(companion, /Next \$\{esc\(entries/);
   // Dictation writes the speaker's own words, with nothing uploaded from here.
   assert.match(client, /if\(hudDictation&&draft\?\.document\?\.rooms\[hudDictation\.index\]/);
@@ -1544,7 +1542,7 @@ test('the camera sheet leaves the room list usable above it', () => {
     // The room a shot lands in is read at capture time, not bound when the
     // camera was presented — otherwise retargeting silently does nothing and
     // every photo still lands in the room it opened on.
-    assert.match(camera, /var room: Int \{ didSet/);
+    assert.match(camera, /\n    var room: Int\n/);
     assert.match(camera, /self\.onCapture\(encoded, self\.room\)/);
     assert.doesNotMatch(shell, /"room": room, "dataUrl"/, 'the presented room must not be captured in the closure');
     assert.match(shell, /"room": capturedRoom, "dataUrl": dataUrl/);
@@ -1562,9 +1560,10 @@ test('the camera sheet leaves the room list usable above it', () => {
     const companion=client.slice(client.indexOf('let cameraRoom=null'), client.indexOf('window.marketelInspectPhotoCaptured'));
     assert.match(companion, /type:'inspectCameraRoom',room:index/);
     assert.match(companion, /data-camera-room/);
-    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(true\);/);
+    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(false,\{fresh:id\}\);/);
     // Closing restores whatever screen the operator was actually on.
-    assert.match(companion, /cameraRoom=null;\s*if\(draft&&!preview&&!draft\.finalizedAt\)editor\('rooms'\)/);
+    assert.match(companion, /cameraRoom=null;\s*if\(!draft\)return landing\(\);\s*if\(preview\|\|draft\.finalizedAt\)return reportPreview\(\);/);
+    assert.match(companion, /\/\/ An unnamed report goes to its details, a named one back to the work\.\s*editor\(\);/);
 });
 
 test('no template expression ships to the screen as literal text', () => {
@@ -2694,23 +2693,80 @@ test('the app stops quoting a price to someone who already paid, and a business 
   assert.doesNotMatch(client, /Hold to talk/);
 });
 
-test('the room is asked before the camera, and changing your mind leaves nothing behind', () => {
+test('a new report opens the camera and asks nothing first; a finding nobody filled in leaves nothing behind', () => {
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  // In the app, for an entry-based wedge, New report goes straight to the camera.
+  assert.match(client, /const cameraFirst = type => native && hudShell\(\) && payAtExport\(\) && entryTool\(type \|\| landingArm\(\)\?\.type \|\| 'routine'\);/);
+  assert.match(client, /if \(payAtExport\(\) && !propertyName\) return cameraFirst\(type\) \? startCameraFirst\(type\) : setupFlow\(\);/);
+  const first = client.slice(client.indexOf('async function startCameraFirst('), client.indexOf('// ——— Check-ins'));
+  assert.match(first, /newDocument\('', /);
+  assert.match(first, /openNativeCamera\(0\);/);
+  // The page behind the sheet is drawn first, so it rises with the sheet.
+  const open = client.slice(client.indexOf('function openNativeCamera('), client.indexOf('// Dictation while the camera is open'));
+  assert.ok(open.indexOf('cameraCompanion(true);') > 0 && open.indexOf('cameraCompanion(true);') < open.indexOf("type:'inspectCamera'"));
+  // No question before the camera, and none of the machinery for one.
+  for (const gone of ['cameraAsk', 'cameraAskScreen', 'leaveCameraAsk', 'hud-room', 'hudAsk', 'data-ask-room']) assert.ok(!client.includes(gone), `${gone} is still in the page`);
+  // "+ another" is a new, unnamed finding straight away.
   const add = client.slice(client.indexOf("$('hud-next').onclick="), client.indexOf("document.querySelectorAll('[data-camera-room]')"));
-  // For findings, "+ another room" only asks. Nothing is pushed until Done,
-  // which is what used to leave "No observation recorded" in the report.
-  const entryBranch = add.slice(add.indexOf('if(entries){'), add.indexOf('return;', add.indexOf('if(entries){')));
-  assert.match(entryBranch, /cameraAsk='new'/);
-  assert.doesNotMatch(entryBranch, /rooms\.push/);
-  assert.match(entryBranch, /type:'inspectCameraClose'/);
-  // The question has a way back, so a mistaken tap is never answered by
-  // inventing a room name.
-  assert.match(client, /id="hud-room-back"/);
-  assert.match(client, /\$\('hud-room-back'\)\.onclick=\(\)=>\{haptic\(\);leaveCameraAsk\(\);\};/);
-  // The camera sheet only opens once the room has a name or one is picked.
-  assert.match(client, /if\(entryTool\(\)&&!\(room\?\.name\|\|''\)\.trim\(\)\)\{ cameraAsk='name'; cameraCompanion\(true\); return; \}/);
-  // A dismissal we asked for is not the owner leaving the camera.
-  assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraAsk\|\|cameraBefore\)return;/);
+  assert.match(add, /rooms\.push\(\{name:entries\?'':nextRoomName\(rooms\),observation:'',issue:false,photos:\[\]\}\)/);
+  // Closing the camera drops a finding with no photo, words or name, and a
+  // report with nothing in it leaves no draft behind.
+  const closed = client.slice(client.indexOf('window.marketelInspectCameraClosed='), client.indexOf('window.marketelInspectPhotoCaptured='));
+  assert.match(closed, /room\.photos\.length\|\|\(room\.observation\|\|''\)\.trim\(\)\|\|\(room\.name\|\|''\)\.trim\(\)/);
+  assert.match(closed, /if\(!kept\.length&&!d\.propertyName\.trim\(\)\)\{[\s\S]*?draft=null/);
+  // A dismissal we asked for (the check-in photo page) is not the owner leaving.
+  assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraBefore\)return;/);
+});
+
+test('holding the shutter talks, a tap is a photo, and the recording never outlives the hold', () => {
+  const fsx = require('node:fs'), pathx = require('node:path');
+  const root = pathx.join(__dirname, '..', '..', 'marketel-frontdesk-ios', 'ios', 'App', 'App');
+  const camera = fsx.readFileSync(pathx.join(root, 'NativeCamera.swift'), 'utf8');
+  const shell = fsx.readFileSync(pathx.join(root, 'AppDelegate.swift'), 'utf8');
+  const dictation = fsx.readFileSync(pathx.join(root, 'NativeDictation.swift'), 'utf8');
+  const client = fsx.readFileSync(pathx.join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  // The photo is taken at touch-down; a finger still down at a quarter second is a hold.
+  assert.match(camera, /shutter\.addTarget\(self, action: #selector\(pressBegan\), for: \.touchDown\)/);
+  assert.match(camera, /for event: UIControl\.Event in \[\.touchUpInside, \.touchUpOutside, \.touchCancel\]/);
+  assert.match(camera, /pressing = true[\s\S]{0,400}takePhoto\(\)[\s\S]{0,200}withTimeInterval: 0\.25/);
+  assert.match(camera, /onHold\?\(true\)/);
+  assert.match(camera, /onHold\?\(false\)/);
+  // Leaving the screen ends a hold, so the microphone is never left open.
+  assert.match(camera, /override func viewWillDisappear[\s\S]*?if holding \{ endHold\(\) \}/);
+  // The shell starts and stops the same recorder the mic button uses, and stops
+  // it only if the hold started it.
+  assert.match(shell, /camera\.onHold = \{ \[weak self\] began in self\?\.handleInspectHold\(began\) \}/);
+  assert.match(shell, /guard !dictation\.isRunning else \{ return \}\n\s+holdStartedDictation = true/);
+  assert.match(shell, /\} else if holdStartedDictation \{\n\s+holdStartedDictation = false\n\s+dictation\.stop\(\)/);
+  // Permission can take longer than the hold: a recording already over is never begun.
+  assert.match(dictation, /private func begin\(captions: Bool\) \{[\s\S]{0,400}guard !settled else \{ return \}/);
+  // The page knows it is listening, and each shot lands with a small animation.
+  assert.match(client, /window\.marketelInspectHold=state=>\{\n  if\(state!=='start'\|\|cameraRoom===null\|\|!draft\|\|hudDictation\)return;/);
+  assert.match(camera, /flyer\.frame = landing/);
+  assert.match(client, /<figure\$\{id===fresh\?' class="is-fresh"':''\}>/);
+  assert.match(client, /cameraCompanion\(false,\{fresh:id\}\)/);
+});
+
+test('an unnamed finding is named after the first room its own words mention', () => {
+  const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
+  const source = client.slice(client.indexOf('function nameFindingsFromNotes()'), client.indexOf('function editor(step)'));
+  // Run the real function against a stand-in draft.
+  const run = (rooms, baselineRooms = []) => {
+    const draft = { document: { type: 'damage', rooms }, baseline: baselineRooms.length ? { document: { type: 'check-in', rooms: baselineRooms } } : null };
+    const wedge = () => ({ seeds: ['Kitchen', 'Bathroom', 'Bedroom', 'Living room', 'Hallway'] });
+    const currentBaseline = () => draft.baseline;
+    new Function('draft', 'wedge', 'currentBaseline', `${source}\nnameFindingsFromNotes();`)(draft, wedge, currentBaseline);
+    return draft.document.rooms.map(room => room.name);
+  };
+  const said = observation => ({ name: '', observation, issue: false, photos: [] });
+  assert.deepEqual(run([said('Kitchen, chipped counter edge beside the sink.')]), ['Kitchen']);
+  assert.deepEqual(run([said('There is a stain on the ceiling in the living room, near the hallway.')]), ['Living room'], 'the first room it mentions wins');
+  assert.deepEqual(run([said('The bathroom door hinge is broken')]), ['Bathroom']);
+  assert.deepEqual(run([said('Big scratch on the wall')]), [''], 'no known room, no name: never invented');
+  assert.deepEqual(run([{ ...said('Kitchen counter'), name: 'Pantry' }]), ['Pantry'], 'a name somebody typed is never replaced');
+  assert.deepEqual(run([said('Kitchenette sink is cracked')]), [''], 'only whole words');
+  // The property's check-in rooms come first, so the finding pairs with its "before".
+  assert.deepEqual(run([said('Master suite window is cracked')], [{ name: 'Master suite', photos: [] }]), ['Master suite']);
 });
 
 test('Meta hears about the website, never about what happens inside the app', async () => {
