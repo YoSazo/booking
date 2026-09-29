@@ -874,3 +874,13 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .launch-clock strong, .sim-paybar small { font-variant-numeric: tabular-nums; }
 .sim-paybar .bar-was { font-size: 14px; font-weight: 600; color: var(--muted); margin-right: 3px; text-decoration-thickness: 2px; }
 .sim-paybar small.bar-clock { color: #aa382b; }
+
+/* The guarantee, Shopify-style: a badge where the first screen is read, and the
+   whole statement beside the button, where the decision is made. */
+.offer-intro .guarantee-badge, .guarantee-badge { display: inline-flex; align-items: center; gap: 7px; margin: 10px 0 0; padding: 6px 14px 6px 10px; border-radius: 999px; background: var(--green-pale); border: 1px solid var(--border); color: var(--green-dark); font-size: 14px; font-weight: 650; }
+.guarantee-badge .icon { flex: 0 0 auto; }
+.guarantee { display: flex; align-items: center; gap: 12px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 16px; background: var(--green-pale); border: 1px solid var(--border); color: var(--green-dark); }
+.guarantee .icon { flex: 0 0 auto; }
+.guarantee div { display: flex; flex-direction: column; gap: 2px; }
+.guarantee strong { font-size: 15px; line-height: 1.25; }
+.guarantee small { color: var(--green-dark); font-size: 13px; line-height: 1.35; }

@@ -39,6 +39,12 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.match(text, /38 seconds/);
     assert.match(text, /Pay once\. Keep it for good\./);
     assert.match(text, /One payment of \$99\. No subscription, and nothing renews\./);
+    // The guarantee, twice: a badge where the first screen is read, and the whole
+    // statement, with its one condition, beside the button.
+    assert.equal((await h.page.locator('.guarantee-badge').innerText()).trim(), '30-day money-back guarantee');
+    assert.equal(await h.page.evaluate(() => { const badge = document.querySelector('.guarantee-badge').getBoundingClientRect(); return badge.bottom < window.innerHeight * 0.6; }), true, 'the badge is on the first screen');
+    assert.match(await h.page.locator('.guarantee').innerText(), /30-day money-back guarantee\s*Full refund within 30 days if you haven't sent a report\. Email support@bookmarketel\.com\./);
+    assert.equal(await h.page.evaluate(() => { const g = document.querySelector('.guarantee').getBoundingClientRect(), b = document.getElementById('sim-buy').getBoundingClientRect(); return g.top >= b.bottom - 1 && g.top - b.bottom < 40; }), true, 'it sits right under the button');
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, /Instead of \$199 every year/);
     assert.match(text, /Launch price ends in 1d 18:5\d:\d\d · then \$199/);
@@ -95,6 +101,7 @@ test('the launch price ends for real: at its moment the page redraws at $199, an
   try {
     await after.page.waitForSelector('#offer-video');
     assert.match(await after.page.textContent('#sim-offer'), /Get it for \$199/);
+    assert.match(await after.page.locator('.guarantee').innerText(), /30-day money-back guarantee/, 'the guarantee does not end with the launch price');
     assert.equal(await after.page.$('[data-launch-left]'), null);
     after.assertClean();
   } finally { await after.close(); }
@@ -109,7 +116,7 @@ test('after paying once, the thank-you page says it is theirs and nothing renews
     await h.page.waitForSelector('.sim-thanks');
     const text = await h.body();
     assert.match(text, /Marketel Claims is yours\./);
-    assert.match(text, /Paid once\. No subscription, and nothing renews\./);
+    assert.match(text, /Paid once\. No subscription, and nothing renews\. Covered by our 30-day money-back guarantee: email support@bookmarketel\.com if it is not for you\./);
     assert.doesNotMatch(text, /free days|subscribed/i);
     h.assertClean();
   } finally { await h.close(); }

@@ -2940,6 +2940,9 @@ test('paying once is one $99 payment with no subscription, and it carries the ad
     assert.deepEqual(params.line_items[0].price_data.unit_amount, 9900);
     assert.equal(params.line_items[0].price_data.currency, 'usd');
     assert.match(params.line_items[0].price_data.product_data.name, /^Marketel Claims: unlimited reports, paid once$/);
+    // The guarantee is on Stripe's page too, under the Pay button.
+    assert.equal(params.custom_text.submit.message, "30-day money-back guarantee. Full refund within 30 days if you haven't sent a report. Email support@bookmarketel.com.");
+    assert.match(params.line_items[0].price_data.product_data.description, /30-day money-back guarantee\.$/);
     assert.equal(params.metadata.plan, 'lifetime');
     assert.equal(params.metadata.ad_fbc, 'fb.1.1700000000.abc');
     assert.equal(params.metadata.ad_fbp, 'fb.1.1700000000.123');
@@ -2969,7 +2972,7 @@ test('the launch price really ends: from its fixed moment checkout charges $199 
     try {
       assert.equal((await buy(h)).status, 200);
       assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 9900);
-      assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
+      assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\. No subscription\. Nothing renews\. 30-day money-back guarantee\.$/);
     } finally { h.registration.close(); }
   });
   await atTime(AFTER_LAUNCH, async () => {
@@ -2977,7 +2980,7 @@ test('the launch price really ends: from its fixed moment checkout charges $199 
     try {
       assert.equal((await buy(h)).status, 200);
       assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 19900);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews.');
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews. 30-day money-back guarantee.');
     } finally { h.registration.close(); }
   });
   // A launch price the registry would accept is lower than the full price and
