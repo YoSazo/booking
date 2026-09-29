@@ -11,7 +11,7 @@ window.MARKETEL_WEDGES = {
       "guest": "Guest"
     },
     "chooser": "Record damage and keep the original uploaded photos.",
-    "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($99 at the launch price until 11:59 PM Pacific on October 1, 2026, then $199), which carries a 30-day money-back guarantee if no report has been sent. Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
+    "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($99 at the launch price until 11:59 PM Pacific on October 1, 2026, then $199). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
     "offer": {
       "mode": "pay-at-export",
       "reportPrice": 12,

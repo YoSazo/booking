@@ -146,7 +146,6 @@ const REPORT_TYPES = Object.freeze(Object.keys(TYPE_CONFIG));
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
 const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetime: (item.offer.lifetime || 0) * 100, launch: item.offer.launch ? Object.freeze({ price: item.offer.launch.price * 100, until: Date.parse(item.offer.launch.until) }) : null, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
-const SUPPORT_EMAIL = 'support@bookmarketel.com';
 // The pay-once price right now, in cents: the launch price until its fixed end,
 // the same moment for everyone, then the full price. Zero where there is none.
 const lifetimeCents = (tool, now = Date.now()) => {
@@ -1029,12 +1028,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
-      // Said again on Stripe's own page, under the Pay button, where the
-      // decision is made.
-      custom_text: { submit: { message: `30-day money-back guarantee. Full refund within 30 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
         product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`,
-          description: `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 30-day money-back guarantee.` } } }],
+          description: atLaunch ? `Launch price. No subscription. Nothing renews.` : 'No subscription. Nothing renews.' } } }],
       ...(email ? { customer_email: email } : {}),
       metadata, payment_intent_data: { metadata },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),

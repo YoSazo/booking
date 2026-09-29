@@ -162,14 +162,11 @@ On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
 ad must say the same thing: an ad promising "free to try" that lands on "$99
 once" is the mismatch that sinks a week.
 
-**Guarantee.** The pay-once landing carries a 30-day money-back guarantee,
-said the same way in four places: a badge under the headline, a block with its
-one condition beside the buy button ("Full refund within 30 days if you haven't
-sent a report"), Stripe's Pay button (`custom_text`) and the thank-you page; the
-terms hold the full clause. Sending a report ends it, since that is using the
-product. Refunds are handled by hand in Stripe from support@bookmarketel.com;
-build a self-serve refund before volume makes that slow. Never promise
-"free" in an ad for a page that charges: "try it risk-free" is the honest word.
+**No guarantee.** A 30-day money-back guarantee (badge, block by the button,
+Stripe `custom_text`, thank-you page, terms) was tried on the Claims pay-once
+landing and removed: it answered the old "free to try" ad, not the new priced
+one. It is in git history (commit 44b5dde8) if a later test wants it. Never
+promise "free" in an ad for a page that charges.
 
 **Launch price.** `offer.launch` (`price` below `offer.lifetime`, and a fixed
 UTC `until`) shows the lower price with a live countdown to that moment, the
