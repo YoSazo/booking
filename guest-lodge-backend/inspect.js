@@ -616,10 +616,12 @@ function locationLines(document) {
   return lines;
 }
 const signaturesHtml = document => (document.signatures || []).map(signature => `<section class="signature"><h3>${safe(roleLabel(signature.role))} signature</h3>${signatureSvg(signature)}<p>${safe(signature.name)} · Signed ${safe(signature.signedAt || 'when this document was finalized')}</p></section>`).join('');
-  const entryHeading = (room, index) => room.name || `Finding ${index + 1}`;
+  // A report of findings numbers them and, when it was given, adds the room:
+  // "Finding 2 · Kitchen". A report of rooms is named by its rooms.
+  const entryHeading = (room, index, report) => (typeConfig(report?.document?.type).unit === 'entry' && room.name ? `Finding ${index + 1} · ${room.name}` : room.name || `Finding ${index + 1}`);
   const issueTag = (report, room) => room.issue && typeConfig(report.document?.type).can.issueToggle ? ' · Issue noted' : '';
   const receiptsHtml = (room, photoPrefix) => (room.receipts || []).length ? `<h3>Receipts &amp; estimates</h3>${room.receipts.map(id => `<figure><img alt="Receipt or estimate" src="${photoPrefix}/${id}"></figure>`).join('')}` : '';
-  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index))}${issueTag(report, room)}</h2>${!room.observation && typeConfig(report.document?.type).can.photosOnly ? '' : `<p>${safe(room.observation || 'No observation recorded.')}</p>`}${room.photos.map(id => `<figure><img alt="Recorded photo" src="${photoPrefix}/${id}"><figcaption>${safe(photoCaption(report.document, report.attachments.find(a => a.id === id)))}</figcaption></figure>`).join('')}${receiptsHtml(room, photoPrefix)}</section>`;
+  const roomHtml = (room, report, photoPrefix, heading = '', index = 0) => `<section>${heading}<h2>${safe(entryHeading(room, index, report))}${issueTag(report, room)}</h2>${!room.observation && typeConfig(report.document?.type).can.photosOnly ? '' : `<p>${safe(room.observation || 'No observation recorded.')}</p>`}${room.photos.map(id => `<figure><img alt="Recorded photo" src="${photoPrefix}/${id}"><figcaption>${safe(photoCaption(report.document, report.attachments.find(a => a.id === id)))}</figcaption></figure>`).join('')}${receiptsHtml(room, photoPrefix)}</section>`;
   const claimAiUse = async (accountId, reportId) => prisma.$transaction(async tx => {
     await lockAccount(tx, accountId);
     const report = await owned(tx, accountId, reportId); mutable(report);
@@ -820,7 +822,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   };
   async function appendPdfRoom(doc, report, room, label, index = 0) {
     doc.addPage().fontSize(9).fillColor('#587064').text(label.toUpperCase());
-    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index)}${room.issue && typeConfig(report.document?.type).can.issueToggle ? ' - Issue noted' : ''}`);
+    doc.moveDown(.4).fontSize(18).fillColor('#1a2b22').text(`${entryHeading(room, index, report)}${room.issue && typeConfig(report.document?.type).can.issueToggle ? ' - Issue noted' : ''}`);
     if (room.observation || !typeConfig(report.document?.type).can.photosOnly) doc.moveDown().fontSize(11).text(room.observation || 'No observation recorded.');
     for (const id of room.photos) {
       const a = report.attachments.find(item => item.id === id);
@@ -833,7 +835,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     for (const id of room.receipts || []) {
       const a = report.attachments.find(item => item.id === id);
       if (!a) continue;
-      doc.addPage().fontSize(12).text(`${room.name || entryHeading(room, index)} · Receipt or estimate`);
+      doc.addPage().fontSize(12).text(`${entryHeading(room, index, report)} · Receipt or estimate`);
       doc.image(await object(a.objectKey), 44, 90, { fit: [507, 660], align: 'center', valign: 'center' });
     }
   }

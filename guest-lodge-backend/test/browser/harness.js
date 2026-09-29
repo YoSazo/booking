@@ -190,7 +190,10 @@ async function newAppReport(h, { property = null, said = '', shots = 1 } = {}) {
   await cameraDone(h.page);
   await h.page.waitForSelector('#property');
   if (property) {
+    // The review page: picking the property fills it in, then the report is built.
     await h.page.click(`[data-pick-property="${property}"]`);
+    await h.page.waitForFunction(() => !document.querySelector('[data-pick-property]'));
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('#send-report');
   }
 }

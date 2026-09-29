@@ -8,7 +8,7 @@ test('Claims starts with a finding, and receipt controls sit apart from photos',
   try {
     await newAppReport(h, { property: 'Pine Cottage' });
     await h.page.click('#edit');
-    await h.page.waitForSelector('#preview');
+    await h.page.waitForSelector('#to-rooms');
     const text = await h.body();
     assert.match(text, /Finding 1/);
     assert.match(text, /Add a receipt or quote/);

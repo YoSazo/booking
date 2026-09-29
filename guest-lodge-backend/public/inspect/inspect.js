@@ -85,7 +85,9 @@ const wedge = type => WEDGES[type] || WEDGES.default;
 // Numbered where it is read, never stored, so nothing claims a location that
 // was never given.
 const entryTool = type => wedge(type ?? draft?.document?.type).unit === 'entry';
-const entryLabel = (room, index) => room?.name || `Finding ${index + 1}`;
+// A report of findings numbers them and, when it was given, adds the room:
+// "Finding 2 · Kitchen". A report of rooms is named by its rooms.
+const entryLabel = (room, index) => (entryTool() && room?.name ? `Finding ${index + 1} · ${room.name}` : room?.name || `Finding ${index + 1}`);
 const SIGNER_ROLES = Object.fromEntries(Object.entries(TYPE_CONFIG).map(([id, config]) => [id, [config.signers.manager, config.signers.other]]));
 SIGNER_ROLES.default = [MANIFESTS.inspect.types.routine.signers.manager, MANIFESTS.inspect.types.routine.signers.other];
 const signerRoles = type => SIGNER_ROLES[type] || SIGNER_ROLES.default;
@@ -1422,7 +1424,8 @@ async function start(propertyName = '', type) {
   if (session && !account) await withTimeout(refresh(), 10000).catch(() => {});
   dismissFlow();
   if (!await keepCurrentDraft(`Start a new ${skin().doc}?`,`Start new ${skin().doc}`)) return;
-  if (payAtExport() && !propertyName) return cameraFirst(type) ? startCameraFirst(type) : setupFlow();
+  if (cameraFirst(type)) return startCameraFirst(type, propertyName);
+  if (payAtExport() && !propertyName) return setupFlow();
   clearURLs(); draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null }; preview = false;
   markLocation('start');
   await persist(); editor();
@@ -1433,12 +1436,14 @@ async function start(propertyName = '', type) {
 // on a saved property. The draft lives on the phone until then. The web keeps
 // its own first steps, because it has no camera sheet.
 const cameraFirst = type => native && hudShell() && payAtExport() && entryTool(type || landingArm()?.type || 'routine');
-async function startCameraFirst(type){
+async function startCameraFirst(type, propertyName = ''){
   clearURLs();
-  draft = { document: newDocument('', type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null };
+  draft = { document: newDocument(propertyName, type || landingArm()?.type || 'routine'), files: [], serverId: null, finalizedAt: null };
   preview = false;
   await persist();
   openNativeCamera(0);
+  // Started from a property, so its check-in (if it has one) is found while they shoot.
+  if (propertyName) linkBaseline().catch(() => {});
 }
 // ——— Check-ins ——————————————————————————————————————————————————————————
 async function startBaseline(propertyName){
@@ -1559,23 +1564,22 @@ function editor(step) {
   // The draft decides which step opens: an unnamed report needs its details, a
   // named one is ready for the work. Returning lands on the work, not the form.
   editorStep = step || (d.propertyName.trim() ? 'rooms' : 'details');
+  // In the app a report made of findings is one page: each finding with its
+  // photos, words and room, and the property. The camera opens on it, and so
+  // does a report opened from the list.
+  if (cameraFirst(d.type)) editorStep = 'review';
   const w = wedge(d.type);
   enterScreen(`editor:${editorStep}`);
   const bar = `<div class="screen-bar">${account
     ? `<button type="button" id="editor-back" class="quiet">← All ${esc(skin().docPlural)}</button>`
     : `<button type="button" id="editor-signin" class="quiet">Already have ${esc(skin().docPlural)}? Sign in</button>`}<button type="button" id="editor-discard" class="quiet danger">Discard</button></div>`;
   if (editorStep === 'details') {
-    // Opened by the camera: the property is the one thing left to say, and it
-    // is one tap on a saved one. Building goes straight to the finished report.
-    const finishing = cameraFirst(d.type);
-    const chips = finishing ? savedPropertyChips() : '';
-    const manyProperties = (propertiesCache?.propertyDetails || []).length > 8;
-    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div>${chips}<section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account&&(!chips||manyProperties)?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>${esc(skin().propertyPrompt)}</h1></div></div><section class="card grid"><div class="property-field"><label>Property / unit name<input id="property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${account?'<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>':''}</div><label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label>${TYPED_ARMS.has(d.type)
       // The report's date and the finalized timestamp both say when it was
       // written down. Neither says when it happened, which is the field an
       // insurer looks for first. Unknown is a real answer.
       ? `<label class="date-field">${esc(w.timeLabel||'Time it happened')}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label>${w.can.deadline?.days ? `<label class="date-field">${esc(w.can.deadline.field)}<input type="date" id="checkout-date" value="${esc(d[w.can.deadline.from] || d.date)}"></label>` : ''}<label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`
-      : `<label>Report type<select id="type">${Object.keys(MANIFESTS[toolId()].types).map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">${finishing ? `Build my ${esc(skin().doc)} →` : 'Continue →'}</button></div>`;
+      : `<label>Report type<select id="type">${Object.keys(MANIFESTS[toolId()].types).map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${esc(typeLabel(t))}</option>`).join('')}</select></label>`}</section><div class="actions row"><button id="to-rooms">Continue →</button></div>`;
     $('property').parentElement.firstChild.textContent=w.propertyLabel||`${skin().placeSingular} name`;
     for (const [id,key] of [['property','propertyName'],['author','author'],['date','date'],['type','type']]) if($(id)) $(id).oninput = event => { d[key] = event.target.value; if (key === 'author') storeAuthor(event.target.value); remember(); };
     if($('checkout-date'))$('checkout-date').oninput = event => { d[w.can.deadline.from] = event.target.value; remember(); };
@@ -1585,29 +1589,71 @@ function editor(step) {
       $('use-existing-property').textContent=`Use existing ${skin().placeSingular}`;
       $('use-existing-property').onclick=()=>run(()=>chooseExistingProperty());
     }
-    $('to-rooms').onclick = event => {
+    $('to-rooms').onclick = () => {
       if(!d.propertyName.trim())return notice(`Enter a ${skin().placeSingular} name first.`,'error');
-      haptic();
-      if(!finishing)return editor('rooms');
-      run(async()=>{
-        // Named now, so its check-in (if it has one) can be found and the
-        // findings named against it before the report is drawn.
-        await withTimeout(linkBaseline(),2500).catch(()=>{});
-        nameFindingsFromNotes();
-        remember();syncPhotosSoon();
-        preview=true;reportPreview();
-      },event.currentTarget);
+      haptic();editor('rooms');
     };
-    if(finishing){
-      document.querySelectorAll('[data-pick-property]').forEach(button=>button.onclick=()=>{
-        d.propertyName=button.dataset.pickProperty;$('property').value=d.propertyName;remember();$('to-rooms').click();
-      });
-      // Saved properties arrive a moment later on a cold start.
-      if(account&&!propertiesCache)api('/properties').then(result=>{
-        propertiesCache=result;
-        if(editorStep==='details'&&currentScreen==='editor:details'&&$('property')&&!$('property').value&&!document.querySelector('[data-pick-property]')&&(result?.propertyDetails||[]).length)editor('details');
-      }).catch(()=>{});
-    }
+  } else if (editorStep === 'review') {
+    const chips = d.propertyName.trim() ? '' : savedPropertyChips();
+    const manyProperties = (propertiesCache?.propertyDetails || []).length > 8;
+    const found = `Found ${docDateText(d.date)}${d.eventTime && d.eventTime !== 'unknown' ? ` · ${timeText(d.eventTime)}` : ''}`;
+    const dateFields = `<label class="date-field">${esc(w.dateLabel)}<input type="date" id="date" value="${esc(d.date)}"></label><label class="date-field">${esc(w.timeLabel||'Time it happened')}<input type="time" id="event-time" value="${esc(d.eventTime === 'unknown' ? '' : d.eventTime || '')}"></label>${w.can.deadline?.days ? `<label class="date-field">${esc(w.can.deadline.field)}<input type="date" id="checkout-date" value="${esc(d[w.can.deadline.from] || d.date)}"></label>` : ''}<label class="issue"><input type="checkbox" id="event-time-unknown" ${d.eventTime === 'unknown' ? 'checked' : ''}>Exact time not known</label>`;
+    const finding = (r, i) => `<section class="card room-card finding-card" data-room="${i}"><div class="finding-head"><h2 class="finding-heading">Finding ${i + 1}</h2>${d.rooms.length > 1 ? `<button type="button" class="quiet danger" data-remove-room="${i}">Remove</button>` : ''}</div><label>${esc(w.noun[0].toUpperCase() + w.noun.slice(1))}<input data-field="name" maxlength="100" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="${esc(w.seeds?.[0] || 'Kitchen')}" value="${esc(r.name)}"></label><div class="photo-grid review-photos" data-photo-grid="${i}">${r.photos.map((id, p) => `<figure data-photo-id="${esc(id)}" data-photo-room="${i}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${p + 1}"><button type="button" class="photo-x" data-delete-id="${i},${esc(id)}" aria-label="Remove photo ${p + 1}">&#10005;</button><div class="photo-meta"><figcaption>${photoTaken(id) ? esc(photoClockText(photoTaken(id))) : ''}</figcaption></div></figure>`).join('')}<button type="button" class="photo-add" data-native-camera="${i}" aria-label="Take a photo for finding ${i + 1}"><span aria-hidden="true">+</span><small>Photo</small></button><label class="photo-add" aria-label="Add photos from your library to finding ${i + 1}">${icon('image', 26)}<small>Library</small><input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label></div><label>What is this?<textarea maxlength="4000" rows="3" data-field="observation" placeholder="Describe only what you observed.">${esc(r.observation)}</textarea></label><button type="button" class="quiet polish" data-ai="${i}">Polish with AI</button>${w.can.receipts ? `<div class="receipts">${(r.receipts || []).length ? `<div class="receipt-grid">${r.receipts.map(id => `<figure><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or quote"><button type="button" class="photo-x" data-receipt-remove="${i},${esc(id)}" aria-label="Remove this receipt">&#10005;</button></figure>`).join('')}</div>` : ''}<label class="quiet add-receipt">+ Add a receipt or quote<input type="file" data-receipt="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></label></div>` : ''}</section>`;
+    $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(w.eyebrow)}</small><h1>Review your findings</h1></div></div><section class="card grid review-property"><div class="property-field"><label>${esc(w.propertyLabel || `${skin().placeSingular} name`)}<input id="property" maxlength="160" autocorrect="off" spellcheck="false" autocapitalize="words" value="${esc(d.propertyName)}" placeholder="Oak Street · Unit 2"></label>${chips}${account && d.propertyName.trim() === '' && manyProperties ? '<button type="button" id="use-existing-property" class="quiet inline-action">Use existing property</button>' : ''}</div></section><div id="rooms">${d.rooms.map(finding).join('')}</div><button id="add-room" class="secondary">+ Add finding</button><details class="card review-dates"><summary>${esc(found)}</summary><div class="grid">${dateFields}</div></details><div class="actions row"><button id="to-rooms">Build my ${esc(skin().doc)} →</button></div>`;
+    bindPhotoDrag();
+    syncPhotosSoon();
+    const linkAndName = () => run(async () => {
+      // Named, so its check-in (if it has one) can be found and a finding named against it.
+      await withTimeout(linkBaseline(), 2500).catch(() => {});
+      nameFindingsFromNotes();
+      remember(); syncPhotosSoon();
+    }, null);
+    $('property').oninput = event => { d.propertyName = event.target.value; remember(); };
+    document.querySelectorAll('[data-pick-property]').forEach(button => button.onclick = () => {
+      d.propertyName = button.dataset.pickProperty; remember(); haptic();
+      linkAndName().then(() => editor());
+    });
+    if ($('use-existing-property')) { $('use-existing-property').textContent = `Use existing ${skin().placeSingular}`; $('use-existing-property').onclick = () => run(() => chooseExistingProperty()); }
+    if (account && !propertiesCache) api('/properties').then(result => {
+      propertiesCache = result;
+      if (editorStep === 'review' && currentScreen === 'editor:review' && $('property') && !$('property').value && !document.querySelector('[data-pick-property]') && (result?.propertyDetails || []).length) editor();
+    }).catch(() => {});
+    $('date').oninput = event => { d.date = event.target.value; remember(); };
+    if ($('checkout-date')) $('checkout-date').oninput = event => { d[w.can.deadline.from] = event.target.value; remember(); };
+    $('event-time').oninput = event => { d.eventTime = event.target.value; $('event-time-unknown').checked = false; remember(); };
+    $('event-time-unknown').onchange = event => { d.eventTime = event.target.checked ? 'unknown' : ($('event-time').value || ''); remember(); };
+    $('rooms').oninput = event => { const field = event.target.dataset.field; if (!field) return; d.rooms[Number(event.target.closest('[data-room]').dataset.room)][field] = event.target.value; remember(); };
+    $('rooms').onchange = event => { if (event.target.matches('input[type=file]')) run(() => addPhotos(event.target)); };
+    $('rooms').onclick = async event => {
+      const figure = event.target.closest('figure[data-photo-id]');
+      if (figure && Date.now() - photoDropAt > 400 && !event.target.closest('button')) return viewPhoto(figure.dataset.photoId);
+      const b = event.target.closest('button'); if (!b) return;
+      if (b.dataset.removeRoom !== undefined) { if (await confirmAction({ title: 'Remove this finding?', message: 'Its photos and notes will be removed from this report.', confirmLabel: 'Remove finding', danger: true })) { d.rooms.splice(Number(b.dataset.removeRoom), 1); remember(); editor(); } return; }
+      if (b.dataset.deleteId) { const [roomIndex, id] = b.dataset.deleteId.split(','); const i = Number(roomIndex), pos = d.rooms[i].photos.indexOf(id); if (pos >= 0) { d.rooms[i].photos.splice(pos, 1); const url = urls.get(id); if (url) { URL.revokeObjectURL(url); urls.delete(id); } draft.files = draft.files.filter(file => file.id !== id); remember(); editor(); } return; }
+      if (b.dataset.receiptRemove) { const [roomIndex, id] = b.dataset.receiptRemove.split(','); const room = d.rooms[Number(roomIndex)]; room.receipts = (room.receipts || []).filter(item => item !== id); draft.files = draft.files.filter(file => file.id !== id); haptic(); remember(); await persist(); return editor(); }
+      if (b.dataset.nativeCamera !== undefined) return openNativeCamera(Number(b.dataset.nativeCamera));
+      if (b.dataset.ai !== undefined) {
+        if (!d.propertyName.trim()) return notice(`Choose the ${skin().placeSingular} first, then polish the wording.`, 'error');
+        rewrite(Number(b.dataset.ai));
+      }
+    };
+    // Another finding is another photo: the camera opens on it. Closing it
+    // with nothing taken leaves no empty finding behind.
+    $('add-room').onclick = () => {
+      if (d.rooms.length >= 30) return notice('Maximum 30 findings.');
+      d.rooms.push({ name: '', observation: '', issue: false, photos: [] });
+      remember();
+      openNativeCamera(d.rooms.length - 1);
+    };
+    $('to-rooms').onclick = event => {
+      if (!d.propertyName.trim()) return notice(`Enter a ${skin().placeSingular} name first.`, 'error');
+      haptic();
+      run(async () => {
+        await withTimeout(linkBaseline(), 2500).catch(() => {});
+        remember(); syncPhotosSoon();
+        preview = true; reportPreview();
+      }, event.currentTarget);
+    };
   } else {
     $('app').innerHTML = `${bar}<div class="row spread"><div><small class="eyebrow">${esc(d.propertyName)||'New condition report'}</small><h1>What did you observe?</h1></div><button type="button" class="quiet" id="to-details">← Details</button></div><div id="rooms">${d.rooms.map((r,i) => `<section class="card room-card" data-room="${i}"><label>Room name<input data-field="name" maxlength="100" value="${esc(r.name)}"></label><div class="row capture-actions"><label class="button secondary">Add photos<input type="file" data-files="${i}" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden></label>${native
       ? `<button type="button" class="secondary" data-native-camera="${i}">Take photo</button>`
@@ -2343,7 +2389,7 @@ window.marketelInspectDictationText=raw=>{
     const spoken=data.text.trim();
     if(spoken){
       const room=draft.document.rooms[hudDictation.index];
-      room.observation=hudDictation.base?`${hudDictation.base}\n${spoken}`:spoken;
+      room.observation=hudDictation.base?`${hudDictation.base} ${spoken}`:spoken;
       remember();
       const box=$('app').querySelector('.hud-note');
       if(box)box.textContent=room.observation;
@@ -2428,7 +2474,7 @@ function signaturePreview(signature){
   return `<section class="signature-preview"><strong>${esc(roleLabel(signature.role))} signature</strong><svg viewBox="0 0 300 100" aria-label="Signature">${paths.map(path=>`<path d="${path}"></path>`).join('')}</svg><small>${esc(signature.name)}${signature.signedAt?` · ${new Date(signature.signedAt).toLocaleString()}`:''}</small></section>`;
 }
 function reportRoom(r,label='',index=0,sample=null,photosOnly=false){
-  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(entryLabel(r,index))}${r.issue&&wedge(draft?.document?.type).can.issueToggle?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo"${sample?'':` data-photo="${esc(id)}"`} src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
+  return `<section class="report-room">${label?`<p class="compare-label">${esc(label)}</p>`:''}<h2>${esc(photosOnly?(r.name||entryLabel(r,index)):entryLabel(r,index))}${r.issue&&wedge(draft?.document?.type).can.issueToggle?' · Issue noted':''}</h2>${photosOnly&&!r.observation?'':`<p class="report-note">${esc(r.observation)||'No observation recorded.'}</p>`}${r.photos.map(id=>`<img class="report-photo"${sample?'':` data-photo="${esc(id)}"`} src="${esc(sample?sample.srcFor(id):photoURL(id))}" alt="Recorded photo"><small class="photo-caption">${esc(sample?sample.sourceLabel:photoCaptionText(id))}</small>`).join('')}${!sample&&(r.receipts||[]).length?`<h3 class="receipts-heading">Receipts &amp; estimates</h3>${r.receipts.map(id=>`<img class="report-photo receipt" data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Receipt or estimate">`).join('')}`:''}</section>`;
 }
 const surfaceList=items=>items.length<2?items[0]:`${items.slice(0,-1).join(', ')} or ${items[items.length-1]}`;
 // A reminder, never a requirement — the finalize button is untouched either way.
@@ -3080,11 +3126,13 @@ window.marketelInspectExportResult=result=>{
 let cameraRoom=null;
 // The check-in photo being looked at on its own page, or null.
 let cameraBefore=null;
+// The photo shown large above the shutter: the latest shot unless another was picked.
+let cameraPreview=null;
 function openNativeCamera(i){
   if(!draft)return;
   haptic();
   cameraRoom=i;
-  cameraBefore=null;
+  cameraBefore=null;cameraPreview=null;
   // The page behind the sheet is drawn now and rises with it, instead of
   // appearing after the sheet has finished arriving.
   cameraCompanion(true);
@@ -3096,6 +3144,7 @@ function openNativeCamera(i){
 let hudDictation=null;
 const hudShell = () => !!window.webkit?.messageHandlers?.marketelShell;
 const LUCIDE = {
+  image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
@@ -3134,23 +3183,31 @@ function cameraCompanion(entering=false,{fresh=null}={}){
   const beforeIds=beforeIdsFor(room.name);
   if(beforeIds.length&&beforeIds.some(id=>!photoFile(id)))ensureBeforeFiles(beforeIds).then(loaded=>{if(loaded&&cameraRoom!==null&&!cameraBefore)cameraCompanion();}).catch(()=>{});
   const beforeThumb=beforeIds.find(id=>photoFile(id));
-  const strip=`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at ${esc(baselineName(currentBaseline()?.document?.type))}"><img data-photo="${esc(beforeThumb)}" src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure${id===fresh?' class="is-fresh"':''}><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${index+1}"><button type="button" class="photo-x" data-strip-remove="${esc(id)}" aria-label="Remove photo ${index+1}">&#10005;</button>${photoTaken(id)?`<small>${esc(photoClockText(photoTaken(id)))}</small>`:''}</figure>`).join('')}`;
-  const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?entryLabel(item,index):(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
+  // The shot just taken is shown large, so "does this look good?" can be
+  // answered in front of the thing, and retaken. The strip below only appears
+  // when there is more than one thing to choose between.
+  const shown=room.photos.includes(cameraPreview)?cameraPreview:room.photos[room.photos.length-1]||null;
+  const preview=shown
+    ?`<div class="hud-preview${shown===fresh?' is-fresh':''}"><img data-photo="${esc(shown)}" src="${esc(photoURL(shown))}" alt="Your latest photo"><button type="button" class="photo-x" data-strip-remove="${esc(shown)}" aria-label="Remove this photo and retake">&#10005;</button>${photoTaken(shown)?`<small>${esc(photoClockText(photoTaken(shown)))}</small>`:''}</div>`
+    :`<div class="hud-preview is-empty"><p class="muted"><small>Shots land here, each one dated.</small></p></div>`;
+  const strip=room.photos.length>1||beforeThumb?`${beforeThumb?`<figure class="is-before"><button type="button" data-before="${esc(beforeThumb)}" aria-label="See how it looked at ${esc(baselineName(currentBaseline()?.document?.type))}"><img data-photo="${esc(beforeThumb)}" src="${esc(photoURL(beforeThumb))}" alt=""></button><small>Before</small></figure>`:''}${room.photos.map((id,index)=>`<figure><button type="button" class="strip-pick${id===shown?' is-active':''}" data-strip-pick="${esc(id)}" aria-label="Show photo ${index+1}"><img data-photo="${esc(id)}" src="${esc(photoURL(id))}" alt="Photo ${index+1}"></button></figure>`).join('')}`:'';
+  const subjects=rooms.map((item,index)=>`<button type="button" class="camera-room${index===cameraRoom?' is-active':''}" data-camera-room="${index}"><strong>${esc(entries?`Finding ${index+1}`:(item.name||`${w.noun} ${index+1}`))}</strong><span>${item.photos.length}</span></button>`).join('');
   // The only words on this page before anyone has said anything. The shutter
   // says how; this says where the words go.
   const prompt=talking?'Listening…':'What you say appears here.';
   const body=note;
-  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another</button></div>${photosOnly?'':`<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div>`}<div class="camera-strip">${strip||`<p class="muted"><small>Shots land here, each one dated.</small></p>`}</div><div class="hud-actions">${hudShell()&&!photosOnly?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></section>`;
+  $('app').innerHTML=`<section class="camera-companion${entering?' is-entering':''}"><div class="camera-rooms">${subjects}<button type="button" id="hud-next" class="camera-room is-add">+ another</button></div>${photosOnly?'':`<div class="hud-note${talking?' is-live':''}">${body?esc(body):`<span class="muted">${esc(prompt)}</span>`}</div>`}<div class="hud-stage">${preview}<div class="hud-actions">${hudShell()&&!photosOnly?`<button type="button" id="hud-talk" class="hud-mic${talking?' is-live':''}" aria-label="${talking?'Stop recording':'Record'}">${icon(talking?'stop':'mic',26)}</button>`:''}</div></div>${strip?`<div class="camera-strip">${strip}</div>`:''}</section>`;
 
   if($('hud-talk'))$('hud-talk').onclick=hudTalk;
   const stripEl=$('app').querySelector('.camera-strip');
   if(stripEl&&fresh)stripEl.scrollLeft=stripEl.scrollWidth;
+  document.querySelectorAll('[data-strip-pick]').forEach(button=>button.onclick=()=>{cameraPreview=button.dataset.stripPick;haptic();cameraCompanion();});
   $('hud-next').onclick=()=>{
     if(rooms.length>=30)return notice(`Maximum 30 ${entries?'findings':w.nounPlural}.`);
     if(hudDictation)hudTalk();
     haptic();
     rooms.push({name:entries?'':nextRoomName(rooms),observation:'',issue:false,photos:[]});
-    cameraRoom=rooms.length-1;
+    cameraRoom=rooms.length-1;cameraPreview=null;
     remember();persist().catch(()=>{});
     window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:cameraRoom,name:(rooms[cameraRoom]?.name||'').trim()});
     cameraCompanion();
@@ -3159,7 +3216,7 @@ function cameraCompanion(entering=false,{fresh=null}={}){
     const index=Number(button.dataset.cameraRoom);
     if(index===cameraRoom)return;
     if(hudDictation)hudTalk();
-    cameraRoom=index;haptic();
+    cameraRoom=index;cameraPreview=null;haptic();
     window.webkit?.messageHandlers?.marketelShell?.postMessage({type:'inspectCameraRoom',room:index,name:(draft.document.rooms[index]?.name||'').trim()});
     cameraCompanion();
   });
@@ -3207,13 +3264,15 @@ window.marketelInspectCameraClosed=()=>{
   // A finding nobody photographed or spoke for is not a finding. A report
   // opened by the camera and left with nothing in it leaves nothing behind.
   const d=draft.document,kept=d.rooms.filter(room=>room.photos.length||(room.observation||'').trim()||(room.name||'').trim());
-  if(!kept.length&&!d.propertyName.trim()){
+  if(!kept.length&&!draft.serverId){
     clearURLs();draft=null;preview=false;stored('delete').catch(()=>{});updateHeader();
     return account?openAccountHome().catch(()=>{}):landing();
   }
   d.rooms=kept.length?kept:d.rooms.slice(0,1);
+  // Named once, from what was said, so the room is already filled in to be
+  // corrected rather than asked for.
+  nameFindingsFromNotes();
   remember();
-  // An unnamed report goes to its details, a named one back to the work.
   editor();
 };
 window.marketelInspectPhotoCaptured=raw=>run(async()=>{
@@ -3229,8 +3288,8 @@ window.marketelInspectPhotoCaptured=raw=>run(async()=>{
   if(wedge(draft.document.type).can.eventTime==='first-photo'&&!draft.document.eventTime)draft.document.eventTime=clockHHMM(new Date());
   remember();await persist();
   syncPhotosSoon();
-  if(cameraRoom!==null)cameraCompanion(false,{fresh:id});
-  else if(!preview&&!draft.finalizedAt&&editorStep==='rooms')editor('rooms');
+  if(cameraRoom!==null){cameraPreview=id;cameraCompanion(false,{fresh:id});}
+  else if(!preview&&!draft.finalizedAt&&(editorStep==='rooms'||editorStep==='review'))editor();
 },null);
 window.marketelInspectNativeSelectTab=page=>{
   // The tab bar stays visible over a sheet now, so a tap has to dismiss it first.

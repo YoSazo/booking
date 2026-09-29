@@ -30,8 +30,11 @@ test('a saved property is one tap once the camera closes', async () => {
   const h = await open({ native: true, accountData: { businessName: 'Pine Stays' }, properties: ['Pine Cottage'] });
   try {
     await newAppReport(h);
-    assert.match(await h.body(), /Which rental/);
+    assert.match(await h.body(), /Review your findings/);
     await h.page.click('[data-pick-property="Pine Cottage"]');
+    await h.page.waitForFunction(() => !document.querySelector('[data-pick-property]'));
+    assert.equal(await h.page.inputValue('#property'), 'Pine Cottage');
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('#send-report');
     assert.match(await h.body(), /Pine Cottage/);
     assert.match(await h.body(), /Finding 1/);

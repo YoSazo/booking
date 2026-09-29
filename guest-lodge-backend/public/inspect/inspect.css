@@ -724,9 +724,40 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
    blinking, because the sheet below it never moved. */
 .camera-companion.is-entering { animation: hud-in .34s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes hud-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-/* The shot just taken lands in the strip with a small pop, so a photo taken
-   is a photo seen. Only the new one moves; the page does not blink. */
-.camera-strip figure.is-fresh { animation: photo-pop .44s cubic-bezier(.2,.9,.3,1.25) both; }
+/* The shot just taken, large, beside the microphone: does it look good? */
+.hud-stage { display: flex; align-items: center; gap: 12px; margin: 6px 0 6px; }
+.hud-stage .hud-actions { margin: 0; flex: 0 0 auto; }
+.hud-preview { position: relative; flex: 1 1 auto; min-width: 0; height: 128px; border-radius: 16px; overflow: hidden; background: var(--surface); border: 1.5px solid var(--border); display: grid; place-items: center; }
+.hud-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hud-preview .photo-x { top: 6px; right: 6px; }
+.hud-preview small { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: #0d1a13b8; color: #fff; font-size: 11px; font-variant-numeric: tabular-nums; }
+.hud-preview.is-empty { border-style: dashed; }
+.hud-preview.is-empty p { margin: 0; padding: 0 12px; text-align: center; }
+.hud-preview.is-fresh { animation: photo-pop .44s cubic-bezier(.2,.9,.3,1.25) both; }
+.camera-strip .strip-pick { display: block; width: 46px; height: 46px; min-height: 0; padding: 0; border: 2px solid transparent; border-radius: 14px; background: none; overflow: hidden; }
+.camera-strip .strip-pick.is-active { border-color: var(--green); }
+.camera-strip .strip-pick img { border-radius: 11px; }
+/* The page after the camera, and where an open report lands. */
+.finding-card .finding-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.finding-card .finding-head .finding-heading { margin: 0; }
+.finding-card textarea { min-height: 84px; }
+.review-photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.review-photos figure { position: relative; width: 96px; margin: 0; }
+.review-photos figure img { width: 96px; height: 96px; object-fit: cover; border-radius: 14px; display: block; }
+.review-photos .photo-meta { padding: 0; }
+.review-photos figcaption { margin-top: 3px; text-align: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.review-photos .photo-add { width: 96px; height: 96px; min-height: 0; padding: 0; display: grid; place-content: center; gap: 2px; border: 2px dashed var(--border); border-radius: 14px; background: var(--surface); color: var(--green-dark); }
+.review-photos .photo-add span { font-size: 28px; line-height: 1; font-weight: 500; }
+.review-photos label.photo-add { cursor: pointer; }
+.review-photos .photo-add .icon { margin: 0 auto; }
+.review-photos .photo-add small { color: var(--green-dark); font-weight: 650; }
+.finding-card .polish { align-self: flex-start; }
+.review-dates { padding: 14px 16px; }
+.review-dates summary { cursor: pointer; font-weight: 650; }
+.review-dates .grid { margin-top: 12px; }
+.review-property .property-chips { margin: 4px 0 10px; }
+/* The shot just taken pops into the large preview, so a photo taken is a
+   photo seen. Only the new one moves; the page does not blink. */
 @keyframes photo-pop { 0% { opacity: 0; transform: scale(.3) translateY(18px); } 55% { opacity: 1; transform: scale(1.1); } 100% { opacity: 1; transform: none; } }
 /* The button was always a tap-to-toggle calling itself "Hold to talk". It is a
    microphone, so it looks like one, and it says what it is doing while it is on. */
@@ -735,7 +766,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 @keyframes hud-mic-live { 0%, 100% { box-shadow: 0 0 0 0 #b3261e52; } 60% { box-shadow: 0 0 0 12px #b3261e00; } }
 @media (prefers-reduced-motion: reduce) {
   .camera-companion.is-entering { animation: none; }
-  .camera-strip figure.is-fresh { animation: none; }
+  .hud-preview.is-fresh { animation: none; }
   .hud-mic.is-live { animation: none; }
 }
 

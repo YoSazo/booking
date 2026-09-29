@@ -1222,8 +1222,8 @@ test('a damage report is findings, and the capture screen is the recording', () 
   // An unnamed entry keeps its empty name through validation and is numbered
   // where it is read, so no document claims a location nobody gave.
   assert.doesNotMatch(server, /text\(room\.name, 100\) \|\| 'Room'/);
-  assert.match(server, /const entryHeading = \(room, index\) => room\.name \|\| `Finding \$\{index \+ 1\}`/);
-  assert.match(client, /const entryLabel = \(room, index\) => room\?\.name \|\| `Finding \$\{index \+ 1\}`/);
+  assert.match(server, /const entryHeading = \(room, index, report\) => \(typeConfig\(report\?\.document\?\.type\)\.unit === 'entry' && room\.name \? `Finding \$\{index \+ 1\} · \$\{room\.name\}` : room\.name \|\| `Finding \$\{index \+ 1\}`\);/);
+  assert.match(client, /const entryLabel = \(room, index\) => \(entryTool\(\) && room\?\.name \? `Finding \$\{index \+ 1\} · \$\{room\.name\}` : room\?\.name \|\| `Finding \$\{index \+ 1\}`\);/);
   for (const renderer of ['roomHtml', 'appendPdfRoom']) assert.ok(server.includes(`${renderer}`) && server.includes('entryHeading('), `${renderer} does not number an unnamed entry`);
 
   // The capture screen is the words and the photographs. Nothing instructs.
@@ -1560,10 +1560,10 @@ test('the camera sheet leaves the room list usable above it', () => {
     const companion=client.slice(client.indexOf('let cameraRoom=null'), client.indexOf('window.marketelInspectPhotoCaptured'));
     assert.match(companion, /type:'inspectCameraRoom',room:index/);
     assert.match(companion, /data-camera-room/);
-    assert.match(client, /if\(cameraRoom!==null\)cameraCompanion\(false,\{fresh:id\}\);/);
+    assert.match(client, /if\(cameraRoom!==null\)\{cameraPreview=id;cameraCompanion\(false,\{fresh:id\}\);\}/);
     // Closing restores whatever screen the operator was actually on.
     assert.match(companion, /cameraRoom=null;\s*if\(!draft\)return landing\(\);\s*if\(preview\|\|draft\.finalizedAt\)return reportPreview\(\);/);
-    assert.match(companion, /\/\/ An unnamed report goes to its details, a named one back to the work\.\s*editor\(\);/);
+    assert.match(companion, /nameFindingsFromNotes\(\);\s*remember\(\);\s*editor\(\);/);
 });
 
 test('no template expression ships to the screen as literal text', () => {
@@ -2697,9 +2697,9 @@ test('a new report opens the camera and asks nothing first; a finding nobody fil
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
   // In the app, for an entry-based wedge, New report goes straight to the camera.
   assert.match(client, /const cameraFirst = type => native && hudShell\(\) && payAtExport\(\) && entryTool\(type \|\| landingArm\(\)\?\.type \|\| 'routine'\);/);
-  assert.match(client, /if \(payAtExport\(\) && !propertyName\) return cameraFirst\(type\) \? startCameraFirst\(type\) : setupFlow\(\);/);
+  assert.match(client, /if \(cameraFirst\(type\)\) return startCameraFirst\(type, propertyName\);\n  if \(payAtExport\(\) && !propertyName\) return setupFlow\(\);/);
   const first = client.slice(client.indexOf('async function startCameraFirst('), client.indexOf('// ——— Check-ins'));
-  assert.match(first, /newDocument\('', /);
+  assert.match(first, /newDocument\(propertyName, /);
   assert.match(first, /openNativeCamera\(0\);/);
   // The page behind the sheet is drawn first, so it rises with the sheet.
   const open = client.slice(client.indexOf('function openNativeCamera('), client.indexOf('// Dictation while the camera is open'));
@@ -2713,7 +2713,7 @@ test('a new report opens the camera and asks nothing first; a finding nobody fil
   // report with nothing in it leaves no draft behind.
   const closed = client.slice(client.indexOf('window.marketelInspectCameraClosed='), client.indexOf('window.marketelInspectPhotoCaptured='));
   assert.match(closed, /room\.photos\.length\|\|\(room\.observation\|\|''\)\.trim\(\)\|\|\(room\.name\|\|''\)\.trim\(\)/);
-  assert.match(closed, /if\(!kept\.length&&!d\.propertyName\.trim\(\)\)\{[\s\S]*?draft=null/);
+  assert.match(closed, /if\(!kept\.length&&!draft\.serverId\)\{[\s\S]*?draft=null/);
   // A dismissal we asked for (the check-in photo page) is not the owner leaving.
   assert.match(client, /window\.marketelInspectCameraClosed=\(\)=>\{\n  document\.documentElement\.classList\.remove\('camera-open'\);\n  if\(cameraBefore\)return;/);
 });
@@ -2743,7 +2743,7 @@ test('holding the shutter talks, a tap is a photo, and the recording never outli
   // The page knows it is listening, and each shot lands with a small animation.
   assert.match(client, /window\.marketelInspectHold=state=>\{\n  if\(state!=='start'\|\|cameraRoom===null\|\|!draft\|\|hudDictation\)return;/);
   assert.match(camera, /flyer\.frame = landing/);
-  assert.match(client, /<figure\$\{id===fresh\?' class="is-fresh"':''\}>/);
+  assert.match(client, /<div class="hud-preview\$\{shown===fresh\?' is-fresh':''\}">/);
   assert.match(client, /cameraCompanion\(false,\{fresh:id\}\)/);
 });
 

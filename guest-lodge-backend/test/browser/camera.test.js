@@ -55,19 +55,25 @@ test('"+ another" is a new finding straight away, and a shot pops into the strip
     await h.page.waitForSelector('.camera-companion');
     await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
     await cameraShot(h.page);
-    await h.page.waitForSelector('.camera-strip figure.is-fresh');
+    await h.page.waitForSelector('.hud-preview.is-fresh');
     assert.equal(await h.page.locator('.camera-companion.is-entering').count(), 0, 'only the new photo moves');
+    // The shot is shown large, with its time, and can be taken away and retaken.
+    assert.equal(await h.page.locator('.hud-preview img').count(), 1);
+    assert.match(await h.page.locator('.hud-preview small').innerText(), /\d{1,2}:\d{2}\s*(AM|PM)/);
+    assert.equal(await h.page.locator('.hud-preview [data-strip-remove]').count(), 1);
+    assert.equal(await h.page.locator('.camera-strip').count(), 0, 'one photo needs no strip');
     assert.match(await h.page.locator('[data-camera-room]').first().innerText(), /Finding 1\s+1/);
     await h.page.click('#hud-next');
     assert.equal(await h.page.locator('[data-camera-room]').count(), 2);
     assert.match(await h.page.locator('[data-camera-room].is-active').innerText(), /Finding 2\s+0/);
     assert.ok(h.shell.some(message => message.type === 'inspectCameraRoom' && message.room === 1), 'the open camera is pointed at the new finding');
     await cameraShot(h.page, 1);
-    await h.page.waitForSelector('.camera-strip figure.is-fresh');
-    // Closing drops nothing that has a photo, and lands on the property question.
+    await h.page.waitForSelector('.hud-preview.is-fresh');
+    // Closing drops nothing that has a photo, and lands on the review page.
     await cameraDone(h.page);
     await h.page.waitForSelector('#property');
-    assert.match(await h.body(), /Which rental property\?/);
+    assert.match(await h.body(), /Review your findings/);
+    assert.equal(await h.page.locator('.finding-card').count(), 2);
     assert.equal((await h.page.textContent('#to-rooms')).trim(), 'Build my report →');
     h.assertClean();
   } finally { await h.close(); }
@@ -90,7 +96,7 @@ test('holding the shutter listens, files the words on the finding, and the mic b
     assert.equal(await h.page.locator('.hud-note').innerText(), 'Kitchen, chipped counter edge');
     // A second hold adds to the same finding rather than replacing it.
     await cameraSay(h.page, 'Second chip by the tap');
-    assert.equal(await h.page.locator('.hud-note').innerText(), 'Kitchen, chipped counter edge\nSecond chip by the tap');
+    assert.equal(await h.page.locator('.hud-note').innerText(), 'Kitchen, chipped counter edge Second chip by the tap', 'it carries on from what was said');
     // The mic button beside the photos is the same recording, by tapping.
     await h.page.click('#hud-talk');
     assert.ok(h.shell.some(message => message.type === 'inspectDictate'));
@@ -109,12 +115,15 @@ test('a finding is named after the room it mentions, and pairs with the check-in
   const h = await open({ native: true, reports: [baseline], properties: ['Pine Cottage'], accountData: { businessName: 'Pine Stays' } });
   try {
     await newAppReport(h, { said: 'Kitchen, chipped counter edge beside the sink.' });
+    // The room is already filled in from the words, to be corrected, not asked for.
+    assert.equal(await h.page.inputValue('[data-room="0"] [data-field="name"]'), 'Kitchen');
     await h.page.click('[data-pick-property="Pine Cottage"]');
+    await h.page.waitForFunction(() => !document.querySelector('[data-pick-property]'));
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('#send-report');
-    // The report reads "Kitchen", not "Finding 1", and shows its check-in as the before.
+    // The report numbers the finding and names its room, and shows its check-in as the before.
     const text = await h.body();
-    assert.match(text, /Kitchen/);
-    assert.doesNotMatch(text, /Finding 1/);
+    assert.match(text, /Finding 1 · Kitchen/);
     assert.match(text, /Compared with the check-in|Before · check-in/i);
     // From the editor, the camera keeps the before in reach for that finding.
     await h.page.click('#edit');
@@ -124,15 +133,16 @@ test('a finding is named after the room it mentions, and pairs with the check-in
     await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
     await h.page.waitForSelector('.camera-strip .is-before');
     assert.match(await h.page.locator('.camera-strip .is-before').innerText(), /Before/);
-    assert.match(await h.page.locator('[data-camera-room]').first().innerText(), /Kitchen\s+1/);
+    assert.match(await h.page.locator('[data-camera-room]').first().innerText(), /Finding 1\s+1/);
     await h.page.click('[data-before]');
     await h.page.waitForSelector('.before-photo');
     assert.match(await h.body(), /Before · check-in Sep 20, 2026/i);
     await h.page.click('#before-back');
     await h.page.waitForSelector('.camera-companion');
     await cameraShot(h.page);
-    await h.page.waitForSelector('.camera-strip figure:not(.is-before) small');
-    assert.match(await h.page.locator('.camera-strip figure:not(.is-before) small').first().innerText(), /\d{1,2}:\d{2}\s*(AM|PM)/);
+    await h.page.waitForSelector('.hud-preview small');
+    assert.match(await h.page.locator('.hud-preview small').innerText(), /\d{1,2}:\d{2}\s*(AM|PM)/);
+    assert.equal(await h.page.locator('.camera-strip .strip-pick').count(), 2, 'both photos can be picked to look at');
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -170,9 +180,50 @@ test('intake, opened by its address, has no rooms in its words', async () => {
     await cameraShot(h.page);
     await cameraDone(h.page);
     await h.page.waitForSelector('#property');
-    assert.match(await h.body(), /Which vehicle\?/);
-    await h.page.click('[data-pick-property="White Tacoma"]');
-    await h.page.waitForSelector('#send-report');
+    assert.match(await h.body(), /Vehicle \/ job/);
+    assert.equal((await h.page.locator('[data-room="0"] label').first().innerText()).trim().split('\n')[0], 'Area');
+    assert.doesNotMatch(await h.body(), /\broom\b/i);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('a report opened from the list lands on the review page: numbered findings, their rooms, and photos to add', async () => {
+  const saved = report('damage', { document: { propertyName: 'Pine Cottage', author: '', type: 'damage', date: '2026-09-24',
+    rooms: [{ name: 'Kitchen', observation: 'Chipped counter edge.', issue: false, photos: [] }, { name: '', observation: '', issue: false, photos: [] }], signatures: [] } });
+  const h = await open({ native: true, reports: [saved], accountData: { businessName: 'Pine Stays', active: true, remaining: 5 }, properties: ['Pine Cottage'] });
+  try {
+    await h.page.waitForSelector('[data-open]');
+    await h.page.click('[data-open]');
+    await h.page.waitForSelector('.finding-card');
+    assert.match(await h.body(), /Review your findings/);
+    assert.deepEqual(await h.page.locator('.finding-heading').allInnerTexts(), ['Finding 1', 'Finding 2']);
+    assert.equal(await h.page.inputValue('[data-room="0"] [data-field="name"]'), 'Kitchen');
+    assert.equal(await h.page.inputValue('#property'), 'Pine Cottage');
+    // Each finding can take a photo with the camera or from the library, and be polished.
+    assert.equal(await h.page.locator('[data-native-camera]').count(), 2);
+    assert.equal(await h.page.locator('[data-files]').count(), 2);
+    assert.equal(await h.page.locator('[data-ai]').count(), 2);
+    assert.equal(await h.page.locator('.receipts').count(), 2);
+    // Naming the room is typing it; the finding keeps its number.
+    await h.page.fill('[data-room="1"] [data-field="name"]', 'Bathroom');
+    await h.page.click('#add-room');
+    assert.ok(h.shell.some(message => message.type === 'inspectCamera' && message.room === 2), 'a new finding opens the camera on it');
+    await h.page.evaluate(() => window.marketelInspectCameraOpened('2'));
+    await cameraDone(h.page);
+    await h.page.waitForSelector('.finding-card');
+    assert.equal(await h.page.locator('.finding-card').count(), 2, 'a finding nobody filled in is dropped');
+    assert.equal(await h.page.inputValue('[data-room="1"] [data-field="name"]'), 'Bathroom');
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('Polish waits for the property, since the wording is checked against a saved report', async () => {
+  const h = await open({ native: true, accountData: { businessName: 'Pine Stays' }, properties: ['Pine Cottage'] });
+  try {
+    await newAppReport(h, { said: 'A mark by the door.' });
+    await h.page.click('[data-ai]');
+    assert.match(await h.body(), /Choose the property first, then polish the wording/);
+    assert.equal(await h.page.locator('#accept-ai').count(), 0);
     h.assertClean();
   } finally { await h.close(); }
 });

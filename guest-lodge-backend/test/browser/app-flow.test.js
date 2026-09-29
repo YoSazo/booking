@@ -110,16 +110,19 @@ test('Claims uploads while editing, computes the filing date, sends dated photos
   try {
     await newAppReport(h);
     // The details step opened by the camera has the filing date on it.
+    await h.page.click('.review-dates summary');
     await h.page.fill('#checkout-date', '2026-09-25');
     await h.page.click('[data-pick-property="Pine Cottage"]');
+    await h.page.waitForFunction(() => !document.querySelector('[data-pick-property]'));
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('#send-report');
     await h.page.click('#edit');
     await h.page.waitForSelector('[data-photo-id] figcaption');
-    // It started uploading the moment the property was named, so by now it is saved.
-    await h.page.waitForFunction(() => [...document.querySelectorAll('[data-photo-id] figcaption')].some(el => /Saved|Original file kept/.test(el.textContent)));
+    // It started uploading the moment the property was named, so it is saved by now.
+    for (let i = 0; i < 40 && h.data.photoCount < 1; i++) await wait(100);
     assert.equal(h.data.photoCount, 1, 'photo uploads before Send');
     const beforeBytes = await h.page.locator('[data-photo-id] img').first().evaluate(async image => (await (await fetch(image.src)).blob()).size);
-    await h.page.click('#preview');
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('#send-report');
     await h.page.click('#send-report');
     await h.page.waitForSelector('#delivery-share');
@@ -170,7 +173,6 @@ test('a dead photo blob repairs from storage and a slow tap has feedback without
     const id = await h.page.locator('[data-photo-id]').first().getAttribute('data-photo-id');
     await h.page.locator('[data-photo-id] img').first().evaluate(image => { image.src = 'blob:http://app.test/dead-photo'; });
     await h.page.waitForFunction(photoId => { const image = document.querySelector(`img[data-photo="${photoId}"]`); return image && image.complete && image.naturalWidth > 0 && image.src !== 'blob:http://app.test/dead-photo'; }, id);
-    await h.page.click('.write-own summary');
     await h.page.fill('[data-field="observation"]', 'Scuff beside the door.');
     await h.page.click('[data-ai]');
     await h.page.waitForSelector('[data-ai].is-busy');
@@ -191,7 +193,7 @@ test('a saved signature is one tap on the next report', async () => {
     await h.page.waitForSelector('[data-files]', { state: 'attached' });
     await h.page.setInputFiles('[data-files]', sample('claims-wall-thumb.jpg'));
     await h.page.waitForSelector('[data-photo-id]');
-    await h.page.click('#preview');
+    await h.page.click('#to-rooms');
     await h.page.waitForSelector('[data-sign="owner"]');
     await h.page.click('[data-sign="owner"]');
     await h.page.fill('#signer-name', 'Alex Host');
@@ -234,7 +236,7 @@ test('Send asks for an unknown author inside the current report and remembers th
     await h.page.waitForSelector('[data-files]', { state: 'attached' });
     await h.page.setInputFiles('[data-files]', sample('claims-wall-thumb.jpg'));
     await h.page.waitForSelector('[data-photo-id]');
-    await h.page.click('#preview');
+    await h.page.click('#to-rooms');
     await h.page.click('#send-report');
     await h.page.waitForSelector('#name-field');
     assert.ok(await h.page.locator('#dialog').evaluate(dialog => dialog.open), 'name is asked in a sheet over the report');

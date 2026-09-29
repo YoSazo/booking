@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { open, report } = require('./harness');
+const { open, report, cameraShot, cameraDone } = require('./harness');
 const { load } = require('../../wedges/registry');
 const path = require('node:path');
 
@@ -98,8 +98,19 @@ for (const native of [false, true]) {
       else await h.page.click('[data-page="properties"]');
       await h.page.waitForSelector('[data-property]');
       await h.page.click('[data-property]');
-      await h.page.waitForSelector('#preview');
-      await h.page.click('#preview');
+      if (native) {
+        // In the app a report started from a property opens the camera; the property is already named.
+        await h.page.waitForSelector('.camera-companion');
+        await h.page.evaluate(() => window.marketelInspectCameraOpened('0'));
+        await cameraShot(h.page);
+        await cameraDone(h.page);
+        await h.page.waitForSelector('#to-rooms');
+        assert.equal(await h.page.inputValue('#property'), 'Pine Ave');
+        await h.page.click('#to-rooms');
+      } else {
+        await h.page.waitForSelector('#preview');
+        await h.page.click('#preview');
+      }
       await h.page.waitForSelector('.biz-header', { state: 'attached' });
       const biz = await h.page.evaluate(() => { const el = document.querySelector('.biz-header'), style = getComputedStyle(el), box = el.getBoundingClientRect(), card = el.closest('article')?.getBoundingClientRect();
         return { position: style.position, shown: style.display !== 'none' && box.height > 0, inside: !!card && box.top >= card.top && box.bottom <= card.bottom, text: el.innerText.trim() }; });
