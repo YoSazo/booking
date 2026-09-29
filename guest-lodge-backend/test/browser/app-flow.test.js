@@ -38,16 +38,43 @@ test('property add and refused delete leave an honest list', async () => {
   } finally { await h.close(); }
 });
 
-test('paying in the native app hands off to the default browser', async () => {
-  const h = await open({ native: true, accountData: { businessName: 'Pine Stays' } });
+// The app is a free companion to a paid web tool: signed out it is a place to
+// sign in, and it never sells, prices or points at buying, in any storefront.
+test('signed out, the app is only a place to sign in', async () => {
+  const h = await open({ native: true, signedIn: false });
   try {
-    await h.page.waitForSelector('#plans');
-    await h.page.click('#plans');
-    await h.page.waitForSelector('#buy');
-    await h.page.click('#buy');
-    await h.page.waitForTimeout(100);
-    assert.ok(h.shell.some(message => message.type === 'openPurchase' && /checkout\.stripe\.com/.test(message.url)));
-    assert.equal(h.purchases[0]?.tool, 'claims');
+    await h.page.waitForSelector('#sign-in');
+    const text = await h.body();
+    assert.match(text, /Sign in to Marketel Claims/);
+    assert.match(text, /Use the email you signed up with\. We will send you a 6-digit code\./);
+    // Nothing else: no pitch, no demo, no offer, no way to buy.
+    assert.doesNotMatch(text, /Document the damage|\$\d|free|plan|price|Create your first|damage report/i);
+    assert.equal(await h.page.locator('#demo, #start, #see-plans, #lead-form').count(), 0);
+    assert.equal(await h.page.locator('main button').count(), 1);
+    // The one button can be read: white text on green, not white on white.
+    const look = await h.page.evaluate(() => { const style = getComputedStyle(document.getElementById('sign-in')); return { color: style.color, background: style.backgroundColor }; });
+    assert.deepEqual(look, { color: 'rgb(255, 255, 255)', background: 'rgb(46, 125, 91)' });
+    await h.page.click('#sign-in');
+    await h.page.waitForTimeout(150);
+    const auth = h.shell.find(message => message.type === 'inspectAuth');
+    assert.equal(auth?.step, 'email');
+    assert.match(auth?.title || '', /Sign in to Marketel Claims/);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('in the app, sending without an allowance sells nothing and points nowhere', async () => {
+  const h = await open({ native: true, accountData: { businessName: 'Pine Stays', active: false, freeAvailable: false, remaining: 0, credits: 0 }, properties: ['Pine Cottage'] });
+  try {
+    await newAppReport(h, { property: 'Pine Cottage' });
+    await h.page.click('#send-report');
+    await h.page.waitForSelector('#refresh-access');
+    const text = await h.page.locator('#dialog').innerText();
+    assert.match(text, /Sending needs a Marketel account with reports available/);
+    assert.doesNotMatch(text, /\$\d|Subscribe|plan|checkout|Stripe/i);
+    assert.equal(await h.page.locator('[data-offer], #offer-pay, #buy').count(), 0);
+    assert.equal(h.purchases.length, 0);
+    assert.ok(!h.shell.some(message => message.type === 'openPurchase' || message.type === 'openBrowser'));
     h.assertClean();
   } finally { await h.close(); }
 });

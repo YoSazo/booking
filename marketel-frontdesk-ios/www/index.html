@@ -90,6 +90,8 @@
       const choosing = new URLSearchParams(location.search).get('choose') === '1';
       if (!choosing && offered.includes(selected)) return open(selected);
       if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
+      // One tool on the menu: nothing to choose, so it opens.
+      if (!choosing && offered.length === 1) return open(offered[0]);
       // Only now is this page staying on screen, so only now does the shell
       // show its floating glass bar over it.
       shell({ type: 'chooserState' });

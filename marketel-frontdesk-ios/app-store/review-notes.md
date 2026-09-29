@@ -9,14 +9,14 @@ not sell media or consumer content.
 
 ## Payments
 
-Building a report is free. Sending a finished report needs a Marketel plan:
-$25/month or $199/year, unlimited reports (fair use 300 a month).
-
-In the United States storefront only, the app opens a Stripe-hosted checkout
-or billing page in Safari, outside the app. The app reads StoreKit's
-storefront country and shows no prices, purchase links or subscription
-management links in any other storefront. Existing subscribers anywhere can
-sign in and use their plan.
+Marketel Claims is a companion to a paid web-based tool (bookmarketel.com, which
+also works in any browser), and this app is free. There is no purchase, price,
+subscription offer or link to buy anywhere in the app, in any storefront
+(Guideline 3.1.3(f)). Customers set up their account on the web and sign in
+here with the same email. Signed out, the app shows a sign-in screen and nothing
+else. Building a report is free; sending needs an account with reports
+available, and an account without one is told exactly that, with no link.
+Existing subscribers can open their billing page from the account menu.
 
 ## Review access
 
@@ -27,8 +27,8 @@ credits, so a report can be sent without a purchase.
 
 ## What to test
 
-1. On first launch, choose **Claims**.
-2. Tap **Sign in** (top right), enter the review email, then the 6-digit code.
+1. Open the app. It shows a sign-in screen.
+2. Tap **Sign in**, enter the review email, then the 6-digit code.
 3. Tap **New Report**. The camera opens at once.
 4. Tap the shutter for a photo. Hold it to describe what you see; the words
    become the note (the mic button beside the photos does the same by tapping).

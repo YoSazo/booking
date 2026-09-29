@@ -884,3 +884,12 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .guarantee div { display: flex; flex-direction: column; gap: 2px; }
 .guarantee strong { font-size: 15px; line-height: 1.25; }
 .guarantee small { color: var(--green-dark); font-size: 13px; line-height: 1.35; }
+
+/* The app's signed-out screen: a place to sign in. */
+.signin-only { display: grid; align-content: center; justify-items: center; gap: 14px; min-height: 62svh; text-align: center; }
+.signin-only h1 { margin: 0; font-size: clamp(27px, 7.2vw, 40px); letter-spacing: -1px; }
+.signin-only p { margin: 0; max-width: 32ch; }
+.signin-only button { max-width: 320px; }
+/* The app's older sign-in link was drawn white with a green edge; here it is the one primary button. */
+.native-inspect-shell .signin-only #sign-in { margin-top: 12px; background: var(--green); border: 0; color: #fff; }
+.native-inspect-shell .signin-only #sign-in:active, .native-inspect-shell .signin-only #sign-in.is-pressed { background: var(--green-dark); }

@@ -1,7 +1,6 @@
 // Browser check, run by hand (not part of npm test). Needs playwright-core 1.27.1
 // and its cached Chromium: NODE_PATH=<dir with playwright-core> node test/browser/plans.js
-// See plans: reachable from Reports and the account sheet, US storefront only,
-// and the checkout it starts carries the tool it was bought from.
+// The app sells nothing: no See plans, no price, no purchase, in any storefront.
 const { chromium } = require('playwright-core');
 const fs = require('fs'), path = require('path');
 const WWW = path.resolve(__dirname, '../../../marketel-frontdesk-ios/www');
@@ -43,35 +42,23 @@ async function scenario(browser, { country, account }) {
 (async () => {
   const browser = await chromium.launch();
   const fresh = { token: 't'.repeat(43), email: 'o@e.com', businessName: 'Pine Stays', active: false, freeAvailable: true, remaining: 0, credits: 0, plans: ['year', 'month'] };
-  { // US, no plan: plans are one tap away from Reports and the account sheet.
-    const { ctx, page, LOG, checkouts, errs, text } = await scenario(browser, { country: 'USA', account: fresh });
-    await until(async () => !!(await page.$('#plans')), 3000);
+  // The app is a free companion to a paid web tool: in every storefront, with
+  // or without a plan, it shows no price and no way to buy.
+  for (const country of ['USA', 'GBR']) {
+    const { ctx, page, LOG, checkouts, errs, text } = await scenario(browser, { country, account: fresh });
+    await sleep(700);
     const t = await text();
-    check('US, no plan: Reports says building is free and sending needs a plan, never "first report is free"', /Building a report is free\. Sending one needs a plan\./.test(t) && !/first complete report is free/.test(t), t.slice(0, 160));
-    check('US, no plan: "See plans →" is on Reports', !!(await page.$('#plans')));
-    await page.click('#plans'); await page.waitForSelector('#buy');
-    check('it opens the plans sheet with both plans', (await page.$$('[data-plan]')).length === 2);
-    await page.click('#buy');
-    await until(async () => LOG.some(m => m.type === 'openPurchase'), 3000);
-    check('Subscribe opens Stripe outside the app, for Claims, from the app', LOG.some(m => m.type === 'openPurchase' && /checkout\.stripe\.com/.test(m.url)) && checkouts[0]?.tool === 'claims' && checkouts[0]?.native === true, JSON.stringify(checkouts));
-    await page.evaluate(() => document.getElementById('dialog').close());
-    await page.evaluate(() => window.marketelInspectNativeAction('account'));
-    await page.waitForSelector('#see-plans', { timeout: 3000 }).catch(() => {});
-    check('the account sheet offers See plans too', !!(await page.$('#see-plans')));
-    if (await page.$('#see-plans')) { await page.click('#see-plans'); check('and it opens the same plans sheet', !!(await page.waitForSelector('#buy', { timeout: 3000 }).catch(() => null))); }
-    check('no page errors (US)', !errs.length, errs.join(' | '));
-    await ctx.close(); }
-  { // Outside the US: no price, no link, nothing that points at paying elsewhere.
-    const { ctx, page, errs, text } = await scenario(browser, { country: 'GBR', account: fresh });
-    await sleep(600);
-    const t = await text();
-    check('outside the US: no See plans, and no "needs a plan"', !(await page.$('#plans')) && !/needs a plan/.test(t) && /Building a report is free\./.test(t), t.slice(0, 160));
+    check(`${country}, no plan: Reports says building is free, and never sells or mentions a plan`, /Building a report is free\./.test(t) && !/needs a plan|See plans|first complete report is free|\$\d/.test(t), t.slice(0, 160));
+    check(`${country}: no "See plans" on Reports`, !(await page.$('#plans')));
     await page.evaluate(() => window.marketelInspectNativeAction('account'));
     await sleep(1300);
-    check('outside the US: the account sheet has no See plans', !(await page.$('#see-plans')));
-    check('no page errors (outside US)', !errs.length, errs.join(' | '));
-    await ctx.close(); }
-  { // Subscribed, or holding credits: nothing to sell.
+    const sheet = await page.evaluate(() => document.getElementById('dialog').innerText.replace(/\s+/g, ' '));
+    check(`${country}: the account sheet has no See plans and no price`, !(await page.$('#see-plans')) && !/\$\d|plan yet/.test(sheet), sheet.slice(0, 200));
+    check(`${country}: nothing opened a purchase`, !LOG.some(m => m.type === 'openPurchase') && checkouts.length === 0);
+    check(`no page errors (${country})`, !errs.length, errs.join(' | '));
+    await ctx.close();
+  }
+  { // Subscribed, or holding credits: nothing to sell either.
     const { ctx, page, text } = await scenario(browser, { country: 'USA', account: { ...fresh, active: true, remaining: 300, freeAvailable: false } });
     await sleep(600);
     check('subscribed: no See plans, and it says unlimited', !(await page.$('#plans')) && /Unlimited reports on your plan\./.test(await text()));
@@ -83,4 +70,5 @@ async function scenario(browser, { country, account }) {
   await browser.close();
   for (const [s, n, d] of results) console.log(`${s}  ${n}${s === 'FAIL' && d ? `\n      ${String(d).slice(0, 300)}` : ''}`);
   console.log(`\n${results.filter(r => r[0] === 'PASS').length}/${results.length} passed`);
+  if (results.some(r => r[0] === 'FAIL')) process.exit(1);
 })().catch(e => { console.log('SCRIPT', e.message.slice(0, 400)); process.exit(1); });

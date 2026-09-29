@@ -1295,6 +1295,10 @@ function landing() {
   updateHeader();
   setActiveNav('current');
   track('LandingViewed');
+  // In the app this is a place to sign in and nothing else. Buying happens on
+  // the web before the app is downloaded, so nothing here sells, prices or
+  // points anywhere.
+  if (native) return signInPage();
   if (!native && payAtExport()) return goldenLanding(arm);
   $('app').innerHTML = `<section class="hero"><div class="eyebrow">${esc(arm?.eyebrow||'For small property managers')}</div><h1>${arm?.title||'Talk through each room.<br>Inspect writes the notes.'}</h1><p class="muted">${esc(arm?.lede||'Your photos and observations, packaged into a finished report before you leave.')}</p><button id="start">Create your first ${esc(skin().doc)} free</button><p><small>Your first complete report across Marketel Inspect is free. No card.</small></p><button id="see-plans" class="quiet">See plans</button><button id="sign-in" class="quiet">Already have reports? Sign in</button>${demoMarkup(arm)}</section>`;
   if(arm){
@@ -1309,6 +1313,12 @@ function landing() {
   // People reach the app through the web funnel, so most of them already have
   // an account there. On the web the free report stays the one primary action.
   if(native){$('sign-in').className='secondary wide';$('start').classList.add('wide');$('start').after($('sign-in'));}
+  $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
+  settleWedgeEntrance();
+}
+function signInPage(){
+  const copy=authCopy('signin');
+  $('app').innerHTML=`<section class="hero signin-only"><h1>${esc(copy.title)}</h1><p class="muted">${esc(copy.message)}</p><button id="sign-in" class="wide">Sign in</button></section>`;
   $('sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   settleWedgeEntrance();
 }
@@ -2755,11 +2765,10 @@ async function exportOffer(action){
   await requestStorefront();
   track('ExportOfferViewed',undefined,false);
   const sk=skin();
-  // Outside the US storefront an app may not point anyone at a way to pay
-  // other than in-app purchase, so this says what is true — the report is
-  // safe, and sending needs an account with an allowance — and links nowhere.
-  // The US storefront permits the link, which is the path below.
-  if(native&&storefront!=='USA'){
+  // The app is a free companion to a paid web tool and points nowhere, in any
+  // storefront, so this says what is true — the report is safe, and sending
+  // needs an account with an allowance. The path below is the web's.
+  if(native){
     modal(`<h2>Your ${esc(sk.doc)} is saved.</h2><p>Sending needs a Marketel account with ${esc(sk.docPlural)} available. If you already have one, refresh your access.</p><button id="refresh-access" class="wide">Refresh access</button>`);
     $('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();if(canSend())finishExport(action);});
     return;
@@ -2832,7 +2841,7 @@ async function resumePendingExport({wait=0}={}){
 async function offer(){
   await requestStorefront();
   logInspect('AdditionalReportOfferViewed');
-  if(native&&storefront!=='USA')return modal('<h2>Your free report is yours.</h2><p>This account has no additional report allowance available. Existing subscribers can refresh their account access.</p><button id="refresh-access">Refresh access</button>'),$('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();});
+  if(native)return modal('<h2>Your free report is yours.</h2><p>This account has no additional report allowance available. Existing subscribers can refresh their account access.</p><button id="refresh-access">Refresh access</button>'),$('refresh-access').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();});
   // Annual is preselected — $29/month takes over three months to repay what one
   // customer costs to acquire — but only intervals the server has a price for
   // are offered, so a missing annual price degrades to monthly, not a dead tap.
@@ -2952,9 +2961,10 @@ function deleteReportRow(id,row){
     setTimeout(()=>{if(currentPage==='reports'&&!$('dialog').open)renderReports();},230);
   },null);
 }
-// Who can buy a plan from here. Claims has no free report, so anyone without
-// a plan or credits can; the link to pay exists only in the US storefront.
-const mayBuy=()=>!!account&&!account.active&&!(account.credits>0)&&(payAtExport()||!account.freeAvailable)&&(!native||storefront==='USA');
+// Who can buy a plan from here: on the web, anyone without a plan or credits.
+// Never in the app: it is a free companion to a paid web tool, so it has no
+// purchase, no price and no link to one. Buying happens on the web.
+const mayBuy=()=>!!account&&!account.active&&!(account.credits>0)&&(payAtExport()||!account.freeAvailable)&&!native;
 let storefrontAsked=false;
 function renderReports(){
   enterScreen('reports');
@@ -3085,7 +3095,7 @@ $('account-button').onclick=async()=>{
     : account.active
     ? `${account.remaining>0?`Unlimited ${esc(sk.docPlural)}.`:esc(FAIR_USE_REACHED)}${account.periodEnd&&!Number.isNaN(new Date(account.periodEnd).getTime())?` ${account.cancellationScheduled?'Access ends':'Renews'} ${new Date(account.periodEnd).toLocaleDateString()}.`:''}`
     : account.credits>0 ? `${account.credits} ${esc(account.credits===1?sk.doc:sk.docPlural)} ready to send.`
-    : payAtExport() ? `No plan yet. Building a ${esc(sk.doc)} is always free, and your ${esc(sk.docPlural)} stay here.`
+    : payAtExport() ? `${native?'':'No plan yet. '}Building a ${esc(sk.doc)} is always free, and your ${esc(sk.docPlural)} stay here.`
     : `One complete ${esc(sk.doc)} free. Existing ${esc(sk.docPlural)} stay available.`;
   // Managing a subscription needs one to exist; offering it to an account
   // without one opened an error. Front Desk is not part of this product, so

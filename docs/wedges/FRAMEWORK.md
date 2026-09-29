@@ -205,6 +205,14 @@ nothing for it. `?notrack=1` on any page does the same for in-app browsers.
 
 ## 9. App Store
 
+The app is a free companion to the paid web tool (Guideline 3.1.3(f)): signed
+out it shows a sign-in screen and nothing else, and it never shows a price, a
+purchase, a plan or a link to buy, in any storefront (`mayBuy()` is false in the
+app, and a report with no allowance says so and points nowhere). Buying happens
+on the web before the app is downloaded. Never add a call to buy to the app or
+its store text; `test/browser/plans.js` and the "sells nothing" tests guard it.
+With one live wedge the chooser opens it straight away.
+
 The listing, review notes and privacy labels live under
 `marketel-frontdesk-ios/app-store/`. The review account uses a fixed code and
 receives 25 report credits on sign-in. Avoid competitors’ trademarks in

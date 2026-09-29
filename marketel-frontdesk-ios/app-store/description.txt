@@ -16,6 +16,6 @@ BEFORE AND AFTER
 Check a unit in at turnover with a few photos. Any damage report for that property shows the check-in as the "before", right beside the damage.
 
 BUILT FOR HOSTS
-Works for any short-term or vacation rental, whether you run one unit or many. Free to build a report; a Marketel plan is needed to send it.
+Works for any short-term or vacation rental, whether you run one unit or many. Free to build a report. Sign in with your Marketel account to send it.
 
 Marketel reports record what the host observed and photographed. They are not valuations, cause determinations, insurance assessments or legal advice, and a report does not guarantee a claim is approved.
