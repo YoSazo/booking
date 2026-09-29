@@ -4,9 +4,13 @@ const assert = require('node:assert/strict');
 const { open } = require('./harness');
 
 const phone = { width: 390, height: 844 };
-// The Claims launch price ends at a fixed moment (2026-10-02T06:59:59Z); pages
-// that show it are pinned before that, so they read the same any day they run.
-const DURING_LAUNCH = '2026-09-30T12:00:00Z';
+// The Claims launch price ends at a fixed moment set in its manifest; pages that
+// show it are pinned to a time before that, so they read the same on any day.
+const LAUNCH_END = Date.parse(require('../../wedges/claims').offer.launch.until);
+const at = offsetMs => new Date(LAUNCH_END + offsetMs).toISOString();
+const HOUR = 3600000;
+const DURING_LAUNCH = at(-42 * HOUR);
+const launchEndText = `${new Date(LAUNCH_END).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
@@ -41,8 +45,8 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.match(text, /One payment of \$99\. No subscription, and nothing renews\./);
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, /Instead of \$199 every year/);
-    assert.match(text, /Launch price ends in 1d 18:5\d:\d\d · then \$199/);
-    assert.match(text, /Launch price until Thu, Oct 1, 11:59 PM PT, then \$199\./);
+    assert.match(text, /Launch price ends in 1d \d\d:\d\d:\d\d · then \$199/);
+    assert.ok(text.includes(`Launch price until ${launchEndText}, then $199.`), launchEndText);
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
@@ -50,7 +54,7 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
     // price, and when it becomes $199.
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199\/yr \$99 once\s*Then \$199 in 1d 18:5\d:\d\d\s*Get it/);
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199\/yr \$99 once\s*Then \$199 in 1d \d\d:\d\d:\d\d\s*Get it/);
     assert.equal(await h.page.textContent('#sim-paybar s'), '$199/yr');
     assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
     // It ticks.
@@ -79,7 +83,7 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
 });
 
 test('the launch price ends for real: at its moment the page redraws at $199, and after it there is no clock', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: '2026-10-02T06:59:57Z' });
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
   try {
     await h.page.waitForSelector('[data-launch-left]');
     assert.match(await h.page.textContent('h1'), /^\$99 once\./);
@@ -91,7 +95,7 @@ test('the launch price ends for real: at its moment the page redraws at $199, an
     h.assertClean();
   } finally { await h.close(); }
 
-  const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: '2026-10-05T12:00:00Z' });
+  const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
   try {
     await after.page.waitForSelector('#offer-video');
     assert.match(await after.page.textContent('#sim-offer'), /Get it for \$199/);

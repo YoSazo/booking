@@ -2921,7 +2921,8 @@ const sendWebhook = (h, object, type = 'checkout.session.completed') => request(
 
 // The launch price's end is fixed, so these tests fix the clock either side of it.
 const atTime = async (iso, run) => { const real = Date.now; Date.now = () => Date.parse(iso); try { return await run(); } finally { Date.now = real; } };
-const DURING_LAUNCH = '2026-09-30T12:00:00Z', AFTER_LAUNCH = '2026-10-02T07:00:00Z';
+const LAUNCH_END = Date.parse(require('../wedges/claims').offer.launch.until);
+const DURING_LAUNCH = new Date(LAUNCH_END - 36 * 3600000).toISOString(), AFTER_LAUNCH = new Date(LAUNCH_END + 3600000).toISOString();
 
 test('paying once is one $99 payment with no subscription, and it carries the ad click to Stripe', () => atTime(DURING_LAUNCH, async () => {
   const h = moneyHarness();
