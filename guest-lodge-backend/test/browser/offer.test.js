@@ -46,7 +46,7 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.match(text, /Pay once\. Keep it for good\./);
     assert.match(text, new RegExp(`One payment of \\$${LAUNCH}\\. No subscription, and nothing renews\\.`));
     // The launch price: the real plan it replaces, and the real moment it ends.
-    assert.match(text, /Instead of \$199 every year/);
+    assert.match(text, new RegExp(`Instead of \\$${STANDING}\\b`));
     assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
     assert.ok(text.includes(`Launch price until ${launchEndText}, then $${STANDING}.`), launchEndText);
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
@@ -55,9 +55,9 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.equal(await h.page.$('#sim-keep'), null);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
-    // price, and when it becomes $199.
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$199\\/yr \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
-    assert.equal(await h.page.textContent('#sim-paybar s'), '$199/yr');
+    // price, and when it becomes the standing price.
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
+    assert.equal(await h.page.textContent('#sim-paybar s'), `$${STANDING}`);
     assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
     // It ticks.
     const before = await h.page.textContent('[data-launch-left]');
