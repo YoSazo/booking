@@ -6,7 +6,9 @@ const { open } = require('./harness');
 const phone = { width: 390, height: 844 };
 // The Claims launch price ends at a fixed moment set in its manifest; pages that
 // show it are pinned to a time before that, so they read the same on any day.
-const LAUNCH_END = Date.parse(require('../../wedges/claims').offer.launch.until);
+const OFFER = require('../../wedges/claims').offer;
+const LAUNCH = OFFER.launch.price, STANDING = OFFER.lifetime;
+const LAUNCH_END = Date.parse(OFFER.launch.until);
 const at = offsetMs => new Date(LAUNCH_END + offsetMs).toISOString();
 const HOUR = 3600000;
 const DURING_LAUNCH = at(-42 * HOUR);
@@ -28,7 +30,7 @@ const fastClock = async (h, { hidden = false } = {}) => {
 // An ad visitor arrives without ?sim: the price as the headline, the real app
 // making a report, and one offer under it. No simulation stands between them
 // and the price, and no subscription is in it: Claims is paid once.
-test('phone: an ad visitor gets $99 once as the headline, the video, and one button', async () => {
+test('phone: an ad visitor gets the launch price once as the headline, the video, and one button', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
@@ -37,16 +39,16 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.match(video.src, /^https:\/\/res\.cloudinary\.com\/.+\.mp4$/);
     assert.match(video.poster, /^https:\/\/res\.cloudinary\.com\/.+\.jpg$/);
     assert.equal(await h.page.$('[data-sim-pick]'), null, 'no simulation');
-    assert.match((await h.page.textContent('h1')).trim(), /^\$99 once\.\s*Unlimited damage reports\.$/);
+    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${LAUNCH} once\\.\\s*Unlimited damage reports\\.$`));
     const text = await h.body();
     assert.match(text, /No subscription\. Nothing renews\./);
     assert.match(text, /38 seconds/);
     assert.match(text, /Pay once\. Keep it for good\./);
-    assert.match(text, /One payment of \$99\. No subscription, and nothing renews\./);
+    assert.match(text, new RegExp(`One payment of \\$${LAUNCH}\\. No subscription, and nothing renews\\.`));
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, /Instead of \$199 every year/);
-    assert.match(text, /Launch price ends in 1d \d\d:\d\d:\d\d · then \$199/);
-    assert.ok(text.includes(`Launch price until ${launchEndText}, then $199.`), launchEndText);
+    assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
+    assert.ok(text.includes(`Launch price until ${launchEndText}, then $${STANDING}.`), launchEndText);
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
@@ -54,7 +56,7 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
     // price, and when it becomes $199.
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199\/yr \$99 once\s*Then \$199 in 1d \d\d:\d\d:\d\d\s*Get it/);
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$199\\/yr \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
     assert.equal(await h.page.textContent('#sim-paybar s'), '$199/yr');
     assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
     // It ticks.
@@ -64,7 +66,7 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
     const bar = await h.page.evaluate(() => { const box = el => document.querySelector(el).getBoundingClientRect();
       return { button: box('#sim-paybar-buy').height, price: box('#sim-paybar strong').bottom, terms: box('#sim-paybar small').top }; });
     assert.ok(bar.button <= 56, JSON.stringify(bar));
-    assert.ok(bar.terms >= bar.price - 1, 'the clock sits under $99 once');
+    assert.ok(bar.terms >= bar.price - 1, 'the clock sits under the price');
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
@@ -82,23 +84,23 @@ test('phone: an ad visitor gets $99 once as the headline, the video, and one but
   } finally { await h.close(); }
 });
 
-test('the launch price ends for real: at its moment the page redraws at $199, and after it there is no clock', async () => {
+test('the launch price ends for real: at its moment the page redraws at the standing price, and after it there is no clock', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
   try {
     await h.page.waitForSelector('[data-launch-left]');
-    assert.match(await h.page.textContent('h1'), /^\$99 once\./);
+    assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once\\.`));
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
-    assert.match((await h.page.textContent('h1')).trim(), /^\$199 once\.\s*Unlimited damage reports\.$/);
+    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${STANDING} once\\.\\s*Unlimited damage reports\\.$`));
     const text = await h.body();
-    assert.doesNotMatch(text, /Launch price|Instead of|\$99/);
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), /\$199 once\s*No subscription\s*Get it/);
+    assert.doesNotMatch(text, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} once\\s*No subscription\\s*Get it`));
     h.assertClean();
   } finally { await h.close(); }
 
   const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
   try {
     await after.page.waitForSelector('#offer-video');
-    assert.match(await after.page.textContent('#sim-offer'), /Get it for \$199/);
+    assert.match(await after.page.textContent('#sim-offer'), new RegExp(`Get it for \\$${STANDING}`));
     assert.equal(await after.page.$('[data-launch-left]'), null);
     after.assertClean();
   } finally { await after.close(); }

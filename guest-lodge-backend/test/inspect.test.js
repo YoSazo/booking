@@ -2921,10 +2921,12 @@ const sendWebhook = (h, object, type = 'checkout.session.completed') => request(
 
 // The launch price's end is fixed, so these tests fix the clock either side of it.
 const atTime = async (iso, run) => { const real = Date.now; Date.now = () => Date.parse(iso); try { return await run(); } finally { Date.now = real; } };
-const LAUNCH_END = Date.parse(require('../wedges/claims').offer.launch.until);
+const OFFER = require('../wedges/claims').offer;
+const LAUNCH_END = Date.parse(OFFER.launch.until);
+const LAUNCH_CENTS = OFFER.launch.price * 100, STANDING_CENTS = OFFER.lifetime * 100;
 const DURING_LAUNCH = new Date(LAUNCH_END - 36 * 3600000).toISOString(), AFTER_LAUNCH = new Date(LAUNCH_END + 3600000).toISOString();
 
-test('paying once is one $99 payment with no subscription, and it carries the ad click to Stripe', () => atTime(DURING_LAUNCH, async () => {
+test('paying once is one payment at the launch price with no subscription, and it carries the ad click to Stripe', () => atTime(DURING_LAUNCH, async () => {
   const h = moneyHarness();
   const buy = body => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', interval: 'month', tool: 'claims', visitorId: `v_${'a'.repeat(12)}`,
@@ -2938,7 +2940,7 @@ test('paying once is one $99 payment with no subscription, and it carries the ad
     assert.equal(params.customer_creation, 'always');
     assert.deepEqual(params.payment_method_types, ['card'], 'paid now, never a debit that clears days later');
     assert.ok(!('subscription_data' in params), 'nothing renews');
-    assert.deepEqual(params.line_items[0].price_data.unit_amount, 9900);
+    assert.deepEqual(params.line_items[0].price_data.unit_amount, LAUNCH_CENTS);
     assert.equal(params.line_items[0].price_data.currency, 'usd');
     assert.match(params.line_items[0].price_data.product_data.name, /^Marketel Claims: unlimited reports, paid once$/);
     assert.equal(params.metadata.plan, 'lifetime');
@@ -2962,14 +2964,14 @@ test('paying once is one $99 payment with no subscription, and it carries the ad
   } finally { had.registration.close(); }
 }));
 
-test('the launch price really ends: from its fixed moment checkout charges $199 for everyone', async () => {
+test('the launch price really ends: from its fixed moment checkout charges the standing price for everyone', async () => {
   const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` }) });
   await atTime(DURING_LAUNCH, async () => {
     const h = moneyHarness();
     try {
       assert.equal((await buy(h)).status, 200);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 9900);
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, LAUNCH_CENTS);
       assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
     } finally { h.registration.close(); }
   });
@@ -2977,7 +2979,7 @@ test('the launch price really ends: from its fixed moment checkout charges $199 
     const h = moneyHarness();
     try {
       assert.equal((await buy(h)).status, 200);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 19900);
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, STANDING_CENTS);
       assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews.');
     } finally { h.registration.close(); }
   });
@@ -3088,6 +3090,6 @@ test('a tap on pay once reaches Meta at its own price', () => atTime(DURING_LAUN
       headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' },
       body: JSON.stringify({ name: 'SimCheckoutTapped', tool: 'claims', visitorId, detail: 'lifetime', attribution: { fbp: 'fb.1.1700000000.123' } }) });
     assert.equal(response.status, 200);
-    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 99, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-tap.${visitorId}` }]);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.launch.price, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-tap.${visitorId}` }]);
   } finally { h.registration.close(); }
 }));
