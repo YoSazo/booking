@@ -104,3 +104,18 @@ test('how far down the page is its own card, and a reset clears it', () => {
   assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['Saw the video on screen', 1], ['Saw the offer card on screen', 1], ['Scrolled to 25%', 2], ['Scrolled to 50%', 0], ['Scrolled to 75%', 0], ['Scrolled to the bottom', 1], ['Tapped "see a report built"', 0]]);
   assert.ok(['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped'].every(name => VISITOR_EVENTS.includes(name)));
 });
+
+test('the first question is a funnel step between staying and tapping, and its own card', () => {
+  const f = buildWedgeFunnel([
+    ev('OfferLanded', 'v_a'), ev('OfferLanded', 'v_b'), ev('OfferLanded', 'v_c'),
+    ev('OfferEngaged', 'v_a'), ev('OfferEngaged', 'v_b'),
+    ev('OfferWantTapped', 'v_a'), ev('OfferUnsureTapped', 'v_b'),
+    ev('SimCheckoutTapped', 'v_a'),
+  ]);
+  const keys = f.steps.map(step => step.key);
+  assert.ok(keys.indexOf('engaged') < keys.indexOf('picked') && keys.indexOf('picked') < keys.indexOf('tapped'));
+  assert.equal(f.steps.find(step => step.key === 'picked').people, 2);
+  const card = f.branches.find(b => b.key === 'pick');
+  assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['Tapped "I want this"', 1], ['Tapped "Not sure"', 1]]);
+  assert.ok(['OfferWantTapped', 'OfferUnsureTapped'].every(name => VISITOR_EVENTS.includes(name)));
+});

@@ -858,6 +858,15 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 @keyframes cue-nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .video-cue span { animation: none; } .video-cue { transition: none; } }
 @media (min-width: 880px) { .video-cue { display: none; } }
+.pick-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; gap: 4px; padding: 12px 16px calc(10px + env(safe-area-inset-bottom)); background: #fbfdfbf2; border-top: 1px solid var(--border); box-shadow: 0 -8px 24px #173b231a; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.pick-bar button { min-height: 52px; font-size: 17px; }
+.pick-bar .quiet { min-height: 40px; font-size: 15px; }
+.offer-landing.is-pick { padding-bottom: 150px; }
+.offer-landing.is-pick .offer-buy, .offer-landing.is-pick .offer-video-title, .offer-landing.is-pick .offer-video figcaption, .offer-landing.is-pick ~ .video-cue, .offer-landing.is-pick ~ .sim-paybar { display: none; }
+.offer-landing.is-pick .offer-video video { height: clamp(200px, calc(100svh - 440px), 420px); }
+.offer-landing.just-picked .offer-buy { animation: offer-in .32s ease both; }
+@keyframes offer-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .offer-landing.just-picked .offer-buy { animation: none; } }
 .offer-video-title { margin: 0 0 10px; font-size: 17px; font-weight: 700; text-align: center; letter-spacing: -0.2px; }
 .offer-video figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
 .offer-buy .sim-offer { margin-top: 0; }
@@ -872,6 +881,9 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
   .offer-video video { height: min(72vh, 640px); }
   .offer-buy { grid-area: buy; }
   .offer-landing ~ .sim-paybar { display: none; }
+  .pick-bar { grid-area: buy; position: static; padding: 0; max-width: 340px; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .offer-landing.is-pick { padding-bottom: 0; }
+  .offer-landing.is-pick .offer-video video { height: min(72vh, 640px); }
 }
 
 /* The launch price: the real alternative it replaces, and the fixed moment it

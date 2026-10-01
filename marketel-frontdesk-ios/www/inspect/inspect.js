@@ -1213,6 +1213,15 @@ function videoActive(){
   // A return from Stripe goes to the page that handles it, never back here.
   return !params.has('sim')&&!params.has('arm')&&!params.has('checkout');
 }
+// Step one is the recording and one question; the offer follows the answer. A
+// visitor who has answered stays answered for the tab, and someone coming back
+// from Stripe has already chosen, so neither is asked again.
+const OFFER_STAGE_KEY='inspect.offerStage';
+let offerStage='pick';
+function offerPicked(){
+  if(offerStage==='offer')return true;
+  try{return sessionStorage.getItem(OFFER_STAGE_KEY)==='offer';}catch{return false;}
+}
 function videoLanding({declined=false}={}){
   enterScreen('offer');
   offerOnVideo=true;
@@ -1222,13 +1231,36 @@ function videoLanding({declined=false}={}){
   const heading=payOnce()?'Pay once. Keep it for good.':SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
   const title=payOnce()?`$${lifetimePrice()} once.<br><span class="green">Unlimited ${esc(wedge(arm.type).label.toLowerCase())}s.</span>`:(g.headline||arm.title);
   const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
-  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><div class="offer-buy">${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption></figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  if(declined)offerStage='offer';
+  const gated=payOnce()&&!offerPicked();
+  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${gated?(g.headline||arm.title):title}</h1><p class="muted">${esc(gated?v.sub:sub)}</p></div><div class="offer-buy">${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption></figure>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-maybe" class="quiet">Not sure</button></div>`:''}</section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
   watchScroll();
   bindVideoCue();
   tickLaunch();
+  if(gated){
+    const choose=kind=>{
+      haptic();
+      track(kind==='want'?'OfferWantTapped':'OfferUnsureTapped',phoneWidth()?'phone':'desktop');
+      offerStage='offer';
+      try{sessionStorage.setItem(OFFER_STAGE_KEY,'offer');}catch{}
+      const section=document.querySelector('.offer-landing');
+      if(!section)return;
+      // The same page, not a new one: the recording keeps its place and the
+      // offer is already in the page, so nothing redraws or restarts.
+      section.querySelector('h1').innerHTML=title;
+      section.querySelector('.offer-intro p').textContent=sub;
+      section.classList.remove('is-pick');
+      section.classList.add('just-picked');
+      setTimeout(()=>section.classList.remove('just-picked'),500);
+      $('pick-bar')?.remove();
+      window.scrollTo(0,0);
+    };
+    $('pick-yes').onclick=()=>choose('want');
+    $('pick-maybe').onclick=()=>choose('unsure');
+  }
   track('OfferLanded',phoneWidth()?'phone':'desktop');
 }
 // The launch clock, once a second. When it reaches zero the price really

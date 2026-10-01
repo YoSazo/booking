@@ -13,6 +13,12 @@ const at = offsetMs => new Date(LAUNCH_END + offsetMs).toISOString();
 const HOUR = 3600000;
 const DURING_LAUNCH = at(-42 * HOUR);
 const launchEndText = `${new Date(LAUNCH_END).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
+// The pay-once landing opens on the recording and one question; the offer is the answer.
+const choose = async (h, which = 'yes') => {
+  await h.page.click(which === 'yes' ? '#pick-yes' : '#pick-maybe');
+  await h.page.waitForSelector('#sim-offer', { state: 'visible' });
+  await h.page.waitForTimeout(450);
+};
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
@@ -34,6 +40,7 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
+    await choose(h);
     const video = await h.page.evaluate(() => { const v = document.getElementById('offer-video'); return { muted: v.muted, loop: v.loop, inline: v.playsInline, src: v.getAttribute('src'), poster: v.getAttribute('poster') }; });
     assert.deepEqual({ muted: video.muted, loop: video.loop, inline: video.inline }, { muted: true, loop: true, inline: true });
     assert.match(video.src, /^https:\/\/res\.cloudinary\.com\/.+\.mp4$/);
@@ -103,7 +110,9 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
 test('the launch price ends for real: at its moment the page redraws at the standing price, and after it there is no clock', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
   try {
-    await h.page.waitForSelector('[data-launch-left]');
+    await h.page.waitForSelector('#pick-yes');
+    await h.page.click('#pick-yes');
+    await h.page.waitForSelector('[data-launch-left]', { state: 'visible' });
     assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once\\.`));
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
     assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${STANDING} once\\.\\s*Unlimited damage reports\\.$`));
@@ -116,6 +125,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
   const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
   try {
     await after.page.waitForSelector('#offer-video');
+    await choose(after);
     assert.match(await after.page.textContent('#sim-offer'), new RegExp(`Get it for \\$${STANDING}`));
     assert.equal(await after.page.$('[data-launch-left]'), null);
     after.assertClean();
@@ -166,10 +176,71 @@ test('the video counts a quarter, half and the end once each', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
+    await choose(h);
     await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' }));
     for (let i = 0; i < 60 && !count(h, 'OfferVideoEnded'); i++) await h.page.waitForTimeout(200);
     await h.page.waitForTimeout(1500);
     assert.deepEqual(['OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].map(name => count(h, name)), [1, 1, 1]);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+// Step one: the recording and one question, with no price on screen. The answer,
+// either one, shows the offer on the same page without redrawing the recording.
+for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
+  test(`phone ${size.width}x${size.height}: the first screen is the recording and two buttons, no price`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#offer-video');
+      await h.page.waitForTimeout(500);
+      const first = await h.page.evaluate(() => { const box = id => document.getElementById(id).getBoundingClientRect(), v = box('offer-video'), yes = box('pick-yes'), maybe = box('pick-maybe'), visible = id => { const el = document.getElementById(id), r = el.getBoundingClientRect(); return r.width > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; };
+        return { height: window.innerHeight, videoTop: v.top, videoBottom: v.bottom, videoMiddle: v.left + v.width / 2, width: window.innerWidth, yes: { top: yes.top, bottom: yes.bottom, text: document.getElementById('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, text: document.getElementById('pick-maybe').textContent.trim() }, offerShown: visible('sim-offer'), paybarShown: visible('sim-paybar'), cueShown: visible('video-cue'), playing: !document.getElementById('offer-video').paused }; });
+      assert.match(first.yes.text, /^I want this/);
+      assert.equal(first.maybe.text, 'Not sure');
+      assert.ok(first.yes.bottom <= first.height && first.maybe.bottom <= first.height, 'both buttons are on screen: ' + JSON.stringify(first));
+      assert.ok(first.videoBottom <= first.yes.top + 1, 'the buttons do not cover the recording: ' + JSON.stringify(first));
+      assert.ok(Math.abs(first.videoMiddle - first.width / 2) <= 2, 'the recording is centred');
+      assert.deepEqual([first.offerShown, first.paybarShown, first.cueShown], [false, false, false], 'no offer, price bar or pill yet');
+      const text = (await h.page.evaluate(() => document.getElementById('app').innerText)) + (await h.page.evaluate(() => document.getElementById('pick-bar').innerText));
+      assert.doesNotMatch(text, /\$\d/, 'no price on the first screen');
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
+test('either answer shows the offer on the same page: the recording is not redrawn, and the answer is counted', async () => {
+  for (const [which, event] of [['yes', 'OfferWantTapped'], ['maybe', 'OfferUnsureTapped']]) {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#offer-video');
+      await h.page.evaluate(() => { document.getElementById('offer-video').dataset.same = 'yes'; });
+      assert.equal(count(h, 'OfferLanded'), 1);
+      await choose(h, which);
+      assert.equal(await h.page.evaluate(() => document.getElementById('offer-video').dataset.same), 'yes', 'the same video element');
+      assert.equal(await h.page.$('#pick-bar'), null);
+      assert.equal(await h.page.evaluate(() => window.scrollY), 0);
+      assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once`));
+      assert.equal(await h.page.isVisible('#sim-buy'), true);
+      assert.deepEqual(['OfferWantTapped', 'OfferUnsureTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
+      assert.equal(h.events.find(e => e.name === event)?.detail, 'phone');
+      assert.equal(count(h, 'OfferLanded'), 1, 'not a second landing');
+      // Reloading keeps them on the offer.
+      await h.page.reload({ waitUntil: 'domcontentloaded' });
+      await h.page.waitForSelector('#sim-offer', { state: 'visible' });
+      assert.equal(await h.page.$('#pick-bar'), null);
+      h.assertClean();
+    } finally { await h.close(); }
+  }
+});
+
+test('desktop: the question sits beside the recording, and answering shows the offer there', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#pick-yes');
+    const layout = await h.page.evaluate(() => { const v = document.getElementById('offer-video').getBoundingClientRect(), y = document.getElementById('pick-yes').getBoundingClientRect(), bar = getComputedStyle(document.getElementById('pick-bar')).position; return { videoRight: v.right, yesLeft: y.left, bar, yesInView: y.bottom <= window.innerHeight }; });
+    assert.ok(layout.yesLeft >= layout.videoRight - 1 && layout.bar === 'static' && layout.yesInView, JSON.stringify(layout));
+    await choose(h);
+    assert.equal(await h.page.isVisible('#sim-buy'), true);
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -182,6 +253,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
+      await choose(h);
       await h.page.waitForTimeout(400);
       const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(), v = document.getElementById('offer-video').getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight, videoOnScreen: Math.max(0, Math.min(v.bottom, window.innerHeight) - Math.max(v.top, 0)) / v.height }; });
       // Either it points to the recording, or the recording is already showing.
@@ -220,6 +292,7 @@ test('scrolling the landing records depth and what came on screen, once each', a
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
+    await choose(h);
     const names = ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer'];
     await h.page.waitForTimeout(500);
     assert.deepEqual(names.slice(0, 4).map(name => count(h, name)), [0, 0, 0, 0], 'standing still records no depth');
@@ -255,6 +328,7 @@ test('desktop: the video sits beside the offer, with no pinned bar', async () =>
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 900 } });
   try {
     await h.page.waitForSelector('#offer-video');
+    await choose(h);
     const layout = await h.page.evaluate(() => ({ videoRight: document.querySelector('.offer-video').getBoundingClientRect().right,
       offerLeft: document.getElementById('sim-offer').getBoundingClientRect().left, bar: getComputedStyle(document.getElementById('sim-paybar')).display }));
     assert.ok(layout.videoRight < layout.offerLeft, JSON.stringify(layout));
@@ -307,6 +381,7 @@ test('tapping start free before twenty seconds is engaged at once', async () => 
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
+    await choose(h);
     await h.page.click('#sim-buy');
     for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
     assert.deepEqual([count(h, 'OfferEngaged'), count(h, 'SimCheckoutTapped'), h.purchases.length], [1, 1, 1]);

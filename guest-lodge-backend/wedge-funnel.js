@@ -10,6 +10,8 @@ const STEPS = Object.freeze([
   // and deciding is staying: twenty seconds, or tapping the button sooner.
   // It is Meta's ViewContent, and it always includes everyone who tapped.
   { key: 'engaged', label: 'Stayed 20 seconds or tapped the button', names: ['OfferEngaged'] },
+  // The first question on the pay-once landing: the recording, then "I want this" or "Not sure".
+  { key: 'picked', label: 'Answered: I want this or Not sure', names: ['OfferWantTapped', 'OfferUnsureTapped'] },
   // The button is "pay once" where the wedge sells that, "start free" otherwise.
   { key: 'tapped', label: 'Tapped the button', names: ['SimCheckoutTapped'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
@@ -27,6 +29,7 @@ const BRANCHES = Object.freeze([
   // How far down the landing page they went. Each is people who got that far at
   // any point; a page that fits the screen records no scroll at all.
   { key: 'scroll', label: 'How far down the page', steps: [['Saw the video on screen', ['OfferSawVideo']], ['Saw the offer card on screen', ['OfferSawOffer']], ['Scrolled to 25%', ['OfferScroll25']], ['Scrolled to 50%', ['OfferScroll50']], ['Scrolled to 75%', ['OfferScroll75']], ['Scrolled to the bottom', ['OfferScroll100']], ['Tapped "see a report built"', ['OfferCueTapped']]] },
+  { key: 'pick', label: 'The first question', steps: [['Tapped "I want this"', ['OfferWantTapped']], ['Tapped "Not sure"', ['OfferUnsureTapped']]] },
   { key: 'video', label: 'The video', steps: [['Watched a quarter', ['OfferVideoQuarter']], ['Watched half', ['OfferVideoHalf']], ['Watched to the end', ['OfferVideoEnded']]] },
   // The try-it simulation, now at ?sim=1: where the earlier weeks' visitors went.
   { key: 'demo', label: 'The try-it demo', steps: [['Started the demo', ['SimStarted']], ['Picked a finding', ['SimFindingPicked']], ['Watched the note get written', ['SimNoteWritten']], ['Took the photo', ['SimPhotoTaken']], ['Saw the report', ['SimReportShown']], ['Tapped "Get this"', ['SimGetThisTapped']], ['Saw the offer', ['SimOfferViewed']]] },
@@ -47,7 +50,7 @@ const VISITOR_EVENTS = Object.freeze([
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
   'OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
-  'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped',
+  'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);
