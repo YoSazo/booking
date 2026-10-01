@@ -53,7 +53,15 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
-    assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar is there from the first second');
+    // The offer comes first: its card and button are on the first screen, so the
+    // pinned bar stands down until the card scrolls away, then it slides in.
+    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').bottom, video: r('offer-video').top, height: window.innerHeight, down: document.getElementById('sim-paybar').classList.contains('is-stood-down') }; });
+    assert.ok(first.buy < first.height, 'the button is on the first screen: ' + JSON.stringify(first));
+    assert.ok(first.video > first.buy, 'the video is under the offer');
+    assert.equal(first.down, true, 'the pinned bar is not repeating the card');
+    await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' }));
+    await h.page.waitForTimeout(500);
+    assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar comes in once the card is behind them');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
     // price, and when it becomes the standing price.
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
@@ -150,6 +158,7 @@ test('the video counts a quarter, half and the end once each', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
+    await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' }));
     for (let i = 0; i < 60 && !count(h, 'OfferVideoEnded'); i++) await h.page.waitForTimeout(200);
     await h.page.waitForTimeout(1500);
     assert.deepEqual(['OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded'].map(name => count(h, name)), [1, 1, 1]);
