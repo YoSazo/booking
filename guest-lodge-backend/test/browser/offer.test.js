@@ -47,6 +47,9 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
     assert.match(require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8'), new RegExp(`\\$${LAUNCH} USD at its launch price until`));
+    // Signing in is the header's job; the landing carries no second link for it.
+    assert.equal(await h.page.$('#offer-sign-in'), null);
+    assert.doesNotMatch(text, /Already have/);
     // What they get is a list right under the button, inside the card.
     const under = await h.page.evaluate(() => { const card = document.getElementById('sim-offer'), button = document.getElementById('sim-buy'), list = card.querySelector('.offer-points'), video = document.getElementById('offer-video'); return { inside: !!list, below: !!list && list.getBoundingClientRect().top >= button.getBoundingClientRect().bottom, nextIsList: button.nextElementSibling === list, items: list ? [...list.querySelectorAll('li')].map(li => li.textContent) : [], beforeVideo: !!list && list.getBoundingClientRect().bottom <= video.getBoundingClientRect().top, outside: document.querySelectorAll('.offer-buy > .offer-points').length }; });
     assert.deepEqual({ inside: under.inside, below: under.below, nextIsList: under.nextIsList, beforeVideo: under.beforeVideo, outside: under.outside }, { inside: true, below: true, nextIsList: true, beforeVideo: true, outside: 0 });
@@ -180,19 +183,24 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
     try {
       await h.page.waitForSelector('#offer-video');
       await h.page.waitForTimeout(400);
-      const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight }; });
-      assert.equal(cue.shown, true, JSON.stringify(cue));
-      assert.equal(cue.opacity, '1');
+      const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(), v = document.getElementById('offer-video').getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight, videoOnScreen: Math.max(0, Math.min(v.bottom, window.innerHeight) - Math.max(v.top, 0)) / v.height }; });
+      // Either it points to the recording, or the recording is already showing.
+      assert.ok(cue.shown || cue.videoOnScreen >= 0.2, JSON.stringify(cue));
       assert.match(cue.text, new RegExp(`See a real report built in ${require('../../wedges/claims').landing.video.seconds} seconds`));
       assert.ok(cue.left >= 8 && cue.width - cue.right >= 8 && cue.bottom <= cue.height, 'the pill fits on screen: ' + JSON.stringify(cue));
       const middle = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { video: r.left + r.width / 2, page: window.innerWidth / 2 }; });
       assert.ok(Math.abs(middle.video - middle.page) <= 2, 'the recording is centred: ' + JSON.stringify(middle));
-      await h.page.click('#video-cue');
-      await h.page.waitForTimeout(900);
-      assert.equal(count(h, 'OfferCueTapped'), 1);
-      assert.equal(await h.page.evaluate(() => document.getElementById('video-cue').classList.contains('is-shown')), false, 'it goes once the recording is on screen');
-      const visible = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; });
-      assert.equal(visible, true, 'the tap brings the recording into view');
+      if (cue.shown) {
+        assert.equal(cue.opacity, '1');
+        await h.page.click('#video-cue');
+        await h.page.waitForTimeout(900);
+        assert.equal(count(h, 'OfferCueTapped'), 1);
+        assert.equal(await h.page.evaluate(() => document.getElementById('video-cue').classList.contains('is-shown')), false, 'it goes once the recording is on screen');
+        const visible = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; });
+        assert.equal(visible, true, 'the tap brings the recording into view');
+      } else {
+        assert.equal(cue.opacity, '0', 'no pill while the recording is already showing');
+      }
       h.assertClean();
     } finally { await h.close(); }
   });

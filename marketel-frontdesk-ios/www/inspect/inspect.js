@@ -1222,14 +1222,13 @@ function videoLanding({declined=false}={}){
   const heading=payOnce()?'Pay once. Keep it for good.':SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
   const title=payOnce()?`$${lifetimePrice()} once.<br><span class="green">Unlimited ${esc(wedge(arm.type).label.toLowerCase())}s.</span>`:(g.headline||arm.title);
   const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
-  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><div class="offer-buy">${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}<button type="button" id="offer-sign-in" class="quiet">Already have ${esc(sk.docPlural)}? Sign in</button></div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption></figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="offer-landing"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><div class="offer-buy">${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption></figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
   watchScroll();
   bindVideoCue();
   tickLaunch();
-  $('offer-sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   track('OfferLanded',phoneWidth()?'phone':'desktop');
 }
 // The launch clock, once a second. When it reaches zero the price really
