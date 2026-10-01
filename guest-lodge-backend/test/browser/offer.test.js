@@ -211,7 +211,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       assert.ok(first.video.bottom <= first.yes.top + 1, 'the buttons do not cover the recording');
       assert.ok(first.video.height >= first.height * 0.6, 'the recording is big: ' + first.video.height);
       assert.ok(Math.abs(first.video.middle - first.width / 2) <= 2, 'the recording is centred');
-      assert.ok(first.video.radius >= 30 && first.video.border === 0, 'rounded corners and no frame: ' + JSON.stringify(first.video));
+      assert.ok(first.video.radius >= 20 && first.video.radius <= 30 && first.video.border === 0, 'softly rounded corners and no frame: ' + JSON.stringify(first.video));
       assert.deepEqual([first.surface.background, first.surface.border, first.surface.shadow], ['rgba(0, 0, 0, 0)', 0, 'none'], 'the recording is the surface: no white card');
       assert.deepEqual([first.side.sameRow, first.side.yesLeftOfMaybe], [true, true], 'the two buttons sit side by side');
       assert.ok(first.fig.top >= 70, 'the page header stays clear above the recording');
@@ -305,7 +305,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       const v = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(), bar = document.getElementById('sim-paybar').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, width: r.width, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight, barTop: bar.top, radius: parseFloat(getComputedStyle(document.getElementById('offer-video')).borderTopLeftRadius) }; });
       assert.ok(v.top >= 64 && v.bottom <= v.barTop, 'all of it is on screen between the header and the price bar: ' + JSON.stringify(v));
       assert.ok(v.height >= v.vh * 0.7, 'big: ' + JSON.stringify(v));
-      assert.ok(v.radius > 0 && v.radius <= 24, 'gentle corners: ' + v.radius);
+      assert.ok(v.radius > 0 && v.radius <= 18, 'gentle corners: ' + v.radius);
       assert.ok(Math.abs(v.middle - v.page) <= 2, 'centred');
       h.assertClean();
     } finally { await h.close(); }
@@ -345,6 +345,62 @@ test('desktop: the question sits under the recording, and answering shows the of
     assert.ok(layout.yesTop >= layout.videoBottom - 1 && layout.yesBottom <= layout.height && layout.fig === 'sticky' && !layout.offerShown, JSON.stringify(layout));
     await choose(h);
     assert.equal(await h.page.isVisible('#sim-buy'), true);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+// The recording starts by itself. A tap-to-play button appears only when the
+// browser says it wants a tap; an interrupted start is retried quietly, and the
+// native player controls never replace it.
+const stubPlay = async (h, mode) => {
+  await h.context.addInitScript(mode => {
+    const real = HTMLMediaElement.prototype.play; let calls = 0;
+    window.__tapped = false; document.addEventListener('pointerdown', () => { window.__tapped = true; }, true);
+    HTMLMediaElement.prototype.play = function () {
+      calls++; window.__playCalls = calls;
+      if (mode === 'blocked' && !window.__tapped) return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' }));
+      if (mode === 'interrupted' && calls <= 2) return Promise.reject(Object.assign(new Error('interrupted'), { name: 'AbortError' }));
+      return real.call(this);
+    };
+  }, mode);
+  await h.page.reload({ waitUntil: 'domcontentloaded' });
+  await h.page.waitForSelector('#offer-video');
+  await h.page.waitForTimeout(900);
+};
+
+test('when the browser wants a tap, a play button sits over the recording, and tapping it plays', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await stubPlay(h, 'blocked');
+    const shown = await h.page.evaluate(() => { const b = document.querySelector('.video-play'), v = document.getElementById('offer-video'); if (!b) return null; const r = b.getBoundingClientRect(), vr = v.getBoundingClientRect(); return { dx: Math.abs(r.left + r.width / 2 - (vr.left + vr.width / 2)), dy: Math.abs(r.top + r.height / 2 - (vr.top + vr.height / 2)), controls: v.controls }; });
+    assert.ok(shown, 'a play button appears');
+    assert.ok(shown.dx <= 2 && shown.dy <= 2, 'centred on the recording: ' + JSON.stringify(shown));
+    assert.equal(shown.controls, false, 'not the native controls');
+    await h.page.click('.video-play');
+    await h.page.waitForTimeout(500);
+    assert.equal(await h.page.$('.video-play'), null, 'it goes once the recording plays');
+    assert.equal(await h.page.evaluate(() => !document.getElementById('offer-video').paused), true);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('a play that is merely interrupted is retried, with no button and no controls', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await stubPlay(h, 'interrupted');
+    const state = await h.page.evaluate(() => ({ button: !!document.querySelector('.video-play'), controls: document.getElementById('offer-video').controls, playing: !document.getElementById('offer-video').paused, calls: window.__playCalls }));
+    assert.deepEqual([state.button, state.controls, state.playing], [false, false, true], JSON.stringify(state));
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('with no trouble at all there is no play button', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#offer-video');
+    await h.page.waitForTimeout(900);
+    assert.equal(await h.page.$('.video-play'), null);
+    assert.equal(await h.page.evaluate(() => document.getElementById('offer-video').controls), false);
     h.assertClean();
   } finally { await h.close(); }
 });

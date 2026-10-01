@@ -1395,12 +1395,37 @@ function bindOfferVideo(){
     if(!length||!Number.isFinite(length))return;
     for(const [share,name] of marks)if(watched>=share*length)track(name);
   });
-  // Where the browser refuses to start it, the controls let them.
-  const play=()=>video.play()?.catch(()=>{video.controls=true;});
+  // It starts by itself. Only when the browser says it wants a tap does a play
+  // button appear over the recording; any other failed start (one interrupted by
+  // the page laying out, or made before it has loaded) is simply tried again,
+  // and the first touch anywhere on the page counts as the tap too.
+  let onScreen=false,button=null;
+  const place=()=>{if(button){button.style.left=`${video.offsetLeft+video.offsetWidth/2}px`;button.style.top=`${video.offsetTop+video.offsetHeight/2}px`;}};
+  const hideButton=()=>{button?.remove();button=null;};
+  const showButton=()=>{
+    if(button||!video.isConnected||!video.parentElement)return;
+    button=document.createElement('button');
+    button.type='button';button.className='video-play';button.setAttribute('aria-label','Play the recording');
+    button.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+    button.onclick=()=>{video.muted=true;video.play().then(hideButton).catch(()=>{});};
+    video.parentElement.appendChild(button);
+    place();
+  };
+  const play=()=>{
+    video.muted=true;
+    const attempt=video.play();
+    if(attempt&&attempt.catch)attempt.then(hideButton).catch(error=>{if(error&&error.name==='NotAllowedError')showButton();});
+  };
+  const retry=()=>{if(onScreen&&video.paused&&video.isConnected)play();};
   if(simReduced()){video.controls=true;return;}
+  video.addEventListener('playing',hideButton);
+  video.addEventListener('loadeddata',retry);
+  video.addEventListener('canplay',retry);
+  window.addEventListener('resize',place);
+  document.addEventListener('pointerdown',retry,{passive:true});
   if(typeof IntersectionObserver==='function')
-    new IntersectionObserver(([entry])=>{if(!video.isConnected)return;if(entry.isIntersecting)play();else video.pause();},{threshold:0.5}).observe(video);
-  else play();
+    new IntersectionObserver(([entry])=>{if(!video.isConnected)return;onScreen=entry.isIntersecting;if(onScreen)play();else video.pause();},{threshold:0.5}).observe(video);
+  else{onScreen=true;play();}
 }
 function landing() {
   enterScreen('landing');
