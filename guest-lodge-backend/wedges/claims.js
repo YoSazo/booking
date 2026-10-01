@@ -179,8 +179,8 @@ module.exports = {
       "reveal": "Here is what your guest or the platform receives."
     },
     "video": {
-      "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_720,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
-      "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_720,q_auto/v1790878619/1001_1_2_dbfaov.jpg",
+      "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
+      "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_1080,q_auto/v1790878619/1001_1_2_dbfaov.jpg",
       "seconds": 35,
       "sub": "A real damage report, made start to finish in 35 seconds.",
       "label": "A damage report being made in the Marketel Claims app"
