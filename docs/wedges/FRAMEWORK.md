@@ -138,21 +138,63 @@ for the deepest one with enough weekly volume, and move down as it grows.
 
 **Video landing.** A wedge with `landing.video` (a Cloudinary `.mp4`, a
 `.jpg` poster, whole `seconds`, a `sub` line and a `label`) gives ad visitors
-the offer first: the ad's headline, a real-time recording of the real app
-making a report, and the offer card with its pinned price bar under it. The ad
-already showed how it works, so every paid visitor meets the price and each
-week answers whether they start a trial. The simulation stays at `?sim=1`;
-Stripe returns and signed-in owners are untouched. Meta's ViewContent there is
-twenty seconds with the page on screen, or tapping start free, whichever comes
-first, so the visitor who gets it in ten seconds counts too. How much of the
-video they watch (seconds actually played on screen) is on `/funnel` only. The
-page's content policy allows media from Cloudinary only.
-Record it in real time and never speed it up: the page says how long it took.
+the offer first: the headline, the offer card with its reasons to buy inside it
+(the checkmark list sits directly under the button, with no paragraph of fine
+print; the terms page carries that), a pill pinned to the bottom that says "See
+a real report built in N seconds ↓" while the offer shows and the recording does
+not, then the real-time recording of the real app under the card, and a pinned
+price bar once the card has scrolled away. The ad already showed how it works,
+so every paid visitor meets the price and each week answers whether they buy.
+The recording is a 720×1556 phone screen served at `w_1080` (a bigger display
+of a 720px file goes soft), shown whole with rounded corners and no frame,
+sized to be on screen all at once between the header and the price bar. Keep
+it under about 40 seconds, record it in real time and never speed it up: the
+page says how long it took, so `seconds` must be what the file is. The
+simulation stays at `?sim=1`; Stripe returns and signed-in owners are
+untouched. Meta's ViewContent there is twenty seconds with the page on screen,
+or tapping the button, whichever comes first. How far down the page they went
+(25, 50, 75 and 100%), whether the recording and the offer card were ever on
+screen, and how much of the recording they watched are on `/funnel` only.
+The page's content policy allows media from Cloudinary only. The first video
+read of this wedge found that one visitor in forty watched even a quarter of a
+recording placed above the offer: do not make the recording the thing people
+must get past.
+
+**The first question (pay-once landing).** A pay-once wedge opens on one
+question, not the pitch. The recording floats over the page as a large card,
+with its own rounded corners and no white surface under it, the label "A damage
+report made in N seconds" above it and two buttons under it, **"I want this →"**
+and **"I don't want this"**. The page behind it is the real offer, blurred,
+untappable and scroll-locked, with the video the only thing in front; the price
+is never in front. Either answer fades the card out and shows the offer, with
+nothing underneath moving: the headline is the final one from the start, the
+offer is already in the page and never re-fades, and the recording keeps its
+element. "I don't want this" is counted at once, then asks one question, "What's
+the main reason?": the live price ("$49 is too expensive"), "I don't rent out
+property", "I don't need this", "I'm not sure it works" or Skip; any tap records
+its own event and shows the offer exactly as "I want this" does. The answer
+persists for the tab (`sessionStorage inspect.offerStage`) and a return from
+Stripe skips the question. Rules: never close the tab or the page on a "no"
+(`window.close` does nothing in Meta's in-app browsers, so the button would look
+broken, and it throws away the fence-sitters); never shame a decline (no "No
+thanks, I like paying more"); never ask before showing the recording; and treat
+"I want this" as "continued", not "convinced", because it is the big green button
+and many people will tap it to get past the card. The real intent signal is the tap
+on the pay button. The mechanism is commitment and consistency (the
+foot-in-the-door effect): after a small yes, a related larger request is more
+likely to get one. It is real but weaker than marketing sites claim (the
+meta-analysis finds a small effect, r about .17, and roughly half of studies
+find none; the "+113%" and "+785%" figures are vendor case studies, mostly for
+free email sign-ups), so it is a better first screen, not a plan to rely on.
+Events: `OfferWantTapped`, `OfferDeclineTapped`, and `OfferReasonPrice`,
+`OfferReasonNoProperty`, `OfferReasonNoNeed`, `OfferReasonDoubt`,
+`OfferReasonSkipped`; `/funnel` has an "Answered" step between staying and
+tapping and the cards "The first question" and "Why they did not want it".
 
 **Pay once.** A wedge with `offer.lifetime` (whole dollars, 19 to 999) sells
-that on its video landing instead of a trial: the price is the headline
-("$99 once. Unlimited damage reports."), one button, no plan switch and no
-"keep it free". Checkout is one Stripe payment with no subscription; the
+that on its video landing instead of a trial: once the first question below is
+answered, the price is the headline ("$49 once. Unlimited damage reports."),
+one button, no plan switch and no "keep it free". Checkout is one Stripe payment with no subscription; the
 webhook (and the thank-you page, whichever is first) sets the account's
 `lifetimeSince`, which keeps the plan active whatever any subscription does.
 Paying once again is refunded automatically, and paying once over a live
@@ -170,7 +212,9 @@ promise "free" in an ad for a page that charges.
 
 **Launch price.** `offer.launch` (`price` below `offer.lifetime`, and a fixed
 UTC `until`) shows the lower price with a live countdown to that moment, the
-same for everyone, and "Instead of ~~$199 every year~~" (the real annual plan).
+same for everyone, and the standing price crossed out ("~~$99~~ $49 once" in the
+bar, "Instead of ~~$99~~" on the card). A crossed-out yearly plan puts a
+subscription number back on a page whose whole point is that there is none.
 At `until` the page redraws at the full price and checkout charges it; the
 registry refuses a launch that is not lower or not a fixed time. Urgency here
 is always real: published tests show real deadlines lifting sales (median
@@ -199,6 +243,14 @@ support dashboard is at `/funnel/legacy`. Opening `/funnel` in a browser switche
 browser off ("Not counting this browser"): it sends no steps, every request is
 marked `x-marketel-no-track`, and the server records nothing and tells Meta
 nothing for it. `?notrack=1` on any page does the same for in-app browsers.
+
+**Markers.** Every material change to a page or an ad gets a `FunnelReset`
+marker row (an `InspectEvent` with that name and the wedge's tool, inserted with
+the database's own clock, never this machine's: it runs minutes ahead and a
+future marker hides real visitors). `/funnel` counts from the latest one and
+nothing is deleted, so earlier versions stay readable by timestamp. Give a
+version at least 50 landed visitors before changing it again; five layouts in a
+day on a hundred visitors meant no version had a fair read.
 
 ## 9. App Store
 
@@ -293,6 +345,34 @@ The minimums keep a good wedge from being killed by bad luck: one where 5 in
 100 really tap shows 0–1 taps in 100 visitors about 4% of the time, and one
 where 2 in 100 really start a trial shows none in 100 visitors 13% of the time
 but in 200 only about 2%.
+
+**Pay-once checkpoints.** The pay-once landing has no trial, so read these in
+order, each from `/funnel`, at about 100 landed. The numbers are the Claims
+guesses, not measurements.
+
+| Checkpoint | Healthy | If low |
+|---|---|---|
+| Answered either button, of landed | 25% or more | Under 20%: the first screen or the recording is not engaging. Fix that before anything else. |
+| Tapped the pay button, of answered | 10% or more | Answers fine but no taps: the offer, price or trust is the problem, not the first screen. |
+| Opened Stripe, of taps | Nearly all | Something is broken. |
+| The reasons | Watch the split | Mostly "I don't rent out property": the audience is wrong. Mostly price: test a lower price. Mostly "not sure it works": add proof. |
+
+At $49 and about $0.30 to $0.70 a landed visitor, break-even is roughly 1% to
+1.7% buying; at the old $0.22 it was 0.5%. Price the test so a first sale is
+possible, then raise it once a buy rate is real.
+
+**The audience Meta picks.** Meta's Advantage audience treats age as a
+suggestion, and the oldest age you can set is "65", which means 65 and over. In
+the first Claims campaigns about 75% of the spend ($106 of $142) went to people
+aged 65+, who have not bought; ages 25 to 54 got about $15. A verdict on that
+traffic is a verdict on 65+. Use original audience options with Advantage
+audience off, a maximum age of 64, and check the age split in Ads Manager after
+a few hundred impressions. Say the same price in the ad, the overlay and the
+page: an ad that says one price over a page that says another is a mismatch,
+and a priced ad with a price on the page cut cost per visitor more than any
+layout change did. Cheap clicks are not a result: judge on cost per sale, and
+read cost per landed visitor, not cost per click. The Meta billing counter lags
+reporting, and a day's budget can be spent in one late-night burst.
 
 **Fixing.** One change a week, at the step losing the most people. A wedge
 gets at most two fix weeks after its first read; still under the line, kill
