@@ -2908,6 +2908,20 @@ test('staying on the video landing reaches Meta as ViewContent; arriving and the
   } finally { h.registration.close(); }
 });
 
+test('the scroll and on-screen marks of the video landing are accepted from anonymous visitors, without reaching Meta', async () => {
+  const visitorId = `v_${'e'.repeat(12)}`;
+  const h = moneyHarness();
+  try {
+    for (const name of ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer']) {
+      const res = await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' }, body: JSON.stringify({ name, tool: 'claims', visitorId, detail: 'phone' }) });
+      assert.equal(res.status, 200, name);
+    }
+    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 6);
+    assert.equal(h.calls.events.find(e => e.name === 'OfferScroll50')?.detail, 'phone');
+    assert.deepEqual(h.calls.capi, []);
+  } finally { h.registration.close(); }
+});
+
 // ——— Pay once ————————————————————————————————————————————————————————
 const onceSession = (overrides = {}) => ({
   id: 'cs_once_1234', mode: 'payment', status: 'complete', payment_status: 'paid', amount_total: 9900, currency: 'usd',

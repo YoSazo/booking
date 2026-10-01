@@ -157,6 +157,31 @@ test('the video counts a quarter, half and the end once each', async () => {
   } finally { await h.close(); }
 });
 
+// Scroll depth and what was on screen are recorded once each, with only the
+// device attached, and nothing on the page changes for the visitor.
+test('scrolling the landing records depth and what came on screen, once each', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#offer-video');
+    const names = ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer'];
+    await h.page.waitForTimeout(500);
+    assert.deepEqual(names.slice(0, 4).map(name => count(h, name)), [0, 0, 0, 0], 'standing still records no depth');
+    const tall = await h.page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight * 1.2);
+    assert.equal(tall, true, 'the phone landing is taller than the screen');
+    for (const share of [0.3, 0.55, 0.8, 1]) {
+      await h.page.evaluate(share => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * share), share);
+      await h.page.waitForTimeout(150);
+    }
+    await h.page.evaluate(() => window.scrollTo(0, 0));
+    await h.page.waitForTimeout(150);
+    await h.page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await h.page.waitForTimeout(400);
+    assert.deepEqual(names.map(name => count(h, name)), [1, 1, 1, 1, 1, 1]);
+    assert.ok(names.every(name => h.events.find(event => event.name === name)?.detail === 'phone'), 'phone or desktop is the only detail');
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
 // Stripe's back button returns ?sim=1&checkout=cancelled; someone who came from
 // the video lands back on it, told nothing was charged, with a clean address.
 test('coming back from Stripe without paying returns to the video landing', async () => {

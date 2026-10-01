@@ -1226,6 +1226,7 @@ function videoLanding({declined=false}={}){
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
+  watchScroll();
   tickLaunch();
   $('offer-sign-in').onclick=()=>ensureAuth(()=>run(()=>openAccountHome()),'signin');
   track('OfferLanded',phoneWidth()?'phone':'desktop');
@@ -1261,6 +1262,38 @@ function watchEngagement(){
     clearInterval(engagedTimer);
     track('OfferEngaged');
   },1000);
+}
+// How far down the page they got, and whether the video and the offer card were
+// ever on screen. Nothing is drawn or changed for the visitor: each is one named
+// event per visit, with only phone or desktop attached. Depth is measured on a
+// real scroll, so a page that fits the screen reports none rather than "100%".
+const SCROLL_MARKS=[[0.25,'OfferScroll25'],[0.5,'OfferScroll50'],[0.75,'OfferScroll75'],[0.97,'OfferScroll100']];
+let scrollHandler=null,scrollSeen=[];
+function watchScroll(){
+  if(scrollHandler){window.removeEventListener('scroll',scrollHandler);scrollHandler=null;}
+  scrollSeen.forEach(observer=>observer.disconnect());scrollSeen=[];
+  const device=phoneWidth()?'phone':'desktop';
+  let pending=false;
+  scrollHandler=()=>{
+    if(pending)return;
+    pending=true;
+    requestAnimationFrame(()=>{
+      pending=false;
+      if(!offerOnVideo)return;
+      const page=document.documentElement,height=Math.max(page.scrollHeight,document.body.scrollHeight);
+      if(height<=window.innerHeight*1.05)return;
+      const depth=((window.scrollY||page.scrollTop||0)+window.innerHeight)/height;
+      for(const [share,name] of SCROLL_MARKS)if(depth>=share)track(name,device);
+    });
+  };
+  window.addEventListener('scroll',scrollHandler,{passive:true});
+  if(typeof IntersectionObserver!=='function')return;
+  for(const [selector,name] of [['.offer-video','OfferSawVideo'],['#sim-offer','OfferSawOffer']]){
+    const target=document.querySelector(selector);
+    if(!target)continue;
+    const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){track(name,device);observer.disconnect();}},{threshold:0.5});
+    observer.observe(target);scrollSeen.push(observer);
+  }
 }
 // Plays only while it is on screen, so "watched" means someone could see it,
 // and counts seconds actually played: the loop restarts the playhead.

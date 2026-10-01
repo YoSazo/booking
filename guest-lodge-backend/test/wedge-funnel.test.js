@@ -94,3 +94,13 @@ test('paying once is paid on the spot: it counts as the purchase step and as pai
   assert.equal(step('paid').ofLanded, 1);
   assert.equal(f.recent[0].label, 'Paid once');
 });
+
+test('how far down the page is its own card, and a reset clears it', () => {
+  const f = buildWedgeFunnel([
+    ev('OfferLanded', 'v_a', { detail: 'phone' }), ev('OfferLanded', 'v_b', { detail: 'phone' }),
+    ev('OfferSawVideo', 'v_a'), ev('OfferSawOffer', 'v_a'), ev('OfferScroll25', 'v_a'), ev('OfferScroll25', 'v_b'), ev('OfferScroll100', 'v_a'),
+  ]);
+  const card = f.branches.find(b => b.key === 'scroll');
+  assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['Saw the video on screen', 1], ['Saw the offer card on screen', 1], ['Scrolled to 25%', 2], ['Scrolled to 50%', 0], ['Scrolled to 75%', 0], ['Scrolled to the bottom', 1]]);
+  assert.ok(['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer'].every(name => VISITOR_EVENTS.includes(name)));
+});
