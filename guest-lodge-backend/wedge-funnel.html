@@ -55,6 +55,12 @@
   .ladder td.bar { width: 40%; padding-left: 12px; }
   .ladder tr:hover td { background: var(--subtle); }
   .ladder td.muted { color: var(--muted); }
+  .ladder tr.child td { font-size: 13px; padding-top: 3px; padding-bottom: 3px; }
+  .ladder tr.child td.step { color: var(--soft); padding-left: 16px; }
+  .ladder tr.child.depth2 td.step { padding-left: 34px; }
+  .ladder tr.child .fill { opacity: .55; }
+  .ladder tr.aside td.step { color: var(--soft); }
+  .ladder .side { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--subtle); color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
   .track { position: relative; height: 14px; background: var(--track); border-radius: 4px; }
   .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 4px; min-width: 2px; }
   .flag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--danger); color: var(--danger); font-size: 11px; font-weight: 700; }
@@ -109,7 +115,7 @@
 
   <section class="card">
     <h2>From the ad to paying</h2>
-    <p class="muted">People at each step. "Of the step before" is the share who went on from the previous row. Hover a row for details.</p>
+    <p class="muted">People at each step. "Of the step before" is the share who went on from the previous row on the main line; rows marked <em>of landed</em> run beside the line (someone can answer without staying twenty seconds), so they are measured against everyone who landed, and the indented rows are the answers to the question above them. Hover a row for details.</p>
     <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>Of the step before</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
   </section>
 
@@ -185,23 +191,31 @@ function render(data) {
     ? `Showing everything, including before the reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Count from the reset</button>`
     : `Counting from your reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Show everything</button>`) : '';
   if ($('since-toggle')) $('since-toggle').onclick = () => { state.everything = !state.everything; saveState(); load(); };
-  const step = key => data.steps.find(s => s.key === key) || { people: 0, ofLanded: null };
-  const tiles = [['Landed', 'landed'], ['Stayed 20s or tapped', 'engaged'], ['Tapped the button', 'tapped'], ['Opened Stripe', 'stripe'], ['Paid once or trial', 'trial'], ['Paid', 'paid']];
+  const rows = data.steps.flatMap(s => [s, ...(s.children || [])]);
+  const step = key => rows.find(s => s.key === key) || { people: 0, ofLanded: null };
+  const tiles = [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Stayed 20s or tapped', 'engaged'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Tapped the button', 'tapped'], ['Opened Stripe', 'stripe'], ['Paid once or trial', 'trial'], ['Paid', 'paid']];
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
     const s = step(key);
     return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : 'people from the ad'}</span></div>`;
   }).join('');
   // The biggest drop between two steps, once there are enough people to mean something.
   let worst = null;
-  data.steps.forEach((s, i) => { if (i && data.steps[i - 1].people >= 5 && s.ofPrevious !== null && (!worst || s.ofPrevious < worst.ofPrevious)) worst = s; });
+  const line = data.steps.filter(s => !s.aside);
+  line.forEach((s, i) => { if (i && line[i - 1].people >= 5 && s.ofPrevious !== null && (!worst || s.ofPrevious < worst.ofPrevious)) worst = s; });
   const top = data.steps[0].people || 0;
-  $('ladder').querySelector('tbody').innerHTML = data.steps.map((s, i) => `<tr data-i="${i}">
+  const bar = people => `<td class="bar"><div class="track"><div class="fill" style="width:${top ? Math.max(0.5, people / top * 100) : 0}%"></div></div></td>`;
+  $('ladder').querySelector('tbody').innerHTML = data.steps.map((s, i) => `<tr data-i="${i}"${s.aside ? ' class="aside"' : ''}>
       <td class="step">${esc(s.label)}${worst && worst.key === s.key ? '<span class="flag">Biggest drop</span>' : ''}</td>
-      <td class="bar"><div class="track"><div class="fill" style="width:${top ? Math.max(0.5, s.people / top * 100) : 0}%"></div></div></td>
+      ${bar(s.people)}
       <td><b>${s.people}</b></td>
-      <td class="${i ? '' : 'muted'}">${i ? pct(s.ofPrevious) : '—'}</td>
-      <td class="muted">${pct(s.ofLanded)}</td></tr>`).join('');
-  $('ladder').querySelectorAll('tbody tr').forEach(row => {
+      <td class="${i ? '' : 'muted'}">${i ? pct(s.ofPrevious) : '—'}${s.aside ? ' <span class="side">of landed</span>' : ''}</td>
+      <td class="muted">${pct(s.ofLanded)}</td></tr>${(s.children || []).map(c => `<tr class="child depth${c.depth}">
+      <td class="step">↳ ${esc(c.label)}</td>
+      ${bar(c.people)}
+      <td><b>${c.people}</b></td>
+      <td class="muted">${pct(c.ofParent)} of ${c.depth > 1 ? 'the no' : 'answers'}</td>
+      <td class="muted">${pct(c.ofLanded)}</td></tr>`).join('')}`).join('');
+  $('ladder').querySelectorAll('tbody tr[data-i]').forEach(row => {
     const s = data.steps[Number(row.dataset.i)], prev = data.steps[Number(row.dataset.i) - 1];
     row.onmousemove = e => tip(e, `<b>${esc(s.label)}</b><br>${s.people} ${s.people === 1 ? 'person' : 'people'}${prev ? `<br>${pct(s.ofPrevious)} of the ${prev.people} who ${esc(prev.label.toLowerCase())}` : ''}<br>${pct(s.ofLanded)} of everyone who landed`);
     row.onmouseleave = () => $('tip').classList.remove('on');

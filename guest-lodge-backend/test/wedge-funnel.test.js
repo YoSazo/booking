@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildWedgeFunnel, excludedAccountIds, STEPS, VISITOR_EVENTS } = require('../wedge-funnel');
+const { buildWedgeFunnel, excludedAccountIds, STEPS, VISITOR_EVENTS, LABELS } = require('../wedge-funnel');
 
 const at = minutes => new Date(Date.UTC(2026, 8, 24, 12, minutes)).toISOString();
 let seq = 0;
@@ -129,4 +129,32 @@ test('why they did not want it is its own card, and a reset clears it', () => {
   const card = f.branches.find(b => b.key === 'reasons');
   assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['The price is too expensive', 2], ['Does not rent out property', 0], ['Does not need it', 0], ['Not sure it works', 0], ['Skipped', 1]]);
   assert.ok(['OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped'].every(name => VISITOR_EVENTS.includes(name)));
+});
+
+test('the ladder lists every step in order, with the answers and reasons under the question', () => {
+  const f = buildWedgeFunnel([
+    ev('OfferLanded', 'v_a'), ev('OfferLanded', 'v_b'), ev('OfferLanded', 'v_c'), ev('OfferLanded', 'v_d'),
+    ev('OfferSawVideo', 'v_a'), ev('OfferSawVideo', 'v_b'), ev('OfferSawVideo', 'v_c'),
+    ev('OfferEngaged', 'v_a'), ev('OfferEngaged', 'v_b'),
+    ev('OfferWantTapped', 'v_a'), ev('OfferDeclineTapped', 'v_b'), ev('OfferDeclineTapped', 'v_c'),
+    ev('OfferReasonPrice', 'v_b'), ev('OfferReasonSkipped', 'v_c'),
+    ev('OfferSawOffer', 'v_a'), ev('SimCheckoutTapped', 'v_a'),
+  ]);
+  assert.deepEqual(f.steps.slice(0, 6).map(s => s.key), ['landed', 'sawvideo', 'engaged', 'picked', 'sawoffer', 'tapped']);
+  const row = key => f.steps.find(s => s.key === key);
+  assert.equal(row('sawvideo').people, 3);
+  assert.equal(row('sawvideo').aside, true);
+  assert.equal(row('engaged').ofPrevious, 0.5, 'engaged is still of landed');
+  assert.equal(row('picked').people, 3);
+  assert.equal(row('picked').aside, true);
+  assert.equal(row('picked').ofPrevious, 0.75, 'a row beside the line is of everyone who landed, so it can never read over 100%');
+  const kids = Object.fromEntries(row('picked').children.map(c => [c.key, c]));
+  assert.deepEqual(['want', 'decline', 'why-price', 'why-property', 'why-need', 'why-doubt', 'why-skip'].map(k => kids[k].people), [1, 2, 1, 0, 0, 0, 1]);
+  assert.deepEqual([kids.want.depth, kids['why-price'].depth], [1, 2]);
+  assert.equal(kids.decline.ofParent, 2 / 3, 'the no is a share of the answers');
+  assert.equal(kids['why-price'].ofParent, 0.5, 'a reason is a share of the no');
+  assert.equal(row('tapped').people, 1);
+  assert.equal(row('tapped').ofPrevious, 0.5, 'the main line skips the rows beside it: tapped is of those who stayed');
+  assert.equal(f.steps.every(s => s.children === undefined || s.key === 'picked'), true);
+  assert.equal(LABELS.OfferReasonPrice, 'The price is too expensive');
 });

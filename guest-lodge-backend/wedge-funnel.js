@@ -6,12 +6,27 @@
 
 const STEPS = Object.freeze([
   { key: 'landed', label: 'Landed from the ad', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
+  // `aside` rows are parallel to the main line, not in it: a visitor can answer
+  // in five seconds without ever staying twenty, and an older version of the
+  // page never recorded them. They are measured against everyone who landed.
+  { key: 'sawvideo', label: 'Saw the floating video', names: ['OfferSawVideo'], aside: true },
   // The video landing: everyone sees the price, so the step between arriving
   // and deciding is staying: twenty seconds, or tapping the button sooner.
   // It is Meta's ViewContent, and it always includes everyone who tapped.
   { key: 'engaged', label: 'Stayed 20 seconds or tapped the button', names: ['OfferEngaged'] },
-  // The first question on the pay-once landing: the recording, then "I want this" or "I don't want this"; either one shows the offer.
-  { key: 'picked', label: 'Answered: I want this or I don\'t want this', names: ['OfferWantTapped', 'OfferDeclineTapped', 'OfferUnsureTapped'] },
+  // The first question on the pay-once landing: the recording, then "I want
+  // this" or "I don't want this"; either shows the offer. A decline asks why.
+  { key: 'picked', label: 'Answered the first question', names: ['OfferWantTapped', 'OfferDeclineTapped', 'OfferUnsureTapped'], aside: true,
+    children: [
+      { key: 'want', label: 'Said "I want this"', names: ['OfferWantTapped'], depth: 1 },
+      { key: 'decline', label: 'Said "I don\'t want this"', names: ['OfferDeclineTapped'], depth: 1 },
+      { key: 'why-price', label: 'The price is too expensive', names: ['OfferReasonPrice'], depth: 2, of: 'decline' },
+      { key: 'why-property', label: 'Does not rent out property', names: ['OfferReasonNoProperty'], depth: 2, of: 'decline' },
+      { key: 'why-need', label: 'Does not need it', names: ['OfferReasonNoNeed'], depth: 2, of: 'decline' },
+      { key: 'why-doubt', label: 'Not sure it works', names: ['OfferReasonDoubt'], depth: 2, of: 'decline' },
+      { key: 'why-skip', label: 'Skipped the reason', names: ['OfferReasonSkipped'], depth: 2, of: 'decline' },
+    ] },
+  { key: 'sawoffer', label: 'Saw the offer card', names: ['OfferSawOffer'], aside: true },
   // The button is "pay once" where the wedge sells that, "start free" otherwise.
   { key: 'tapped', label: 'Tapped the button', names: ['SimCheckoutTapped'] },
   { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
@@ -59,6 +74,7 @@ const VISITOR_EVENTS = Object.freeze([
 
 const LABELS = Object.freeze(Object.fromEntries([
   ...STEPS.flatMap(step => step.names.map(name => [name, step.label])),
+  ...STEPS.flatMap(step => (step.children || []).flatMap(child => child.names.map(name => [name, child.label]))),
   ...BRANCHES.flatMap(branch => branch.steps.flatMap(([label, names]) => names.map(name => [name.split(':')[0], label]))),
   ['SimStarted', 'Started the demo'], ['LandingViewed', 'Landed on the page'], ['SimPurchased', 'Bought without a trial'],
   ['PaymentSucceeded', 'Payment'], ['TrialConverted', 'Trial ended by a report'], ['ReportExported', 'Downloaded a PDF'],
@@ -85,7 +101,20 @@ function buildWedgeFunnel(events) {
     const row = { key: step.key, label: step.label, people: count,
       ofPrevious: previous === null ? null : previous ? count / previous : null,
       ofLanded: landed ? count / landed : null };
-    previous = count;
+    if (step.aside) { row.aside = true; row.ofPrevious = row.ofLanded; }
+    else previous = count;
+    // The answers to a question under it: each is a share of the step it hangs
+    // from (the question, or the "no" that asked why), never part of the chain.
+    if (step.children) {
+      const counts = {};
+      row.children = step.children.map(child => {
+        const n = people(events, child.names);
+        counts[child.key] = n;
+        const parent = child.of ? counts[child.of] : count;
+        return { key: child.key, label: child.label, depth: child.depth || 1, people: n,
+          ofParent: parent ? n / parent : null, ofLanded: landed ? n / landed : null };
+      });
+    }
     return row;
   });
   const branches = BRANCHES.map(branch => ({ key: branch.key, label: branch.label,

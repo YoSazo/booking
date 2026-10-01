@@ -188,8 +188,14 @@ find none; the "+113%" and "+785%" figures are vendor case studies, mostly for
 free email sign-ups), so it is a better first screen, not a plan to rely on.
 Events: `OfferWantTapped`, `OfferDeclineTapped`, and `OfferReasonPrice`,
 `OfferReasonNoProperty`, `OfferReasonNoNeed`, `OfferReasonDoubt`,
-`OfferReasonSkipped`; `/funnel` has an "Answered" step between staying and
-tapping and the cards "The first question" and "Why they did not want it".
+`OfferReasonSkipped`; `/funnel` lists every step in order: landed from the ad, saw the floating
+video, stayed 20 seconds, answered the first question (with "I want this", "I
+don't want this" and each reason indented under it), saw the offer card,
+tapped the button, opened Stripe, paid. Rows that run beside the line (saw the
+video, answered, saw the offer card) are measured against everyone who landed,
+never against the row above, because someone can answer in five seconds without
+staying twenty. There is a tile for each, plus the cards "How far down the
+page", "The first question" and "Why they did not want it".
 
 **Pay once.** A wedge with `offer.lifetime` (whole dollars, 19 to 999) sells
 that on its video landing instead of a trial: once the first question below is
