@@ -1233,7 +1233,8 @@ function videoLanding({declined=false}={}){
   const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
   if(declined)offerStage='offer';
   const gated=payOnce()&&!offerPicked();
-  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${gated?(g.headline||arm.title):title}</h1><p class="muted">${esc(gated?v.sub:sub)}</p></div><div class="offer-buy">${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2><video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption></figure>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-maybe" class="quiet">Not sure</button></div>`:''}</section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  document.documentElement.classList.toggle('pick-open',gated);
+  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${gated?(g.headline||arm.title):title}</h1><p class="muted">${esc(gated?v.sub:sub)}</p></div><div class="offer-buy"${gated?' inert':''}>${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-maybe" class="quiet">Not sure</button></div>`:''}</figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
@@ -1248,15 +1249,23 @@ function videoLanding({declined=false}={}){
       try{sessionStorage.setItem(OFFER_STAGE_KEY,'offer');}catch{}
       const section=document.querySelector('.offer-landing');
       if(!section)return;
-      // The same page, not a new one: the recording keeps its place and the
-      // offer is already in the page, so nothing redraws or restarts.
-      section.querySelector('h1').innerHTML=title;
-      section.querySelector('.offer-intro p').textContent=sub;
-      section.classList.remove('is-pick');
-      section.classList.add('just-picked');
-      setTimeout(()=>section.classList.remove('just-picked'),500);
       $('pick-bar')?.remove();
-      window.scrollTo(0,0);
+      // The same page, not a new one: the card lets go of the recording, which
+      // keeps its element, and the offer behind it is already in the page.
+      const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      section.classList.add('pick-leaving');
+      setTimeout(()=>{
+        section.querySelector('h1').innerHTML=title;
+        section.querySelector('.offer-intro p').textContent=sub;
+        $('pick-label')?.remove();
+        section.querySelectorAll('[inert]').forEach(el=>el.removeAttribute('inert'));
+        section.classList.remove('is-pick','pick-leaving');
+        section.classList.add('just-picked');
+        document.documentElement.classList.remove('pick-open');
+        setTimeout(()=>section.classList.remove('just-picked'),500);
+        window.scrollTo(0,0);
+        watchScroll();
+      },calm?0:230);
     };
     $('pick-yes').onclick=()=>choose('want');
     $('pick-maybe').onclick=()=>choose('unsure');
@@ -1343,7 +1352,7 @@ function watchScroll(){
   if(typeof IntersectionObserver!=='function')return;
   for(const [selector,name] of [['.offer-video','OfferSawVideo'],['#sim-offer','OfferSawOffer']]){
     const target=document.querySelector(selector);
-    if(!target)continue;
+    if(!target||(selector==='#sim-offer'&&target.closest('.is-pick')))continue;
     const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){track(name,device);observer.disconnect();}},{threshold:0.5});
     observer.observe(target);scrollSeen.push(observer);
   }

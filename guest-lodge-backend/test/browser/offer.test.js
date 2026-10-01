@@ -19,6 +19,7 @@ const choose = async (h, which = 'yes') => {
   await h.page.waitForSelector('#sim-offer', { state: 'visible' });
   await h.page.waitForTimeout(450);
 };
+const SECONDS = require('../../wedges/claims').landing.video.seconds;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
@@ -49,7 +50,7 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${LAUNCH} once\\.\\s*Unlimited damage reports\\.$`));
     const text = await h.body();
     assert.match(text, /No subscription\. Nothing renews\./);
-    assert.match(text, /38 seconds/);
+    assert.match(text, new RegExp(`${SECONDS} seconds`));
     assert.match(text, /Pay once\. Keep it for good\./);
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
@@ -113,6 +114,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     await h.page.waitForSelector('#pick-yes');
     await h.page.click('#pick-yes');
     await h.page.waitForSelector('[data-launch-left]', { state: 'visible' });
+    await h.page.waitForFunction(() => /once/.test(document.querySelector('h1').textContent));
     assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once\\.`));
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
     assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${STANDING} once\\.\\s*Unlimited damage reports\\.$`));
@@ -188,21 +190,27 @@ test('the video counts a quarter, half and the end once each', async () => {
 // Step one: the recording and one question, with no price on screen. The answer,
 // either one, shows the offer on the same page without redrawing the recording.
 for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
-  test(`phone ${size.width}x${size.height}: the first screen is the recording and two buttons, no price`, async () => {
+  test(`phone ${size.width}x${size.height}: the recording floats over the page with two buttons under it, and no price in front`, async () => {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await h.page.waitForTimeout(500);
-      const first = await h.page.evaluate(() => { const box = id => document.getElementById(id).getBoundingClientRect(), v = box('offer-video'), yes = box('pick-yes'), maybe = box('pick-maybe'), visible = id => { const el = document.getElementById(id), r = el.getBoundingClientRect(); return r.width > 0 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; };
-        return { height: window.innerHeight, videoTop: v.top, videoBottom: v.bottom, videoMiddle: v.left + v.width / 2, width: window.innerWidth, yes: { top: yes.top, bottom: yes.bottom, text: document.getElementById('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, text: document.getElementById('pick-maybe').textContent.trim() }, offerShown: visible('sim-offer'), paybarShown: visible('sim-paybar'), cueShown: visible('video-cue'), playing: !document.getElementById('offer-video').paused }; });
+      const first = await h.page.evaluate(() => { const box = el => el.getBoundingClientRect(), $ = id => document.getElementById(id), fig = box(document.querySelector('.offer-video')), v = box($('offer-video')), yes = box($('pick-yes')), maybe = box($('pick-maybe')), buy = box($('sim-buy')), front = document.elementFromPoint(buy.left + buy.width / 2, buy.top + buy.height / 2);
+        return { height: window.innerHeight, width: window.innerWidth, fig: { position: getComputedStyle(document.querySelector('.offer-video')).position, top: fig.top, bottom: fig.bottom }, video: { top: v.top, bottom: v.bottom, height: v.height, middle: v.left + v.width / 2, radius: parseFloat(getComputedStyle($('offer-video')).borderTopLeftRadius), fit: getComputedStyle($('offer-video')).objectFit }, yes: { bottom: yes.bottom, top: yes.top, text: $('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, text: $('pick-maybe').textContent.trim() }, label: $('pick-label').textContent.trim(), priceBehindScrim: !front || !front.closest('#sim-offer'), behindIsInert: document.querySelector('.offer-buy').hasAttribute('inert'), scrollLocked: getComputedStyle(document.documentElement).overflow, paybar: getComputedStyle($('sim-paybar')).display, cue: getComputedStyle($('video-cue')).display }; });
+      assert.equal(first.fig.position, 'fixed', 'the recording floats');
       assert.match(first.yes.text, /^I want this/);
       assert.equal(first.maybe.text, 'Not sure');
+      assert.equal(first.label, `A damage report made in ${SECONDS} seconds`);
       assert.ok(first.yes.bottom <= first.height && first.maybe.bottom <= first.height, 'both buttons are on screen: ' + JSON.stringify(first));
-      assert.ok(first.videoBottom <= first.yes.top + 1, 'the buttons do not cover the recording: ' + JSON.stringify(first));
-      assert.ok(Math.abs(first.videoMiddle - first.width / 2) <= 2, 'the recording is centred');
-      assert.deepEqual([first.offerShown, first.paybarShown, first.cueShown], [false, false, false], 'no offer, price bar or pill yet');
-      const text = (await h.page.evaluate(() => document.getElementById('app').innerText)) + (await h.page.evaluate(() => document.getElementById('pick-bar').innerText));
-      assert.doesNotMatch(text, /\$\d/, 'no price on the first screen');
+      assert.ok(first.video.bottom <= first.yes.top + 1, 'the buttons do not cover the recording');
+      assert.ok(first.video.height >= first.height * 0.45, 'the recording is big: ' + first.video.height);
+      assert.ok(Math.abs(first.video.middle - first.width / 2) <= 2, 'the recording is centred');
+      assert.ok(first.video.radius >= 30 && first.video.fit === 'contain', 'a phone-shaped frame around the whole recording: ' + JSON.stringify(first.video));
+      assert.ok(first.fig.top > 100, 'the top of the page shows above the card');
+      assert.equal(first.priceBehindScrim, true, 'the price is behind the card, not in front of it');
+      assert.equal(first.behindIsInert, true, 'the page behind cannot be tapped');
+      assert.equal(first.scrollLocked, 'hidden', 'the page does not scroll behind the card');
+      assert.deepEqual([first.paybar, first.cue], ['none', 'none']);
       h.assertClean();
     } finally { await h.close(); }
   });
@@ -233,12 +241,12 @@ test('either answer shows the offer on the same page: the recording is not redra
   }
 });
 
-test('desktop: the question sits beside the recording, and answering shows the offer there', async () => {
+test('desktop: the question sits under the recording, and answering shows the offer beside it', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#pick-yes');
-    const layout = await h.page.evaluate(() => { const v = document.getElementById('offer-video').getBoundingClientRect(), y = document.getElementById('pick-yes').getBoundingClientRect(), bar = getComputedStyle(document.getElementById('pick-bar')).position; return { videoRight: v.right, yesLeft: y.left, bar, yesInView: y.bottom <= window.innerHeight }; });
-    assert.ok(layout.yesLeft >= layout.videoRight - 1 && layout.bar === 'static' && layout.yesInView, JSON.stringify(layout));
+    const layout = await h.page.evaluate(() => { const v = document.getElementById('offer-video').getBoundingClientRect(), y = document.getElementById('pick-yes').getBoundingClientRect(), fig = getComputedStyle(document.querySelector('.offer-video')).position; return { videoBottom: v.bottom, yesTop: y.top, yesBottom: y.bottom, fig, offerShown: getComputedStyle(document.querySelector('.offer-buy')).display !== 'none', height: window.innerHeight }; });
+    assert.ok(layout.yesTop >= layout.videoBottom - 1 && layout.yesBottom <= layout.height && layout.fig === 'sticky' && !layout.offerShown, JSON.stringify(layout));
     await choose(h);
     assert.equal(await h.page.isVisible('#sim-buy'), true);
     h.assertClean();
@@ -258,7 +266,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(), v = document.getElementById('offer-video').getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight, videoOnScreen: Math.max(0, Math.min(v.bottom, window.innerHeight) - Math.max(v.top, 0)) / v.height }; });
       // Either it points to the recording, or the recording is already showing.
       assert.ok(cue.shown || cue.videoOnScreen >= 0.2, JSON.stringify(cue));
-      assert.match(cue.text, new RegExp(`See a real report built in ${require('../../wedges/claims').landing.video.seconds} seconds`));
+      assert.match(cue.text, new RegExp(`See a real report built in ${SECONDS} seconds`));
       assert.ok(cue.left >= 8 && cue.width - cue.right >= 8 && cue.bottom <= cue.height, 'the pill fits on screen: ' + JSON.stringify(cue));
       const middle = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { video: r.left + r.width / 2, page: window.innerWidth / 2 }; });
       assert.ok(Math.abs(middle.video - middle.page) <= 2, 'the recording is centred: ' + JSON.stringify(middle));
