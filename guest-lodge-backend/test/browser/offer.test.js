@@ -15,7 +15,7 @@ const DURING_LAUNCH = at(-42 * HOUR);
 const launchEndText = `${new Date(LAUNCH_END).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
 // The pay-once landing opens on the recording and one question; the offer is the answer.
 const choose = async (h, which = 'yes') => {
-  await h.page.click(which === 'yes' ? '#pick-yes' : '#pick-maybe');
+  await h.page.click(which === 'yes' ? '#pick-yes' : '#pick-no');
   await h.page.waitForSelector('#sim-offer', { state: 'visible' });
   await h.page.waitForTimeout(450);
 };
@@ -189,17 +189,18 @@ test('the video counts a quarter, half and the end once each', async () => {
 
 // Step one: the recording and one question, with no price on screen. The answer,
 // either one, shows the offer on the same page without redrawing the recording.
-for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
+for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }, { width: 360, height: 640 }]) {
   test(`phone ${size.width}x${size.height}: the recording floats over the page with two buttons under it, and no price in front`, async () => {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await h.page.waitForTimeout(500);
-      const first = await h.page.evaluate(() => { const box = el => el.getBoundingClientRect(), $ = id => document.getElementById(id), fig = box(document.querySelector('.offer-video')), v = box($('offer-video')), yes = box($('pick-yes')), maybe = box($('pick-maybe')), buy = box($('sim-buy')), front = document.elementFromPoint(buy.left + buy.width / 2, buy.top + buy.height / 2);
-        return { height: window.innerHeight, width: window.innerWidth, fig: { position: getComputedStyle(document.querySelector('.offer-video')).position, top: fig.top, bottom: fig.bottom }, video: { top: v.top, bottom: v.bottom, height: v.height, middle: v.left + v.width / 2, radius: parseFloat(getComputedStyle($('offer-video')).borderTopLeftRadius), border: parseFloat(getComputedStyle($('offer-video')).borderTopWidth), fit: getComputedStyle($('offer-video')).objectFit }, surface: { background: getComputedStyle(document.querySelector('.offer-video')).backgroundColor, border: parseFloat(getComputedStyle(document.querySelector('.offer-video')).borderTopWidth), shadow: getComputedStyle(document.querySelector('.offer-video')).boxShadow }, side: { sameRow: Math.abs(yes.top - maybe.top) <= 1, yesLeftOfMaybe: yes.right <= maybe.left + 1 }, yes: { bottom: yes.bottom, top: yes.top, text: $('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, text: $('pick-maybe').textContent.trim() }, label: $('pick-label').textContent.trim(), priceBehindScrim: !front || !front.closest('#sim-offer'), behindIsInert: document.querySelector('.offer-buy').hasAttribute('inert'), scrollLocked: getComputedStyle(document.documentElement).overflow, paybar: getComputedStyle($('sim-paybar')).display, cue: getComputedStyle($('video-cue')).display }; });
+      const first = await h.page.evaluate(() => { const box = el => el.getBoundingClientRect(), $ = id => document.getElementById(id), fig = box(document.querySelector('.offer-video')), v = box($('offer-video')), yes = box($('pick-yes')), maybe = box($('pick-no')), buy = box($('sim-buy')), front = document.elementFromPoint(buy.left + buy.width / 2, buy.top + buy.height / 2);
+        return { height: window.innerHeight, width: window.innerWidth, fig: { position: getComputedStyle(document.querySelector('.offer-video')).position, top: fig.top, bottom: fig.bottom }, video: { top: v.top, bottom: v.bottom, height: v.height, middle: v.left + v.width / 2, radius: parseFloat(getComputedStyle($('offer-video')).borderTopLeftRadius), border: parseFloat(getComputedStyle($('offer-video')).borderTopWidth), fit: getComputedStyle($('offer-video')).objectFit }, surface: { background: getComputedStyle(document.querySelector('.offer-video')).backgroundColor, border: parseFloat(getComputedStyle(document.querySelector('.offer-video')).borderTopWidth), shadow: getComputedStyle(document.querySelector('.offer-video')).boxShadow }, side: { sameRow: Math.abs(yes.top - maybe.top) <= 1, yesLeftOfMaybe: yes.right <= maybe.left + 1 }, yes: { bottom: yes.bottom, top: yes.top, text: $('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, height: maybe.height, text: $('pick-no').textContent.trim() }, label: $('pick-label').textContent.trim(), priceBehindScrim: !front || !front.closest('#sim-offer'), behindIsInert: document.querySelector('.offer-buy').hasAttribute('inert'), scrollLocked: getComputedStyle(document.documentElement).overflow, paybar: getComputedStyle($('sim-paybar')).display, cue: getComputedStyle($('video-cue')).display }; });
       assert.equal(first.fig.position, 'fixed', 'the recording floats');
       assert.match(first.yes.text, /^I want this/);
-      assert.equal(first.maybe.text, 'Not sure');
+      assert.equal(first.maybe.text, "I don't want this");
+      assert.ok(first.yes.bottom - first.yes.top <= 56 && first.maybe.height <= 56, 'each button is one line: ' + JSON.stringify([first.yes, first.maybe]));
       assert.equal(first.label, `A damage report made in ${SECONDS} seconds`);
       assert.ok(first.yes.bottom <= first.height && first.maybe.bottom <= first.height, 'both buttons are on screen: ' + JSON.stringify(first));
       assert.ok(first.video.bottom <= first.yes.top + 1, 'the buttons do not cover the recording');
@@ -219,7 +220,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
 }
 
 test('either answer shows the offer on the same page: the recording is not redrawn, and the answer is counted', async () => {
-  for (const [which, event] of [['yes', 'OfferWantTapped'], ['maybe', 'OfferUnsureTapped']]) {
+  for (const [which, event] of [['yes', 'OfferWantTapped'], ['no', 'OfferDeclineTapped']]) {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
@@ -231,7 +232,7 @@ test('either answer shows the offer on the same page: the recording is not redra
       assert.equal(await h.page.evaluate(() => window.scrollY), 0);
       assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once`));
       assert.equal(await h.page.isVisible('#sim-buy'), true);
-      assert.deepEqual(['OfferWantTapped', 'OfferUnsureTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
+      assert.deepEqual(['OfferWantTapped', 'OfferDeclineTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
       assert.equal(h.events.find(e => e.name === event)?.detail, 'phone');
       assert.equal(count(h, 'OfferLanded'), 1, 'not a second landing');
       // Reloading keeps them on the offer.

@@ -861,8 +861,8 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .pick-label { margin: 0; flex: 0 0 auto; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; text-align: center; }
 .pick-bar { display: flex; gap: 10px; width: 100%; flex: 0 0 auto; }
 .pick-bar button { min-height: 52px; margin: 0; font-size: 17px; }
-.pick-bar #pick-yes { flex: 1.7 1 0; }
-.pick-bar #pick-maybe { flex: 1 1 0; background: #ffffffe6; border: 1px solid var(--border); font-size: 16px; }
+.pick-bar #pick-yes { flex: 1.1 1 0; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+.pick-bar #pick-no { flex: 1 1 0; white-space: nowrap; padding-left: 8px; padding-right: 8px; background: #ffffffe6; border: 1px solid var(--border); font-size: clamp(14px, 4vw, 16px); }
 html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: none; }
 /* Step one on a phone: the recording floats over the page, which shows blurred
    behind it, and is as big as the screen allows. */
