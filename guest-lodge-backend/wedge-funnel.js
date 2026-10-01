@@ -29,6 +29,7 @@ const BRANCHES = Object.freeze([
   // How far down the landing page they went. Each is people who got that far at
   // any point; a page that fits the screen records no scroll at all.
   { key: 'scroll', label: 'How far down the page', steps: [['Saw the video on screen', ['OfferSawVideo']], ['Saw the offer card on screen', ['OfferSawOffer']], ['Scrolled to 25%', ['OfferScroll25']], ['Scrolled to 50%', ['OfferScroll50']], ['Scrolled to 75%', ['OfferScroll75']], ['Scrolled to the bottom', ['OfferScroll100']], ['Tapped "see a report built"', ['OfferCueTapped']]] },
+  { key: 'reasons', label: 'Why they did not want it', steps: [['The price is too expensive', ['OfferReasonPrice']], ['Does not rent out property', ['OfferReasonNoProperty']], ['Does not need it', ['OfferReasonNoNeed']], ['Not sure it works', ['OfferReasonDoubt']], ['Skipped', ['OfferReasonSkipped']]] },
   { key: 'pick', label: 'The first question', steps: [['Tapped "I want this"', ['OfferWantTapped']], ['Tapped "I don\'t want this"', ['OfferDeclineTapped']]] },
   { key: 'video', label: 'The video', steps: [['Watched a quarter', ['OfferVideoQuarter']], ['Watched half', ['OfferVideoHalf']], ['Watched to the end', ['OfferVideoEnded']]] },
   // The try-it simulation, now at ?sim=1: where the earlier weeks' visitors went.
@@ -51,6 +52,7 @@ const VISITOR_EVENTS = Object.freeze([
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
   'OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
+  'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);

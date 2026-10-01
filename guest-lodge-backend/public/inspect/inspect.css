@@ -863,6 +863,13 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .pick-bar button { min-height: 52px; margin: 0; font-size: 17px; }
 .pick-bar #pick-yes { flex: 1.1 1 0; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .pick-bar #pick-no { flex: 1 1 0; white-space: nowrap; padding-left: 8px; padding-right: 8px; background: #ffffffe6; border: 1px solid var(--border); font-size: clamp(14px, 4vw, 16px); }
+.pick-reasons { display: grid; gap: 10px; width: 100%; }
+.pick-reasons button { min-height: 52px; margin: 0; font-size: 16px; background: #ffffffe6; border: 1px solid var(--border); }
+.pick-reasons .quiet { min-height: 42px; background: #ffffff8c; border-color: transparent; }
+.offer-landing.is-pick.is-asking::before { background: #e8f0eaf5; transition: background .2s ease; }
+.offer-landing.is-pick .offer-video.is-asking { justify-content: center; }
+.offer-landing.is-pick .offer-video.is-asking video { display: none; }
+.offer-landing.is-pick .offer-video.is-asking .pick-label { font-size: 21px; margin-bottom: 4px; }
 html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: none; }
 /* Step one on a phone: the recording floats over the page, which shows blurred
    behind it, and is as big as the screen allows. */

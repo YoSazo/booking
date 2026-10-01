@@ -14,8 +14,13 @@ const HOUR = 3600000;
 const DURING_LAUNCH = at(-42 * HOUR);
 const launchEndText = `${new Date(LAUNCH_END).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
 // The pay-once landing opens on the recording and one question; the offer is the answer.
-const choose = async (h, which = 'yes') => {
-  await h.page.click(which === 'yes' ? '#pick-yes' : '#pick-no');
+const choose = async (h, which = 'yes', reason = 'price') => {
+  if (which === 'yes') await h.page.click('#pick-yes');
+  else {
+    await h.page.click('#pick-no');
+    await h.page.waitForSelector(`[data-reason="${reason}"]`, { state: 'visible' });
+    await h.page.click(`[data-reason="${reason}"]`);
+  }
   await h.page.waitForSelector('#sim-offer', { state: 'visible' });
   await h.page.waitForTimeout(450);
 };
@@ -219,6 +224,48 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
   });
 }
 
+// "I don't want this" is counted at once, then asks why. Any reason, or Skip, shows
+// the offer exactly as "I want this" does.
+for (const size of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
+  test(`phone ${size.width}x${size.height}: I don't want this asks why before the offer, and the price is one of the choices`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#pick-no');
+      await h.page.waitForTimeout(400);
+      await h.page.click('#pick-no');
+      await h.page.waitForSelector('[data-reason="price"]', { state: 'visible' });
+      await h.page.waitForTimeout(400);
+      assert.equal(count(h, 'OfferDeclineTapped'), 1, 'the decline is counted before they answer why');
+      const ask = await h.page.evaluate(() => { const vh = window.innerHeight, buttons = [...document.querySelectorAll('[data-reason]')]; return { label: document.getElementById('pick-label').textContent, texts: buttons.map(b => b.textContent.trim()), onScreen: buttons.every(b => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= vh; }), videoShown: getComputedStyle(document.getElementById('offer-video')).display !== 'none', yes: !!document.getElementById('pick-yes'), offerInert: document.querySelector('.offer-buy').hasAttribute('inert'), stage: sessionStorage.getItem('inspect.offerStage') }; });
+      assert.equal(ask.label, "What's the main reason?");
+      assert.deepEqual(ask.texts, [`$${LAUNCH} is too expensive`, "I don't rent out property", "I don't need this", "I'm not sure it works", 'Skip']);
+      assert.equal(ask.onScreen, true, 'every choice fits on screen');
+      assert.deepEqual([ask.videoShown, ask.yes, ask.offerInert, ask.stage], [false, false, true, null], 'still asking: the offer is not shown yet');
+      await h.page.click('[data-reason="skip"]');
+      await h.page.waitForTimeout(600);
+      assert.equal(count(h, 'OfferReasonSkipped'), 1);
+      assert.equal(await h.page.isVisible('#sim-buy'), true);
+      assert.equal(await h.page.$('.pick-reasons'), null);
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
+test('each reason is its own event, then the offer', async () => {
+  for (const [key, event] of [['price', 'OfferReasonPrice'], ['noproperty', 'OfferReasonNoProperty'], ['noneed', 'OfferReasonNoNeed'], ['doubt', 'OfferReasonDoubt']]) {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#pick-no');
+      await choose(h, 'no', key);
+      const names = ['OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped'];
+      assert.deepEqual(names.map(name => count(h, name)), names.map(name => (name === event ? 1 : 0)));
+      assert.equal(count(h, 'OfferDeclineTapped'), 1);
+      assert.equal(await h.page.isVisible('#sim-buy'), true);
+      assert.equal(h.events.find(e => e.name === event)?.detail, 'phone');
+    } finally { await h.close(); }
+  }
+});
+
 test('either answer shows the offer on the same page: the recording is not redrawn, and the answer is counted', async () => {
   for (const [which, event] of [['yes', 'OfferWantTapped'], ['no', 'OfferDeclineTapped']]) {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
@@ -233,6 +280,7 @@ test('either answer shows the offer on the same page: the recording is not redra
       assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once`));
       assert.equal(await h.page.isVisible('#sim-buy'), true);
       assert.deepEqual(['OfferWantTapped', 'OfferDeclineTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
+      if (which === 'no') assert.equal(count(h, 'OfferReasonPrice'), 1);
       assert.equal(h.events.find(e => e.name === event)?.detail, 'phone');
       assert.equal(count(h, 'OfferLanded'), 1, 'not a second landing');
       // Reloading keeps them on the offer.

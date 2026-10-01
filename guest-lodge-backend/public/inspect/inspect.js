@@ -1242,16 +1242,15 @@ function videoLanding({declined=false}={}){
   bindVideoCue();
   tickLaunch();
   if(gated){
-    const choose=kind=>{
-      haptic();
-      track(kind==='want'?'OfferWantTapped':'OfferDeclineTapped',phoneWidth()?'phone':'desktop');
+    const device=phoneWidth()?'phone':'desktop';
+    // Whichever way they got here, the page underneath is the offer: the card
+    // fades out and nothing else moves.
+    const finish=()=>{
       offerStage='offer';
       try{sessionStorage.setItem(OFFER_STAGE_KEY,'offer');}catch{}
       const section=document.querySelector('.offer-landing');
       if(!section)return;
       $('pick-bar')?.remove();
-      // The same page, not a new one: the card lets go of the recording, which
-      // keeps its element, and the offer behind it is already in the page.
       const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       section.classList.add('pick-leaving');
       setTimeout(()=>{
@@ -1262,6 +1261,35 @@ function videoLanding({declined=false}={}){
         window.scrollTo(0,0);
         watchScroll();
       },calm?0:230);
+    };
+    // "I don't want this" is counted at once, then asks why: one tap, or skip.
+    const REASONS=[['price',`$${lifetimePrice()} is too expensive`,'OfferReasonPrice'],['noproperty',"I don't rent out property",'OfferReasonNoProperty'],['noneed',"I don't need this",'OfferReasonNoNeed'],['doubt',"I'm not sure it works",'OfferReasonDoubt']];
+    const ask=()=>{
+      const figure=document.querySelector('.offer-video'),bar=$('pick-bar'),label=$('pick-label');
+      if(!figure||!bar||!label)return finish();
+      const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      figure.style.opacity='0';
+      setTimeout(()=>{
+        label.textContent="What's the main reason?";
+        bar.className='pick-reasons';
+        bar.innerHTML=REASONS.map(([key,text])=>`<button type="button" class="secondary" data-reason="${key}">${esc(text)}</button>`).join('')+'<button type="button" class="quiet" data-reason="skip">Skip</button>';
+        figure.classList.add('is-asking');
+        figure.closest('.offer-landing')?.classList.add('is-asking');
+        bar.querySelectorAll('[data-reason]').forEach(button=>{
+          button.onclick=()=>{
+            haptic();
+            const reason=REASONS.find(([key])=>key===button.dataset.reason);
+            track(reason?reason[2]:'OfferReasonSkipped',device);
+            finish();
+          };
+        });
+        figure.style.opacity='';
+      },calm?0:180);
+    };
+    const choose=kind=>{
+      haptic();
+      track(kind==='want'?'OfferWantTapped':'OfferDeclineTapped',device);
+      if(kind==='want')finish();else ask();
     };
     $('pick-yes').onclick=()=>choose('want');
     $('pick-no').onclick=()=>choose('decline');

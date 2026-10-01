@@ -2912,11 +2912,11 @@ test('the scroll and on-screen marks of the video landing are accepted from anon
   const visitorId = `v_${'e'.repeat(12)}`;
   const h = moneyHarness();
   try {
-    for (const name of ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer']) {
+    for (const name of ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferWantTapped', 'OfferDeclineTapped', 'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped']) {
       const res = await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' }, body: JSON.stringify({ name, tool: 'claims', visitorId, detail: 'phone' }) });
       assert.equal(res.status, 200, name);
     }
-    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 6);
+    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 13);
     assert.equal(h.calls.events.find(e => e.name === 'OfferScroll50')?.detail, 'phone');
     assert.deepEqual(h.calls.capi, []);
   } finally { h.registration.close(); }

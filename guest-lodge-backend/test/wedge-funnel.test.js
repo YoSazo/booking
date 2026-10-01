@@ -119,3 +119,14 @@ test('the first question is a funnel step between staying and tapping, and its o
   assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['Tapped "I want this"', 1], ['Tapped "I don\'t want this"', 1]]);
   assert.ok(['OfferWantTapped', 'OfferDeclineTapped', 'OfferUnsureTapped'].every(name => VISITOR_EVENTS.includes(name)));
 });
+
+test('why they did not want it is its own card, and a reset clears it', () => {
+  const f = buildWedgeFunnel([
+    ev('OfferLanded', 'v_a'), ev('OfferLanded', 'v_b'), ev('OfferLanded', 'v_c'),
+    ev('OfferDeclineTapped', 'v_a'), ev('OfferDeclineTapped', 'v_b'), ev('OfferDeclineTapped', 'v_c'),
+    ev('OfferReasonPrice', 'v_a'), ev('OfferReasonPrice', 'v_b'), ev('OfferReasonSkipped', 'v_c'),
+  ]);
+  const card = f.branches.find(b => b.key === 'reasons');
+  assert.deepEqual(card.steps.map(s => [s.label, s.people]), [['The price is too expensive', 2], ['Does not rent out property', 0], ['Does not need it', 0], ['Not sure it works', 0], ['Skipped', 1]]);
+  assert.ok(['OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped'].every(name => VISITOR_EVENTS.includes(name)));
+});
