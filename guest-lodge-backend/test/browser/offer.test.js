@@ -166,6 +166,41 @@ test('the video counts a quarter, half and the end once each', async () => {
   } finally { await h.close(); }
 });
 
+// The recording is under the offer, so every phone size is told it is there:
+// a pill at the bottom while the offer shows and the recording does not, gone
+// once the recording is on screen, and the recording sits in the middle.
+for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
+  test(`phone ${size.width}x${size.height}: a pill says the recording is below, and the recording is centred`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#offer-video');
+      await h.page.waitForTimeout(400);
+      const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight }; });
+      assert.equal(cue.shown, true, JSON.stringify(cue));
+      assert.equal(cue.opacity, '1');
+      assert.match(cue.text, new RegExp(`See a real report built in ${require('../../wedges/claims').landing.video.seconds} seconds`));
+      assert.ok(cue.left >= 8 && cue.width - cue.right >= 8 && cue.bottom <= cue.height, 'the pill fits on screen: ' + JSON.stringify(cue));
+      const middle = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { video: r.left + r.width / 2, page: window.innerWidth / 2 }; });
+      assert.ok(Math.abs(middle.video - middle.page) <= 2, 'the recording is centred: ' + JSON.stringify(middle));
+      await h.page.click('#video-cue');
+      await h.page.waitForTimeout(900);
+      assert.equal(count(h, 'OfferCueTapped'), 1);
+      assert.equal(await h.page.evaluate(() => document.getElementById('video-cue').classList.contains('is-shown')), false, 'it goes once the recording is on screen');
+      const visible = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; });
+      assert.equal(visible, true, 'the tap brings the recording into view');
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
+test('desktop: no pill, the recording is already beside the offer', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#offer-video');
+    assert.equal(await h.page.evaluate(() => getComputedStyle(document.getElementById('video-cue')).display), 'none');
+  } finally { await h.close(); }
+});
+
 // Scroll depth and what was on screen are recorded once each, with only the
 // device attached, and nothing on the page changes for the visitor.
 test('scrolling the landing records depth and what came on screen, once each', async () => {
