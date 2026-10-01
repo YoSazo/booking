@@ -861,6 +861,7 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .offer-video-title { margin: 0 0 10px; font-size: 17px; font-weight: 700; text-align: center; letter-spacing: -0.2px; }
 .offer-video figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
 .offer-buy .sim-offer { margin-top: 0; }
+.sim-offer .offer-points { margin: 18px 2px 14px; }
 .offer-points { list-style: none; margin: 16px 4px 8px; padding: 0; display: grid; gap: 8px; }
 .offer-points li { position: relative; padding-left: 26px; line-height: 1.35; }
 .offer-points li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 750; }

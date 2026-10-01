@@ -44,11 +44,16 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.match(text, /No subscription\. Nothing renews\./);
     assert.match(text, /38 seconds/);
     assert.match(text, /Pay once\. Keep it for good\./);
-    assert.match(text, new RegExp(`One payment of \\$${LAUNCH}\\. No subscription, and nothing renews\\.`));
+    // The paragraph of fine print is not on the page; the terms page carries it.
+    assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
+    assert.match(require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8'), new RegExp(`\\$${LAUNCH} USD at its launch price until`));
+    // What they get is a list right under the button, inside the card.
+    const under = await h.page.evaluate(() => { const card = document.getElementById('sim-offer'), button = document.getElementById('sim-buy'), list = card.querySelector('.offer-points'), video = document.getElementById('offer-video'); return { inside: !!list, below: !!list && list.getBoundingClientRect().top >= button.getBoundingClientRect().bottom, nextIsList: button.nextElementSibling === list, items: list ? [...list.querySelectorAll('li')].map(li => li.textContent) : [], beforeVideo: !!list && list.getBoundingClientRect().bottom <= video.getBoundingClientRect().top, outside: document.querySelectorAll('.offer-buy > .offer-points').length }; });
+    assert.deepEqual({ inside: under.inside, below: under.below, nextIsList: under.nextIsList, beforeVideo: under.beforeVideo, outside: under.outside }, { inside: true, below: true, nextIsList: true, beforeVideo: true, outside: 0 });
+    assert.ok(under.items.some(item => /Talk through a room/.test(item)), JSON.stringify(under.items));
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, new RegExp(`Instead of \\$${STANDING}\\b`));
     assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
-    assert.ok(text.includes(`Launch price until ${launchEndText}, then $${STANDING}.`), launchEndText);
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
