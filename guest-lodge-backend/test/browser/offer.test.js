@@ -263,6 +263,31 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
   });
 }
 
+// Answering must not look like a reload: the page underneath stays exactly
+// where it is, at full strength, while the card fades away.
+test('answering leaves the offer page still: no headline swap, no shift, no flicker', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#pick-yes');
+    await h.page.waitForTimeout(500);
+    const before = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { h1: document.querySelector('h1').textContent, h1h: document.querySelector('h1').getBoundingClientRect().height, offerTop: r('sim-offer').top, buyTop: r('sim-buy').top }; });
+    await h.page.evaluate(() => {
+      window.__samples = [];
+      const sample = () => { const o = document.getElementById('sim-offer'), b = document.querySelector('.offer-buy'), r = o.getBoundingClientRect(); window.__samples.push({ opacity: parseFloat(getComputedStyle(b).opacity), top: r.top, h1: document.querySelector('h1').textContent }); if (window.__samples.length < 40) requestAnimationFrame(sample); };
+      requestAnimationFrame(sample);
+    });
+    await h.page.click('#pick-yes');
+    await h.page.waitForTimeout(900);
+    const samples = await h.page.evaluate(() => window.__samples);
+    assert.ok(samples.length >= 30, 'sampled ' + samples.length);
+    assert.ok(samples.every(x => x.opacity === 1), 'the offer never fades or flickers: ' + JSON.stringify(samples.map(x => x.opacity).filter(o => o !== 1)));
+    assert.ok(samples.every(x => Math.abs(x.top - before.offerTop) <= 0.5), 'the offer never moves: ' + JSON.stringify([...new Set(samples.map(x => Math.round(x.top)))]));
+    assert.ok(samples.every(x => x.h1 === before.h1), 'the headline never changes');
+    assert.equal(await h.page.evaluate(() => document.querySelector('h1').getBoundingClientRect().height), before.h1h);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
 test('desktop: the question sits under the recording, and answering shows the offer beside it', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
   try {

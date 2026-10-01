@@ -874,9 +874,6 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .offer-landing.is-pick .offer-video-title, .offer-landing.is-pick .offer-video figcaption, .offer-landing.is-pick ~ .video-cue, .offer-landing.is-pick ~ .sim-paybar, .offer-landing.pick-leaving ~ .video-cue, .offer-landing.pick-leaving ~ .sim-paybar { display: none; }
 .offer-landing.is-pick { padding-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { .offer-landing.is-pick .offer-video, .offer-landing.is-pick::before { transition: none; } }
-.offer-landing.just-picked .offer-buy { animation: offer-in .32s ease both; }
-@keyframes offer-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .offer-landing.just-picked .offer-buy { animation: none; } }
 .offer-video-title { margin: 0 0 10px; font-size: 17px; font-weight: 700; text-align: center; letter-spacing: -0.2px; }
 .offer-video figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted); }
 .offer-buy .sim-offer { margin-top: 0; }

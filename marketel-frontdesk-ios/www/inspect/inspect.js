@@ -1234,7 +1234,7 @@ function videoLanding({declined=false}={}){
   if(declined)offerStage='offer';
   const gated=payOnce()&&!offerPicked();
   document.documentElement.classList.toggle('pick-open',gated);
-  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${gated?(g.headline||arm.title):title}</h1><p class="muted">${esc(gated?v.sub:sub)}</p></div><div class="offer-buy"${gated?' inert':''}>${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="metadata" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-maybe" class="secondary">Not sure</button></div>`:''}</figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><div class="offer-buy"${gated?' inert':''}>${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-maybe" class="secondary">Not sure</button></div>`:''}</figure></section><button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   watchEngagement();
@@ -1255,14 +1255,10 @@ function videoLanding({declined=false}={}){
       const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       section.classList.add('pick-leaving');
       setTimeout(()=>{
-        section.querySelector('h1').innerHTML=title;
-        section.querySelector('.offer-intro p').textContent=sub;
         $('pick-label')?.remove();
         section.querySelectorAll('[inert]').forEach(el=>el.removeAttribute('inert'));
         section.classList.remove('is-pick','pick-leaving');
-        section.classList.add('just-picked');
         document.documentElement.classList.remove('pick-open');
-        setTimeout(()=>section.classList.remove('just-picked'),500);
         window.scrollTo(0,0);
         watchScroll();
       },calm?0:230);
