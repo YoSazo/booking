@@ -243,6 +243,26 @@ test('either answer shows the offer on the same page: the recording is not redra
   }
 });
 
+// Under the offer the recording is as big as fits: all of it on screen at once,
+// with gentle corners.
+for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
+  test(`phone ${size.width}x${size.height}: the recording under the offer shows whole, big, with gentle corners`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#offer-video');
+      await choose(h);
+      await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' }));
+      await h.page.waitForTimeout(600);
+      const v = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(), bar = document.getElementById('sim-paybar').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, width: r.width, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight, barTop: bar.top, radius: parseFloat(getComputedStyle(document.getElementById('offer-video')).borderTopLeftRadius) }; });
+      assert.ok(v.top >= 64 && v.bottom <= v.barTop, 'all of it is on screen between the header and the price bar: ' + JSON.stringify(v));
+      assert.ok(v.height >= v.vh * 0.7, 'big: ' + JSON.stringify(v));
+      assert.ok(v.radius > 0 && v.radius <= 24, 'gentle corners: ' + v.radius);
+      assert.ok(Math.abs(v.middle - v.page) <= 2, 'centred');
+      h.assertClean();
+    } finally { await h.close(); }
+  });
+}
+
 test('desktop: the question sits under the recording, and answering shows the offer beside it', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
   try {

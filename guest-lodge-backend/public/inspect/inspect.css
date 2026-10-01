@@ -850,8 +850,8 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .offer-intro h1 .green { color: var(--green); }
 .offer-intro p { margin: 0; }
 .offer-intro h1, .offer-intro p { text-wrap: balance; }
-.offer-video { margin: 0; justify-self: center; text-align: center; }
-.offer-video video { display: block; margin: 0 auto; height: min(56vh, 520px); width: auto; aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 36px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
+.offer-video { margin: 0; justify-self: center; width: 100%; max-width: 440px; text-align: center; }
+.offer-video video { display: block; margin: 0 auto; width: auto; max-width: 100%; height: min(calc(100svh - 170px), 780px); aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 20px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
 .video-cue { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 39; display: flex; align-items: center; gap: 8px; width: max-content; max-width: calc(100% - 32px); white-space: nowrap; padding: 11px 18px; border-radius: 999px; background: var(--green); color: #fff; font-size: 15px; font-weight: 650; line-height: 1.25; text-align: left; box-shadow: 0 10px 26px #173b2340; opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .28s ease, transform .28s ease; }
 .video-cue.is-shown { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 .video-cue span { flex: 0 0 auto; font-size: 18px; animation: cue-nudge 1.6s ease-in-out infinite; }
@@ -867,8 +867,8 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 /* Step one on a phone: the recording floats over the page, which shows blurred
    behind it, and is as big as the screen allows. */
 .offer-landing.is-pick::before, .offer-landing.pick-leaving::before { content: ""; position: fixed; z-index: 44; left: 0; right: 0; bottom: 0; top: calc(env(safe-area-inset-top) + 64px); background: #e8f0ea99; -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); transition: opacity .22s ease; }
-.offer-landing.is-pick .offer-video { position: fixed; z-index: 46; left: 14px; right: 14px; top: calc(env(safe-area-inset-top) + 82px); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0; padding: 0; transition: opacity .22s ease, transform .22s ease; }
-.offer-landing.is-pick .offer-video video { flex: 1 1 0; min-height: 0; height: auto; max-width: 100%; }
+.offer-landing.is-pick .offer-video { position: fixed; z-index: 46; left: 14px; right: 14px; top: calc(env(safe-area-inset-top) + 82px); bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0; padding: 0; width: auto; max-width: none; transition: opacity .22s ease, transform .22s ease; }
+.offer-landing.is-pick .offer-video video { flex: 1 1 0; min-height: 0; width: auto; height: auto; max-width: 100%; border-radius: 36px; }
 .offer-landing.pick-leaving::before { opacity: 0; }
 .offer-landing.pick-leaving .offer-video { opacity: 0; transform: scale(.97); }
 .offer-landing.is-pick .offer-video-title, .offer-landing.is-pick .offer-video figcaption, .offer-landing.is-pick ~ .video-cue, .offer-landing.is-pick ~ .sim-paybar, .offer-landing.pick-leaving ~ .video-cue, .offer-landing.pick-leaving ~ .sim-paybar { display: none; }
@@ -887,13 +887,13 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 @media (min-width: 880px) {
   .offer-landing { grid-template-columns: auto minmax(0, 440px); grid-template-areas: "video intro" "video buy"; justify-content: center; column-gap: 48px; align-content: start; }
   .offer-intro { grid-area: intro; text-align: left; align-self: end; }
-  .offer-video { grid-area: video; position: sticky; top: 90px; align-self: start; }
-  .offer-video video { height: min(72vh, 640px); }
+  .offer-video { grid-area: video; position: sticky; top: 90px; align-self: start; width: auto; max-width: none; }
+  .offer-video video { height: min(72vh, 640px); width: auto; }
   .offer-buy { grid-area: buy; }
   .offer-landing ~ .sim-paybar { display: none; }
   .offer-landing.is-pick::before { display: none; }
   .offer-landing.is-pick .offer-video { position: sticky; top: 90px; left: auto; right: auto; bottom: auto; z-index: auto; display: block; padding: 0; background: none; border: 0; box-shadow: none; }
-  .offer-landing.is-pick .offer-video video { height: min(64vh, 600px); flex: none; }
+  .offer-landing.is-pick .offer-video video { height: min(64vh, 600px); width: auto; flex: none; }
   .offer-landing.is-pick .offer-buy { display: none; }
   .pick-label { margin-bottom: 10px; }
   .pick-bar { margin-top: 12px; }
