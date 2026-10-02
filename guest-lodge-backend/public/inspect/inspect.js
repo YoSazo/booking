@@ -1308,6 +1308,7 @@ function videoLanding({declined=false}={}){
     $('pick-no').onclick=()=>choose('decline');
   }
   track('OfferLanded',phoneWidth()?'phone':'desktop');
+  trackSource();
 }
 // The launch clock, once a second. When it reaches zero the price really
 // changes, so the page redraws at the full price rather than showing a price
@@ -1399,6 +1400,17 @@ function watchScroll(){
     const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){track(name,device);observer.disconnect();}},{threshold:0.5});
     observer.observe(target);scrollSeen.push(observer);
   }
+}
+// Where this landing came from, so /funnel can tell an ad click from everyone else
+// (including the owner's own visit): "ad" when Meta added its click id to the
+// link, "social" from Facebook or Instagram without one, "direct" with no
+// referrer (typed, a QR code, a bookmark), "other" from any other site. And the
+// browser's name. Two counts per visit; no URL, no IP, nothing personal.
+function browserFamily(){const ua=navigator.userAgent||'';return /Instagram/i.test(ua)?'instagram':/FBAN|FBAV|FB_IAB/i.test(ua)?'facebook':/CriOS|Chrome/i.test(ua)?'chrome':/Safari/i.test(ua)?'safari':'other';}
+function trackSource(){
+  const referrer=document.referrer||'';
+  track('OfferFrom',new URLSearchParams(location.search).get('fbclid')?'ad':/(^|\.)(facebook|instagram|fb|messenger)\.com/i.test(referrer)?'social':!referrer?'direct':'other');
+  track('OfferBrowser',browserFamily());
 }
 // Microsoft Clarity (heatmaps, scroll maps, recordings) on the ad landing only:
 // the web, never the app, never someone signed in (reports hold customers'

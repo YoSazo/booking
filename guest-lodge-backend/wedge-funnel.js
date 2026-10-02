@@ -52,6 +52,10 @@ const BRANCHES = Object.freeze([
   // How far down the landing page they went. Each is people who got that far at
   // any point; a page that fits the screen records no scroll at all.
   { key: 'scroll', label: 'How far down the page', steps: [['Saw the video on screen', ['OfferSawVideo']], ['Saw the offer card on screen', ['OfferSawOffer']], ['Scrolled to 25%', ['OfferScroll25']], ['Scrolled to 50%', ['OfferScroll50']], ['Scrolled to 75%', ['OfferScroll75']], ['Scrolled to the bottom', ['OfferScroll100']], ['Tapped "see a report built"', ['OfferCueTapped']]] },
+  // Where each landing came from. "ad" is a visit that carried Meta's click id; "direct" has no
+  // referrer (typed, a QR code, a bookmark, or the owner's own browser).
+  { key: 'from', label: 'Where they came from', steps: [['Clicked the ad (Meta click id)', ['OfferFrom:ad']], ['From Facebook or Instagram, no click id', ['OfferFrom:social']], ['No referrer: typed, QR, or you', ['OfferFrom:direct']], ['From another site', ['OfferFrom:other']]] },
+  { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['OfferBrowser:instagram']], ['Facebook app', ['OfferBrowser:facebook']], ['Safari', ['OfferBrowser:safari']], ['Chrome', ['OfferBrowser:chrome']], ['Other', ['OfferBrowser:other']]] },
   { key: 'checks', hideWhenEmpty: true, label: 'Could they answer? (checks)', steps: [['Buttons were reachable', ['OfferPickReady']], ['Buttons were blocked', ['OfferPickBlocked']], ['Touched the screen', ['OfferPickTouched']]] },
   { key: 'reasons', hideWhenEmpty: true, label: 'Why they did not want it', steps: [['The price is too expensive', ['OfferReasonPrice']], ['Does not rent out property', ['OfferReasonNoProperty']], ['Does not need it', ['OfferReasonNoNeed']], ['Not sure it works', ['OfferReasonDoubt']], ['Skipped', ['OfferReasonSkipped']]] },
   { key: 'pick', hideWhenEmpty: true, label: 'The first question', steps: [['Tapped "I want this"', ['OfferWantTapped']], ['Tapped "I don\'t want this"', ['OfferDeclineTapped']]] },
@@ -77,7 +81,7 @@ const VISITOR_EVENTS = Object.freeze([
   'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
   'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped',
-  'OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched',
+  'OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched', 'OfferFrom', 'OfferBrowser',
   'LandingViewed', 'SetupStarted', 'SetupCompleted', 'FirstPhotoAdded', 'ReportRevealed', 'ExportOfferViewed', 'OfferDeclined',
   'VoiceNoteRecorded',
 ]);
@@ -164,4 +168,11 @@ async function countingSince(prisma, tool) {
   return marker ? new Date(marker.createdAt) : null;
 }
 
-module.exports = { STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince };
+// Only the people who arrived with Meta's click id, with everything they did (a payment record
+// carries the visitor id too). Visits from before the source was recorded are left out.
+function onlyAdClicks(events) {
+  const ads = new Set(events.filter(event => event.name === 'OfferFrom' && event.detail === 'ad' && event.visitorId).map(event => event.visitorId));
+  return events.filter(event => event.visitorId && ads.has(event.visitorId));
+}
+
+module.exports = { onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince };

@@ -294,6 +294,28 @@ test('a button covered by something else is reported as blocked', async () => {
   } finally { await h.close(); }
 });
 
+// Each landing says where it came from, so /funnel can set ad clicks apart from the
+// owner's own visit: "ad" when Meta added its click id, "direct" with no referrer.
+test('a landing says whether it came from the ad, and in which browser', async () => {
+  const fromAd = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await fromAd.page.waitForSelector('#offer-video'); await fromAd.page.waitForTimeout(400);
+    assert.equal(fromAd.events.find(e => e.name === 'OfferFrom')?.detail, 'ad');
+    assert.match(fromAd.events.find(e => e.name === 'OfferBrowser')?.detail, /^(chrome|safari|instagram|facebook|other)$/);
+    assert.equal(count(fromAd, 'OfferFrom'), 1);
+  } finally { await fromAd.close(); }
+  const typed = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await typed.page.waitForSelector('#offer-video'); await typed.page.waitForTimeout(400);
+    assert.equal(typed.events.find(e => e.name === 'OfferFrom')?.detail, 'direct', 'no click id and no referrer');
+  } finally { await typed.close(); }
+  const owner = await open({ arm: 'claims', signedIn: false, query: 'notrack=1&fbclid=x', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await owner.page.waitForSelector('#offer-video'); await owner.page.waitForTimeout(400);
+    assert.deepEqual(['OfferFrom', 'OfferBrowser'].map(name => count(owner, name)), [0, 0], 'the owner browser sends nothing');
+  } finally { await owner.close(); }
+});
+
 // Clarity records the ad landing for an anonymous visitor on the web, and nobody
 // else: not the owner's browser, not someone signed in (their reports hold
 // customers' photos), not the app. Signing in switches it off.

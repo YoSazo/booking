@@ -130,3 +130,29 @@ test('/funnel for a page with no first question shows the page and scroll metric
     assert.ok(!tiles.some(label => /Answered|want this/.test(label)) && tiles.includes('Scrolled halfway'), JSON.stringify(tiles));
   } finally { await browser.close(); }
 });
+
+test('/funnel has an "Only ad clicks" switch that asks the server for just those visitors', async () => {
+  const seen = [];
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.addInitScript(() => localStorage.setItem('marketelAdminToken', 'test'));
+    await page.route('http://funnel.test/**', route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/funnel/wedge') { seen.push(url.searchParams.get('ad')); return route.fulfill({ status: 200, body: JSON.stringify({ wedges: [{ id: 'claims', product: 'Claims' }], tool: 'claims', adOnly: url.searchParams.get('ad') === '1', ...buildWedgeFunnel([]) }), headers: { 'content-type': 'application/json' } }); }
+      if (url.pathname === '/funnel') return route.fulfill({ status: 200, body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')), headers: { 'content-type': 'text/html' } });
+      return route.fulfill({ status: 404, body: '' });
+    });
+    await page.goto('http://funnel.test/funnel');
+    await page.waitForSelector('#ad-only');
+    assert.equal(await page.getAttribute('#ad-only', 'aria-pressed'), 'false');
+    assert.equal(await page.isVisible('#ad-note'), false);
+    await page.click('#ad-only');
+    await page.waitForFunction(() => document.getElementById('ad-only').getAttribute('aria-pressed') === 'true');
+    await page.waitForSelector('#ad-note', { state: 'visible' });
+    assert.equal(seen[seen.length - 1], '1', 'the request asks for ad clicks only');
+    await page.click('#ad-only');
+    await page.waitForFunction(() => document.getElementById('ad-only').getAttribute('aria-pressed') === 'false');
+    assert.equal(seen[seen.length - 1], null);
+  } finally { await browser.close(); }
+});

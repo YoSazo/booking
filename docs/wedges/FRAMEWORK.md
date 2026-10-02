@@ -260,6 +260,17 @@ browser off ("Not counting this browser"): it sends no steps, every request is
 marked `x-marketel-no-track`, and the server records nothing and tells Meta
 nothing for it. `?notrack=1` on any page does the same for in-app browsers.
 
+**Where a visit came from.** Each landing records `OfferFrom` (`ad` when Meta's
+click id `fbclid` is on the link, `social` from Facebook or Instagram without one,
+`direct` with no referrer: typed, a QR code, a bookmark or the owner's own
+browser, `other`) and `OfferBrowser` (instagram, facebook, safari, chrome,
+other): counts only, no URL and no IP. `/funnel` shows both as cards, and its
+"Only ad clicks" switch (`?ad=1`) keeps just the visitors who arrived with a
+click id and everything they did, payments included. Visits from before this was
+recorded have no source and drop out of that view. Use it whenever an own visit
+could be hiding in a small count: a "landed" that is higher than Meta's link
+clicks for the day is not all ads.
+
 **Clarity.** Microsoft Clarity (the same project as the booking site, id
 `wvc5g15yl5`; filter its sessions by the custom tag `wedge`, or by URL
 `/claims`) records heatmaps, scroll maps and sessions on the ad landing only,

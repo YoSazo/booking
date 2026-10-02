@@ -12041,7 +12041,8 @@ app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
             select: { id: true, name: true, detail: true, visitorId: true, accountId: true, createdAt: true },
         }));
         res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), countingSince: since ? since.toISOString() : null,
-            everything: req.query.everything === '1', ...wedgeFunnel.buildWedgeFunnel(events.filter(event => event.name !== wedgeFunnel.RESET_EVENT)) });
+            everything: req.query.everything === '1', adOnly: req.query.ad === '1',
+            ...wedgeFunnel.buildWedgeFunnel((req.query.ad === '1' ? wedgeFunnel.onlyAdClicks(events) : events).filter(event => event.name !== wedgeFunnel.RESET_EVENT)) });
     } catch (e) {
         console.error('Wedge funnel error:', e.message);
         res.status(500).json({ success: false, message: 'Could not load the funnel.' });

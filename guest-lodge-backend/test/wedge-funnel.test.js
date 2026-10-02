@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildWedgeFunnel, excludedAccountIds, STEPS, VISITOR_EVENTS, LABELS } = require('../wedge-funnel');
+const { buildWedgeFunnel, excludedAccountIds, STEPS, VISITOR_EVENTS, LABELS, onlyAdClicks } = require('../wedge-funnel');
 
 const at = minutes => new Date(Date.UTC(2026, 8, 24, 12, minutes)).toISOString();
 let seq = 0;
@@ -157,4 +157,23 @@ test('the ladder lists every step in order, with the answers and reasons under t
   assert.equal(row('tapped').ofPrevious, 0.5, 'the main line skips the rows beside it: tapped is of those who stayed');
   assert.equal(f.steps.every(s => s.children === undefined || s.key === 'picked'), true);
   assert.equal(LABELS.OfferReasonPrice, 'The price is too expensive');
+});
+
+test('where they came from is its own card, and "only ad clicks" keeps just those visitors and everything they did', () => {
+  const events = [
+    ev('OfferLanded', 'v_a', { detail: 'phone' }), ev('OfferFrom', 'v_a', { detail: 'ad' }), ev('OfferBrowser', 'v_a', { detail: 'instagram' }),
+    ev('OfferLanded', 'v_b', { detail: 'phone' }), ev('OfferFrom', 'v_b', { detail: 'direct' }), ev('OfferBrowser', 'v_b', { detail: 'safari' }),
+    ev('OfferLanded', 'v_c', { detail: 'phone' }), ev('OfferFrom', 'v_c', { detail: 'social' }), ev('OfferBrowser', 'v_c', { detail: 'facebook' }),
+    ev('OfferEngaged', 'v_a'), ev('OfferEngaged', 'v_b'), ev('SimCheckoutTapped', 'v_a'),
+    ev('LifetimePurchased', 'acct1', { visitorId: 'v_a' }), ev('LifetimePurchased', 'acct2', { visitorId: 'v_b' }),
+  ];
+  const f = buildWedgeFunnel(events);
+  const from = f.branches.find(b => b.key === 'from');
+  assert.deepEqual(from.steps.map(s => [s.label, s.people]), [['Clicked the ad (Meta click id)', 1], ['From Facebook or Instagram, no click id', 1], ['No referrer: typed, QR, or you', 1], ['From another site', 0]]);
+  assert.deepEqual(f.branches.find(b => b.key === 'browser').steps.map(s => s.people), [1, 1, 1, 0, 0]);
+  const ads = buildWedgeFunnel(onlyAdClicks(events));
+  const row = key => ads.steps.find(s => s.key === key);
+  assert.deepEqual([row('landed').people, row('engaged').people, row('tapped').people, row('trial').people], [1, 1, 1, 1], 'only the ad visitor, with their tap and their payment');
+  assert.ok(['OfferFrom', 'OfferBrowser'].every(name => VISITOR_EVENTS.includes(name)));
+  assert.deepEqual(onlyAdClicks([ev('OfferLanded', 'v_old')]), [], 'a visit from before the source was recorded is left out');
 });
