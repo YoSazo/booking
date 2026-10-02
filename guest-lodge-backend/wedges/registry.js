@@ -38,6 +38,8 @@ function validate(manifest, filename = '') {
     || (video.poster !== undefined && !(cloudinary.test(String(video.poster)) && /\.jpg$/.test(video.poster)))
     || !Number.isInteger(video.seconds) || video.seconds < 1 || typeof video.sub !== 'string' || !video.sub.trim()
     || typeof video.label !== 'string' || !video.label.trim())) bad('landing.video needs a Cloudinary .mp4 src, an optional .jpg poster, whole seconds, a sub line and a label');
+  // Whether a pay-once landing opens on the question ("I want this" / "I don't want this") before the offer. Off unless asked for.
+  if (manifest.landing.firstQuestion !== undefined && typeof manifest.landing.firstQuestion !== 'boolean') bad('landing.firstQuestion must be true or false');
   if (manifest.id !== 'inspect' && (!manifest.webTitle || !manifest.skin.home || !manifest.skin.terms)) bad('web title, home and terms are required');
   if (!['single', 'select'].includes(manifest.selection)) bad('selection must be single or select');
   if (manifest.id !== 'inspect' && (!manifest.landing.type || !manifest.types[manifest.landing.type])) bad('landing type must exist');

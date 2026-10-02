@@ -179,6 +179,7 @@ window.MARKETEL_WEDGES = {
         "building": "Building your damage report",
         "reveal": "Here is what your guest or the platform receives."
       },
+      "firstQuestion": false,
       "video": {
         "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
         "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_1080,q_auto/v1790878619/1001_1_2_dbfaov.jpg",

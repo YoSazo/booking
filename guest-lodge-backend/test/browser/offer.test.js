@@ -15,6 +15,7 @@ const DURING_LAUNCH = at(-42 * HOUR);
 const launchEndText = `${new Date(LAUNCH_END).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
 // The pay-once landing opens on the recording and one question; the offer is the answer.
 const choose = async (h, which = 'yes', reason = 'price') => {
+  if (!(await h.page.$('#pick-yes'))) return;
   if (which === 'yes') await h.page.click('#pick-yes');
   else {
     await h.page.click('#pick-no');
@@ -114,7 +115,7 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
 });
 
 test('the launch price ends for real: at its moment the page redraws at the standing price, and after it there is no clock', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
   try {
     await h.page.waitForSelector('#pick-yes');
     await h.page.click('#pick-yes');
@@ -129,7 +130,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     h.assertClean();
   } finally { await h.close(); }
 
-  const after = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
+  const after = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
   try {
     await after.page.waitForSelector('#offer-video');
     await choose(after);
@@ -196,7 +197,7 @@ test('the video counts a quarter, half and the end once each', async () => {
 // either one, shows the offer on the same page without redrawing the recording.
 for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }, { width: 360, height: 640 }]) {
   test(`phone ${size.width}x${size.height}: the recording floats over the page with two buttons under it, and no price in front`, async () => {
-    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await h.page.waitForTimeout(500);
@@ -228,7 +229,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
 // the offer exactly as "I want this" does.
 for (const size of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
   test(`phone ${size.width}x${size.height}: I don't want this asks why before the offer, and the price is one of the choices`, async () => {
-    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
+    const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#pick-no');
       await h.page.waitForTimeout(400);
@@ -253,7 +254,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
 
 test('each reason is its own event, then the offer', async () => {
   for (const [key, event] of [['price', 'OfferReasonPrice'], ['noproperty', 'OfferReasonNoProperty'], ['noneed', 'OfferReasonNoNeed'], ['doubt', 'OfferReasonDoubt']]) {
-    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+    const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#pick-no');
       await choose(h, 'no', key);
@@ -269,7 +270,7 @@ test('each reason is its own event, then the offer', async () => {
 // If nobody answers, these say why: whether the buttons could be reached, whether
 // the screen was touched at all, and in which browser. Counts only.
 test('the first question reports whether its buttons were reachable, and whether anyone touched the screen', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#pick-yes');
     await h.page.waitForTimeout(1200);
@@ -283,7 +284,7 @@ test('the first question reports whether its buttons were reachable, and whether
 });
 
 test('a button covered by something else is reported as blocked', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.context.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const style = document.createElement('style'); style.textContent = '#pick-bar::after { content: ""; position: fixed; inset: 0; z-index: 99999; }'; document.head.appendChild(style); }); });
     await h.page.reload({ waitUntil: 'domcontentloaded' });
@@ -297,7 +298,7 @@ test('a button covered by something else is reported as blocked', async () => {
 // else: not the owner's browser, not someone signed in (their reports hold
 // customers' photos), not the app. Signing in switches it off.
 test('Clarity loads for an anonymous ad visitor, tagged with the wedge', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#pick-yes');
     for (let i = 0; i < 40 && !h.clarity.length; i++) await h.page.waitForTimeout(100);
@@ -310,7 +311,7 @@ test('Clarity loads for an anonymous ad visitor, tagged with the wedge', async (
 });
 
 test('Clarity stays out of the owner browser, a signed-in visit and the app', async () => {
-  const owner = await open({ arm: 'claims', signedIn: false, query: 'notrack=1', viewport: phone, now: DURING_LAUNCH });
+  const owner = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: 'notrack=1', viewport: phone, now: DURING_LAUNCH });
   try { await owner.page.waitForSelector('#pick-yes'); await owner.page.waitForTimeout(1900); assert.deepEqual(owner.clarity, [], 'the owner browser'); } finally { await owner.close(); }
   const member = await open({ arm: 'claims', signedIn: true, viewport: phone });
   try { await member.page.waitForTimeout(2200); assert.deepEqual(member.clarity, [], 'someone signed in'); } finally { await member.close(); }
@@ -328,7 +329,7 @@ test('every way of signing in switches Clarity off', () => {
 
 test('either answer shows the offer on the same page: the recording is not redrawn, and the answer is counted', async () => {
   for (const [which, event] of [['yes', 'OfferWantTapped'], ['no', 'OfferDeclineTapped']]) {
-    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+    const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await h.page.evaluate(() => { document.getElementById('offer-video').dataset.same = 'yes'; });
@@ -375,7 +376,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
 // Answering must not look like a reload: the page underneath stays exactly
 // where it is, at full strength, while the card fades away.
 test('answering leaves the offer page still: no headline swap, no shift, no flicker', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#pick-yes');
     await h.page.waitForTimeout(500);
@@ -398,7 +399,7 @@ test('answering leaves the offer page still: no headline swap, no shift, no flic
 });
 
 test('desktop: the question sits under the recording, and answering shows the offer beside it', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#pick-yes');
     const layout = await h.page.evaluate(() => { const v = document.getElementById('offer-video').getBoundingClientRect(), y = document.getElementById('pick-yes').getBoundingClientRect(), fig = getComputedStyle(document.querySelector('.offer-video')).position; return { videoBottom: v.bottom, yesTop: y.top, yesBottom: y.bottom, fig, offerShown: getComputedStyle(document.querySelector('.offer-buy')).display !== 'none', height: window.innerHeight }; });
@@ -429,7 +430,7 @@ const stubPlay = async (h, mode) => {
 };
 
 test('when the browser wants a tap, a play button sits over the recording, and tapping it plays', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await stubPlay(h, 'blocked');
     const shown = await h.page.evaluate(() => { const b = document.querySelector('.video-play'), v = document.getElementById('offer-video'); if (!b) return null; const r = b.getBoundingClientRect(), vr = v.getBoundingClientRect(); return { dx: Math.abs(r.left + r.width / 2 - (vr.left + vr.width / 2)), dy: Math.abs(r.top + r.height / 2 - (vr.top + vr.height / 2)), controls: v.controls }; });
@@ -445,7 +446,7 @@ test('when the browser wants a tap, a play button sits over the recording, and t
 });
 
 test('a play that is merely interrupted is retried, with no button and no controls', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await stubPlay(h, 'interrupted');
     const state = await h.page.evaluate(() => ({ button: !!document.querySelector('.video-play'), controls: document.getElementById('offer-video').controls, playing: !document.getElementById('offer-video').paused, calls: window.__playCalls }));
@@ -455,7 +456,7 @@ test('a play that is merely interrupted is retried, with no button and no contro
 });
 
 test('with no trouble at all there is no play button', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
     await h.page.waitForTimeout(900);

@@ -20,7 +20,7 @@ const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
+async function open({ firstQuestion = false, native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [], clarity = [];
@@ -78,6 +78,7 @@ async function open({ native = false, arm = 'claims', demo = false, query = null
     let body = fs.readFileSync(filename);
     if (/\.(css|html)$/.test(filename)) body = Buffer.from(body.toString().replace(/(\d)svh/g, '$1vh'));
     if (includeFixture && filename.endsWith('wedges.js')) body = Buffer.from(body.toString() + `\nwindow.MARKETEL_WEDGES.fixture = ${JSON.stringify(fixtureManifest)};\n`);
+    if (firstQuestion && filename.endsWith('wedges.js')) body = Buffer.from(body.toString().replace('"firstQuestion": false', '"firstQuestion": true'));
     if (native && filename.endsWith('inspect.js')) body = Buffer.from(body.toString().replace(/^.*\n/, 'const native = true;\n'));
     return route.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(filename)] || 'application/octet-stream' } });
   });

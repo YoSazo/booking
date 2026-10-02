@@ -193,7 +193,7 @@ function render(data) {
   if ($('since-toggle')) $('since-toggle').onclick = () => { state.everything = !state.everything; saveState(); load(); };
   const rows = data.steps.flatMap(s => [s, ...(s.children || [])]);
   const step = key => rows.find(s => s.key === key) || { people: 0, ofLanded: null };
-  const tiles = [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Stayed 20s or tapped', 'engaged'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Tapped the button', 'tapped'], ['Opened Stripe', 'stripe'], ['Paid once or trial', 'trial'], ['Paid', 'paid']];
+  const tiles = [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Stayed 20s or tapped', 'engaged'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Scrolled halfway', 'scroll50'], ['Tapped the button', 'tapped'], ['Opened Stripe', 'stripe'], ['Paid once or trial', 'trial'], ['Paid', 'paid']].filter(([, key]) => rows.some(row => row.key === key));
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
     const s = step(key);
     return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : 'people from the ad'}</span></div>`;
