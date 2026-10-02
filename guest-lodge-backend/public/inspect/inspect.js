@@ -1415,9 +1415,9 @@ function trackSource(){
 // Microsoft Clarity (heatmaps, scroll maps, recordings) on the ad landing only:
 // the web, never the app, never someone signed in (reports hold customers'
 // photos and notes), never the owner's own browser, never a developer's machine.
-// It is switched off the moment anyone signs in. The same project as the
-// booking site, bookmarketel.com; filter its sessions by the "wedge" tag.
-const CLARITY_ID='wvc5g15yl5';
+// It is switched off the moment anyone signs in. The bookmarketel.com project
+// (y93wrwbvgb); filter its sessions by the "wedge" tag.
+const CLARITY_ID='y93wrwbvgb';
 function loadClarity(){
   if(native||session||ownerBrowser||window.clarity)return;
   if(/^(localhost|127\.|.*\.local$)/.test(location.hostname))return;

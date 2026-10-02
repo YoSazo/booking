@@ -325,7 +325,7 @@ test('Clarity loads for an anonymous ad visitor, tagged with the wedge', async (
     await h.page.waitForSelector('#pick-yes');
     for (let i = 0; i < 40 && !h.clarity.length; i++) await h.page.waitForTimeout(100);
     assert.equal(h.clarity.length, 1);
-    assert.match(h.clarity[0], /^https:\/\/www\.clarity\.ms\/tag\/wvc5g15yl5$/);
+    assert.match(h.clarity[0], /^https:\/\/www\.clarity\.ms\/tag\/y93wrwbvgb$/);
     await h.page.waitForTimeout(200);
     assert.deepEqual((await h.page.evaluate(() => window.__clarityCalls || [])).filter(c => c[0] === 'set'), [['set', 'wedge', 'claims']]);
     h.assertClean();

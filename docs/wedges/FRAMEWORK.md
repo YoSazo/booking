@@ -271,9 +271,10 @@ recorded have no source and drop out of that view. Use it whenever an own visit
 could be hiding in a small count: a "landed" that is higher than Meta's link
 clicks for the day is not all ads.
 
-**Clarity.** Microsoft Clarity (the same project as the booking site, id
-`wvc5g15yl5`; filter its sessions by the custom tag `wedge`, or by URL
-`/claims`) records heatmaps, scroll maps and sessions on the ad landing only,
+**Clarity.** Microsoft Clarity (the bookmarketel.com project, id `y93wrwbvgb`; the
+mktel.co hotel app reports to a different one, `wvc5g15yl5`, so check you are in
+the right project before concluding a page is not recorded; filter sessions by
+the custom tag `wedge`, or by URL `/claims`) records heatmaps, scroll maps and sessions on the ad landing only,
 through `loadClarity` in `inspect.js`. It loads for an anonymous web visitor and
 never for the iPhone app, a signed-in visit (reports hold customers' photos and
 notes), the owner's browser (`?notrack=1`) or `localhost`; every sign-in calls
