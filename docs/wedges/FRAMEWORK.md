@@ -160,7 +160,14 @@ read of this wedge found that one visitor in forty watched even a quarter of a
 recording placed above the offer: do not make the recording the thing people
 must get past.
 
-**The first question (pay-once landing).** A pay-once wedge opens on one
+**The first question (pay-once landing, off for Claims since 2026-10-02).** It is
+opt-in per wedge: `landing.firstQuestion: true` in the manifest turns it on; the
+default is off. Claims turned it off after 52 visitors saw nothing but the
+recording and none answered: with the question on, anyone who does not answer
+never sees the offer, so a low answer rate hides the very thing under test. The
+code and its tests stay for a later wedge or test; with it off, `/funnel` hides
+the question rows and cards until someone uses them and shows scroll depth on
+the ladder instead. A pay-once wedge that does opt in opens on one
 question, not the pitch. The recording floats over the page as a large card,
 with its own rounded corners and no white surface under it, the label "A damage
 report made in N seconds" above it and two buttons under it, **"I want this →"**
