@@ -2908,15 +2908,30 @@ test('staying on the video landing reaches Meta as ViewContent; arriving and the
   } finally { h.registration.close(); }
 });
 
+test('the Inspect pages allow Clarity and no other third party', () => {
+  const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../server.js'), 'utf8');
+  const gate = source.slice(source.indexOf('function inspectGate'), source.indexOf('for (const slug of Object.keys(INSPECT_ARMS))'));
+  const policy = (gate.match(/'Content-Security-Policy', "([^"]+)"/) || [])[1] || '';
+  assert.ok(policy, 'the gate sets a policy');
+  const directive = name => (policy.split(';').map(part => part.trim()).find(part => part.startsWith(`${name} `)) || '').split(/\s+/).slice(1);
+  assert.deepEqual(directive('script-src'), ["'self'", 'https://www.clarity.ms', 'https://scripts.clarity.ms']);
+  assert.deepEqual(directive('connect-src'), ["'self'", 'https://*.clarity.ms', 'https://c.bing.com']);
+  assert.deepEqual(directive('img-src'), ["'self'", 'blob:', 'data:', 'https://res.cloudinary.com', 'https://*.clarity.ms', 'https://c.bing.com']);
+  assert.deepEqual(directive('media-src'), ["'self'", 'https://res.cloudinary.com']);
+  assert.deepEqual(directive('default-src'), ["'self'"]);
+  assert.doesNotMatch(policy, /unsafe-eval/);
+  assert.equal(directive('frame-ancestors').join(' '), "'none'");
+});
+
 test('the scroll and on-screen marks of the video landing are accepted from anonymous visitors, without reaching Meta', async () => {
   const visitorId = `v_${'e'.repeat(12)}`;
   const h = moneyHarness();
   try {
-    for (const name of ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferWantTapped', 'OfferDeclineTapped', 'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped']) {
+    for (const name of ['OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferWantTapped', 'OfferDeclineTapped', 'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped', 'OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched']) {
       const res = await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' }, body: JSON.stringify({ name, tool: 'claims', visitorId, detail: 'phone' }) });
       assert.equal(res.status, 200, name);
     }
-    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 13);
+    assert.equal(h.calls.events.filter(e => e.visitorId === visitorId).length, 16);
     assert.equal(h.calls.events.find(e => e.name === 'OfferScroll50')?.detail, 'phone');
     assert.deepEqual(h.calls.capi, []);
   } finally { h.registration.close(); }

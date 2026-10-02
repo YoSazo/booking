@@ -900,7 +900,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // How far down the landing they scrolled, and whether they ever saw the video and the offer card.
     'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
     // Why someone said they did not want it: one tap, or skipped.
-    'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped'];
+    'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped',
+    // Whether the first question's buttons were reachable, and whether anyone touched the screen.
+    'OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
   const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   // A step taken inside the iOS app says so: the app's own start screen is not

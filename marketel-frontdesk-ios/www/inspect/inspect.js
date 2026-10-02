@@ -1241,6 +1241,7 @@ function videoLanding({declined=false}={}){
   watchScroll();
   bindVideoCue();
   tickLaunch();
+  loadClarity();
   if(gated){
     const device=phoneWidth()?'phone':'desktop';
     // Whichever way they got here, the page underneath is the offer: the card
@@ -1291,6 +1292,17 @@ function videoLanding({declined=false}={}){
       track(kind==='want'?'OfferWantTapped':'OfferDeclineTapped',device);
       if(kind==='want')finish();else ask();
     };
+    // Why nobody answers, if nobody does: whether the buttons could be reached
+    // on this phone, whether they touched the screen at all, and in which browser.
+    // Counts only, with the browser's name as the one detail.
+    const family=(()=>{const ua=navigator.userAgent||'';return /Instagram/i.test(ua)?'instagram':/FBAN|FBAV|FB_IAB/i.test(ua)?'facebook':/CriOS|Chrome/i.test(ua)?'chrome':/Safari/i.test(ua)?'safari':'other';})();
+    setTimeout(()=>{
+      const yes=$('pick-yes');
+      if(!yes)return;
+      const r=yes.getBoundingClientRect(),front=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+      track(r.width>0&&r.bottom<=window.innerHeight&&front&&(front===yes||yes.contains(front))?'OfferPickReady':'OfferPickBlocked',family);
+    },700);
+    document.addEventListener('pointerdown',()=>track('OfferPickTouched',family),{once:true,passive:true});
     $('pick-yes').onclick=()=>choose('want');
     $('pick-no').onclick=()=>choose('decline');
   }
@@ -1381,6 +1393,23 @@ function watchScroll(){
     observer.observe(target);scrollSeen.push(observer);
   }
 }
+// Microsoft Clarity (heatmaps, scroll maps, recordings) on the ad landing only:
+// the web, never the app, never someone signed in (reports hold customers'
+// photos and notes), never the owner's own browser, never a developer's machine.
+// It is switched off the moment anyone signs in. The same project as the
+// booking site, bookmarketel.com; filter its sessions by the "wedge" tag.
+const CLARITY_ID='wvc5g15yl5';
+function loadClarity(){
+  if(native||session||ownerBrowser||window.clarity)return;
+  if(/^(localhost|127\.|.*\.local$)/.test(location.hostname))return;
+  const start=()=>{
+    if(session||window.clarity)return;
+    (function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src='https://www.clarity.ms/tag/'+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,'clarity','script',CLARITY_ID);
+    window.clarity('set','wedge',toolId());
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(start,{timeout:1500});else setTimeout(start,800);
+}
+function stopClarity(){try{if(window.clarity)window.clarity('stop');}catch{}}
 // Plays only while it is on screen, so "watched" means someone could see it,
 // and counts seconds actually played: the loop restarts the playhead.
 function bindOfferVideo(){
@@ -2255,7 +2284,7 @@ function ensureAuth(after, intent='keep') {
       verifying=true;lastTried=code;
       run(async()=>{
         const result=await api('/auth/verify',{method:'POST',body:{email,code,attribution:inspectAttribution,tool:toolId()}});
-        session=result.token;localStorage.setItem('inspect.session',session);account=result;signedInAt=Date.now();updateHeader();prefetchLists();drawer.restore();
+        session=result.token;localStorage.setItem('inspect.session',session);stopClarity();account=result;signedInAt=Date.now();updateHeader();prefetchLists();drawer.restore();
       },null).then(()=>{
         verifying=false;
         if(account)return after();
@@ -2308,7 +2337,7 @@ window.marketelInspectAuthVerify=raw=>{
     .then(result=>{
       if(nativeAuth!==pending)return;
       nativeAuth=null;
-      session=result.token;localStorage.setItem('inspect.session',session);account=result;signedInAt=Date.now();
+      session=result.token;localStorage.setItem('inspect.session',session);stopClarity();account=result;signedInAt=Date.now();
       postAuthResult({step:'verified'});
       updateHeader();prefetchLists();
       pending.after();
@@ -3448,7 +3477,7 @@ window.marketelInspectOpenHandoff=async rawToken=>{
     const response=await fetch(`${API}/auth/handoff`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:raw})});
     const result=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(result.error||'This app link is invalid or expired.');
-    session=result.token;localStorage.setItem('inspect.session',session);account=result;
+    session=result.token;localStorage.setItem('inspect.session',session);stopClarity();account=result;
     clearURLs();draft=null;preview=false;await stored('delete');reportsCache=null;propertiesCache=null;
     updateHeader();prefetchLists();if(native&&!LANDING_ARMS[localStorage.getItem('marketel.product')])localStorage.setItem('marketel.product','inspect');
     if(result.reportId)await openReport(result.reportId);else await openAccountHome();

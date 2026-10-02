@@ -266,6 +266,66 @@ test('each reason is its own event, then the offer', async () => {
   }
 });
 
+// If nobody answers, these say why: whether the buttons could be reached, whether
+// the screen was touched at all, and in which browser. Counts only.
+test('the first question reports whether its buttons were reachable, and whether anyone touched the screen', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#pick-yes');
+    await h.page.waitForTimeout(1200);
+    assert.deepEqual(['OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched'].map(name => count(h, name)), [1, 0, 0]);
+    assert.match(h.events.find(e => e.name === 'OfferPickReady').detail, /^(chrome|safari|instagram|facebook|other)$/);
+    await h.page.touchscreen.tap(200, 300);
+    await h.page.waitForTimeout(300);
+    assert.equal(count(h, 'OfferPickTouched'), 1);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('a button covered by something else is reported as blocked', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.context.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const style = document.createElement('style'); style.textContent = '#pick-bar::after { content: ""; position: fixed; inset: 0; z-index: 99999; }'; document.head.appendChild(style); }); });
+    await h.page.reload({ waitUntil: 'domcontentloaded' });
+    await h.page.waitForSelector('#pick-yes', { state: 'attached' });
+    await h.page.waitForTimeout(1200);
+    assert.deepEqual(['OfferPickReady', 'OfferPickBlocked'].map(name => count(h, name)), [0, 1]);
+  } finally { await h.close(); }
+});
+
+// Clarity records the ad landing for an anonymous visitor on the web, and nobody
+// else: not the owner's browser, not someone signed in (their reports hold
+// customers' photos), not the app. Signing in switches it off.
+test('Clarity loads for an anonymous ad visitor, tagged with the wedge', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  try {
+    await h.page.waitForSelector('#pick-yes');
+    for (let i = 0; i < 40 && !h.clarity.length; i++) await h.page.waitForTimeout(100);
+    assert.equal(h.clarity.length, 1);
+    assert.match(h.clarity[0], /^https:\/\/www\.clarity\.ms\/tag\/wvc5g15yl5$/);
+    await h.page.waitForTimeout(200);
+    assert.deepEqual((await h.page.evaluate(() => window.__clarityCalls || [])).filter(c => c[0] === 'set'), [['set', 'wedge', 'claims']]);
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
+test('Clarity stays out of the owner browser, a signed-in visit and the app', async () => {
+  const owner = await open({ arm: 'claims', signedIn: false, query: 'notrack=1', viewport: phone, now: DURING_LAUNCH });
+  try { await owner.page.waitForSelector('#pick-yes'); await owner.page.waitForTimeout(1900); assert.deepEqual(owner.clarity, [], 'the owner browser'); } finally { await owner.close(); }
+  const member = await open({ arm: 'claims', signedIn: true, viewport: phone });
+  try { await member.page.waitForTimeout(2200); assert.deepEqual(member.clarity, [], 'someone signed in'); } finally { await member.close(); }
+  const app = await open({ arm: 'claims', native: true, signedIn: false, viewport: phone });
+  try { await app.page.waitForTimeout(2200); assert.deepEqual(app.clarity, [], 'the iPhone app'); } finally { await app.close(); }
+});
+
+test('every way of signing in switches Clarity off', () => {
+  const source = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/inspect.js'), 'utf8');
+  const starts = source.match(/session=result\.token;localStorage\.setItem\('inspect\.session',session\);/g) || [];
+  const stopped = source.match(/session=result\.token;localStorage\.setItem\('inspect\.session',session\);stopClarity\(\);/g) || [];
+  assert.ok(starts.length >= 3 && starts.length === stopped.length, `${stopped.length} of ${starts.length} sign-in points stop it`);
+  assert.match(source, /if\(native\|\|session\|\|ownerBrowser\|\|window\.clarity\)return;/);
+});
+
 test('either answer shows the offer on the same page: the recording is not redrawn, and the answer is counted', async () => {
   for (const [which, event] of [['yes', 'OfferWantTapped'], ['no', 'OfferDeclineTapped']]) {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });

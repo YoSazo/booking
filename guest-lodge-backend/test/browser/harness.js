@@ -23,7 +23,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function open({ native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
-  const shell = [], events = [], purchases = [], errors = [];
+  const shell = [], events = [], purchases = [], errors = [], clarity = [];
   const fallbackPhoto = photoFallback ? fs.readFileSync(photoFallback) : JPEG;
   const data = { reports: [...reports], properties: [...properties], account: account(accountData), photoCount: 0, photoBytes: new Map() };
   await context.exposeBinding('__shell', (_, message) => shell.push(message));
@@ -64,6 +64,8 @@ async function open({ native = false, arm = 'claims', demo = false, query = null
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
   page.on('pageerror', error => errors.push(error.message));
+  // Microsoft Clarity is never fetched from the real network; each request is recorded.
+  await page.route('https://www.clarity.ms/**', route => { clarity.push(route.request().url()); return route.fulfill({ status: 200, body: 'var q = (window.clarity && window.clarity.q) || []; window.clarity = function () { (window.__clarityCalls = window.__clarityCalls || []).push([].slice.call(arguments)); }; q.forEach(function (a) { window.clarity.apply(null, a); });', headers: { 'content-type': 'application/javascript' } }); });
   await page.route('http://app.test/**', route => {
     const url = new URL(route.request().url());
     let rel = WEDGE_PAGE.test(url.pathname) ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/inspect\/?/, '');
@@ -164,7 +166,7 @@ async function open({ native = false, arm = 'claims', demo = false, query = null
   const close = async () => { await context.close(); await browser.close(); };
   const body = () => page.locator('body').innerText();
   const assertClean = () => assert.deepEqual(errors, []);
-  return { browser, context, page, shell, events, purchases, errors, data, body, close, assertClean };
+  return { browser, context, page, shell, events, purchases, clarity, errors, data, body, close, assertClean };
 }
 
 // The app's camera as the shell drives it: a shot arrives, the words arrive
