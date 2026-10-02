@@ -13,7 +13,10 @@ const STEPS = Object.freeze([
   // The video landing: everyone sees the price, so the step between arriving
   // and deciding is staying: twenty seconds, or tapping the button sooner.
   // It is Meta's ViewContent, and it always includes everyone who tapped.
-  { key: 'engaged', label: 'Stayed 20 seconds or tapped the button', names: ['OfferEngaged'] },
+  // What Meta hears as ViewContent: the first deliberate act (scrolled most of the
+  // way, a quarter of the recording, the see-a-report pill, or the pay button).
+  { key: 'engaged', label: 'Did something on purpose (what Meta hears)', names: ['OfferEngaged'] },
+  { key: 'stayed', label: 'Stayed 20 seconds (not sent to Meta)', names: ['OfferStayed20'], aside: true },
   // The first question on the pay-once landing: the recording, then "I want
   // this" or "I don't want this"; either shows the offer. A decline asks why.
   { key: 'picked', label: 'Answered the first question', hideWhenEmpty: true, names: ['OfferWantTapped', 'OfferDeclineTapped', 'OfferUnsureTapped'], aside: true,
@@ -71,7 +74,7 @@ const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
   'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
-  'OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
+  'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
   'OfferReasonPrice', 'OfferReasonNoProperty', 'OfferReasonNoNeed', 'OfferReasonDoubt', 'OfferReasonSkipped',
   'OfferPickReady', 'OfferPickBlocked', 'OfferPickTouched',

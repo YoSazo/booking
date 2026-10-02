@@ -85,16 +85,16 @@ test('/funnel draws every step, the answers under the question and the reasons u
     await page.waitForSelector('#ladder tbody tr');
     const rows = await page.$$eval('#ladder tbody tr', trs => trs.map(tr => ({ cls: tr.className, label: tr.querySelector('td.step').textContent.replace(/\s+/g, ' ').trim(), people: tr.querySelector('td:nth-child(3)').textContent.trim() })));
     const labels = rows.map(r => r.label);
-    assert.deepEqual(labels.slice(0, 19), [
-      'Landed from the ad', 'Saw the video', 'Stayed 20 seconds or tapped the button', 'Answered the first question',
+    assert.deepEqual(labels.slice(0, 20), [
+      'Landed from the ad', 'Saw the video', 'Did something on purpose (what Meta hears)', 'Stayed 20 seconds (not sent to Meta)', 'Answered the first question',
       '↳ Said "I want this"', '↳ Said "I don\'t want this"', '↳ The price is too expensive', '↳ Does not rent out property', '↳ Does not need it', '↳ Not sure it works', '↳ Skipped the reason',
       'Saw the offer card', 'Scrolled a quarter of the way', 'Scrolled halfway', 'Scrolled three quarters', 'Scrolled to the bottom',
       'Tapped the button', 'Opened Stripe', 'Paid once or started a trial',
     ]);
-    assert.deepEqual(rows.slice(0, 19).map(r => r.people), ['3', '2', '1', '2', '1', '1', '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0']);
-    assert.ok(rows[1].cls.includes('aside') && rows[3].cls.includes('aside') && rows[4].cls.includes('child') && rows[6].cls.includes('depth2'));
+    assert.deepEqual(rows.slice(0, 20).map(r => r.people), ['3', '2', '1', '0', '2', '1', '1', '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0']);
+    assert.ok(rows[1].cls.includes('aside') && rows[3].cls.includes('aside') && rows[4].cls.includes('aside') && rows[5].cls.includes('child') && rows[7].cls.includes('depth2'));
     const tiles = await page.$$eval('#tiles .tile', els => els.map(el => [el.querySelector('small').textContent, el.querySelector('strong').textContent]));
-    assert.deepEqual(tiles.slice(0, 8), [['Landed', '3'], ['Saw the video', '2'], ['Stayed 20s or tapped', '1'], ['Answered the question', '2'], ['Said I want this', '1'], ["Said I don't want this", '1'], ['Saw the offer card', '1'], ['Scrolled halfway', '0']]);
+    assert.deepEqual(tiles.slice(0, 8), [['Landed', '3'], ['Saw the video', '2'], ['Did something on purpose', '1'], ['Stayed 20s', '0'], ['Answered the question', '2'], ['Said I want this', '1'], ["Said I don't want this", '1'], ['Saw the offer card', '1']]);
     await page.screenshot({ path: process.env.FUNNEL_SHOT || '/tmp/funnel-shot.png', fullPage: true });
   } finally { await browser.close(); }
 });
@@ -122,7 +122,7 @@ test('/funnel for a page with no first question shows the page and scroll metric
     await page.goto('http://funnel.test/funnel');
     await page.waitForSelector('#ladder tbody tr');
     const rows = await page.$$eval('#ladder tbody tr', trs => trs.map(tr => [tr.querySelector('td.step').textContent.replace(/\s+/g, ' ').trim(), tr.querySelector('td:nth-child(3)').textContent.trim()]));
-    assert.deepEqual(rows.slice(0, 9), [['Landed from the ad', '4'], ['Saw the video', '2'], ['Stayed 20 seconds or tapped the button', '1'], ['Saw the offer card', '2'], ['Scrolled a quarter of the way', '2'], ['Scrolled halfway', '1'], ['Scrolled three quarters', '0'], ['Scrolled to the bottom', '0'], ['Tapped the button', '1']]);
+    assert.deepEqual(rows.slice(0, 10), [['Landed from the ad', '4'], ['Saw the video', '2'], ['Did something on purpose (what Meta hears)', '1'], ['Stayed 20 seconds (not sent to Meta)', '0'], ['Saw the offer card', '2'], ['Scrolled a quarter of the way', '2'], ['Scrolled halfway', '1'], ['Scrolled three quarters', '0'], ['Scrolled to the bottom', '0'], ['Tapped the button', '1']]);
     assert.ok(!rows.some(([label]) => /first question|I want this|I don't want|reason|Skipped/i.test(label)), 'no question rows');
     const cards = await page.$$eval('#branches .card h2', hs => hs.map(h => h.textContent));
     assert.ok(cards.includes('How far down the page') && !cards.some(c => /first question|Why they did not|Could they answer/.test(c)), JSON.stringify(cards));

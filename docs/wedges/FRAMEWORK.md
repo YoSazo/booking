@@ -151,8 +151,11 @@ sized to be on screen all at once between the header and the price bar. Keep
 it under about 40 seconds, record it in real time and never speed it up: the
 page says how long it took, so `seconds` must be what the file is. The
 simulation stays at `?sim=1`; Stripe returns and signed-in owners are
-untouched. Meta's ViewContent there is twenty seconds with the page on screen,
-or tapping the button, whichever comes first. How far down the page they went
+untouched. Meta's ViewContent there (`OfferEngaged`) is the first deliberate act: scrolling
+most of the way down, a quarter of the recording watched, the see-a-report pill,
+or the pay button, never time alone (a visitor who lingers is the cheapest to
+find and the least likely to buy). Twenty seconds on screen is `OfferStayed20`,
+a number on `/funnel` that Meta does not hear. How far down the page they went
 (25, 50, 75 and 100%), whether the recording and the offer card were ever on
 screen, and how much of the recording they watched are on `/funnel` only.
 The page's content policy allows media from Cloudinary only. The first video
@@ -407,9 +410,11 @@ it. Fix only what one change can close: a step that must double can be fixed,
 a step that must grow five times cannot. Run at most four wedges at once and
 move money to the one whose paying customer costs least.
 
-**Meta.** On the video landing, ViewContent is twenty seconds on the page or
-tapping start free. Move the ads to InitiateCheckout (start free) once it
-reaches about 20 a week. A killed wedge is a week or two and a few hundred
+**Meta.** On the video landing, ViewContent is the first deliberate act (see §8),
+which should fire for roughly 15% to 25% of visitors, enough for Meta to learn
+from at about $20 a day. Move the ads to InitiateCheckout (the pay tap) once it
+reaches about 50 a week; the deeper the event, the fewer there are, and below
+about 50 a week Meta falls back on its default cheap, old-skewing delivery. A killed wedge is a week or two and a few hundred
 dollars: move to the next brief, and keep the next one ready before you need
 it.
 

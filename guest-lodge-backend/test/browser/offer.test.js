@@ -582,21 +582,44 @@ test('without a landing video, with ?sim=1, or signed in, nothing changes', asyn
 
 // Meta's ViewContent on the video landing: twenty seconds with the page on
 // screen, or tapping start free sooner, once per visit, with the Meta ids.
-test('twenty seconds on screen is engaged, once, with the Meta ids; a hidden tab does not count', async () => {
+test('twenty seconds on screen is its own number and is not what Meta hears; a hidden tab does not count', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
     await fastClock(h, { hidden: true });
     await h.page.waitForTimeout(1200);
-    assert.equal(count(h, 'OfferEngaged'), 0, 'a minute behind other tabs is not engaged');
+    assert.equal(count(h, 'OfferStayed20'), 0, 'a minute behind other tabs is not a stay');
     await h.page.evaluate(() => { window.__hidden = false; });
-    for (let i = 0; i < 30 && !count(h, 'OfferEngaged'); i++) await h.page.waitForTimeout(100);
+    for (let i = 0; i < 30 && !count(h, 'OfferStayed20'); i++) await h.page.waitForTimeout(100);
     await h.page.waitForTimeout(600);
-    assert.equal(count(h, 'OfferEngaged'), 1);
-    assert.match(String(h.events.find(event => event.name === 'OfferEngaged').attribution?.fbc || ''), /test-click/);
+    assert.equal(count(h, 'OfferStayed20'), 1);
+    assert.equal(count(h, 'OfferEngaged'), 0, 'time alone is never ViewContent');
     h.assertClean();
   } finally { await h.close(); }
 });
+
+// ViewContent, the event Meta optimizes on, is the first deliberate act and
+// nothing else, once per visit, with the browser's Meta ids.
+for (const [name, act] of [
+  ['scrolling most of the way down', async h => { for (const share of [0.5, 0.8, 1]) { await h.page.evaluate(share => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * share), share); await h.page.waitForTimeout(150); } }],
+  ['a quarter of the recording watched', async h => { await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' })); for (let i = 0; i < 60 && !count(h, 'OfferVideoQuarter'); i++) await h.page.waitForTimeout(200); }],
+  ['the see-a-report pill', async h => { await h.page.waitForSelector('#video-cue.is-shown'); await h.page.click('#video-cue'); }],
+  ['the pay button', async h => { await h.page.click('#sim-buy'); }],
+]) {
+  test(`ViewContent is sent for ${name}, once, with the Meta ids`, async () => {
+    const h = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone, now: DURING_LAUNCH });
+    try {
+      await h.page.waitForSelector('#offer-video');
+      await h.page.waitForTimeout(700);
+      assert.equal(count(h, 'OfferEngaged'), 0, 'nothing yet: a visit that only looks is not ViewContent');
+      await act(h);
+      for (let i = 0; i < 30 && !count(h, 'OfferEngaged'); i++) await h.page.waitForTimeout(100);
+      await h.page.waitForTimeout(500);
+      assert.equal(count(h, 'OfferEngaged'), 1);
+      assert.match(String(h.events.find(event => event.name === 'OfferEngaged').attribution?.fbc || ''), /test-click/);
+    } finally { await h.close(); }
+  });
+}
 
 test('tapping start free before twenty seconds is engaged at once', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });

@@ -140,7 +140,7 @@ test('the ladder lists every step in order, with the answers and reasons under t
     ev('OfferReasonPrice', 'v_b'), ev('OfferReasonSkipped', 'v_c'),
     ev('OfferSawOffer', 'v_a'), ev('SimCheckoutTapped', 'v_a'),
   ]);
-  assert.deepEqual(f.steps.slice(0, 10).map(s => s.key), ['landed', 'sawvideo', 'engaged', 'picked', 'sawoffer', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'tapped']);
+  assert.deepEqual(f.steps.slice(0, 11).map(s => s.key), ['landed', 'sawvideo', 'engaged', 'stayed', 'picked', 'sawoffer', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'tapped']);
   const row = key => f.steps.find(s => s.key === key);
   assert.equal(row('sawvideo').people, 3);
   assert.equal(row('sawvideo').aside, true);

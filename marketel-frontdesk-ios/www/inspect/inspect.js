@@ -1290,6 +1290,7 @@ function videoLanding({declined=false}={}){
     const choose=kind=>{
       haptic();
       track(kind==='want'?'OfferWantTapped':'OfferDeclineTapped',device);
+      if(kind==='want')engaged();
       if(kind==='want')finish();else ask();
     };
     // Why nobody answers, if nobody does: whether the buttons could be reached
@@ -1325,19 +1326,24 @@ function tickLaunch(){
     if(bar)bar.textContent=launchBarLine();
   },1000);
 }
-// Engaged is Meta's ViewContent on this page: twenty seconds with it on their
-// screen (a tab left open behind others does not count), or tapping start free,
-// whichever comes first. Once per visit, however often the page is redrawn.
-const OFFER_ENGAGED_SECONDS=20;
+// Meta's ViewContent here is "did something on purpose", never time alone: a
+// visitor who lingers is the cheapest one to find and the least likely to buy
+// (in the first Claims campaigns they were mostly 65 and over). Once per visit,
+// on the first of: scrolled most of the way down, watched a quarter of the
+// recording, tapped the "see a real report" pill, or tapped the pay button.
+// Twenty seconds with the page on screen is still counted, as its own number on
+// /funnel (OfferStayed20), but Meta is not told about it.
+const OFFER_STAYED_SECONDS=20;
+function engaged(){if(offerOnVideo)track('OfferEngaged');}
 let engagedTimer=null;
 function watchEngagement(){
   if(engagedTimer)return;
   let seen=0;
   engagedTimer=setInterval(()=>{
     if(document.visibilityState!=='visible')return;
-    if(++seen<OFFER_ENGAGED_SECONDS)return;
+    if(++seen<OFFER_STAYED_SECONDS)return;
     clearInterval(engagedTimer);
-    track('OfferEngaged');
+    track('OfferStayed20');
   },1000);
 }
 // The recording sits under the offer, so while the offer is on screen and the
@@ -1357,6 +1363,7 @@ function bindVideoCue(){
   }
   cue.onclick=()=>{
     track('OfferCueTapped',phoneWidth()?'phone':'desktop');
+    engaged();
     const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     video.scrollIntoView({behavior:calm?'auto':'smooth',block:'center'});
   };
@@ -1381,7 +1388,7 @@ function watchScroll(){
       const page=document.documentElement,height=Math.max(page.scrollHeight,document.body.scrollHeight);
       if(height<=window.innerHeight*1.05)return;
       const depth=((window.scrollY||page.scrollTop||0)+window.innerHeight)/height;
-      for(const [share,name] of SCROLL_MARKS)if(depth>=share)track(name,device);
+      for(const [share,name] of SCROLL_MARKS)if(depth>=share){track(name,device);if(name==='OfferScroll75')engaged();}
     });
   };
   window.addEventListener('scroll',scrollHandler,{passive:true});
@@ -1422,7 +1429,7 @@ function bindOfferVideo(){
     if(at>last&&at-last<1.5)watched+=at-last;
     last=at;
     if(!length||!Number.isFinite(length))return;
-    for(const [share,name] of marks)if(watched>=share*length)track(name);
+    for(const [share,name] of marks)if(watched>=share*length){track(name);if(name==='OfferVideoQuarter')engaged();}
   });
   // It starts by itself. Only when the browser says it wants a tap does a play
   // button appear over the recording; any other failed start (one interrupted by

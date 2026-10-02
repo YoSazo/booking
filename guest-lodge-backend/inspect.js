@@ -896,7 +896,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // above — comparing them is the entire reason both exist.
   const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
     // The video landing: arriving, then how much of the video they watched.
-    'OfferLanded', 'OfferEngaged', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
+    'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
     // How far down the landing they scrolled, and whether they ever saw the video and the offer card.
     'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
     // Why someone said they did not want it: one tap, or skipped.
@@ -916,9 +916,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       : LADDER_EVENTS.includes(body?.name) && body?.name !== 'OfferDeclined' ? (fromAppOrigin(req) ? 'app' : 'web') : null,
   });
   // The signals Meta can optimize for. On the video landing everyone sees the
-  // price, so seeing it tells Meta nothing: ViewContent is twenty seconds there
-  // or tapping start free, whichever comes first, so the visitor who gets it in
-  // ten seconds and taps counts too. Otherwise the demo's three, from the shallowest with
+  // price, so seeing it tells Meta nothing: ViewContent (OfferEngaged) is the first
+  // deliberate act there (scrolling most of the way, a quarter of the recording,
+  // the see-a-report pill, the pay button), never time on the page, which is
+  // OfferStayed20 and stays on /funnel. Otherwise the demo's three, from the shallowest with
   // the most volume to the deepest: the report seen (ViewContent), "Get this"
   // (AddToCart), and the start-free tap (InitiateCheckout). There is no
   // account yet, so each goes with the browser's Meta ids and the visitor id,
