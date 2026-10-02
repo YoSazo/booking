@@ -250,6 +250,20 @@ browser off ("Not counting this browser"): it sends no steps, every request is
 marked `x-marketel-no-track`, and the server records nothing and tells Meta
 nothing for it. `?notrack=1` on any page does the same for in-app browsers.
 
+**Clarity.** Microsoft Clarity (the same project as the booking site, id
+`wvc5g15yl5`; filter its sessions by the custom tag `wedge`, or by URL
+`/claims`) records heatmaps, scroll maps and sessions on the ad landing only,
+through `loadClarity` in `inspect.js`. It loads for an anonymous web visitor and
+never for the iPhone app, a signed-in visit (reports hold customers' photos and
+notes), the owner's browser (`?notrack=1`) or `localhost`; every sign-in calls
+`stopClarity`. The Inspect pages' content policy allows `www`/`scripts.clarity.ms`
+for scripts and `*.clarity.ms` and `c.bing.com` for reports, and nothing else
+third party; the terms page says so. Heatmaps need about 30 sessions to mean
+anything. Three diagnostics on the first question say why nobody answers: `OfferPickReady`
+or `OfferPickBlocked` (could the button be reached), `OfferPickTouched` (did the
+screen get touched at all), each with the browser's name (instagram, facebook,
+chrome, safari) as its one detail; they sit on `/funnel` as "Could they answer?".
+
 **Markers.** Every material change to a page or an ad gets a `FunnelReset`
 marker row (an `InspectEvent` with that name and the wedge's tool, inserted with
 the database's own clock, never this machine's: it runs minutes ahead and a
