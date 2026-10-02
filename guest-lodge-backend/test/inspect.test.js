@@ -2955,6 +2955,20 @@ const LAUNCH_END = Date.parse(OFFER.launch.until);
 const LAUNCH_CENTS = OFFER.launch.price * 100, STANDING_CENTS = OFFER.lifetime * 100;
 const DURING_LAUNCH = new Date(LAUNCH_END - 36 * 3600000).toISOString(), AFTER_LAUNCH = new Date(LAUNCH_END + 3600000).toISOString();
 
+test('a headless or crawler browser opening Checkout is not counted as someone who opened Stripe', () => atTime(DURING_LAUNCH, async () => {
+  const h = moneyHarness();
+  const buy = userAgent => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': userAgent },
+    body: JSON.stringify({ plan: 'lifetime', interval: 'month', tool: 'claims', visitorId: `v_${'b'.repeat(12)}` }) });
+  try {
+    for (const bot of ['Mozilla/5.0 HeadlessChrome/120.0', 'Mozilla/5.0 (compatible; SomeBot/2.1; +http://x.test)', 'Playwright/1.27 Mozilla/5.0', 'FacebookExternalHit crawler']) {
+      assert.equal((await buy(bot)).status, 200, bot);
+    }
+    assert.deepEqual(h.calls.events.filter(event => event.name === 'SimCheckoutStarted'), [], 'no row for any of them');
+    assert.equal((await buy('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0')).status, 200);
+    assert.equal(h.calls.events.filter(event => event.name === 'SimCheckoutStarted').length, 1, 'a phone in the Instagram app is counted');
+  } finally { h.registration.close(); }
+}));
+
 test('paying once is one payment at the launch price with no subscription, and it carries the ad click to Stripe', () => atTime(DURING_LAUNCH, async () => {
   const h = moneyHarness();
   const buy = body => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },

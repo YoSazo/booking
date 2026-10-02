@@ -501,6 +501,10 @@ function registerInspect(app, {
   };
   // Set by /funnel's "Don't count my visits" switch in the owner's own browser.
   const ownerBrowser = req => String(req?.headers?.['x-marketel-no-track'] || '') === '1';
+  // Headless and crawler browsers are not visitors. The visit endpoint has always ignored them;
+  // the checkout ones must too, or a script that opens Checkout is counted as "opened Stripe"
+  // with no visit, no ad click and no person behind it.
+  const automatedBrowser = req => /HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req?.headers?.['user-agent'] || ''));
   const queueInspectCapi = async (eventName, {
     account,
     req,
@@ -962,7 +966,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (ownerBrowser(req)) return res.json({ success: true, ignored: true });
     // Automated browsers are not visitors: our own production checks run
     // headless, and counting them (or sending them to Meta) skews the funnel.
-    if (/HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req.headers?.['user-agent'] || ''))) return res.json({ success: true, ignored: true });
+    if (automatedBrowser(req)) return res.json({ success: true, ignored: true });
     rate(`inspect-anon-events:${req.ip}`, 120, 3600000);
     await record(null, req.body.name, undefined, eventExtra(req.body, req));
     if (SIM_SIGNALS[req.body.name]) {
@@ -1045,7 +1049,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
-    if (!ownerBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: 'lifetime' });
+    if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: 'lifetime' });
     res.json({ url: session.url, trialDays: 0, lifetime: true });
   }
   router.post('/checkout/sim', guarded(async (req, res) => {
@@ -1105,7 +1109,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
-    if (!ownerBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
+    if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor });
     res.json({ url: session.url, trialDays });
   }));
 
