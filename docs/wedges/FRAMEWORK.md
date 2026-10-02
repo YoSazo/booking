@@ -411,10 +411,14 @@ a step that must grow five times cannot. Run at most four wedges at once and
 move money to the one whose paying customer costs least.
 
 **Meta.** On the video landing, ViewContent is the first deliberate act (see §8),
-which should fire for roughly 15% to 25% of visitors, enough for Meta to learn
-from at about $20 a day. Move the ads to InitiateCheckout (the pay tap) once it
-reaches about 50 a week; the deeper the event, the fewer there are, and below
-about 50 a week Meta falls back on its default cheap, old-skewing delivery. A killed wedge is a week or two and a few hundred
+which should fire for roughly 15% to 25% of visitors; at $1 or so a visitor that
+is about $4 to $12 an event. Do not wait on Meta's "50 events a week" figure: it
+is a guideline for leaving the learning label, not a requirement, and an ad set
+below it still delivers. What decides a test is who sees the ad (hard age limits,
+original audience options) and whether the creative is cheap enough per
+visitor and per sale. Judge on landed visitors and cost per sale. Move the ads
+to InitiateCheckout (the pay tap) when it happens often enough to be worth the
+deeper signal; the deeper the event, the rarer and dearer it is. A killed wedge is a week or two and a few hundred
 dollars: move to the next brief, and keep the next one ready before you need
 it.
 
