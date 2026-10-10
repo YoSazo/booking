@@ -40,10 +40,10 @@ const fastClock = async (h, { hidden = false } = {}) => {
   await h.page.waitForSelector('#offer-video');
 };
 
-// An ad visitor arrives without ?sim: the job as the headline, the real app
-// making a report, and the price on one button under it. No simulation stands
-// between them and the price, and no subscription is in it: Claims is paid once.
-test('phone: an ad visitor gets the job as the headline, the video, and one button', async () => {
+// An ad visitor arrives without ?sim: the price as the headline, the full card,
+// and the recording under it. No simulation stands between them and the price,
+// and no subscription is in it: Claims is paid once.
+test('phone: an ad visitor gets the price as the headline, the full card, and the recording under it', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
@@ -53,7 +53,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and one butt
     assert.match(video.src, /^https:\/\/res\.cloudinary\.com\/.+\.mp4$/);
     assert.match(video.poster, /^https:\/\/res\.cloudinary\.com\/.+\.jpg$/);
     assert.equal(await h.page.$('[data-sim-pick]'), null, 'no simulation');
-    assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
+    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`\\$${LAUNCH} once\\.\\s*Unlimited damage reports\\.`));
     const text = await h.body();
     assert.match(text, /Pay once\. Keep it for good\./);
     assert.match(text, new RegExp(`${SECONDS} seconds`));
@@ -72,12 +72,11 @@ test('phone: an ad visitor gets the job as the headline, the video, and one butt
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
-    // Job, stars, tape and a large recording share the first screen. The buy
-    // card is under the recording; the pinned bar covers the price until they
-    // scroll to it.
-    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').top, videoTop: r('offer-video').top, video: r('offer-video').bottom, height: window.innerHeight }; });
-    assert.ok(first.videoTop < first.height && first.video > 80, 'the recording is on the first screen: ' + JSON.stringify(first));
-    assert.ok(first.video < first.buy, 'the video is above the offer');
+    // Price, stars and the full card share the first screen. The recording is
+    // under the card; the pinned bar covers the price once they scroll past it.
+    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').top, card: r('sim-offer').bottom, videoTop: r('offer-video').top, height: window.innerHeight }; });
+    assert.ok(first.buy > 0 && first.buy < first.height, 'the offer is on the first screen: ' + JSON.stringify(first));
+    assert.ok(first.card < first.videoTop, 'the video is under the offer');
     await h.page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await h.page.waitForTimeout(500);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar comes in once the card is behind them');
@@ -121,7 +120,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     assert.match(await h.page.textContent('#sim-buy'), new RegExp(`Get it for \\$${LAUNCH}`));
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
     assert.match((await h.page.textContent('#sim-buy')).trim(), new RegExp(`Get it for \\$${STANDING}`));
-    assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
+    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`\\$${STANDING} once\\.\\s*Unlimited damage reports\\.`));
     const offer = `${await h.page.textContent('#sim-offer')} ${await h.page.textContent('#sim-paybar')}`;
     assert.doesNotMatch(offer, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} once\\s*No subscription\\s*Get it`));
@@ -358,7 +357,7 @@ test('either answer shows the offer on the same page: the recording is not redra
       assert.equal(await h.page.evaluate(() => document.getElementById('offer-video').dataset.same), 'yes', 'the same video element');
       assert.equal(await h.page.$('#pick-bar'), null);
       assert.equal(await h.page.evaluate(() => window.scrollY), 0);
-      assert.match(await h.page.textContent('h1'), /Document the damage\s*while it is in front of you\./);
+      assert.match(await h.page.textContent('h1'), new RegExp(`\\$${LAUNCH} once\\.\\s*Unlimited damage reports\\.`));
       assert.equal(await h.page.isVisible('#sim-buy'), true);
       assert.deepEqual(['OfferWantTapped', 'OfferDeclineTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
       if (which === 'no') assert.equal(count(h, 'OfferReasonPrice'), 1);
@@ -486,17 +485,18 @@ test('with no trouble at all there is no play button', async () => {
   } finally { await h.close(); }
 });
 
-// The recording is on the first screen. No scroll pill — they can already see it.
+// The offer is on the first screen. No scroll pill. The recording sits under it.
 for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
-  test(`phone ${size.width}x${size.height}: the recording is on screen and centred, with no scroll pill`, async () => {
+  test(`phone ${size.width}x${size.height}: the offer is on screen and the recording is under it, with no scroll pill`, async () => {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await choose(h);
       await h.page.waitForTimeout(400);
       assert.equal(await h.page.$('#video-cue'), null);
-      const view = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight }; });
-      assert.ok(view.top < view.vh && view.bottom > 0, 'the recording is on the first screen: ' + JSON.stringify(view));
+      const view = await h.page.evaluate(() => { const buy = document.getElementById('sim-buy').getBoundingClientRect(), r = document.getElementById('offer-video').getBoundingClientRect(); return { buy: buy.top, video: r.top, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight }; });
+      assert.ok(view.buy > 0 && view.buy < view.vh, 'the offer is on the first screen: ' + JSON.stringify(view));
+      assert.ok(view.video > view.buy, 'the recording is under the offer: ' + JSON.stringify(view));
       assert.ok(Math.abs(view.middle - view.page) <= 2, 'the recording is centred: ' + JSON.stringify(view));
       h.assertClean();
     } finally { await h.close(); }
