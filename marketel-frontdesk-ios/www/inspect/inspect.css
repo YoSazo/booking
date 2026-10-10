@@ -897,7 +897,7 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .offer-tape-run { display: flex; gap: 10px; padding-right: 10px; }
 .tape-card { flex: 0 0 220px; margin: 0; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
 .tape-card .review-stars { display: block; margin-bottom: 4px; font-size: 13px; }
-.tape-card blockquote { margin: 0; font-size: 13px; line-height: 1.35; letter-spacing: -.15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tape-card blockquote { margin: 0; padding: 0; background: none; border-radius: 0; white-space: normal; font-size: 13px; line-height: 1.35; letter-spacing: -.15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tape-card figcaption { margin-top: 6px; display: flex; flex-direction: column; gap: 0; }
 .review-name { font-weight: 700; font-size: 12px; }
 .review-role { color: var(--muted); font-size: 11px; }
