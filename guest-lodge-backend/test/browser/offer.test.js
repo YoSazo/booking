@@ -56,10 +56,15 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
     const text = await h.body();
     assert.match(text, /Pay once\. Keep it for good\./);
+    assert.match(text, /3-day money-back guarantee/);
+    assert.match(text, /Try Marketel Claims\. If it's not right for you, request a refund within 3 days of purchase\./);
     assert.match(text, new RegExp(`${SECONDS} seconds`));
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
-    assert.match(require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8'), new RegExp(`\\$${LAUNCH} USD at its launch price until`));
+    const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
+    assert.match(terms, new RegExp(`\\$${LAUNCH} USD at its launch price until`));
+    assert.match(terms, /3-day money-back guarantee/);
+    assert.match(terms, /have not sent a report/);
     // Signing in is the header's job; the landing carries no second link for it.
     assert.equal(await h.page.$('#offer-sign-in'), null);
     assert.doesNotMatch(text, /Already have/);
@@ -148,6 +153,7 @@ test('after paying once, the thank-you page says it is theirs and nothing renews
     const text = await h.body();
     assert.match(text, /Marketel Claims is yours\./);
     assert.match(text, /Paid once\. No subscription, and nothing renews\./);
+    assert.match(text, /3-day money-back guarantee/);
     assert.match(text, /Continue in this browser/);
     assert.match(text, /new on the App Store/i);
     assert.doesNotMatch(text, /free days|subscribed/i);

@@ -2986,6 +2986,8 @@ test('paying once is one payment at the launch price with no subscription, and i
     assert.deepEqual(params.line_items[0].price_data.unit_amount, LAUNCH_CENTS);
     assert.equal(params.line_items[0].price_data.currency, 'usd');
     assert.match(params.line_items[0].price_data.product_data.name, /^Marketel Claims: unlimited reports, paid once$/);
+    assert.match(params.line_items[0].price_data.product_data.description, /3-day money-back guarantee/);
+    assert.match(params.custom_text.submit.message, /3-day money-back guarantee/);
     assert.equal(params.metadata.plan, 'lifetime');
     assert.equal(params.metadata.ad_fbc, 'fb.1.1700000000.abc');
     assert.equal(params.metadata.ad_fbp, 'fb.1.1700000000.123');
@@ -3023,7 +3025,7 @@ test('the launch price really ends: from its fixed moment checkout charges the s
     try {
       assert.equal((await buy(h)).status, 200);
       assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, STANDING_CENTS);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews.');
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews. 3-day money-back guarantee.');
     } finally { h.registration.close(); }
   });
   // A launch price the registry would accept is lower than the full price and

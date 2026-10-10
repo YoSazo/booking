@@ -850,6 +850,12 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .offer-intro p { margin: 0; }
 .offer-intro h1, .offer-intro p { text-wrap: balance; }
 .offer-intro .offer-trust { margin-top: 10px; }
+.offer-intro .guarantee-badge { display: inline-flex; align-items: center; gap: 7px; margin: 10px 0 0; color: var(--green); font-size: 15px; font-weight: 700; }
+.guarantee-badge .icon { flex: 0 0 auto; }
+.guarantee { margin: 16px 0 2px; text-align: left; }
+.guarantee-title { display: flex; align-items: center; gap: 8px; margin: 0; color: #1a2b22; font-size: 16px; font-weight: 750; letter-spacing: -0.2px; line-height: 1.25; }
+.guarantee-title .icon { flex: 0 0 auto; color: var(--green); }
+.guarantee-line { margin: 6px 0 0; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.4; }
 .offer-video { position: relative; margin: 0; justify-self: center; width: 100%; max-width: 440px; text-align: center; }
 .offer-video video { display: block; margin: 0 auto; width: auto; max-width: 100%; height: min(calc(100svh - 300px), 720px); aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 16px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
 .sim-thanks #sim-get-app { margin-top: 10px; }
