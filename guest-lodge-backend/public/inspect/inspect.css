@@ -852,6 +852,7 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .offer-intro .offer-trust { margin-top: 10px; }
 .offer-video { position: relative; margin: 0; justify-self: center; width: 100%; max-width: 440px; text-align: center; }
 .offer-video video { display: block; margin: 0 auto; width: auto; max-width: 100%; height: min(calc(100svh - 300px), 720px); aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 16px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
+.sim-thanks #sim-get-app { margin-top: 10px; }
 .offer-fine { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 14px; font-weight: 600; }
 .sim-offer.is-tight { padding: 18px 18px 16px; text-align: center; }
 .sim-offer.is-tight #sim-buy { margin: 0; }

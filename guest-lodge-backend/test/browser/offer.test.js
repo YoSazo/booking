@@ -148,6 +148,8 @@ test('after paying once, the thank-you page says it is theirs and nothing renews
     const text = await h.body();
     assert.match(text, /Marketel Claims is yours\./);
     assert.match(text, /Paid once\. No subscription, and nothing renews\./);
+    assert.match(text, /Continue in this browser/);
+    assert.match(text, /new on the App Store/i);
     assert.doesNotMatch(text, /free days|subscribed/i);
     h.assertClean();
   } finally { await h.close(); }

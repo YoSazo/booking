@@ -137,7 +137,7 @@ test('the originals line on the send sheet is each wedge\'s own', () => {
 // appStore.live is the switch between "use it here in the browser" and "get the
 // iPhone app" after paying. Claims is in the approved app; Moveout is not yet.
 for (const [id, live] of [['moveout', false], ['claims', true]]) {
-  test(`${id}: after paying, ${live ? 'buyers are pointed at the iPhone app' : 'buyers start in the browser and never see the App Store'}`, async () => {
+  test(`${id}: after paying, ${live ? 'buyers can continue in the browser or get the new iPhone app' : 'buyers start in the browser and never see the App Store'}`, async () => {
     const config = load({ fixture: true }).byId[id];
     assert.equal(config.appStore.live, live);
     const h = await open({ arm: id, includeFixture: id === 'fixture', signedIn: false, demo: true });
@@ -148,7 +148,8 @@ for (const [id, live] of [['moveout', false], ['claims', true]]) {
         start: document.getElementById('sim-signin')?.textContent.trim(), text: document.querySelector('.sim-thanks').innerText }));
       if (live) {
         assert.ok(view.appLink, JSON.stringify(view));
-        assert.match(view.text, /Get the iPhone app/);
+        assert.match(view.text, /new on the App Store/i);
+        assert.match(view.start, /Continue in this browser/);
       } else {
         assert.ok(!view.appLink && !/iPhone app|App Store/i.test(view.text), JSON.stringify(view));
         assert.match(view.start, /^Start your first /);
