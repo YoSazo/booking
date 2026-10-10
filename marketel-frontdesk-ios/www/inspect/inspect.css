@@ -674,6 +674,8 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-paybar strong { font-size: 20px; font-weight: 750; line-height: 1.15; }
 .sim-paybar small { color: var(--muted); font-weight: 600; font-size: 13px; line-height: 1.2; }
 .sim-paybar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; white-space: nowrap; }
+.sim-paybar.has-guarantee { flex-wrap: wrap; row-gap: 6px; }
+.sim-paybar .guarantee-badge { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0; color: var(--green); font-size: 12px; font-weight: 700; line-height: 1.2; }
 .sim-report { padding-bottom: 96px; }
 /* Annual is a text switch in the small print rather than a segmented control:
    the sticky bar is the offer, and a second full choice under it is a fifth

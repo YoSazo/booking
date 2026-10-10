@@ -91,6 +91,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
     assert.equal(await h.page.textContent('#sim-paybar s'), `$${STANDING}`);
     assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
+    assert.equal((await h.page.textContent('#sim-paybar .guarantee-badge')).trim(), '3-day money-back guarantee');
     // It ticks.
     const before = await h.page.textContent('[data-launch-left]');
     await h.page.waitForTimeout(1300);
@@ -99,6 +100,18 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
       return { button: box('#sim-paybar-buy').height, price: box('#sim-paybar strong').bottom, terms: box('#sim-paybar small').top }; });
     assert.ok(bar.button <= 56, JSON.stringify(bar));
     assert.ok(bar.terms >= bar.price - 1, 'the clock sits under the price');
+    for (const width of [320, 390]) {
+      await h.page.setViewportSize({ width, height: phone.height });
+      const layout = await h.page.evaluate(() => {
+        const box = selector => document.querySelector(selector).getBoundingClientRect();
+        const badge = box('#sim-paybar .guarantee-badge'), button = box('#sim-paybar-buy'), bar = box('#sim-paybar');
+        return { badgeTop: badge.top, badgeBottom: badge.bottom, buttonBottom: button.bottom, buttonHeight: button.height,
+          badgeLeft: badge.left, badgeRight: badge.right, barBottom: bar.bottom, width: window.innerWidth, scrollWidth: document.documentElement.scrollWidth };
+      });
+      assert.ok(layout.badgeTop >= layout.buttonBottom && layout.badgeBottom <= layout.barBottom, 'the guarantee sits below the button inside the sticky: ' + JSON.stringify(layout));
+      assert.ok(layout.badgeLeft >= 0 && layout.badgeRight <= width && layout.scrollWidth <= width, 'the sticky fits a narrow phone: ' + JSON.stringify(layout));
+      assert.ok(layout.buttonHeight <= 56, 'the purchase button stays compact');
+    }
     const shown = await h.page.evaluate(() => [...document.querySelectorAll('[hidden]')].filter(el => getComputedStyle(el).display !== 'none').map(el => el.id || el.className));
     assert.deepEqual(shown, []);
     const landed = h.events.find(event => event.name === 'OfferLanded');
@@ -130,6 +143,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     const offer = `${await h.page.textContent('#sim-offer')} ${await h.page.textContent('#sim-paybar')}`;
     assert.doesNotMatch(offer, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} once\\s*No subscription\\s*Get it`));
+    assert.equal((await h.page.textContent('#sim-paybar .guarantee-badge')).trim(), '3-day money-back guarantee', 'the guarantee survives the launch ending');
     h.assertClean();
   } finally { await h.close(); }
 
