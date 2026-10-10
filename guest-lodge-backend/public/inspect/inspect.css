@@ -841,8 +841,8 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .sim-nextbar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; }
 .sim-back-report { margin: 0 0 4px -12px; }
 .sim-offer-page { padding-bottom: 96px; }
-/* The video landing: the price and the full offer card first, a thin tape of
-   real reviews, then a recording sized to the leftover phone screen. */
+/* The video landing: the job, a thin moving tape of real reviews, then a
+   recording sized to the leftover phone screen, then the full offer card. */
 .offer-landing { display: grid; gap: 14px; padding-bottom: 96px; min-width: 0; }
 .offer-intro { text-align: center; }
 .offer-intro h1 { margin: 8px 0 8px; font-size: clamp(27px, 7.2vw, 44px); letter-spacing: -1.1px; }
@@ -908,8 +908,8 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
   .offer-tape-run + .offer-tape-run { display: none; }
 }
 @media (min-width: 880px) {
-  .offer-landing { grid-template-columns: auto minmax(0, 440px); grid-template-areas: "video intro" "video buy" "video tape"; justify-content: center; column-gap: 48px; align-content: start; }
-  .offer-intro { grid-area: intro; text-align: left; align-self: start; }
+  .offer-landing { grid-template-columns: auto minmax(0, 440px); grid-template-areas: "video intro" "video tape" "video buy"; justify-content: center; column-gap: 48px; align-content: start; }
+  .offer-intro { grid-area: intro; text-align: left; align-self: end; }
   .offer-tape { grid-area: tape; }
   .offer-video { grid-area: video; position: sticky; top: 90px; align-self: start; width: auto; max-width: none; }
   .offer-video video { height: min(72vh, 640px); width: auto; }
