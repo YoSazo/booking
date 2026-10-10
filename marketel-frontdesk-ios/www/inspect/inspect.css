@@ -841,17 +841,20 @@ html.sim-framed.sim-split #app { grid-row: 2; grid-column: 1; margin: 0; }
 .sim-nextbar button { flex: 1 1 auto; min-height: 50px; font-size: 16px; }
 .sim-back-report { margin: 0 0 4px -12px; }
 .sim-offer-page { padding-bottom: 96px; }
-/* The video landing: the ad's promise, the real app making a real report, and
-   the offer under it. The video is sized by the screen's height so the price bar
-   and the start of the offer stay in view on a phone. */
+/* The video landing: the job, a compact recording, then the price on the
+   button so a phone sees the promise and the buy on one screen. */
 .offer-landing { display: grid; gap: 16px; padding-bottom: 96px; }
 .offer-intro { text-align: center; }
 .offer-intro h1 { margin: 8px 0 8px; font-size: clamp(27px, 7.2vw, 44px); letter-spacing: -1.1px; }
 .offer-intro h1 .green { color: var(--green); }
 .offer-intro p { margin: 0; }
 .offer-intro h1, .offer-intro p { text-wrap: balance; }
+.offer-intro .offer-trust { margin-top: 12px; }
 .offer-video { position: relative; margin: 0; justify-self: center; width: 100%; max-width: 440px; text-align: center; }
-.offer-video video { display: block; margin: 0 auto; width: auto; max-width: 100%; height: min(calc(100svh - 170px), 780px); aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 16px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
+.offer-video video { display: block; margin: 0 auto; width: auto; max-width: 100%; height: min(42svh, 380px); aspect-ratio: 720 / 1556; object-fit: cover; border-radius: 16px; background: #dfe9e2; box-shadow: 0 18px 44px #173b2340; }
+.offer-fine { margin: 10px 0 0; text-align: center; color: var(--muted); font-size: 14px; font-weight: 600; }
+.sim-offer.is-tight { padding: 18px 18px 16px; text-align: center; }
+.sim-offer.is-tight #sim-buy { margin: 0; }
 .video-cue { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 39; display: flex; align-items: center; gap: 8px; width: max-content; max-width: calc(100% - 32px); white-space: nowrap; padding: 11px 18px; border-radius: 999px; background: var(--green); color: #fff; font-size: 15px; font-weight: 650; line-height: 1.25; text-align: left; box-shadow: 0 10px 26px #173b2340; opacity: 0; pointer-events: none; transform: translate(-50%, 10px); transition: opacity .28s ease, transform .28s ease; }
 .video-cue.is-shown { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 .video-cue span { flex: 0 0 auto; font-size: 18px; animation: cue-nudge 1.6s ease-in-out infinite; }

@@ -1260,19 +1260,23 @@ function bindReviewsMore(){
   if(!btn||!more)return;
   btn.addEventListener('click',()=>{more.hidden=false;btn.remove();});
 }
+function videoBuyMarkup({declined=false}={}){
+  if(!payOnce())return `${simOfferMarkup({declined})}<ul class="offer-points">${(skin().offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`;
+  const copy=simOffer(),launch=launchOffer();
+  return `<section class="card sim-offer is-tight" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}${launch?`<p class="price-anchor">Instead of <s>$${toolOffer().lifetime}</s></p>`:''}<button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button>${launch?`<p class="launch-clock">Launch price ends in <strong data-launch-left>${launchLeft()}</strong> · then $${toolOffer().lifetime}</p>`:''}<p class="offer-fine">One payment · No subscription</p><p><small>Payment by Stripe. <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p></section>`;
+}
 function videoLanding({declined=false}={}){
   enterScreen('offer');
   offerOnVideo=true;
   simUnframe();
   updateHeader();
-  const v=offerVideo(),arm=landingArm(),g=arm.golden||{},sk=skin(),copy=simOffer();
-  const heading=payOnce()?'Pay once. Keep it for good.':SIM_TRIAL_DAYS?`Try it free for ${SIM_TRIAL_DAYS} days.`:`Start Marketel ${sk.product}.`;
-  const title=payOnce()?`$${lifetimePrice()} once.<br><span class="green">Unlimited ${esc(wedge(arm.type).label.toLowerCase())}s.</span>`:(g.headline||arm.title);
-  const sub=payOnce()?`No subscription. Nothing renews. ${v.sub}`:v.sub;
+  const v=offerVideo(),arm=landingArm(),g=arm.golden||{},copy=simOffer();
+  const title=payOnce()?(arm.title||g.headline):(g.headline||arm.title);
+  const sub=payOnce()?(arm.lede||v.sub):v.sub;
   if(declined)offerStage='offer';
   const gated=payOnce()&&arm.firstQuestion===true&&!offerPicked();
   document.documentElement.classList.toggle('pick-open',gated);
-  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p></div><div class="offer-buy"${gated?' inert':''}>${simOfferMarkup({declined,heading})}${payOnce()?'':`<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`}${offerTrust()}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-no" class="secondary">I don't want this</button></div>`:''}</figure></section>${gated?'':offerReviews()}<button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p>${offerTrust()}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-no" class="secondary">I don't want this</button></div>`:''}</figure><div class="offer-buy"${gated?' inert':''}>${videoBuyMarkup({declined})}</div></section>${gated?'':offerReviews()}<button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
   bindReviewsMore();
@@ -1386,19 +1390,18 @@ function watchEngagement(){
     track('OfferStayed20');
   },1000);
 }
-// The recording sits under the offer, so while the offer is on screen and the
-// recording is not, a pill at the bottom says it is there and takes them to it.
-// It goes as soon as the recording is on screen, and the pinned price bar, which
-// stands down while the offer shows, takes its place once the offer is behind them.
+// The recording sits above the offer. While it is off screen (they have
+// scrolled to the reviews), a pill brings them back to it. The pinned price
+// bar stands down while the offer shows, then takes the pill's place.
 function bindVideoCue(){
   const cue=$('video-cue'),card=$('sim-offer'),video=$('offer-video');
   if(!cue||!card||!video)return;
   const share=el=>{const r=el.getBoundingClientRect(),h=r.height||1;return Math.max(0,Math.min(r.bottom,window.innerHeight)-Math.max(r.top,0))/h;};
-  let cardOn=share(card)>=0.3,videoOn=share(video)>=0.2;
-  const paint=()=>cue.classList.toggle('is-shown',cardOn&&!videoOn);
+  let videoOn=share(video)>=0.2;
+  const barUp=()=>$('sim-paybar')&&!$('sim-paybar').classList.contains('is-stood-down');
+  const paint=()=>cue.classList.toggle('is-shown',!videoOn&&!barUp());
   paint();
   if(typeof IntersectionObserver==='function'){
-    new IntersectionObserver(entries=>{cardOn=entries.some(entry=>entry.isIntersecting);paint();},{threshold:0.3}).observe(card);
     new IntersectionObserver(entries=>{videoOn=entries.some(entry=>entry.isIntersecting);paint();},{threshold:0.2}).observe(video);
   }
   cue.onclick=()=>{

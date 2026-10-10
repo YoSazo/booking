@@ -208,9 +208,9 @@ staying twenty. There is a tile for each, plus the cards "How far down the
 page", "The first question" and "Why they did not want it".
 
 **Pay once.** A wedge with `offer.lifetime` (whole dollars, 19 to 999) sells
-that on its video landing instead of a trial: once the first question below is
-answered, the price is the headline ("$49 once. Unlimited damage reports."),
-one button, no plan switch and no "keep it free". Checkout is one Stripe payment with no subscription; the
+that on its video landing instead of a trial: the headline is the job, the
+recording is next, and the price is on the one button ("Get it for $99"),
+with no plan switch and no "keep it free". Checkout is one Stripe payment with no subscription; the
 webhook (and the thank-you page, whichever is first) sets the account's
 `lifetimeSince`, which keeps the plan active whatever any subscription does.
 Paying once again is refunded automatically, and paying once over a live

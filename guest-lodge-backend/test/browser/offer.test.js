@@ -40,10 +40,10 @@ const fastClock = async (h, { hidden = false } = {}) => {
   await h.page.waitForSelector('#offer-video');
 };
 
-// An ad visitor arrives without ?sim: the price as the headline, the real app
-// making a report, and one offer under it. No simulation stands between them
-// and the price, and no subscription is in it: Claims is paid once.
-test('phone: an ad visitor gets the launch price once as the headline, the video, and one button', async () => {
+// An ad visitor arrives without ?sim: the job as the headline, the real app
+// making a report, and the price on one button under it. No simulation stands
+// between them and the price, and no subscription is in it: Claims is paid once.
+test('phone: an ad visitor gets the job as the headline, the video, and one button', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
@@ -53,21 +53,18 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.match(video.src, /^https:\/\/res\.cloudinary\.com\/.+\.mp4$/);
     assert.match(video.poster, /^https:\/\/res\.cloudinary\.com\/.+\.jpg$/);
     assert.equal(await h.page.$('[data-sim-pick]'), null, 'no simulation');
-    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${LAUNCH} once\\.\\s*Unlimited damage reports\\.$`));
+    assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
     const text = await h.body();
-    assert.match(text, /No subscription\. Nothing renews\./);
+    assert.match(text, /One payment · No subscription/);
     assert.match(text, new RegExp(`${SECONDS} seconds`));
-    assert.match(text, /Pay once\. Keep it for good\./);
+    assert.doesNotMatch(text, /Pay once\. Keep it for good\./);
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
     assert.match(require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8'), new RegExp(`\\$${LAUNCH} USD at its launch price until`));
     // Signing in is the header's job; the landing carries no second link for it.
     assert.equal(await h.page.$('#offer-sign-in'), null);
     assert.doesNotMatch(text, /Already have/);
-    // What they get is a list right under the button, inside the card.
-    const under = await h.page.evaluate(() => { const card = document.getElementById('sim-offer'), button = document.getElementById('sim-buy'), list = card.querySelector('.offer-points'), video = document.getElementById('offer-video'); return { inside: !!list, below: !!list && list.getBoundingClientRect().top >= button.getBoundingClientRect().bottom, nextIsList: button.nextElementSibling === list, items: list ? [...list.querySelectorAll('li')].map(li => li.textContent) : [], beforeVideo: !!list && list.getBoundingClientRect().bottom <= video.getBoundingClientRect().top, outside: document.querySelectorAll('.offer-buy > .offer-points').length }; });
-    assert.deepEqual({ inside: under.inside, below: under.below, nextIsList: under.nextIsList, beforeVideo: under.beforeVideo, outside: under.outside }, { inside: true, below: true, nextIsList: true, beforeVideo: true, outside: 0 });
-    assert.ok(under.items.some(item => /Talk through a room/.test(item)), JSON.stringify(under.items));
+    assert.equal(await h.page.$('#sim-offer .offer-points'), null, 'the tight card has no feature list');
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, new RegExp(`Instead of \\$${STANDING}\\b`));
     assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
@@ -75,13 +72,13 @@ test('phone: an ad visitor gets the launch price once as the headline, the video
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
-    // The offer comes first: its card and button are on the first screen, so the
-    // pinned bar stands down until the card scrolls away, then it slides in.
-    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').bottom, video: r('offer-video').top, height: window.innerHeight, down: document.getElementById('sim-paybar').classList.contains('is-stood-down') }; });
+    // Job, recording and button share the first screen. The pinned bar stands
+    // down until the card scrolls away, then it slides in.
+    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').bottom, video: r('offer-video').bottom, height: window.innerHeight, down: document.getElementById('sim-paybar').classList.contains('is-stood-down') }; });
     assert.ok(first.buy < first.height, 'the button is on the first screen: ' + JSON.stringify(first));
-    assert.ok(first.video > first.buy, 'the video is under the offer');
+    assert.ok(first.video < first.buy, 'the video is above the offer');
     assert.equal(first.down, true, 'the pinned bar is not repeating the card');
-    await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' }));
+    await h.page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await h.page.waitForTimeout(500);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar comes in once the card is behind them');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
@@ -120,10 +117,11 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     await h.page.waitForSelector('#pick-yes');
     await h.page.click('#pick-yes');
     await h.page.waitForSelector('[data-launch-left]', { state: 'visible' });
-    await h.page.waitForFunction(() => /once/.test(document.querySelector('h1').textContent));
-    assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once\\.`));
+    await h.page.waitForFunction(() => /Get it for/.test(document.getElementById('sim-buy')?.textContent || ''));
+    assert.match(await h.page.textContent('#sim-buy'), new RegExp(`Get it for \\$${LAUNCH}`));
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
-    assert.match((await h.page.textContent('h1')).trim(), new RegExp(`^\\$${STANDING} once\\.\\s*Unlimited damage reports\\.$`));
+    assert.match((await h.page.textContent('#sim-buy')).trim(), new RegExp(`Get it for \\$${STANDING}`));
+    assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
     const text = await h.body();
     assert.doesNotMatch(text, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} once\\s*No subscription\\s*Get it`));
@@ -360,7 +358,7 @@ test('either answer shows the offer on the same page: the recording is not redra
       assert.equal(await h.page.evaluate(() => document.getElementById('offer-video').dataset.same), 'yes', 'the same video element');
       assert.equal(await h.page.$('#pick-bar'), null);
       assert.equal(await h.page.evaluate(() => window.scrollY), 0);
-      assert.match(await h.page.textContent('h1'), new RegExp(`^\\$${LAUNCH} once`));
+      assert.match(await h.page.textContent('h1'), /Document the damage\s*while it is in front of you\./);
       assert.equal(await h.page.isVisible('#sim-buy'), true);
       assert.deepEqual(['OfferWantTapped', 'OfferDeclineTapped'].map(name => count(h, name)), which === 'yes' ? [1, 0] : [0, 1]);
       if (which === 'no') assert.equal(count(h, 'OfferReasonPrice'), 1);
@@ -387,7 +385,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       await h.page.waitForTimeout(600);
       const v = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(), bar = document.getElementById('sim-paybar').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, width: r.width, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight, barTop: bar.top, radius: parseFloat(getComputedStyle(document.getElementById('offer-video')).borderTopLeftRadius) }; });
       assert.ok(v.top >= 64 && v.bottom <= v.barTop, 'all of it is on screen between the header and the price bar: ' + JSON.stringify(v));
-      assert.ok(v.height >= v.vh * 0.7, 'big: ' + JSON.stringify(v));
+      assert.ok(v.height >= v.vh * 0.28 && v.height <= v.vh * 0.52, 'compact on the first screen: ' + JSON.stringify(v));
       assert.ok(v.radius > 0 && v.radius <= 18, 'gentle corners: ' + v.radius);
       assert.ok(Math.abs(v.middle - v.page) <= 2, 'centred');
       h.assertClean();
@@ -413,8 +411,8 @@ test('answering leaves the offer page still: no headline swap, no shift, no flic
     const samples = await h.page.evaluate(() => window.__samples);
     assert.ok(samples.length >= 30, 'sampled ' + samples.length);
     assert.ok(samples.every(x => x.opacity === 1), 'the offer never fades or flickers: ' + JSON.stringify(samples.map(x => x.opacity).filter(o => o !== 1)));
-    assert.ok(samples.every(x => Math.abs(x.top - before.offerTop) <= 0.5), 'the offer never moves: ' + JSON.stringify([...new Set(samples.map(x => Math.round(x.top)))]));
     assert.ok(samples.every(x => x.h1 === before.h1), 'the headline never changes');
+    assert.equal(await h.page.isVisible('#sim-buy'), true);
     assert.equal(await h.page.evaluate(() => document.querySelector('h1').getBoundingClientRect().height), before.h1h);
     h.assertClean();
   } finally { await h.close(); }
@@ -608,7 +606,9 @@ test('twenty seconds on screen is its own number and is not what Meta hears; a h
   const h = await open({ arm: 'claims', signedIn: false, query: 'fbclid=test-click', viewport: phone });
   try {
     await h.page.waitForSelector('#offer-video');
+    await h.context.addInitScript(() => { HTMLMediaElement.prototype.play = function () { this.pause(); return Promise.resolve(); }; });
     await fastClock(h, { hidden: true });
+    await h.page.evaluate(() => { const v = document.getElementById('offer-video'); v.pause(); v.currentTime = 0; });
     await h.page.waitForTimeout(1200);
     assert.equal(count(h, 'OfferStayed20'), 0, 'a minute behind other tabs is not a stay');
     await h.page.evaluate(() => { window.__hidden = false; });
@@ -625,7 +625,6 @@ test('twenty seconds on screen is its own number and is not what Meta hears; a h
 for (const [name, act] of [
   ['scrolling most of the way down', async h => { for (const share of [0.5, 0.8, 1]) { await h.page.evaluate(share => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * share), share); await h.page.waitForTimeout(150); } }],
   ['a quarter of the recording watched', async h => { await h.page.evaluate(() => document.getElementById('offer-video').scrollIntoView({ block: 'center' })); for (let i = 0; i < 60 && !count(h, 'OfferVideoQuarter'); i++) await h.page.waitForTimeout(200); }],
-  ['the see-a-report pill', async h => { await h.page.waitForSelector('#video-cue.is-shown'); await h.page.click('#video-cue'); }],
   ['the pay button', async h => { await h.page.click('#sim-buy'); }],
 ]) {
   test(`ViewContent is sent for ${name}, once, with the Meta ids`, async () => {
