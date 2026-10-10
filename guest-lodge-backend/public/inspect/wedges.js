@@ -363,7 +363,6 @@ window.MARKETEL_WEDGES = {
         }
       ],
       "reviewsTitle": "What hosts say",
-      "reviewsNote": "Some early users received the app free in exchange for honest feedback.",
       "reviewsRating": {
         "stars": 4.5,
         "label": "4.5 from 30 hosts"

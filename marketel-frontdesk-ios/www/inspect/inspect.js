@@ -1222,43 +1222,28 @@ function offerPicked(){
   if(offerStage==='offer')return true;
   try{return sessionStorage.getItem(OFFER_STAGE_KEY)==='offer';}catch{return false;}
 }
-// Social proof on the video landing, straight from the manifest: a compact trust
-// strip under the offer's button (landing.reviewsRating), and a testimonials
-// block under the recording (landing.reviews, titled by landing.reviewsTitle).
-// Both render only from real content the owner supplies; with nothing there,
-// each returns '' so no empty box and no invented quote, name or rating ever
-// shows. Shape, all optional and empty by default:
+// Social proof on the video landing, from the manifest only: a star rating
+// (landing.reviewsRating) and a short moving tape of real quotes (landing.reviews)
+// above the recording. Empty content renders nothing.
 //   reviews: [{ quote, name, role?, stars? }]
-//   reviewsTitle: "What hosts say"
-//   reviewsNote:  "Some early users received the app free in exchange for honest feedback."
 //   reviewsRating: { stars, label? }   (or null)
-const REVIEW_PREVIEW=6;
 function reviewStars(value){
   const full=Math.round(Math.max(0,Math.min(5,Number(value)||0)));
   return `<span class="review-stars" role="img" aria-label="${full} out of 5 stars">${'★'.repeat(full)}<span class="review-stars-off" aria-hidden="true">${'★'.repeat(5-full)}</span></span>`;
 }
-function reviewCard(review){
-  return `<figure class="review-card">${Number(review.stars)>0?reviewStars(review.stars):''}<blockquote>${esc(review.quote||'')}</blockquote><figcaption>${review.name?`<span class="review-name">${esc(review.name)}</span>`:''}${review.role?`<span class="review-role">${esc(review.role)}</span>`:''}</figcaption></figure>`;
+function tapeCard(review){
+  return `<figure class="tape-card">${Number(review.stars)>0?reviewStars(review.stars):''}<blockquote>${esc(review.quote||'')}</blockquote><figcaption>${review.name?`<span class="review-name">${esc(review.name)}</span>`:''}${review.role?`<span class="review-role">${esc(review.role)}</span>`:''}</figcaption></figure>`;
 }
 function offerTrust(){
   const rating=landingArm()?.reviewsRating;
   if(!rating||!(Number(rating.stars)>0))return '';
   return `<div class="offer-trust">${reviewStars(rating.stars)}${rating.label?`<span class="offer-trust-text">${esc(rating.label)}</span>`:''}</div>`;
 }
-function offerReviews(){
+function offerTape(){
   const items=landingArm()?.reviews;
   if(!Array.isArray(items)||!items.length)return '';
-  const title=landingArm()?.reviewsTitle||'';
-  const note=landingArm()?.reviewsNote||'';
-  const shown=items.slice(0,REVIEW_PREVIEW);
-  const rest=items.slice(REVIEW_PREVIEW);
-  const more=rest.length?`<button type="button" class="secondary" id="reviews-more">See all ${items.length} reviews</button><div class="offer-reviews-grid" id="offer-reviews-more" hidden>${rest.map(reviewCard).join('')}</div>`:'';
-  return `<section class="offer-reviews" id="offer-reviews"${title?' aria-labelledby="offer-reviews-title"':' aria-label="Reviews"'}>${title?`<h2 class="offer-reviews-title" id="offer-reviews-title">${esc(title)}</h2>`:''}${note?`<p class="offer-reviews-note">${esc(note)}</p>`:''}<div class="offer-reviews-grid">${shown.map(reviewCard).join('')}</div>${more}</section>`;
-}
-function bindReviewsMore(){
-  const btn=$('reviews-more'),more=$('offer-reviews-more');
-  if(!btn||!more)return;
-  btn.addEventListener('click',()=>{more.hidden=false;btn.remove();});
+  const run=items.map(tapeCard).join('');
+  return `<section class="offer-tape" id="offer-tape" aria-label="Host reviews"><div class="offer-tape-track"><div class="offer-tape-run">${run}</div><div class="offer-tape-run" aria-hidden="true">${run}</div></div></section>`;
 }
 function videoBuyMarkup({declined=false}={}){
   if(!payOnce())return `${simOfferMarkup({declined})}<ul class="offer-points">${(skin().offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`;
@@ -1276,13 +1261,11 @@ function videoLanding({declined=false}={}){
   if(declined)offerStage='offer';
   const gated=payOnce()&&arm.firstQuestion===true&&!offerPicked();
   document.documentElement.classList.toggle('pick-open',gated);
-  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p>${offerTrust()}</div><figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-no" class="secondary">I don't want this</button></div>`:''}</figure><div class="offer-buy"${gated?' inert':''}>${videoBuyMarkup({declined})}</div></section>${gated?'':offerReviews()}<button type="button" class="video-cue" id="video-cue">See a real report built in ${v.seconds} seconds <span aria-hidden="true">&darr;</span></button><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
+  $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p>${offerTrust()}</div>${gated?'':offerTape()}<figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-no" class="secondary">I don't want this</button></div>`:''}</figure><div class="offer-buy"${gated?' inert':''}>${videoBuyMarkup({declined})}</div></section><aside class="sim-paybar" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button></aside>`;
   bindSimOffer();
   bindOfferVideo();
-  bindReviewsMore();
   watchEngagement();
   watchScroll();
-  bindVideoCue();
   tickLaunch();
   loadClarity();
   if(gated){
@@ -1389,27 +1372,6 @@ function watchEngagement(){
     clearInterval(engagedTimer);
     track('OfferStayed20');
   },1000);
-}
-// The recording sits above the offer. While it is off screen (they have
-// scrolled to the reviews), a pill brings them back to it. The pinned price
-// bar stands down while the offer shows, then takes the pill's place.
-function bindVideoCue(){
-  const cue=$('video-cue'),card=$('sim-offer'),video=$('offer-video');
-  if(!cue||!card||!video)return;
-  const share=el=>{const r=el.getBoundingClientRect(),h=r.height||1;return Math.max(0,Math.min(r.bottom,window.innerHeight)-Math.max(r.top,0))/h;};
-  let videoOn=share(video)>=0.2;
-  const barUp=()=>$('sim-paybar')&&!$('sim-paybar').classList.contains('is-stood-down');
-  const paint=()=>cue.classList.toggle('is-shown',!videoOn&&!barUp());
-  paint();
-  if(typeof IntersectionObserver==='function'){
-    new IntersectionObserver(entries=>{videoOn=entries.some(entry=>entry.isIntersecting);paint();},{threshold:0.2}).observe(video);
-  }
-  cue.onclick=()=>{
-    track('OfferCueTapped',phoneWidth()?'phone':'desktop');
-    engaged();
-    const calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    video.scrollIntoView({behavior:calm?'auto':'smooth',block:'center'});
-  };
 }
 // How far down the page they got, and whether the video and the offer card were
 // ever on screen. Nothing is drawn or changed for the visitor: each is one named

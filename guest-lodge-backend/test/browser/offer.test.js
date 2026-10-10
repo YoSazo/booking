@@ -72,12 +72,12 @@ test('phone: an ad visitor gets the job as the headline, the video, and one butt
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
     assert.equal(await h.page.$('#sim-keep'), null);
-    // Job, recording and button share the first screen. The pinned bar stands
-    // down until the card scrolls away, then it slides in.
-    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').bottom, video: r('offer-video').bottom, height: window.innerHeight, down: document.getElementById('sim-paybar').classList.contains('is-stood-down') }; });
-    assert.ok(first.buy < first.height, 'the button is on the first screen: ' + JSON.stringify(first));
+    // Job, stars, tape and a large recording share the first screen. The buy
+    // card is under the recording; the pinned bar covers the price until they
+    // scroll to it.
+    const first = await h.page.evaluate(() => { const r = id => document.getElementById(id).getBoundingClientRect(); return { buy: r('sim-buy').top, videoTop: r('offer-video').top, video: r('offer-video').bottom, height: window.innerHeight }; });
+    assert.ok(first.videoTop < first.height && first.video > 80, 'the recording is on the first screen: ' + JSON.stringify(first));
     assert.ok(first.video < first.buy, 'the video is above the offer');
-    assert.equal(first.down, true, 'the pinned bar is not repeating the card');
     await h.page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await h.page.waitForTimeout(500);
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar comes in once the card is behind them');
@@ -99,7 +99,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and one butt
     const landed = h.events.find(event => event.name === 'OfferLanded');
     assert.deepEqual({ tool: landed?.tool, detail: landed?.detail }, { tool: 'claims', detail: 'phone' });
     // The button goes straight to Stripe, whose page takes the email.
-    await h.page.click('#sim-paybar-buy');
+    await h.page.click('#sim-buy');
     for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
     assert.equal(count(h, 'SimCheckoutTapped'), 1, 'the tap is InitiateCheckout');
     assert.equal(h.events.find(event => event.name === 'SimCheckoutTapped').detail, 'lifetime');
@@ -200,7 +200,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       await h.page.waitForSelector('#offer-video');
       await h.page.waitForTimeout(500);
       const first = await h.page.evaluate(() => { const box = el => el.getBoundingClientRect(), $ = id => document.getElementById(id), fig = box(document.querySelector('.offer-video')), v = box($('offer-video')), yes = box($('pick-yes')), maybe = box($('pick-no')), buy = box($('sim-buy')), front = document.elementFromPoint(buy.left + buy.width / 2, buy.top + buy.height / 2);
-        return { height: window.innerHeight, width: window.innerWidth, fig: { position: getComputedStyle(document.querySelector('.offer-video')).position, top: fig.top, bottom: fig.bottom }, video: { top: v.top, bottom: v.bottom, height: v.height, middle: v.left + v.width / 2, radius: parseFloat(getComputedStyle($('offer-video')).borderTopLeftRadius), border: parseFloat(getComputedStyle($('offer-video')).borderTopWidth), fit: getComputedStyle($('offer-video')).objectFit }, surface: { background: getComputedStyle(document.querySelector('.offer-video')).backgroundColor, border: parseFloat(getComputedStyle(document.querySelector('.offer-video')).borderTopWidth), shadow: getComputedStyle(document.querySelector('.offer-video')).boxShadow }, side: { sameRow: Math.abs(yes.top - maybe.top) <= 1, yesLeftOfMaybe: yes.right <= maybe.left + 1 }, yes: { bottom: yes.bottom, top: yes.top, text: $('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, height: maybe.height, text: $('pick-no').textContent.trim() }, label: $('pick-label').textContent.trim(), priceBehindScrim: !front || !front.closest('#sim-offer'), behindIsInert: document.querySelector('.offer-buy').hasAttribute('inert'), scrollLocked: getComputedStyle(document.documentElement).overflow, paybar: getComputedStyle($('sim-paybar')).display, cue: getComputedStyle($('video-cue')).display }; });
+        return { height: window.innerHeight, width: window.innerWidth, fig: { position: getComputedStyle(document.querySelector('.offer-video')).position, top: fig.top, bottom: fig.bottom }, video: { top: v.top, bottom: v.bottom, height: v.height, middle: v.left + v.width / 2, radius: parseFloat(getComputedStyle($('offer-video')).borderTopLeftRadius), border: parseFloat(getComputedStyle($('offer-video')).borderTopWidth), fit: getComputedStyle($('offer-video')).objectFit }, surface: { background: getComputedStyle(document.querySelector('.offer-video')).backgroundColor, border: parseFloat(getComputedStyle(document.querySelector('.offer-video')).borderTopWidth), shadow: getComputedStyle(document.querySelector('.offer-video')).boxShadow }, side: { sameRow: Math.abs(yes.top - maybe.top) <= 1, yesLeftOfMaybe: yes.right <= maybe.left + 1 }, yes: { bottom: yes.bottom, top: yes.top, text: $('pick-yes').textContent.trim() }, maybe: { bottom: maybe.bottom, height: maybe.height, text: $('pick-no').textContent.trim() }, label: $('pick-label').textContent.trim(), priceBehindScrim: !front || !front.closest('#sim-offer'), behindIsInert: document.querySelector('.offer-buy').hasAttribute('inert'), scrollLocked: getComputedStyle(document.documentElement).overflow, paybar: getComputedStyle($('sim-paybar')).display, cue: $('video-cue') ? getComputedStyle($('video-cue')).display : 'none' }; });
       assert.equal(first.fig.position, 'fixed', 'the recording floats');
       assert.match(first.yes.text, /^I want this/);
       assert.equal(first.maybe.text, "I don't want this");
@@ -385,7 +385,7 @@ for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { 
       await h.page.waitForTimeout(600);
       const v = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(), bar = document.getElementById('sim-paybar').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, width: r.width, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight, barTop: bar.top, radius: parseFloat(getComputedStyle(document.getElementById('offer-video')).borderTopLeftRadius) }; });
       assert.ok(v.top >= 64 && v.bottom <= v.barTop, 'all of it is on screen between the header and the price bar: ' + JSON.stringify(v));
-      assert.ok(v.height >= v.vh * 0.28 && v.height <= v.vh * 0.52, 'compact on the first screen: ' + JSON.stringify(v));
+      assert.ok(v.height >= v.vh * 0.5, 'big: ' + JSON.stringify(v));
       assert.ok(v.radius > 0 && v.radius <= 18, 'gentle corners: ' + v.radius);
       assert.ok(Math.abs(v.middle - v.page) <= 2, 'centred');
       h.assertClean();
@@ -486,44 +486,28 @@ test('with no trouble at all there is no play button', async () => {
   } finally { await h.close(); }
 });
 
-// The recording is under the offer, so every phone size is told it is there:
-// a pill at the bottom while the offer shows and the recording does not, gone
-// once the recording is on screen, and the recording sits in the middle.
+// The recording is on the first screen. No scroll pill — they can already see it.
 for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 430, height: 932 }]) {
-  test(`phone ${size.width}x${size.height}: a pill says the recording is below, and the recording is centred`, async () => {
+  test(`phone ${size.width}x${size.height}: the recording is on screen and centred, with no scroll pill`, async () => {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: size, now: DURING_LAUNCH });
     try {
       await h.page.waitForSelector('#offer-video');
       await choose(h);
       await h.page.waitForTimeout(400);
-      const cue = await h.page.evaluate(() => { const el = document.getElementById('video-cue'), r = el.getBoundingClientRect(), v = document.getElementById('offer-video').getBoundingClientRect(); return { shown: el.classList.contains('is-shown'), opacity: getComputedStyle(el).opacity, text: el.textContent.trim(), left: r.left, right: r.right, bottom: r.bottom, width: window.innerWidth, height: window.innerHeight, videoOnScreen: Math.max(0, Math.min(v.bottom, window.innerHeight) - Math.max(v.top, 0)) / v.height }; });
-      // Either it points to the recording, or the recording is already showing.
-      assert.ok(cue.shown || cue.videoOnScreen >= 0.2, JSON.stringify(cue));
-      assert.match(cue.text, new RegExp(`See a real report built in ${SECONDS} seconds`));
-      assert.ok(cue.left >= 8 && cue.width - cue.right >= 8 && cue.bottom <= cue.height, 'the pill fits on screen: ' + JSON.stringify(cue));
-      const middle = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { video: r.left + r.width / 2, page: window.innerWidth / 2 }; });
-      assert.ok(Math.abs(middle.video - middle.page) <= 2, 'the recording is centred: ' + JSON.stringify(middle));
-      if (cue.shown) {
-        assert.equal(cue.opacity, '1');
-        await h.page.click('#video-cue');
-        await h.page.waitForTimeout(900);
-        assert.equal(count(h, 'OfferCueTapped'), 1);
-        assert.equal(await h.page.evaluate(() => document.getElementById('video-cue').classList.contains('is-shown')), false, 'it goes once the recording is on screen');
-        const visible = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0; });
-        assert.equal(visible, true, 'the tap brings the recording into view');
-      } else {
-        assert.equal(cue.opacity, '0', 'no pill while the recording is already showing');
-      }
+      assert.equal(await h.page.$('#video-cue'), null);
+      const view = await h.page.evaluate(() => { const r = document.getElementById('offer-video').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, middle: r.left + r.width / 2, page: window.innerWidth / 2, vh: window.innerHeight }; });
+      assert.ok(view.top < view.vh && view.bottom > 0, 'the recording is on the first screen: ' + JSON.stringify(view));
+      assert.ok(Math.abs(view.middle - view.page) <= 2, 'the recording is centred: ' + JSON.stringify(view));
       h.assertClean();
     } finally { await h.close(); }
   });
 }
 
-test('desktop: no pill, the recording is already beside the offer', async () => {
+test('desktop: no scroll pill, the recording is already beside the offer', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: { width: 1280, height: 800 }, now: DURING_LAUNCH });
   try {
     await h.page.waitForSelector('#offer-video');
-    assert.equal(await h.page.evaluate(() => getComputedStyle(document.getElementById('video-cue')).display), 'none');
+    assert.equal(await h.page.$('#video-cue'), null);
   } finally { await h.close(); }
 });
 

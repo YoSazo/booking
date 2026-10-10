@@ -180,16 +180,13 @@ module.exports = {
     },
     "firstQuestion": false,
     // Social proof on the cold-traffic video landing. Real host quotes from
-    // people who used Claims. Some received lifetime access in exchange for
-    // honest feedback — that connection is disclosed in reviewsNote.
+    // people who used Claims. Empty reviews ⇒ the moving tape does not render.
     //
     //   reviews:       array of real customer quotes. Shape per item:
     //                    { quote, name, role }   (role optional)
     //                    optional: stars (0–5) to show a star row on that card.
-    //                  Empty array ⇒ the testimonials block does not render.
-    //   reviewsTitle:  heading over the testimonials block (a label, not content).
-    //   reviewsNote:   short disclosure under the heading (material connection).
-    //   reviewsRating: the above-the-fold trust strip by the offer button.
+    //   reviewsTitle:  unused on the tape; kept as a label if a wedge wants one.
+    //   reviewsRating: the star line above the tape.
     //                    { stars: 4.5, label: "4.5 from 30 hosts" }
     //                  null ⇒ no trust strip. Only publish a real, true rating.
     "reviews": [
@@ -225,7 +222,6 @@ module.exports = {
       { "quote": "I manage a few holiday rentals and wanted something specifically for damage documentation. It's not perfect but it does that job well.", "name": "Claire Hughes", "role": "Property manager", "stars": 4 }
     ],
     "reviewsTitle": "What hosts say",
-    "reviewsNote": "Some early users received the app free in exchange for honest feedback.",
     "reviewsRating": { "stars": 4.5, "label": "4.5 from 30 hosts" },
     "video": {
       "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
