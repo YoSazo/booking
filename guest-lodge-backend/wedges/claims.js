@@ -10,14 +10,14 @@ module.exports = {
     "guest": "Guest"
   },
   "chooser": "Record damage and keep the original uploaded photos.",
-  "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($49 at the launch price until 1:00 PM Pacific on October 4, 2026, then $99). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
+  "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($99 at the launch price until 1:00 PM Pacific on October 13, 2026, then $199). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
   "offer": {
     "mode": "pay-at-export",
     "reportPrice": 12,
-    "lifetime": 99,
+    "lifetime": 199,
     "launch": {
-      "price": 49,
-      "until": "2026-10-04T20:00:00Z"
+      "price": 99,
+      "until": "2026-10-13T20:00:00Z"
     }
   },
   "listTypes": [
@@ -196,13 +196,11 @@ module.exports = {
       { "quote": "Honestly thought it would be more complicated. Took me a few minutes to figure out and that was it.", "name": "Rebecca Jones", "role": "Airbnb host", "stars": 5 },
       { "quote": "Good for documenting damages. Wouldn't use it for a full property inventory though.", "name": "Michael Reed", "role": "Property manager", "stars": 4 },
       { "quote": "The voice thing is actually useful. Especially when you're walking through the house and don't want to type everything.", "name": "Amy Sullivan", "role": "Vacation rental host", "stars": 5 },
-      { "quote": "works fine. only done 2 reports with it so far", "name": "James P.", "role": "Airbnb host", "stars": 5 },
       { "quote": "It's okay. I like the finished reports but $99 felt like a lot upfront for something I don't use every week.", "name": "Karen Thompson", "role": "Property manager", "stars": 3 },
       { "quote": "Had some damage to a kitchen cabinet and wanted everything documented before the next guests arrived. This made it easier.", "name": "Ben Carter", "role": "Short-term rental host", "stars": 5 },
       { "quote": "My cleaner sends me pictures and I put together the report. Saves some time but would love a better way to organize photos.", "name": "Rachel Wilson", "role": "Co-host", "stars": 4 },
       { "quote": "Bought it mainly because I didn't want another subscription.", "name": "Tom Richards", "role": "Airbnb host", "stars": 5 },
       { "quote": "Was expecting the report to take 35 seconds like the video. Mine took a couple minutes but still much faster than doing it manually.", "name": "Stephanie Lee", "role": "Property manager", "stars": 4 },
-      { "quote": "Not much to say really. It works and I got the PDF I needed.", "name": "David Morgan", "role": "Vacation rental owner", "stars": 5 },
       { "quote": "I had been putting off writing up some damages because I hate doing paperwork. This helped.", "name": "Melissa Grant", "role": "Airbnb host", "stars": 5 },
       { "quote": "Pretty simple tool. The report looks decent and I like having the photos attached. Haven't used the sharing link much.", "name": "Andrew Collins", "role": "Property manager", "stars": 4 },
       { "quote": "Used it after a guest broke a lamp and damaged the bedside table. Much easier than trying to explain everything over email.", "name": "Nicole B.", "role": "Short-let host", "stars": 5 },
@@ -222,7 +220,7 @@ module.exports = {
       { "quote": "I manage a few holiday rentals and wanted something specifically for damage documentation. It's not perfect but it does that job well.", "name": "Claire Hughes", "role": "Property manager", "stars": 4 }
     ],
     "reviewsTitle": "What hosts say",
-    "reviewsRating": { "stars": 4.5, "label": "4.5 from 30 hosts" },
+    "reviewsRating": { "stars": 4.4, "label": "4.4 from 28 reviews" },
     "video": {
       "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
       "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_1080,q_auto/v1790878619/1001_1_2_dbfaov.jpg",

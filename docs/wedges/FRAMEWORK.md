@@ -229,8 +229,8 @@ promise "free" in an ad for a page that charges.
 
 **Launch price.** `offer.launch` (`price` below `offer.lifetime`, and a fixed
 UTC `until`) shows the lower price with a live countdown to that moment, the
-same for everyone, and the standing price crossed out ("~~$99~~ $49 once" in the
-bar, "Instead of ~~$99~~" on the card). A crossed-out yearly plan puts a
+same for everyone, and the standing price crossed out ("~~$199~~ $99 once" in the
+bar, "Instead of ~~$199~~" on the card). A crossed-out yearly plan puts a
 subscription number back on a page whose whole point is that there is none.
 At `until` the page redraws at the full price and checkout charges it; the
 registry refuses a launch that is not lower or not a fixed time. Urgency here

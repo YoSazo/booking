@@ -1247,8 +1247,7 @@ function offerTape(){
 }
 function videoBuyMarkup({declined=false}={}){
   if(!payOnce())return `${simOfferMarkup({declined})}<ul class="offer-points">${(skin().offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`;
-  const copy=simOffer(),launch=launchOffer();
-  return `<section class="card sim-offer is-tight" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}${launch?`<p class="price-anchor">Instead of <s>$${toolOffer().lifetime}</s></p>`:''}<button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button>${launch?`<p class="launch-clock">Launch price ends in <strong data-launch-left>${launchLeft()}</strong> · then $${toolOffer().lifetime}</p>`:''}<p class="offer-fine">One payment · No subscription</p><p><small>Payment by Stripe. <a href="${esc(skin().terms)}">${esc(skin().termsLabel)}</a></small></p></section>`;
+  return simOfferMarkup({declined,heading:'Pay once. Keep it for good.'});
 }
 function videoLanding({declined=false}={}){
   enterScreen('offer');

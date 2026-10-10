@@ -11,14 +11,14 @@ window.MARKETEL_WEDGES = {
       "guest": "Guest"
     },
     "chooser": "Record damage and keep the original uploaded photos.",
-    "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($49 at the launch price until 1:00 PM Pacific on October 4, 2026, then $99). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
+    "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($99 at the launch price until 1:00 PM Pacific on October 13, 2026, then $199). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
     "offer": {
       "mode": "pay-at-export",
       "reportPrice": 12,
-      "lifetime": 99,
+      "lifetime": 199,
       "launch": {
-        "price": 49,
-        "until": "2026-10-04T20:00:00Z"
+        "price": 99,
+        "until": "2026-10-13T20:00:00Z"
       }
     },
     "listTypes": [
@@ -218,12 +218,6 @@ window.MARKETEL_WEDGES = {
           "stars": 5
         },
         {
-          "quote": "works fine. only done 2 reports with it so far",
-          "name": "James P.",
-          "role": "Airbnb host",
-          "stars": 5
-        },
-        {
           "quote": "It's okay. I like the finished reports but $99 felt like a lot upfront for something I don't use every week.",
           "name": "Karen Thompson",
           "role": "Property manager",
@@ -252,12 +246,6 @@ window.MARKETEL_WEDGES = {
           "name": "Stephanie Lee",
           "role": "Property manager",
           "stars": 4
-        },
-        {
-          "quote": "Not much to say really. It works and I got the PDF I needed.",
-          "name": "David Morgan",
-          "role": "Vacation rental owner",
-          "stars": 5
         },
         {
           "quote": "I had been putting off writing up some damages because I hate doing paperwork. This helped.",
@@ -364,8 +352,8 @@ window.MARKETEL_WEDGES = {
       ],
       "reviewsTitle": "What hosts say",
       "reviewsRating": {
-        "stars": 4.5,
-        "label": "4.5 from 30 hosts"
+        "stars": 4.4,
+        "label": "4.4 from 28 reviews"
       },
       "video": {
         "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",

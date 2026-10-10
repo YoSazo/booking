@@ -55,16 +55,16 @@ test('phone: an ad visitor gets the job as the headline, the video, and one butt
     assert.equal(await h.page.$('[data-sim-pick]'), null, 'no simulation');
     assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
     const text = await h.body();
-    assert.match(text, /One payment · No subscription/);
+    assert.match(text, /Pay once\. Keep it for good\./);
     assert.match(text, new RegExp(`${SECONDS} seconds`));
-    assert.doesNotMatch(text, /Pay once\. Keep it for good\./);
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
     assert.match(require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8'), new RegExp(`\\$${LAUNCH} USD at its launch price until`));
     // Signing in is the header's job; the landing carries no second link for it.
     assert.equal(await h.page.$('#offer-sign-in'), null);
     assert.doesNotMatch(text, /Already have/);
-    assert.equal(await h.page.$('#sim-offer .offer-points'), null, 'the tight card has no feature list');
+    const points = await h.page.$$('#sim-offer .offer-points li');
+    assert.ok(points.length >= 4, 'the full card lists what they get');
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, new RegExp(`Instead of \\$${STANDING}\\b`));
     assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
@@ -122,8 +122,8 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     for (let i = 0; i < 60 && await h.page.$('[data-launch-left]'); i++) await h.page.waitForTimeout(100);
     assert.match((await h.page.textContent('#sim-buy')).trim(), new RegExp(`Get it for \\$${STANDING}`));
     assert.match((await h.page.textContent('h1')).trim(), /Document the damage\s*while it is in front of you\./);
-    const text = await h.body();
-    assert.doesNotMatch(text, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
+    const offer = `${await h.page.textContent('#sim-offer')} ${await h.page.textContent('#sim-paybar')}`;
+    assert.doesNotMatch(offer, new RegExp(`Launch price|Instead of|\\$${LAUNCH}\\b`));
     assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} once\\s*No subscription\\s*Get it`));
     h.assertClean();
   } finally { await h.close(); }
