@@ -40,6 +40,18 @@ function validate(manifest, filename = '') {
     || typeof video.label !== 'string' || !video.label.trim())) bad('landing.video needs a Cloudinary .mp4 src, an optional .jpg poster, whole seconds, a sub line and a label');
   // Whether a pay-once landing opens on the question ("I want this" / "I don't want this") before the offer. Off unless asked for.
   if (manifest.landing.firstQuestion !== undefined && typeof manifest.landing.firstQuestion !== 'boolean') bad('landing.firstQuestion must be true or false');
+  // Social proof on the landing: real customer quotes the owner writes, kept in
+  // the manifest so the engine never invents them. All optional and empty by
+  // default, so a wedge that sets none renders no reviews section at all.
+  const reviews = manifest.landing.reviews;
+  if (reviews !== undefined && (!Array.isArray(reviews) || reviews.some(item => !item || typeof item.quote !== 'string' || !item.quote.trim()
+    || typeof item.name !== 'string' || !item.name.trim() || (item.role !== undefined && typeof item.role !== 'string')
+    || (item.stars !== undefined && (typeof item.stars !== 'number' || item.stars < 0 || item.stars > 5))))) bad('landing.reviews must be items with a quote and a name, an optional role, and optional stars 0–5');
+  if (manifest.landing.reviewsTitle !== undefined && (typeof manifest.landing.reviewsTitle !== 'string' || !manifest.landing.reviewsTitle.trim())) bad('landing.reviewsTitle must be a non-empty string');
+  if (manifest.landing.reviewsNote !== undefined && (typeof manifest.landing.reviewsNote !== 'string' || !manifest.landing.reviewsNote.trim())) bad('landing.reviewsNote must be a non-empty string');
+  const rating = manifest.landing.reviewsRating;
+  if (rating !== undefined && rating !== null && (typeof rating !== 'object' || typeof rating.stars !== 'number' || rating.stars < 0 || rating.stars > 5
+    || (rating.label !== undefined && typeof rating.label !== 'string'))) bad('landing.reviewsRating needs stars 0–5 and an optional label, or null');
   if (manifest.id !== 'inspect' && (!manifest.webTitle || !manifest.skin.home || !manifest.skin.terms)) bad('web title, home and terms are required');
   if (!['single', 'select'].includes(manifest.selection)) bad('selection must be single or select');
   if (manifest.id !== 'inspect' && (!manifest.landing.type || !manifest.types[manifest.landing.type])) bad('landing type must exist');

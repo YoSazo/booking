@@ -179,6 +179,54 @@ module.exports = {
       "reveal": "Here is what your guest or the platform receives."
     },
     "firstQuestion": false,
+    // Social proof on the cold-traffic video landing. Real host quotes from
+    // people who used Claims. Some received lifetime access in exchange for
+    // honest feedback — that connection is disclosed in reviewsNote.
+    //
+    //   reviews:       array of real customer quotes. Shape per item:
+    //                    { quote, name, role }   (role optional)
+    //                    optional: stars (0–5) to show a star row on that card.
+    //                  Empty array ⇒ the testimonials block does not render.
+    //   reviewsTitle:  heading over the testimonials block (a label, not content).
+    //   reviewsNote:   short disclosure under the heading (material connection).
+    //   reviewsRating: the above-the-fold trust strip by the offer button.
+    //                    { stars: 4.5, label: "4.5 from 30 hosts" }
+    //                  null ⇒ no trust strip. Only publish a real, true rating.
+    "reviews": [
+      { "quote": "Had to document a broken coffee table after checkout. Did what I needed. Pretty straightforward.", "name": "Daniel Harris", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Used it for two properties so far. The reports look good, just wish organizing them was a little easier.", "name": "Laura M.", "role": "Property manager", "stars": 4 },
+      { "quote": "I was making these in Word before. Definitely not going back to that.", "name": "Chris Walker", "role": "Short-term rental owner", "stars": 5 },
+      { "quote": "Honestly thought it would be more complicated. Took me a few minutes to figure out and that was it.", "name": "Rebecca Jones", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Good for documenting damages. Wouldn't use it for a full property inventory though.", "name": "Michael Reed", "role": "Property manager", "stars": 4 },
+      { "quote": "The voice thing is actually useful. Especially when you're walking through the house and don't want to type everything.", "name": "Amy Sullivan", "role": "Vacation rental host", "stars": 5 },
+      { "quote": "works fine. only done 2 reports with it so far", "name": "James P.", "role": "Airbnb host", "stars": 5 },
+      { "quote": "It's okay. I like the finished reports but $99 felt like a lot upfront for something I don't use every week.", "name": "Karen Thompson", "role": "Property manager", "stars": 3 },
+      { "quote": "Had some damage to a kitchen cabinet and wanted everything documented before the next guests arrived. This made it easier.", "name": "Ben Carter", "role": "Short-term rental host", "stars": 5 },
+      { "quote": "My cleaner sends me pictures and I put together the report. Saves some time but would love a better way to organize photos.", "name": "Rachel Wilson", "role": "Co-host", "stars": 4 },
+      { "quote": "Bought it mainly because I didn't want another subscription.", "name": "Tom Richards", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Was expecting the report to take 35 seconds like the video. Mine took a couple minutes but still much faster than doing it manually.", "name": "Stephanie Lee", "role": "Property manager", "stars": 4 },
+      { "quote": "Not much to say really. It works and I got the PDF I needed.", "name": "David Morgan", "role": "Vacation rental owner", "stars": 5 },
+      { "quote": "I had been putting off writing up some damages because I hate doing paperwork. This helped.", "name": "Melissa Grant", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Pretty simple tool. The report looks decent and I like having the photos attached. Haven't used the sharing link much.", "name": "Andrew Collins", "role": "Property manager", "stars": 4 },
+      { "quote": "Used it after a guest broke a lamp and damaged the bedside table. Much easier than trying to explain everything over email.", "name": "Nicole B.", "role": "Short-let host", "stars": 5 },
+      { "quote": "Not bad. I only have one rental so I'm not sure how often I'll need it. Probably makes more sense for someone managing several.", "name": "Mark Davis", "role": "Airbnb host", "stars": 3 },
+      { "quote": "The main thing for me is not having photos scattered across my phone anymore when I need to put a report together.", "name": "Sarah Evans", "role": "Property manager", "stars": 5 },
+      { "quote": "I like that it doesn't try to do a hundred different things.", "name": "Kevin Brooks", "role": "Vacation rental host", "stars": 5 },
+      { "quote": "Only started using it recently. So far so good. Would be nice to have a few more options for the layout of the final report.", "name": "Helen Foster", "role": "Holiday let owner", "stars": 4 },
+      { "quote": "Took pictures of a damaged sofa, talked through what happened and exported it. No issues.", "name": "Brian Mitchell", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Useful when we have back to back bookings. I still double check the wording before sending anything to the owner.", "name": "Michelle Adams", "role": "Co-host", "stars": 4 },
+      { "quote": "I was skeptical about paying $99 but I prefer knowing I won't get billed again next month.", "name": "Paul Henderson", "role": "Rental property owner", "stars": 5 },
+      { "quote": "I wish there were more templates. Other than that I like it.", "name": "Jennifer Clark", "role": "Airbnb host", "stars": 4 },
+      { "quote": "My old way was just emailing photos to myself and writing notes later. This is better.", "name": "Scott Martin", "role": "Property manager", "stars": 5 },
+      { "quote": "Does what it says but I don't think it's something I'd use every checkout. More for when something actually goes wrong.", "name": "Emma Roberts", "role": "Holiday let host", "stars": 3 },
+      { "quote": "Used it for a damaged door frame. Nice having everything in one report instead of sending five separate pictures.", "name": "Jason Miller", "role": "Short-term rental operator", "stars": 5 },
+      { "quote": "The voice notes save me the most time. You still need to check the report, obviously, but there's a lot less typing.", "name": "Lisa Bennett", "role": "Airbnb co-host", "stars": 4 },
+      { "quote": "Simple, works on my phone, no subscription. That's enough for me.", "name": "Robert K.", "role": "Property owner", "stars": 5 },
+      { "quote": "I manage a few holiday rentals and wanted something specifically for damage documentation. It's not perfect but it does that job well.", "name": "Claire Hughes", "role": "Property manager", "stars": 4 }
+    ],
+    "reviewsTitle": "What hosts say",
+    "reviewsNote": "Some early users received the app free in exchange for honest feedback.",
+    "reviewsRating": { "stars": 4.5, "label": "4.5 from 30 hosts" },
     "video": {
       "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
       "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_1080,q_auto/v1790878619/1001_1_2_dbfaov.jpg",

@@ -890,6 +890,29 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .offer-points { list-style: none; margin: 16px 4px 8px; padding: 0; display: grid; gap: 8px; }
 .offer-points li { position: relative; padding-left: 26px; line-height: 1.35; }
 .offer-points li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 750; }
+/* Social proof, from the manifest only: a compact trust strip under the offer's
+   button, and a testimonials block under the recording. Empty content renders
+   nothing, so these rules never produce a visible box on their own. */
+.offer-trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 2px 4px; flex-wrap: wrap; }
+.review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
+.review-stars-off { color: var(--border); }
+.offer-trust-text { color: var(--muted); font-size: 14px; font-weight: 600; }
+.offer-reviews { width: 100%; max-width: 560px; margin: 8px auto 0; justify-self: center; }
+.offer-reviews-title { margin: 0 0 8px; text-align: center; font-size: 20px; line-height: 1.15; letter-spacing: -.4px; }
+.offer-reviews-note { margin: 0 0 14px; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.offer-reviews-grid { display: grid; gap: 12px; }
+.offer-reviews #reviews-more { display: block; width: 100%; margin: 12px 0 0; }
+.review-card { margin: 0; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 8px 24px #2e7d5b0d; }
+.review-card .review-stars { display: block; margin-bottom: 8px; font-size: 16px; }
+.review-card blockquote { margin: 0; font-size: 16px; line-height: 1.5; letter-spacing: -.2px; }
+.review-card figcaption { margin-top: 12px; display: flex; flex-direction: column; gap: 1px; }
+.review-name { font-weight: 700; font-size: 14px; }
+.review-role { color: var(--muted); font-size: 13px; }
+.offer-landing.is-pick ~ .offer-reviews, .offer-landing.pick-leaving ~ .offer-reviews { display: none; }
+@media (min-width: 880px) {
+  .offer-reviews { max-width: 940px; margin-top: 4px; }
+  .offer-reviews-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
 @media (min-width: 880px) {
   .offer-landing { grid-template-columns: auto minmax(0, 440px); grid-template-areas: "video intro" "video buy"; justify-content: center; column-gap: 48px; align-content: start; }
   .offer-intro { grid-area: intro; text-align: left; align-self: end; }
