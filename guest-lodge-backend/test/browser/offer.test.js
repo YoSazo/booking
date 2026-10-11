@@ -27,6 +27,25 @@ const choose = async (h, which = 'yes', reason = 'price') => {
 };
 const SECONDS = require('../../wedges/claims').landing.video.seconds;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
+test('the paused offer keeps $49 after the old deadline and carries no ticking urgency', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, launchPaused: true, now: at(365 * 24 * HOUR) });
+  try {
+    await h.page.waitForSelector('#sim-buy');
+    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
+    assert.match(await h.page.textContent('#sim-paybar'), /Countdown paused/);
+    assert.equal(await h.page.$('[data-launch-left]'), null);
+    assert.doesNotMatch(await h.page.textContent('#sim-offer'), /Launch price ends in|then \$199/);
+    await h.page.waitForTimeout(1300);
+    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
+    await h.page.click('#sim-buy');
+    for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
+    assert.equal(h.purchases[0]?.plan, 'lifetime');
+    const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
+    assert.match(terms, /countdown is currently paused/);
+    assert.doesNotMatch(terms, /October 13, 2026/);
+    h.assertClean();
+  } finally { await h.close(); }
+});
 test('the reset command reopens $49 with a 48-hour countdown and still expires at $199', async t => {
   const { backendRoot, root } = require('../helpers/claims-reset-fixture').fixture(t);
   const { resetClaimsLaunch } = require('../../scripts/claims-reset');
@@ -82,7 +101,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
     const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
-    assert.match(terms, new RegExp(`\\$${LAUNCH} USD at its launch price until`));
+    assert.match(terms, new RegExp(`\\$${LAUNCH} USD at its launch price`));
     assert.match(terms, /3-day money-back guarantee/);
     assert.match(terms, /have not sent a report/);
     // Signing in is the header's job; the landing carries no second link for it.

@@ -3009,7 +3009,7 @@ test('paying once is one payment at the launch price with no subscription, and i
   } finally { had.registration.close(); }
 }));
 
-test('the launch price really ends: from its fixed moment checkout charges the standing price for everyone', async () => {
+test('checkout honors the launch deadline and a paused launch remains available after it', async () => {
   const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` }) });
   await atTime(DURING_LAUNCH, async () => {
@@ -3024,8 +3024,9 @@ test('the launch price really ends: from its fixed moment checkout charges the s
     const h = moneyHarness();
     try {
       assert.equal((await buy(h)).status, 200);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, STANDING_CENTS);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews. 3-day money-back guarantee.');
+      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, OFFER.launch.paused ? LAUNCH_CENTS : STANDING_CENTS);
+      if (OFFER.launch.paused) assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
+      else assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews. 3-day money-back guarantee.');
     } finally { h.registration.close(); }
   });
   // A launch price the registry would accept is lower than the full price and
@@ -3035,6 +3036,12 @@ test('the launch price really ends: from its fixed moment checkout charges the s
   const withLaunch = launch => ({ ...claims, offer: { ...claims.offer, launch } });
   assert.throws(() => validate(withLaunch({ price: 249, until: '2026-10-02T06:59:59Z' })), /offer\.launch/);
   assert.throws(() => validate(withLaunch({ price: 99, until: 'next week' })), /offer\.launch/);
+  assert.throws(() => validate(withLaunch({ ...OFFER.launch, paused: 'true' })), /paused must be a boolean/);
+  const { priceForOffer } = require('../inspect');
+  const offer = { lifetime: STANDING_CENTS, launch: { price: LAUNCH_CENTS, until: LAUNCH_END, paused: false } };
+  assert.equal(priceForOffer(offer, LAUNCH_END - 1), LAUNCH_CENTS);
+  assert.equal(priceForOffer(offer, LAUNCH_END), STANDING_CENTS);
+  assert.equal(priceForOffer({ ...offer, launch: { ...offer.launch, paused: true } }, LAUNCH_END + 365 * 86400000), LAUNCH_CENTS);
 });
 
 test('paying once grants the plan for good, exactly once, and Meta hears the sale', async () => {

@@ -26,6 +26,7 @@ test('reset reopens an expired $49 offer for 48 hours and synchronizes terms, mi
   assert.equal(claims.offer.launch.price, 49);
   assert.equal(claims.offer.lifetime, 199);
   assert.equal(claims.offer.launch.until, result.until);
+  assert.equal(claims.offer.launch.paused, undefined, 'reset resumes the countdown');
   assert.ok(claims.termsIntro.includes(result.deadline));
   for (const name of ['index.html', 'terms.html', 'wedges.js']) {
     assert.deepEqual(fs.readFileSync(path.join(backendRoot, 'public/inspect', name)), fs.readFileSync(path.join(root, 'marketel-frontdesk-ios/www/inspect', name)));

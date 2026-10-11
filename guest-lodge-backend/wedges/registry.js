@@ -21,6 +21,7 @@ function validate(manifest, filename = '') {
   const launch = manifest.offer.launch;
   if (launch !== undefined && (!manifest.offer.lifetime || !Number.isInteger(launch?.price) || launch.price < 19 || launch.price >= manifest.offer.lifetime
     || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(launch.until || '')) || !Number.isFinite(Date.parse(launch.until)))) bad('offer.launch needs a whole-dollar price below offer.lifetime and a fixed UTC until (YYYY-MM-DDTHH:MM:SSZ)');
+  if (launch?.paused !== undefined && typeof launch.paused !== 'boolean') bad('offer.launch.paused must be a boolean');
   if (!Array.isArray(manifest.listTypes) || !manifest.listTypes.length || !manifest.types || typeof manifest.types !== 'object') bad('types and listTypes are required');
   if (!manifest.skin || !manifest.landing || !manifest.appStore || typeof manifest.chooser !== 'string') bad('skin, landing, appStore and chooser are required');
   if (!manifest.roleLabels || typeof manifest.roleLabels !== 'object') bad('role labels are required');

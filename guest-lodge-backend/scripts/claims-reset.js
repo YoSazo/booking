@@ -22,9 +22,9 @@ function resetClaimsLaunch({ backendRoot = path.resolve(__dirname, '..'), hours 
   delete require.cache[require.resolve(manifestPath)];
   const manifest = structuredClone(require(manifestPath));
   manifest.offer.launch = { price: PRICE, until };
-  const introPattern = /\(\$\d+ at the launch price until [^)]+\)/;
+  const introPattern = /(pay-once purchase )\([^)]*\)/;
   if (!introPattern.test(manifest.termsIntro)) throw new Error('Claims termsIntro has changed; update the reset command before using it.');
-  manifest.termsIntro = manifest.termsIntro.replace(introPattern, () => `($${PRICE} at the launch price until ${deadline}, then $${manifest.offer.lifetime})`);
+  manifest.termsIntro = manifest.termsIntro.replace(introPattern, (_, prefix) => `${prefix}($${PRICE} at the launch price until ${deadline}, then $${manifest.offer.lifetime})`);
   const { validate } = require(path.join(backendRoot, 'wedges/registry'));
   validate(manifest);
 

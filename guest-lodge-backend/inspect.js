@@ -145,15 +145,15 @@ const REPORT_TYPES = Object.freeze(Object.keys(TYPE_CONFIG));
 // finalized report. A 'pay-at-export' tool is free to build and asks at the
 // moment a finished report is sent or downloaded, which is when cold traffic
 // has just seen its own report and is most willing to pay for it.
-const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetime: (item.offer.lifetime || 0) * 100, launch: item.offer.launch ? Object.freeze({ price: item.offer.launch.price * 100, until: Date.parse(item.offer.launch.until) }) : null, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
+const TOOLS = Object.freeze(Object.fromEntries(WEDGE_REGISTRY.all.map(item => [item.id, Object.freeze({ unit: item.types[item.listTypes[0]].unit, types: Object.keys(item.types), offerMode: item.offer.mode, reportPrice: item.offer.reportPrice * 100, lifetime: (item.offer.lifetime || 0) * 100, launch: item.offer.launch ? Object.freeze({ price: item.offer.launch.price * 100, until: Date.parse(item.offer.launch.until), paused: item.offer.launch.paused }) : null, label: `Marketel ${item.product}`, home: item.skin.home || `/${item.id}` })])));
 const SUPPORT_EMAIL = 'support@bookmarketel.com';
 // The pay-once price right now, in cents: the launch price until its fixed end,
 // the same moment for everyone, then the full price. Zero where there is none.
-const lifetimeCents = (tool, now = Date.now()) => {
-  const offer = TOOLS[tool];
+const priceForOffer = (offer, now = Date.now()) => {
   if (!offer?.lifetime) return 0;
-  return offer.launch && now < offer.launch.until ? offer.launch.price : offer.lifetime;
+  return offer.launch && (offer.launch.paused || now < offer.launch.until) ? offer.launch.price : offer.lifetime;
 };
+const lifetimeCents = (tool, now = Date.now()) => priceForOffer(TOOLS[tool], now);
 const toolOf = value => (Object.prototype.hasOwnProperty.call(TOOLS, value) ? value : 'inspect');
 const toolForType = type => Object.keys(TOOLS).find(key => TOOLS[key].types.includes(type)) || 'inspect';
 const DECLINE_REASONS = Object.freeze(['too_expensive', 'only_needed_one', 'missing_something', 'just_looking']);
@@ -2278,6 +2278,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
 }
 
 module.exports = {
+  priceForOffer,
   registerInspect,
   stampPhoto,
   stampText,
