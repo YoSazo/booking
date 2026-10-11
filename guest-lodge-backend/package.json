@@ -13,6 +13,7 @@
     "test:browser:review": "node test/browser/review-walk.mjs",
     "wedges:build": "node scripts/wedges-build.js",
     "wedges:check": "node scripts/wedges-build.js --check",
+    "claims:reset": "node scripts/claims-reset.js",
     "qa:release:auto": "npm test && node scripts/release-qa.js",
     "qa:release:database": "node scripts/release-qa.js",
     "stripe:domains:sync": "node scripts/register-stripe-payment-domains.js",

@@ -27,6 +27,26 @@ const choose = async (h, which = 'yes', reason = 'price') => {
 };
 const SECONDS = require('../../wedges/claims').landing.video.seconds;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
+test('the reset command reopens $49 with a 48-hour countdown and still expires at $199', async t => {
+  const { backendRoot, root } = require('../helpers/claims-reset-fixture').fixture(t);
+  const { resetClaimsLaunch } = require('../../scripts/claims-reset');
+  const path = require('node:path');
+  const now = LAUNCH_END + HOUR;
+  const result = resetClaimsLaunch({ backendRoot, now });
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: new Date(now).toISOString(),
+    webRoot: path.join(backendRoot, 'public/inspect'), appRoot: path.join(root, 'marketel-frontdesk-ios/www/inspect') });
+  try {
+    await h.page.waitForSelector('[data-launch-left]');
+    await h.page.evaluate(time => { Date.now = () => time; }, now);
+    await h.page.waitForFunction(() => document.querySelector('[data-launch-left]')?.textContent === '48:00:00');
+    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
+    assert.match(await h.page.textContent('#sim-paybar'), /Then \$199 in 48:00:00/);
+    await h.page.evaluate(time => { Date.now = () => time; }, Date.parse(result.until));
+    await h.page.waitForFunction(() => document.getElementById('sim-buy')?.textContent.includes('$199'));
+    assert.equal(await h.page.$('[data-launch-left]'), null);
+    h.assertClean();
+  } finally { await h.close(); }
+});
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
 const fastClock = async (h, { hidden = false } = {}) => {
@@ -72,7 +92,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     assert.ok(points.length >= 4, 'the full card lists what they get');
     // The launch price: the real plan it replaces, and the real moment it ends.
     assert.match(text, new RegExp(`Instead of \\$${STANDING}\\b`));
-    assert.match(text, new RegExp(`Launch price ends in 1d \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
+    assert.match(text, new RegExp(`Launch price ends in \\d\\d:\\d\\d:\\d\\d · then \\$${STANDING}`));
     // No trial, no monthly price, no plan to switch, no $12-a-report side door.
     assert.doesNotMatch(text, /free for 3 days|\/month|\/year|Keep it free|\$12/i);
     assert.equal(await h.page.$('[data-sim-plan]'), null);
@@ -88,7 +108,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     assert.equal(await h.page.isVisible('#sim-paybar-buy'), true, 'the price bar comes in once the card is behind them');
     // The bar is what a phone visitor keeps seeing: the plan it replaces, the
     // price, and when it becomes the standing price.
-    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} \\$${LAUNCH} once\\s*Then \\$${STANDING} in 1d \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
+    assert.match((await h.page.textContent('#sim-paybar')).replace(/\s+/g, ' '), new RegExp(`\\$${STANDING} \\$${LAUNCH} once\\s*Then \\$${STANDING} in \\d\\d:\\d\\d:\\d\\d\\s*Get it`));
     assert.equal(await h.page.textContent('#sim-paybar s'), `$${STANDING}`);
     assert.equal(await h.page.getAttribute('#sim-paybar small', 'class'), 'bar-clock');
     assert.equal((await h.page.textContent('#sim-paybar .guarantee-badge')).trim(), '3-day money-back guarantee');

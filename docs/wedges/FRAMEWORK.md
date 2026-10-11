@@ -242,6 +242,15 @@ is always real: published tests show real deadlines lifting sales (median
 timers as deceptive. A new launch price later is a real price change, never a
 reset. "Only N left" waits until real sales make the number true.
 
+To bring Claims' $49 offer back for a new promotion, run
+`npm --prefix guest-lodge-backend run claims:reset` at the repository root.
+It sets a new fixed deadline 48 hours from the command, updates the price
+terms, rebuilds the web/iOS wedge data and bumps both asset versions.
+Use `-- --hours 24` for one day, or `-- --dry-run` to preview without writing.
+Commit and deploy the resulting files to activate the offer. The command does
+not commit, push, or renew the deadline automatically; checkout returns to
+$199 at the published deadline.
+
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
 app carries it. While it is `false`, the web funnel keeps buyers in the
 browser: the page after paying says it works right here and starts the first
