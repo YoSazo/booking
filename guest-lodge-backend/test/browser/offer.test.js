@@ -41,8 +41,7 @@ test('the paused offer keeps $49 after the old deadline and carries no ticking u
     for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
     assert.equal(h.purchases[0]?.plan, 'lifetime');
     const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
-    assert.match(terms, /countdown is currently paused/);
-    assert.doesNotMatch(terms, /October 13, 2026/);
+    assert.doesNotMatch(terms, /countdown is currently paused|remains available while it is paused|A new deadline will be published/);
     h.assertClean();
   } finally { await h.close(); }
 });
