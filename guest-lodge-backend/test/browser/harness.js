@@ -79,7 +79,7 @@ async function open({ launchPaused = false, firstQuestion = false, native = fals
     if (/\.(css|html)$/.test(filename)) body = Buffer.from(body.toString().replace(/(\d)svh/g, '$1vh'));
     if (includeFixture && filename.endsWith('wedges.js')) body = Buffer.from(body.toString() + `\nwindow.MARKETEL_WEDGES.fixture = ${JSON.stringify(fixtureManifest)};\n`);
     // Running-deadline contracts are the default; pause checks opt in.
-    if (filename.endsWith('wedges.js')) body = Buffer.from(body.toString().replace(/("paused":\s*)(?:true|false)/g, (_, prefix) => prefix + launchPaused));
+    if (filename.endsWith('wedges.js')) body = Buffer.from(body.toString() + `\nif (window.MARKETEL_WEDGES.claims?.offer.launch) window.MARKETEL_WEDGES.claims.offer.launch.paused = ${JSON.stringify(launchPaused)};\n`);
     if (firstQuestion && filename.endsWith('wedges.js')) body = Buffer.from(body.toString().replace('"firstQuestion": false', '"firstQuestion": true'));
     if (native && filename.endsWith('inspect.js')) body = Buffer.from(body.toString().replace(/^.*\n/, 'const native = true;\n'));
     return route.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(filename)] || 'application/octet-stream' } });

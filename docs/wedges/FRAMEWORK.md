@@ -251,10 +251,10 @@ Commit and deploy the resulting files to activate the offer. The command does
 not commit, push, or renew the deadline automatically; checkout returns to
 $199 at the published deadline.
 
-Claims' countdown is currently paused while its ads are off:
-`offer.launch.paused: true` keeps $49 available even after the saved deadline,
+Claims supports pausing its countdown with
+`offer.launch.paused: true`, which keeps $49 available even after the saved deadline,
 and the landing and sticky say "Countdown paused" instead of showing a ticking
-deadline. The terms agree. Run `claims:reset` when the ads restart; it removes
+deadline. Run `claims:reset` to resume it; this removes
 the pause, publishes a fresh 48-hour deadline and rebuilds both copies.
 
 **App switch.** Each wedge's `appStore.live` says whether the approved iPhone
