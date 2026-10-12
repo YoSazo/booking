@@ -1246,7 +1246,7 @@ function offerTape(){
   const items=landingArm()?.reviews;
   if(!Array.isArray(items)||!items.length)return '';
   const run=items.map(tapeCard).join('');
-  return `<section class="offer-tape" id="offer-tape" aria-label="Host reviews"><div class="offer-tape-track"><div class="offer-tape-run">${run}</div><div class="offer-tape-run" aria-hidden="true">${run}</div></div></section>`;
+  return `<section class="offer-tape" id="offer-tape" aria-label="Customer reviews"><div class="offer-tape-track"><div class="offer-tape-run">${run}</div><div class="offer-tape-run" aria-hidden="true">${run}</div></div></section>`;
 }
 function videoBuyMarkup({declined=false}={}){
   if(!payOnce())return `${simOfferMarkup({declined})}<ul class="offer-points">${(skin().offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`;

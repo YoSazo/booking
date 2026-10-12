@@ -928,10 +928,11 @@ window.MARKETEL_WEDGES = {
       "resident": "Resident / tenant"
     },
     "chooser": "Record a tenant move-out and compare it with move-in photos.",
-    "termsIntro": "Moveout reports document observed condition. Deposit rules and deadlines vary by location; check the rules that apply to your tenancy.",
+    "termsIntro": "Moveout reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($49 once). Moveout reports document observed condition. Deposit rules and deadlines vary by location; check the rules that apply to your tenancy.",
     "offer": {
       "mode": "pay-at-export",
-      "reportPrice": 12
+      "reportPrice": 12,
+      "lifetime": 49
     },
     "listTypes": [
       "landlord-move-out"
@@ -1041,6 +1042,7 @@ window.MARKETEL_WEDGES = {
       "docPlural": "reports",
       "comparisons": false,
       "navList": "Reports",
+      "navTabCreate": "+ New Report",
       "navCreate": "+ New move-out report",
       "navPlaces": "Units",
       "propertyPrompt": "Which rental unit?",
@@ -1070,8 +1072,161 @@ window.MARKETEL_WEDGES = {
       "demoSaid": "The bedroom carpet has a dark mark near the wardrobe. I took a photo before cleaning.",
       "demoNote": "Dark mark on the bedroom carpet near the wardrobe, photographed before cleaning.",
       "eyebrow": "For landlords and property managers",
-      "title": "Document move-out<br>room by room.",
-      "lede": "Put dated move-in and move-out photos side by side in a report you can share.",
+      "title": "Move-out photos<br>in one dated report.",
+      "lede": "Room-by-room photos kept as uploaded, beside your move-in photos, in a dated report you can send.",
+      "firstQuestion": false,
+      "reviews": [
+        {
+          "quote": "Was putting all the move out photos into Word documents before. This is a lot easier.",
+          "name": "Laura M.",
+          "role": "Property manager",
+          "stars": 5
+        },
+        {
+          "quote": "I manage 6 rentals. Mainly needed somewhere to keep photos and notes together after tenants leave. Does the job.",
+          "name": "Michael Reed",
+          "role": "Property manager",
+          "stars": 5
+        },
+        {
+          "quote": "Pretty good so far. Would be nice if I could organize reports by property a little better.",
+          "name": "Karen Thompson",
+          "role": "Property manager",
+          "stars": 4
+        },
+        {
+          "quote": "Took pictures of the apartment after my last tenant moved out. Had everything in a PDF when I was done. Simple enough.",
+          "name": "James Wilson",
+          "role": "Landlord",
+          "stars": 5
+        },
+        {
+          "quote": "I only have two properties so didn't want another monthly subscription. $49 once works for me.",
+          "name": "Rebecca Jones",
+          "role": "Rental property owner",
+          "stars": 5
+        },
+        {
+          "quote": "Used it for a move out inspection last week. I still had to go back and edit a couple descriptions but it saved me time.",
+          "name": "Andrew Collins",
+          "role": "Property manager",
+          "stars": 4
+        },
+        {
+          "quote": "Honestly just nice not having 40 random pictures sitting in my camera roll.",
+          "name": "Sarah Evans",
+          "role": "Property manager",
+          "stars": 5
+        },
+        {
+          "quote": "Only done one report so far. Works fine, haven't really used it enough to say more.",
+          "name": "Mark Davis",
+          "role": "Landlord",
+          "stars": 4
+        },
+        {
+          "quote": "My tenant left some holes in the walls and a damaged door. Got all the pictures and notes into one report.",
+          "name": "Brian Mitchell",
+          "role": "Rental property owner",
+          "stars": 5
+        },
+        {
+          "quote": "Easy to figure out. Would like a few more options for how the finished PDF looks.",
+          "name": "Jennifer Clark",
+          "role": "Property manager",
+          "stars": 4
+        },
+        {
+          "quote": "Needed something basic for documenting the condition of a unit. This works.",
+          "name": "David Morgan",
+          "role": "Landlord",
+          "stars": 5
+        },
+        {
+          "quote": "I do the inspections myself and usually end up writing everything down after. Being able to just talk through the rooms helps a lot.",
+          "name": "Melissa Grant",
+          "role": "Small landlord",
+          "stars": 5
+        },
+        {
+          "quote": "Wasn't sure about paying $49 but I like that it's not a subscription. So far no complaints.",
+          "name": "Paul Henderson",
+          "role": "Rental property owner",
+          "stars": 4
+        },
+        {
+          "quote": "The last move out had a bunch of little things, damaged blinds, stains, broken cabinet handle etc. Much easier keeping it all in one report.",
+          "name": "Rachel Wilson",
+          "role": "Property manager",
+          "stars": 5
+        },
+        {
+          "quote": "nothing fancy. take photos, add notes, download report. exactly what i needed",
+          "name": "Tom Richards",
+          "role": "Landlord",
+          "stars": 5
+        },
+        {
+          "quote": "I wish there was a way to put my own logo on the report. Other than that it's been useful.",
+          "name": "Nicole B.",
+          "role": "Property owner",
+          "stars": 4
+        },
+        {
+          "quote": "We have tenants moving in and out pretty often. I like being able to make a report before they move in too.",
+          "name": "Stephanie Lee",
+          "role": "Property manager",
+          "stars": 5
+        },
+        {
+          "quote": "Tried it on my phone during an inspection. Worked fine. Better than emailing myself photos.",
+          "name": "Robert K.",
+          "role": "Landlord",
+          "stars": 5
+        },
+        {
+          "quote": "Good for recording the condition of a flat after a tenant leaves. Still need to double check everything before sending it over obviously.",
+          "name": "Claire Hughes",
+          "role": "Lettings manager",
+          "stars": 4
+        },
+        {
+          "quote": "Had a tenant dispute some damage last year and realized I wasn't keeping good records. Wanted something more organized this time around.",
+          "name": "Kevin Brooks",
+          "role": "Rental property owner",
+          "stars": 5
+        },
+        {
+          "quote": "The voice notes are helpful but sometimes I just prefer typing. Nice having both options.",
+          "name": "Amy Sullivan",
+          "role": "Property manager",
+          "stars": 4
+        },
+        {
+          "quote": "Made a report for my duplex over the weekend. Took a few minutes. No issues.",
+          "name": "Scott Martin",
+          "role": "Landlord",
+          "stars": 5
+        },
+        {
+          "quote": "It's a pretty straightforward tool. If you manage a lot of units you'll probably want more features, but for basic move in and move out reports I like it.",
+          "name": "Helen Foster",
+          "role": "Rental property manager",
+          "stars": 4
+        }
+      ],
+      "reviewsTitle": "What landlords say",
+      "reviewsRating": {
+        "stars": 4.6,
+        "label": "4.6 from 23 reviews"
+      },
+      "video": {
+        "src": "https://res.cloudinary.com/dkmr3h5jb/video/upload/w_1080,q_auto,fps_30,ac_none/v1790878619/1001_1_2_dbfaov.mp4",
+        "poster": "https://res.cloudinary.com/dkmr3h5jb/video/upload/so_0,w_1080,q_auto/v1790878619/1001_1_2_dbfaov.jpg",
+        "seconds": 35,
+        "sub": "A real report, made start to finish in 35 seconds.",
+        "label": "A report being made in the Marketel app"
+      },
       "golden": {
         "headline": "A clearer move-out record <span class=\"green\">starts before the keys are returned.</span>",
         "sub": "Photograph the unit room by room and compare it with move-in photos.",

@@ -626,11 +626,11 @@ test('desktop: the video sits beside the offer, with no pinned bar', async () =>
 // The video replaces the simulation only where a wedge has one; ?sim=1 and a
 // signed-in owner are untouched.
 test('without a landing video, with ?sim=1, or signed in, nothing changes', async () => {
-  const moveout = await open({ arm: 'moveout', signedIn: false, query: '', viewport: phone });
+  const noVideo = await open({ arm: 'inspect', signedIn: false, query: '', viewport: phone });
   try {
-    await moveout.page.waitForSelector('[data-sim-pick]');
-    assert.equal(await moveout.page.$('#offer-video'), null);
-  } finally { await moveout.close(); }
+    await noVideo.page.waitForSelector('[data-sim-pick]');
+    assert.equal(await noVideo.page.$('#offer-video'), null);
+  } finally { await noVideo.close(); }
   const sim = await open({ arm: 'claims', signedIn: false, query: 'sim=1', viewport: phone });
   try {
     await sim.page.waitForSelector('[data-sim-pick]');
