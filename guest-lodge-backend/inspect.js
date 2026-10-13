@@ -1047,7 +1047,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
         product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`,
           description: `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
       ...(email ? { customer_email: email } : {}),
-      metadata, payment_intent_data: { metadata },
+      metadata, payment_intent_data: { metadata, capture_method: 'manual' },
       success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
       cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
     });
