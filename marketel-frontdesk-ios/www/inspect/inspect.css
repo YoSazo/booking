@@ -901,8 +901,8 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
 .review-stars-off { color: var(--border); }
 .offer-trust-text { color: var(--muted); font-size: 14px; font-weight: 600; }
-.offer-tape { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
-.offer-tape-track { display: flex; width: max-content; animation: offer-tape 90s linear infinite; }
+.offer-tape { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); isolation: isolate; transform: translateZ(0); }
+.offer-tape-track { display: flex; width: max-content; animation: offer-tape 90s linear infinite; will-change: transform; backface-visibility: hidden; }
 .offer-tape-run { display: flex; gap: 10px; padding-right: 10px; }
 .tape-card { flex: 0 0 220px; margin: 0; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
 .tape-card .review-stars { display: block; margin-bottom: 4px; font-size: 13px; }
