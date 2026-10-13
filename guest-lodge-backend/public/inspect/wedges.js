@@ -17,7 +17,7 @@ window.MARKETEL_WEDGES = {
       "reportPrice": 12,
       "lifetime": 199,
       "launch": {
-        "price": 1,
+        "price": 49,
         "until": "2026-10-14T05:09:00Z"
       }
     },
