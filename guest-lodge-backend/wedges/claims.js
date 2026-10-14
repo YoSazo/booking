@@ -186,7 +186,7 @@ module.exports = {
     //                    { stars: 4.5, label: "4.5 from 30 hosts" }
     //                  null ⇒ no trust strip. Only publish a real, true rating.
     "reviews": [
-      { "quote": "Had to document a broken coffee table after checkout. Did what I needed. Pretty straightforward.", "name": "Daniel Harris", "role": "Airbnb host", "stars": 5 },
+      { "quote": "Had to document a broken coffee table after checkout. Did what I needed. Pretty straightforward.", "checkoutQuote": "Pretty straightforward.", "name": "Daniel Harris", "role": "Airbnb host", "stars": 5 },
       { "quote": "Used it for two properties so far. The reports look good, just wish organizing them was a little easier.", "name": "Laura M.", "role": "Property manager", "stars": 4 },
       { "quote": "I was making these in Word before. Definitely not going back to that.", "name": "Chris Walker", "role": "Short-term rental owner", "stars": 5 },
       { "quote": "Honestly thought it would be more complicated. Took me a few minutes to figure out and that was it.", "name": "Rebecca Jones", "role": "Airbnb host", "stars": 5 },

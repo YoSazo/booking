@@ -48,6 +48,8 @@ function validate(manifest, filename = '') {
   if (reviews !== undefined && (!Array.isArray(reviews) || reviews.some(item => !item || typeof item.quote !== 'string' || !item.quote.trim()
     || typeof item.name !== 'string' || !item.name.trim() || (item.role !== undefined && typeof item.role !== 'string')
     || (item.stars !== undefined && (typeof item.stars !== 'number' || item.stars < 0 || item.stars > 5))))) bad('landing.reviews must be items with a quote and a name, an optional role, and optional stars 0–5');
+  if (reviews?.some(item => item.checkoutQuote !== undefined && (typeof item.checkoutQuote !== 'string'
+    || !item.checkoutQuote.trim() || item.checkoutQuote.length > 80 || !item.quote.includes(item.checkoutQuote)))) bad('landing.reviews checkoutQuote must be an exact source excerpt of 1–80 characters');
   if (manifest.landing.reviewsTitle !== undefined && (typeof manifest.landing.reviewsTitle !== 'string' || !manifest.landing.reviewsTitle.trim())) bad('landing.reviewsTitle must be a non-empty string');
   if (manifest.landing.reviewsNote !== undefined && (typeof manifest.landing.reviewsNote !== 'string' || !manifest.landing.reviewsNote.trim())) bad('landing.reviewsNote must be a non-empty string');
   const rating = manifest.landing.reviewsRating;

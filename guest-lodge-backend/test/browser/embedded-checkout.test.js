@@ -72,13 +72,18 @@ for (const width of [320, 390, 1280]) {
       assert.equal(await h.page.isVisible('.offer-landing'), false, 'the long pitch is not the payment screen');
       assert.equal(await h.page.isVisible('.checkout-review'), true, 'trust carries onto the payment screen');
       assert.match(await h.page.textContent('.checkout-review'), /Daniel Harris/);
+      assert.match(await h.page.textContent('.checkout-review'), /Pretty straightforward\./);
+      assert.equal(await h.page.locator('.checkout-promise .checkout-review').count(),1,'compact proof is inside the price summary');
+      assert.equal(await h.page.locator('#payment-step .tape-card').count(),0,'no full review card pushes payment down');
       assert.match(await h.page.textContent('.checkout-next'), /Start your first report immediately in your browser/);
       assert.equal(await h.page.locator('.checkout-next').count(),1,'next steps are not repeated below the form');
       assert.equal(await h.page.evaluate(()=>{
         const follows=(a,b)=>!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
         const form=document.getElementById('stripe-checkout'),next=document.querySelector('.checkout-next'),review=document.querySelector('.checkout-review');
-        return follows(form,next)&&follows(next,review);
-      }),true,'the form comes first; what happens after payment and the review sit under it');
+        return follows(review,form)&&follows(form,next);
+      }),true,'compact review comes before payment, while next steps stay below it');
+      const reviewHeight=await h.page.locator('.checkout-review').evaluate(el=>el.getBoundingClientRect().height);
+      assert.ok(reviewHeight<=50,'the review stays compact: '+reviewHeight);
       const formTop=await h.page.evaluate(()=>document.getElementById('stripe-checkout').getBoundingClientRect().top);
       assert.ok(formTop<420,'the card form starts high on the screen, not below a stack of copy: '+formTop);
       assert.equal((await h.page.textContent('#payment-progress')).trim(), 'Step 2 of 2 — Payment', 'they know this is the last step');
@@ -101,6 +106,22 @@ for (const width of [320, 390, 1280]) {
     } finally { await h.close(); }
   });
 }
+
+test('payment omits review proof when a valid source excerpt is missing', async()=>{
+  const h=await open({signedIn:false,query:''});
+  try{
+    await paymentFixture(h);
+    for(const value of [undefined,'Not a source quote.']){
+      await h.page.evaluate(excerpt=>{window.MARKETEL_WEDGES.claims.landing.reviews[0].checkoutQuote=excerpt;},value);
+      await h.page.click('#sim-buy');
+      await h.page.waitForSelector('#stripe-checkout.is-ready');
+      assert.equal(await h.page.locator('.checkout-review').count(),0,'never invent or paraphrase a testimonial');
+      await h.page.click('#embedded-payment-close');
+      await h.page.waitForURL('http://app.test/claims');
+    }
+    h.assertClean();
+  }finally{await h.close();}
+});
 
 test('the payment next steps mention the iPhone app only when this wedge is live in it', async () => {
   const h=await open({signedIn:false,query:''});

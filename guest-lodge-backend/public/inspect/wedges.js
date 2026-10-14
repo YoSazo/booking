@@ -179,6 +179,7 @@ window.MARKETEL_WEDGES = {
       "reviews": [
         {
           "quote": "Had to document a broken coffee table after checkout. Did what I needed. Pretty straightforward.",
+          "checkoutQuote": "Pretty straightforward.",
           "name": "Daniel Harris",
           "role": "Airbnb host",
           "stars": 5

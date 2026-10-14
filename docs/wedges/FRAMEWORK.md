@@ -227,7 +227,10 @@ once" is the mismatch that sinks a week.
 as GuestInfoPage does, but create no Session and send no checkout signal until
 the buy tap. The button opens a focused same-site payment step (`#payment`),
 not a scroll down the offer. It adds no account or email screen; Stripe takes
-the email and payment. Show the price/no-renewal summary, one existing review,
+the email and payment. Show the price/no-renewal summary with a compact review
+inside it above the fields. Its manifest `checkoutQuote` must be a short exact
+excerpt of the same review; preserve the author's name and actual rating. No
+full review card or carousel on the payment screen. Show
 secure Stripe payment, the exact refund condition, and what happens after
 paying. The amount comes from the server. Keep the landing DOM hidden, not
 rebuilt, so Back restores its video and exact scroll position. Hide the sticky
