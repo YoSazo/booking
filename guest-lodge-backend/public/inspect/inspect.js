@@ -1101,25 +1101,21 @@ async function showEmbeddedCheckout(result){
   $('sim-buy').hidden=true;
   bar?.classList.add('is-stood-down');
   $('offer-video')?.pause();
-  $('sim-buy').insertAdjacentHTML('afterend',`<section class="embedded-payment" id="embedded-payment" aria-label="Secure payment"><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span><button type="button" class="quiet" id="embedded-payment-close" aria-label="Close payment form">Back</button></div><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${esc(result.amount)} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span></div></div><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}">Terms</a></span></div><div id="stripe-checkout"><div class="checkout-loading" role="status">Loading secure payment…</div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p></section>`);
+  $('sim-buy').insertAdjacentHTML('afterend',`<section class="embedded-payment" id="embedded-payment" aria-label="Secure payment"><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span><button type="button" class="quiet" id="embedded-payment-close" aria-label="Close payment form">Back</button></div><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${esc(result.amount)} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span></div></div><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}">Terms</a></span></div><div class="checkout-frame-shell"><div id="stripe-checkout"></div><div class="checkout-loading" role="status">Loading secure payment…</div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p></section>`);
   $('embedded-payment-close').onclick=()=>{haptic();destroyEmbeddedCheckout();restoreCheckoutOffer();if(!launchOffer())videoLanding();requestAnimationFrame(()=>$('sim-buy')?.scrollIntoView({block:'center'}));};
   requestAnimationFrame(()=>$('embedded-payment')?.scrollIntoView({block:'start',behavior:simReduced()?'auto':'smooth'}));
-  // Stripe's own rendered event is the source of truth. An empty iframe can
-  // exist for seconds (or forever behind a blocker) and cannot be counted.
+  // Embedded Checkout has no stable ready callback. Once Stripe initializes
+  // successfully, accept its mounted, visible iframe; Stripe owns the loading
+  // and payment UI inside it. Optional analytics must never block a buyer.
   await new Promise((resolve,reject)=>{
-    let settled=false;
-    const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);attempt.cancel=null;error?reject(error):resolve();};
+    let settled=false,observer=null,resize=null;
+    const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);observer?.disconnect();resize?.disconnect();attempt.cancel=null;error?reject(error):resolve();};
     const timer=setTimeout(()=>finish(alive()?new Error('Secure checkout did not appear.'):closedError()),20000);
     attempt.cancel=()=>finish(closedError());
     loadStripeJs().then(async Stripe=>{
       if(!alive())throw closedError();
       const instance=await Stripe(result.publishableKey).initEmbeddedCheckout({
         clientSecret:result.clientSecret,
-        onAnalyticsEvent:event=>{
-          if(event.eventType!=='checkoutRendered'||!alive()||settled)return;
-          $('stripe-checkout')?.classList.add('is-ready');
-          simCheckoutRendered();finish();
-        },
         onComplete:()=>{
           if(!alive())return;
           finish();destroyEmbeddedCheckout();
@@ -1129,6 +1125,19 @@ async function showEmbeddedCheckout(result){
       if(!alive()||settled){instance.destroy();return;}
       attempt.instance=instance;
       instance.mount('#stripe-checkout');
+      const container=$('stripe-checkout');
+      const ready=()=>{
+        if(!alive()||settled)return;
+        const frame=container.querySelector('iframe');
+        if(!frame)return;
+        const bounds=frame.getBoundingClientRect();
+        if(bounds.width<=0||bounds.height<=0){resize?.observe(frame);return;}
+        container.classList.add('is-ready');simCheckoutRendered();finish();
+      };
+      observer=new MutationObserver(ready);
+      observer.observe(container,{childList:true,subtree:true,attributes:true,attributeFilter:['style','height']});
+      if(typeof ResizeObserver==='function')resize=new ResizeObserver(ready);
+      requestAnimationFrame(ready);
     }).catch(error=>finish(error));
   });
 }

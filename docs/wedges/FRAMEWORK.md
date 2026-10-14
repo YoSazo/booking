@@ -116,7 +116,7 @@ trial is the full three days (the price bar says "Free for 3 days"): nothing
 sent in them ends it early, and every trialist is emailed the day before.
 `SimCheckoutTapped` records the CTA tap internally. `SimCheckoutRendered`
 fires Meta InitiateCheckout with a deduplicating event ID when Stripe reports
-that the embedded payment form has rendered (or the hosted fallback URL is
+that Checkout has initialized and mounted visibly (or the hosted fallback URL is
 ready). The server sends StartTrial and Purchase, excludes
 owner/test emails with normalized plus aliases, and excludes app purchases
 (`metadata.source='app'`). Native purchases open the default browser only in
@@ -230,8 +230,11 @@ the server, with no renewal, access after payment, secure Stripe payment and
 the exact refund condition. Keep the video and reviews in the page. Hide the
 sticky purchase bar while the form is open so it cannot cover inputs. The form
 has a Back action, closing while it loads never redirects, and the launch
-deadline cannot destroy a form while someone is paying. Stripe's rendered
-callback sends `SimCheckoutRendered`; inserting an iframe does not. If Stripe
+deadline cannot destroy a form while someone is paying. Successful Stripe
+initialization and a mounted, visible iframe send `SimCheckoutRendered`; a
+zero-size iframe does not. Stripe's optional analytics callback is not a
+readiness requirement. The mount container must be empty; put our loading
+indicator beside it, never inside it. If Stripe
 fails to load, recover with hosted Checkout. Purchases in the iPhone app keep
 their default-browser handoff. `STRIPE_INSPECT_PUBLISHABLE_KEY` (or
 `STRIPE_MARKETEL_PUBLISHABLE_KEY`) must match the billing secret's account and

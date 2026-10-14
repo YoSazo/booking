@@ -649,9 +649,10 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .checkout-refund strong, .checkout-refund span { display: block; }
 .checkout-refund strong { color: var(--green-dark); font-size: 13px; }
 .checkout-refund span { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-#stripe-checkout { position: relative; min-height: 320px; }
+.checkout-frame-shell { position: relative; min-height: 320px; }
+#stripe-checkout { min-height: 320px; }
 .checkout-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
-#stripe-checkout.is-ready .checkout-loading { display: none; }
+#stripe-checkout.is-ready + .checkout-loading { display: none; }
 .embedded-payment-note { margin: 8px 10px 0; text-align: center; color: var(--muted); }
 html.checkout-open .sim-paybar { display: none; }
 @media (max-width: 520px) {

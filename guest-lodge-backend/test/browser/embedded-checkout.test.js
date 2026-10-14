@@ -7,8 +7,8 @@ const OFFER = require('../../wedges/claims').offer;
 const beforeDeadline = new Date(Date.parse(OFFER.launch.until) - 3600000).toISOString();
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 
-// Test the public Stripe.js contract: initialize asynchronously, mount, then
-// announce checkoutRendered. A frame's existence alone never proves readiness.
+// Test Stripe's stable contract: initialize asynchronously and mount an empty
+// container. A zero-height iframe is not yet a visible payment surface.
 async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false, render = true, failHosted = false } = {}) {
   const requests = [];
   await h.page.route('**/api/inspect/checkout/sim', route => {
@@ -32,13 +32,14 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
         let frame;
         return {
           mount: selector => {
+            if (document.querySelector(selector).childNodes.length) throw new Error('Embedded Checkout must be mounted in a DOM element that contains no child nodes.');
             window.__stripeFixture.mounts++;
             frame = document.createElement('iframe');
             frame.title = 'Stripe payment form';
-            frame.style.cssText = 'width:100%;height:470px;border:0;display:block';
+            frame.style.cssText = 'width:100%;height:0;border:0;display:block';
             frame.srcdoc = '<html><body style="margin:0;padding:16px;box-sizing:border-box;font:16px system-ui"><strong>$49.00</strong><p>Email</p><input style="box-sizing:border-box;width:100%" type="email"><p>Card information</p><input style="box-sizing:border-box;width:100%" placeholder="Card number"><p>Your card details stay inside Stripe.</p><button style="width:100%;padding:14px;background:#2e7d5b;color:white;border:0;border-radius:8px">Pay $49.00</button></body></html>';
             document.querySelector(selector).appendChild(frame);
-            if (${render}) setTimeout(() => options.onAnalyticsEvent({ eventType: 'checkoutRendered' }), ${renderDelay});
+            if (${render}) setTimeout(() => { frame.style.height = '470px'; }, ${renderDelay});
           },
           destroy: () => { window.__stripeFixture.destroyed++; frame?.remove(); }
         };
@@ -49,7 +50,7 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
 }
 
 for (const width of [320, 390, 1280]) {
-  test(`Claims ${width}px: payment opens in place, reports readiness after Stripe, and can reopen`, async () => {
+  test(`Claims ${width}px: payment opens in place without analytics, waits for a visible frame, and can reopen`, async () => {
     const h = await open({ signedIn: false, query: '', viewport: { width, height: 900 }, now: beforeDeadline });
     try {
       const requests = await paymentFixture(h, { renderDelay: 450 });
