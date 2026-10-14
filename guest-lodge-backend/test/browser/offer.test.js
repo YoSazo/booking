@@ -4,11 +4,12 @@ const assert = require('node:assert/strict');
 const { open } = require('./harness');
 
 const phone = { width: 390, height: 844 };
-// The Claims launch price ends at a fixed moment set in its manifest; pages that
-// show it are pinned to a time before that, so they read the same on any day.
-const OFFER = require('../../wedges/claims').offer;
-const LAUNCH = OFFER.launch.price, STANDING = OFFER.lifetime;
-const LAUNCH_END = Date.parse(OFFER.launch.until);
+// Claims sells at a standing $49 with no countdown. The launch mechanism (other
+// offers can use it) is tested by handing the page a $49-then-$199 launch that
+// ends at a fixed moment; pages that show it are pinned to a time before that.
+const LAUNCH = 49, STANDING = 199;
+const LAUNCH_END = Date.parse('2026-10-14T05:09:00Z');
+const LAUNCH_FIXTURE = { lifetime: STANDING, launch: { price: LAUNCH, until: new Date(LAUNCH_END).toISOString().replace('.000Z', 'Z') } };
 const at = offsetMs => new Date(LAUNCH_END + offsetMs).toISOString();
 const HOUR = 3600000;
 const DURING_LAUNCH = at(-42 * HOUR);
@@ -27,43 +28,24 @@ const choose = async (h, which = 'yes', reason = 'price') => {
 };
 const SECONDS = require('../../wedges/claims').landing.video.seconds;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
-test('the paused offer keeps $49 after the old deadline and carries no ticking urgency', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, launchPaused: true, now: at(365 * 24 * HOUR) });
-  try {
-    await h.page.waitForSelector('#sim-buy');
-    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
-    assert.match(await h.page.textContent('#sim-paybar'), /Countdown paused/);
-    assert.equal(await h.page.$('[data-launch-left]'), null);
-    assert.doesNotMatch(await h.page.textContent('#sim-offer'), /Launch price ends in|then \$199/);
-    await h.page.waitForTimeout(1300);
-    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
-    await h.page.click('#sim-buy');
-    for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
-    assert.equal(h.purchases[0]?.plan, 'lifetime');
-    const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
-    assert.doesNotMatch(terms, /countdown is currently paused|remains available while it is paused|A new deadline will be published/);
-    h.assertClean();
-  } finally { await h.close(); }
-});
-test('the reset command reopens $49 with a 48-hour countdown and still expires at $199', async t => {
-  const { backendRoot, root } = require('../helpers/claims-reset-fixture').fixture(t);
-  const { resetClaimsLaunch } = require('../../scripts/claims-reset');
-  const path = require('node:path');
-  const now = LAUNCH_END + HOUR;
-  const result = resetClaimsLaunch({ backendRoot, now });
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: new Date(now).toISOString(),
-    webRoot: path.join(backendRoot, 'public/inspect'), appRoot: path.join(root, 'marketel-frontdesk-ios/www/inspect') });
-  try {
-    await h.page.waitForSelector('[data-launch-left]');
-    await h.page.evaluate(time => { Date.now = () => time; }, now);
-    await h.page.waitForFunction(() => document.querySelector('[data-launch-left]')?.textContent === '48:00:00');
-    assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
-    assert.match(await h.page.textContent('#sim-paybar'), /Then \$199 in 48:00:00/);
-    await h.page.evaluate(time => { Date.now = () => time; }, Date.parse(result.until));
-    await h.page.waitForFunction(() => document.getElementById('sim-buy')?.textContent.includes('$199'));
-    assert.equal(await h.page.$('[data-launch-left]'), null);
-    h.assertClean();
-  } finally { await h.close(); }
+test('Claims is $49 whatever the date: no clock, no crossed-out price, no deadline in the terms', async () => {
+  for (const when of [at(-42 * HOUR), at(365 * 24 * HOUR)]) {
+    const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: when });
+    try {
+      await h.page.waitForSelector('#sim-buy');
+      assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
+      assert.equal(await h.page.$('[data-launch-left]'), null);
+      assert.equal(await h.page.$('#sim-paybar s'), null);
+      assert.doesNotMatch(`${await h.page.textContent('#sim-offer')} ${await h.page.textContent('#sim-paybar')}`, /Launch price|Instead of|then \$199|Countdown/);
+      await h.page.click('#sim-buy');
+      for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
+      assert.equal(h.purchases[0]?.plan, 'lifetime');
+      h.assertClean();
+    } finally { await h.close(); }
+  }
+  const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
+  assert.match(terms, /Marketel Claims that is \$49 USD, with no launch price or countdown/);
+  assert.doesNotMatch(terms, /launch price until|10:09 PM|then \$199/);
 });
 // The page's one-second clock at fifty times speed, and a switch for whether
 // the tab is on screen, so twenty seconds takes under half a second here.
@@ -82,7 +64,7 @@ const fastClock = async (h, { hidden = false } = {}) => {
 // and the full card under it. No simulation stands between them and the price,
 // and no subscription is in it: Claims is paid once.
 test('phone: an ad visitor gets the job as the headline, the video, and the full card under it', async () => {
-  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH });
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: DURING_LAUNCH, launchFixture: LAUNCH_FIXTURE });
   try {
     await h.page.waitForSelector('#offer-video');
     await choose(h);
@@ -100,7 +82,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
     // The paragraph of fine print is not on the page; the terms page carries it.
     assert.doesNotMatch(text, /One payment of|Launch price until|fair use/);
     const terms = require('fs').readFileSync(require('path').join(__dirname, '../../public/inspect/terms.html'), 'utf8');
-    assert.match(terms, new RegExp(`\\$${LAUNCH} USD at its launch price`));
+    assert.match(terms, /\$49 USD, with no launch price or countdown/);
     assert.match(terms, /3-day money-back guarantee/);
     assert.match(terms, /have not sent a report/);
     // Signing in is the header's job; the landing carries no second link for it.
@@ -168,7 +150,7 @@ test('phone: an ad visitor gets the job as the headline, the video, and the full
 });
 
 test('the launch price ends for real: at its moment the page redraws at the standing price, and after it there is no clock', async () => {
-  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000) });
+  const h = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(-3000), launchFixture: LAUNCH_FIXTURE });
   try {
     await h.page.waitForSelector('#pick-yes');
     await h.page.click('#pick-yes');
@@ -185,7 +167,7 @@ test('the launch price ends for real: at its moment the page redraws at the stan
     h.assertClean();
   } finally { await h.close(); }
 
-  const after = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR) });
+  const after = await open({ firstQuestion: true, arm: 'claims', signedIn: false, query: '', viewport: phone, now: at(24 * HOUR), launchFixture: LAUNCH_FIXTURE });
   try {
     await after.page.waitForSelector('#offer-video');
     await choose(after);

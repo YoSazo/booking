@@ -3,8 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { open } = require('./harness');
 
-const OFFER = require('../../wedges/claims').offer;
-const beforeDeadline = new Date(Date.parse(OFFER.launch.until) - 3600000).toISOString();
+const OLD_DEADLINE = Date.parse('2026-10-14T05:09:00Z');
+const beforeDeadline = new Date(OLD_DEADLINE - 3600000).toISOString();
 const count = (h, name) => h.events.filter(event => event.name === name).length;
 
 // Test Stripe's stable contract: initialize asynchronously and mount an empty
@@ -57,7 +57,7 @@ for (const width of [320, 390, 1280]) {
       await h.page.waitForSelector('#sim-buy');
       const beforeUrl = h.page.url();
       await h.page.evaluate(() => { document.getElementById('sim-buy').click(); document.getElementById('sim-paybar-buy').click(); });
-      await h.page.waitForSelector('#stripe-checkout iframe');
+      await h.page.waitForSelector('#stripe-checkout iframe', { state: 'attached' });
       assert.equal(count(h, 'SimCheckoutRendered'), 0, 'an inserted frame is not a rendered form');
       assert.equal(requests.length, 1, 'the two CTAs share the same in-flight attempt');
       await h.page.waitForSelector('#stripe-checkout.is-ready');
@@ -156,12 +156,12 @@ test('a completed embedded payment returns through the existing verified Session
 });
 
 test('the offer deadline cannot remove a payment form while someone is entering payment', async () => {
-  const h = await open({ signedIn: false, query: '', now: beforeDeadline });
+  const h = await open({ signedIn: false, query: '', now: beforeDeadline, launchFixture: { lifetime: 199, launch: { price: 49, until: new Date(OLD_DEADLINE).toISOString().replace('.000Z', 'Z') } } });
   try {
     await paymentFixture(h);
     await h.page.click('#sim-buy');
     await h.page.waitForSelector('#stripe-checkout.is-ready');
-    await h.page.evaluate(at => { Date.now = () => at; }, Date.parse(OFFER.launch.until) + 1000);
+    await h.page.evaluate(at => { Date.now = () => at; }, OLD_DEADLINE + 1000);
     await h.page.waitForTimeout(1200);
     assert.equal(await h.page.locator('#stripe-checkout iframe').count(), 1);
     assert.match(await h.page.textContent('.checkout-promise'), /\$49 once/);
