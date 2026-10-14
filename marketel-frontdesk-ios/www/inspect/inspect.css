@@ -631,9 +631,17 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-offer .sim-declined { margin: 0 0 6px; font-size: 14px; font-weight: 750; color: var(--green-dark); }
 .sim-offer .sim-keep { margin: 6px 0 0; text-align: center; }
 .sim-offer .sim-keep .quiet { font-size: 13px; white-space: normal; }
-.embedded-payment { margin: 12px -8px 4px; padding: 16px 8px 4px; border-top: 1px solid var(--border); text-align: left; scroll-margin-top: calc(84px + env(safe-area-inset-top)); }
-.sim-offer.is-checkout > .guarantee { display: none; }
-.sim-offer.is-checkout > .launch-clock { display: none; }
+.payment-step { max-width: 620px; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); }
+.payment-back { margin: 0 0 10px; }
+.payment-step .embedded-payment { margin: 0; padding: 20px; text-align: left; }
+.payment-step h1 { margin: 0 0 16px; font-size: 26px; letter-spacing: -.7px; outline: none; }
+.checkout-review { margin: 0 6px 16px; }
+.checkout-review .tape-card { width: auto; min-height: 0; padding: 12px 14px; margin: 0; background: #f7faf8; box-shadow: none; }
+.checkout-review .tape-card blockquote { display: block; margin: 6px 0; font-size: 13px; -webkit-line-clamp: unset; }
+.checkout-review figcaption { font-size: 12px; }
+.checkout-next { margin: 14px 10px 0; color: var(--muted); font-size: 13px; }
+html.checkout-open body { padding-bottom: 20px; }
+html.checkout-open #account-button { visibility: hidden; pointer-events: none; }
 .embedded-payment-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 0 6px 12px; }
 .checkout-secure { display: flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 13px; font-weight: 700; }
 .checkout-stripe { display: inline-flex; align-items: center; gap: 5px; color: #475569; white-space: nowrap; }
@@ -651,7 +659,10 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .checkout-refund span { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .checkout-frame-shell { position: relative; min-height: 320px; }
 #stripe-checkout { min-height: 320px; }
-.checkout-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
+.checkout-loading { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
+.checkout-spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: checkout-spin 900ms linear infinite; }
+@keyframes checkout-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .checkout-spinner { animation: none; } }
 #stripe-checkout.is-ready + .checkout-loading { display: none; }
 .next-steps { margin: 16px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--green-pale); text-align: left; }
 .next-steps h3 { margin: 0 0 8px; font-size: 14px; color: var(--green-dark); }
@@ -662,8 +673,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .embedded-payment-note { margin: 8px 10px 0; text-align: center; color: var(--muted); }
 html.checkout-open .sim-paybar { display: none; }
 @media (max-width: 520px) {
-  .sim-offer.is-checkout { padding-left: 12px; padding-right: 12px; }
-  .embedded-payment { margin-left: -6px; margin-right: -6px; padding-left: 0; padding-right: 0; }
+  .payment-step .embedded-payment { padding: 16px 10px; }
 }
 .sim-trial-note { margin: -4px 0 12px; color: var(--muted); }
 

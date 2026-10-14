@@ -20,7 +20,7 @@ const document = (type = 'damage', extra = {}) => ({ propertyName: 'Pine Cottage
 const report = (type = 'damage', extra = {}) => ({ id: `report-${Math.random().toString(36).slice(2)}`, document: document(type), attachments: [], finalizedAt: null, updatedAt: new Date().toISOString(), baselineReportId: null, ...extra });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function open({ launchFixture = null, firstQuestion = false, native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
+async function open({ beforeOpen = null, launchFixture = null, firstQuestion = false, native = false, arm = 'claims', demo = false, query = null, simEmail = null, signedIn = true, accountData = {}, reports = [], properties = [], slowList = 0, slowAccount = 0, slowRewrite = 0, refuseDelete = false, now = null, country = 'USA', includeFixture = false, viewport = { width: 390, height: 844 }, deviceScaleFactor = 1, videoDir = null, photoFallback = null, sentPhoto = null, webRoot = WEB, appRoot = APP } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, deviceScaleFactor, isMobile: true, hasTouch: true, ...(videoDir ? { recordVideo: { dir: videoDir, size: { width: 1080, height: 1920 } } } : {}) });
   const shell = [], events = [], purchases = [], errors = [], clarity = [];
@@ -70,6 +70,9 @@ async function open({ launchFixture = null, firstQuestion = false, native = fals
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
   page.on('pageerror', error => errors.push(error.message));
+  // Prewarming payment must never contact real Stripe from a test. Checkout
+  // tests install their own Stripe implementation before clicking the CTA.
+  await page.route('https://js.stripe.com/v3/', route => route.fulfill({ body: '/* Stripe preload fixture */', headers: { 'content-type': 'application/javascript', 'access-control-allow-origin': '*' } }));
   // Microsoft Clarity is never fetched from the real network; each request is recorded.
   await page.route('https://www.clarity.ms/**', route => { clarity.push(route.request().url()); return route.fulfill({ status: 200, body: 'var q = (window.clarity && window.clarity.q) || []; window.clarity = function () { (window.__clarityCalls = window.__clarityCalls || []).push([].slice.call(arguments)); }; q.forEach(function (a) { window.clarity.apply(null, a); });', headers: { 'content-type': 'application/javascript' } }); });
   await page.route('http://app.test/**', route => {
@@ -172,6 +175,7 @@ async function open({ launchFixture = null, firstQuestion = false, native = fals
   // query: null keeps the demo switch; a string opens the page exactly as an ad
   // visitor does ("") or with the given parameters.
   const search = query === null ? `?sim=${demo ? '1' : '0'}` : query ? `?${query}` : '';
+  if(beforeOpen)await beforeOpen(page);
   await page.goto(native ? `http://app.test/inspect/index.html?arm=${arm}` : `http://app.test/${arm === 'inspect' ? 'inspect/' : arm}${search}`, { waitUntil: 'domcontentloaded' });
   const close = async () => { await context.close(); await browser.close(); };
   const body = () => page.locator('body').innerText();

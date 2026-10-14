@@ -50,7 +50,7 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
 }
 
 for (const width of [320, 390, 1280]) {
-  test(`Claims ${width}px: payment opens in place without analytics, waits for a visible frame, and can reopen`, async () => {
+  test(`Claims ${width}px: focused payment keeps trust, waits for a visible frame, and can reopen`, async () => {
     const h = await open({ signedIn: false, query: '', viewport: { width, height: 900 }, now: beforeDeadline });
     try {
       const requests = await paymentFixture(h, { renderDelay: 450 });
@@ -63,11 +63,15 @@ for (const width of [320, 390, 1280]) {
       await h.page.waitForSelector('#stripe-checkout.is-ready');
       await h.page.waitForTimeout(80);
       assert.equal(count(h, 'SimCheckoutRendered'), 1);
-      assert.equal(h.page.url(), beforeUrl, 'no Stripe redirect before payment');
+      assert.equal(h.page.url(), `${beforeUrl}#payment`, 'payment is a same-site step, not a Stripe redirect');
+      assert.equal(count(h, 'SimPaymentStepViewed'), 1);
       assert.equal(await h.page.$('#sim-email-field'), null, 'no additional email screen');
       assert.equal(await h.page.isVisible('#sim-buy'), false);
       assert.equal(await h.page.isVisible('#sim-paybar'), false, 'the sticky CTA cannot cover payment inputs');
       assert.equal(await h.page.locator('.offer-tape').count(), 1, 'reviews are kept on the page');
+      assert.equal(await h.page.isVisible('.offer-landing'), false, 'the long pitch is not the payment screen');
+      assert.equal(await h.page.isVisible('.checkout-review'), true, 'trust carries onto the payment screen');
+      assert.match(await h.page.textContent('.checkout-review'), /Daniel Harris/);
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 once\. Yours for good\./);
       assert.match(await h.page.textContent('.checkout-promise'), /No subscription\. Nothing renews\./);
       assert.match(await h.page.textContent('.checkout-refund'), /within 3 days and haven't sent a report/);
@@ -77,6 +81,7 @@ for (const width of [320, 390, 1280]) {
       if (width === 390) await h.page.screenshot({ path: '/tmp/claims-embedded-checkout-390.png', fullPage: true });
       await h.page.click('#embedded-payment-close');
       assert.equal(await h.page.$('#embedded-payment'), null);
+      await h.page.waitForURL(beforeUrl);
       await h.page.click('#sim-buy');
       await h.page.waitForSelector('#stripe-checkout.is-ready');
       assert.equal(requests.length, 2);
@@ -102,6 +107,122 @@ test('closing during Stripe initialization cancels the attempt without redirecti
     assert.ok(h.page.url().endsWith('/claims'));
     h.assertClean();
   } finally { await h.close(); }
+});
+
+test('Stripe is preloaded on the landing, without a Session or checkout event; the buy tap reuses it', async () => {
+  let requests,loads=0;
+  const h=await open({signedIn:false,query:'',beforeOpen:async page=>{
+    requests=await paymentFixture({page});
+    page.on('request',request=>{if(request.url()==='https://js.stripe.com/v3/')loads++;});
+  }});
+  try{
+    await h.page.waitForFunction(()=>typeof window.Stripe==='function');
+    assert.equal(loads,1);
+    assert.equal(requests.length,0);
+    assert.equal(await h.page.locator('#stripe-checkout iframe').count(),0,'preloading does not mount heavy payment UI');
+    assert.equal(count(h,'SimPaymentStepViewed'),0);
+    assert.equal(count(h,'SimCheckoutRendered'),0);
+    await h.page.click('#sim-buy');
+    await h.page.waitForSelector('#stripe-checkout.is-ready');
+    assert.equal(loads,1,'no second Stripe.js download on payment entry');
+    assert.equal(requests.length,1);
+    await h.page.reload();
+    await h.page.waitForSelector('.offer-landing');
+    assert.equal(await h.page.locator('#payment-step').count(),0,'reload returns to the offer, never silently starts payment');
+    assert.equal(requests.length,1);
+    assert.equal(h.page.url(),'http://app.test/claims');
+    h.assertClean();
+  }finally{await h.close();}
+});
+
+test('a failed Stripe preload is retried at checkout, without dropping the buyer', async () => {
+  let loads=0;
+  const h=await open({signedIn:false,query:'',beforeOpen:async page=>{
+    await paymentFixture({page});
+    await page.route('https://js.stripe.com/v3/',route=>++loads===1
+      ?route.fulfill({status:503,body:'temporarily unavailable'})
+      :route.fallback());
+  }});
+  try{
+    await h.page.waitForTimeout(150);
+    assert.equal(loads,1);
+    assert.equal(count(h,'SimCheckoutRendered'),0);
+    await h.page.click('#sim-buy');
+    await h.page.waitForSelector('#stripe-checkout.is-ready');
+    assert.equal(loads,2);
+    assert.equal(count(h,'SimCheckoutRendered'),1);
+    h.assertClean();
+  }finally{await h.close();}
+});
+
+test('preloading stays out of signed-in visits, the app, other wedges and the demo', async () => {
+  for(const options of [{signedIn:true,query:''},{signedIn:false,native:true},{signedIn:false,arm:'inspect',query:''},{signedIn:false,query:'sim=1'}]){
+    let loads=0;
+    const h=await open({...options,beforeOpen:async page=>{page.on('request',request=>{if(request.url()==='https://js.stripe.com/v3/')loads++;});}});
+    try{
+      await h.page.waitForTimeout(100);
+      assert.equal(loads,0,JSON.stringify(options));
+      h.assertClean();
+    }finally{await h.close();}
+  }
+});
+
+test('browser Back restores the exact offer DOM, scroll position and attribution, without treating payment scroll as landing engagement', async () => {
+  const h=await open({signedIn:false,query:'fbclid=fixtureclick&utm_campaign=claims'});
+  try{
+    await paymentFixture(h);
+    await h.page.evaluate(()=>{window.__originalVideo=document.getElementById('offer-video');window.scrollTo(0,260);});
+    await h.page.waitForTimeout(100);
+    const original=await h.page.evaluate(()=>({url:location.href,scroll:window.scrollY}));
+    await h.page.evaluate(()=>document.getElementById('sim-buy').click());
+    await h.page.waitForSelector('#stripe-checkout.is-ready');
+    const scrollEvents=h.events.filter(event=>event.name.startsWith('OfferScroll')).length;
+    await h.page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+    await h.page.waitForTimeout(120);
+    assert.equal(h.events.filter(event=>event.name.startsWith('OfferScroll')).length,scrollEvents);
+    await h.page.goBack();
+    await h.page.waitForSelector('.offer-landing:not([hidden])');
+    await h.page.waitForTimeout(100);
+    assert.equal(h.page.url(),original.url);
+    assert.equal(await h.page.evaluate(()=>window.__originalVideo===document.getElementById('offer-video')),true);
+    assert.ok(Math.abs(await h.page.evaluate(()=>window.scrollY)-original.scroll)<2);
+    assert.equal(await h.page.locator('#payment-step').count(),0);
+    await h.page.goForward();
+    await h.page.waitForTimeout(120);
+    assert.equal(await h.page.locator('#payment-step').count(),0,'Forward does not start another payment');
+    assert.equal(h.page.url(),original.url);
+    h.assertClean();
+  }finally{await h.close();}
+});
+
+test('Back while the Session request is pending discards the late response and allows a fresh attempt', async () => {
+  const h=await open({signedIn:false,query:''});
+  try{
+    const requests=await paymentFixture(h);
+    let release,started;
+    const gate=new Promise(resolve=>{release=resolve;});
+    const arrived=new Promise(resolve=>{started=resolve;});
+    await h.page.route('**/api/inspect/checkout/sim',async route=>{
+      await h.page.unroute('**/api/inspect/checkout/sim',undefined);
+      started();await gate;
+      await route.fulfill({status:200,headers:{'content-type':'application/json'},body:JSON.stringify({embedded:true,publishableKey:'pk_test_fixture',clientSecret:'cs_test_old_secret',sessionId:'cs_test_old',amount:49,lifetime:true})});
+    });
+    await h.page.click('#sim-buy');await arrived;
+    await h.page.click('#embedded-payment-close');
+    await h.page.waitForURL('http://app.test/claims');
+    assert.equal(count(h,'SimCheckoutRendered'),0);
+    assert.equal(await h.page.locator('#payment-step').count(),0);
+    // Reinstall the fixture after removing the delayed handler.
+    const fresh=await paymentFixture(h);
+    await h.page.click('#sim-buy');
+    await h.page.waitForSelector('#stripe-checkout.is-ready');
+    release();
+    await h.page.waitForTimeout(150);
+    assert.equal(fresh.length,1);
+    assert.equal(await h.page.locator('#stripe-checkout.is-ready').count(),1,'the abandoned response cannot remove the new form');
+    assert.equal(requests.length,0,'the abandoned request did not trigger a fallback');
+    h.assertClean();
+  }finally{await h.close();}
 });
 
 test('a Stripe initialization error recovers through hosted Checkout with the same offer and attribution', async () => {

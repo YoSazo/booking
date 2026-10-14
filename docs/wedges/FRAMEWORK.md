@@ -223,13 +223,20 @@ On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
 ad must say the same thing: an ad promising "free to try" that lands on "$99
 once" is the mismatch that sinks a week.
 
-**Claims payment.** On the web video landing, the payment button embeds Stripe
-Checkout inside the offer card. It adds no account or email screen; Stripe
-takes the email and payment. The amount in the payment reassurance comes from
-the server, with no renewal, access after payment, secure Stripe payment and
-the exact refund condition. Keep the video and reviews in the page. Hide the
-sticky purchase bar while the form is open so it cannot cover inputs. The form
-has a Back action, closing while it loads never redirects, and the launch
+**Claims payment.** On the web video landing, preload Stripe.js immediately,
+as GuestInfoPage does, but create no Session and send no checkout signal until
+the buy tap. The button opens a focused same-site payment step (`#payment`),
+not a scroll down the offer. It adds no account or email screen; Stripe takes
+the email and payment. Show the price/no-renewal summary, one existing review,
+secure Stripe payment, the exact refund condition, and what happens after
+paying. The amount comes from the server. Keep the landing DOM hidden, not
+rebuilt, so Back restores its video and exact scroll position. Hide the sticky
+purchase bar, and never count payment-screen scrolling as landing engagement.
+The payment step appears immediately with a stable loading shell, though the
+Session and Stripe iframe still need network requests. Closing or browser Back
+while either loads discards the late response and never redirects. Forward
+does not create another Session. Record `SimPaymentStepViewed` on our ladder
+only; Meta still hears only `SimCheckoutRendered`. The launch
 deadline cannot destroy a form while someone is paying. Successful Stripe
 initialization and a mounted, visible iframe send `SimCheckoutRendered`; a
 zero-size iframe does not. Stripe's optional analytics callback is not a
@@ -321,7 +328,8 @@ never for the iPhone app, a signed-in visit (reports hold customers' photos and
 notes), the owner's browser (`?notrack=1`) or `localhost`; every sign-in calls
 `stopClarity`. The Inspect pages' content policy allows `www`/`scripts.clarity.ms`
 for scripts and `*.clarity.ms` and `c.bing.com` for reports, plus Stripe and
-Link origins for payment. Stripe.js loads only on a purchase attempt. The terms
+Link origins for payment. Stripe.js preloads on the Claims video landing; the
+heavy payment UI and Session are created only after a purchase tap. The terms
 page describes the providers. Heatmaps need about 30 sessions to mean
 anything. Three diagnostics on the first question say why nobody answers: `OfferPickReady`
 or `OfferPickBlocked` (could the button be reached), `OfferPickTouched` (did the

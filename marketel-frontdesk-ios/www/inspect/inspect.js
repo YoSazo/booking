@@ -26,7 +26,7 @@ const PLANS = Object.freeze({
 // Monthly leads everywhere a price is shown. A year is not a decision cold
 // traffic makes, and defaulting to it is what made the sheet read as a trap.
 let planInterval = 'month';
-let stripeJsPromise = null, checkoutAttempt = null, checkoutBusy = false;
+let stripeJsPromise = null, checkoutAttempt = null, checkoutBusy = false, checkoutRequest = null, paymentStep = null;
 let editorStep = 'details';
 const urls = new Map();
 const attributionKey = 'inspect.metaAttribution.v1';
@@ -320,6 +320,7 @@ async function run(fn, trigger = tappedButton()) {
 // a long editor instead of at the top of the report.
 let currentScreen='';
 function enterScreen(key){
+  if(paymentStep&&key!=='payment')closePaymentStep({back:false});
   if(checkoutAttempt&&key!=='offer')destroyEmbeddedCheckout();
   if(key==='sim')simSide('done');
   const framed = document.documentElement.classList.contains('sim-framed');
@@ -1022,25 +1023,30 @@ function simCheckout(email,trigger){
   if(checkoutBusy)return;
   if(checkoutAttempt){$('embedded-payment')?.scrollIntoView({block:'start'});return;}
   checkoutBusy=true;
+  const request={closed:false};checkoutRequest=request;
+  const wantsEmbedded=!native&&offerOnVideo&&payOnce()&&toolId()==='claims';
+  if(wantsEmbedded)openPaymentStep(request);
   return run(async()=>{
     haptic();
-    const wantsEmbedded=!native&&offerOnVideo&&payOnce()&&toolId()==='claims';
-    // Download Stripe.js while the server creates the Session. Do not wait on
-    // that download before the request, and do not load it on customer reports.
+    // Usually already warm from the landing, as in GuestInfoPage. A failed
+    // preload is retried here; a Session is only created after the buy tap.
     if(wantsEmbedded)loadStripeJs().catch(()=>{});
     let r;
     try{
       r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:'lifetime'}:{}),embedded:wantsEmbedded,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
     }catch(error){
+      if(request.closed)return;
       // Already paying, from a second ad or another device: charging them
       // again is the one thing that must not happen, and getting them into
       // what they already have is the one useful thing left.
       if(error.status!==409)throw error;
+      if(paymentStep)closePaymentStep({back:false});
       try{localStorage.setItem('inspect.email',email);}catch{}
       simUnframe();
       notice(error.message,'success');
       return ensureAuth(()=>run(()=>openAccountHome()),'paid');
     }
+    if(request.closed)return;
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
     try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));sessionStorage.setItem('inspect.sim.once',r.lifetime?'1':'');}catch{}
     if(r.embedded){
@@ -1049,20 +1055,65 @@ function simCheckout(email,trigger){
         return await showEmbeddedCheckout(r);
       }
       catch(error){
-        if(error.checkoutClosed){destroyEmbeddedCheckout();return;}
+        if(request.closed||error.checkoutClosed)return;
         // A content blocker, old in-app browser or transient Stripe.js failure
         // must not turn a willing buyer into an error toast. Create a normal
         // hosted Session and move them forward instead.
         destroyEmbeddedCheckout();
-        restoreCheckoutOffer();
         r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,plan:'lifetime',embedded:false,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+        if(request.closed)return;
       }
     }
     if(!r.url)throw new Error('Secure checkout did not load. Please try again.');
     simCheckoutRendered();
+    request.handedOff=true;
     openPurchase(r.url);
-  },trigger).finally(()=>{checkoutBusy=false;});
+  },trigger).finally(()=>{
+    if(checkoutRequest!==request)return;
+    checkoutBusy=false;checkoutRequest=null;
+    if(paymentStep&&!checkoutAttempt&&!request.handedOff)closePaymentStep();
+  });
 }
+// One job per screen. Keep the actual landing DOM (video position and handlers
+// included), rather than rebuilding it when a buyer goes back.
+function paymentReview(){
+  const reviews=landingArm()?.reviews;
+  const review=Array.isArray(reviews)?reviews.find(item=>item.quote&&Number(item.stars)>=4):null;
+  return review?`<aside class="checkout-review" aria-label="Customer review">${tapeCard(review)}</aside>`:'';
+}
+function openPaymentStep(request){
+  const nodes=Array.from($('app').children),bar=$('sim-paybar');
+  paymentStep={request,nodes,bar,scrollY:window.scrollY,screen:currentScreen,url:location.href,state:history.state};
+  $('offer-video')?.pause();
+  nodes.forEach(node=>{node.hidden=true;node.inert=true;});
+  if(bar)bar.hidden=true;
+  document.documentElement.classList.add('checkout-open');
+  currentScreen='payment';
+  history.pushState({...history.state,marketelPayment:true},'',`${location.pathname}${location.search}#payment`);
+  $('app').insertAdjacentHTML('beforeend',`<section class="payment-step" id="payment-step" aria-label="Payment"><button type="button" class="quiet payment-back" id="embedded-payment-close">← Back</button><section class="card embedded-payment" id="embedded-payment" aria-label="Secure payment"><h1 tabindex="-1" id="payment-heading">Complete your purchase</h1><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${lifetimePrice()} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span></div></div>${paymentReview()}<div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span></div><div class="checkout-frame-shell"><div id="stripe-checkout"></div><div class="checkout-loading" role="status"><span class="checkout-spinner" aria-hidden="true"></span><span>Preparing secure payment…</span></div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}" target="_blank" rel="noopener">Terms</a></span></div><p class="checkout-next">After payment, start your first report right here in your browser.</p></section></section>`);
+  $('embedded-payment-close').onclick=()=>{haptic();closePaymentStep();};
+  track('SimPaymentStepViewed');
+  requestAnimationFrame(()=>{if(paymentStep?.request!==request)return;window.scrollTo({top:0,behavior:'instant'});$('payment-heading')?.focus({preventScroll:true});});
+}
+function closePaymentStep({back=true}={}){
+  const step=paymentStep;if(!step)return;
+  paymentStep=null;step.request.closed=true;
+  if(checkoutRequest===step.request){checkoutRequest=null;checkoutBusy=false;}
+  destroyEmbeddedCheckout();
+  $('payment-step')?.remove();
+  step.nodes.forEach(node=>{node.hidden=false;node.inert=false;});
+  if(step.bar)step.bar.hidden=false;
+  for(const id of ['sim-buy','sim-paybar-buy']){const button=$(id);if(button){button.disabled=false;button.classList.remove('is-busy');}}
+  currentScreen=step.screen;
+  if(history.state?.marketelPayment){if(back)history.back();else history.replaceState(step.state,'',step.url);}
+  if(toolOffer().launch&&!launchOffer())videoLanding();else{watchScroll();tickLaunch();}
+  requestAnimationFrame(()=>{if(!paymentStep)window.scrollTo({top:step.scrollY,behavior:'instant'});});
+}
+window.addEventListener('popstate',()=>{
+  if(paymentStep&&!history.state?.marketelPayment)closePaymentStep({back:false});
+  // Forward/reload never creates a payment Session without a new buy tap.
+  if(!paymentStep&&history.state?.marketelPayment)history.replaceState(null,'',`${location.pathname}${location.search}`);
+});
 function loadStripeJs(){
   if(typeof window.Stripe==='function')return Promise.resolve(window.Stripe);
   if(stripeJsPromise)return stripeJsPromise;
@@ -1084,29 +1135,17 @@ function destroyEmbeddedCheckout(){
     attempt.cancel?.();
     try{attempt.instance?.destroy();}catch{}
   }
-  document.documentElement.classList.remove('checkout-open');
-}
-function restoreCheckoutOffer(){
-  $('embedded-payment')?.remove();
-  $('sim-offer')?.classList.remove('is-checkout');
-  if($('sim-buy'))$('sim-buy').hidden=false;
+  if(!paymentStep)document.documentElement.classList.remove('checkout-open');
 }
 async function showEmbeddedCheckout(result){
   destroyEmbeddedCheckout();
-  const offer=$('sim-offer'),bar=$('sim-paybar');
-  if(!offer)throw new Error('The payment form has nowhere to open.');
+  if(!paymentStep||!$('embedded-payment'))throw Object.assign(new Error('Payment form closed.'),{checkoutClosed:true});
   const attempt={closed:false,instance:null,cancel:null};
   checkoutAttempt=attempt;
   const closedError=()=>Object.assign(new Error('Payment form closed.'),{checkoutClosed:true});
   const alive=()=>checkoutAttempt===attempt&&!attempt.closed&&!!$('embedded-payment');
-  offer.classList.add('is-checkout');
   document.documentElement.classList.add('checkout-open');
-  $('sim-buy').hidden=true;
-  bar?.classList.add('is-stood-down');
-  $('offer-video')?.pause();
-  $('sim-buy').insertAdjacentHTML('afterend',`<section class="embedded-payment" id="embedded-payment" aria-label="Secure payment"><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span><button type="button" class="quiet" id="embedded-payment-close" aria-label="Close payment form">Back</button></div><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${esc(result.amount)} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span></div></div><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}">Terms</a></span></div><div class="checkout-frame-shell"><div id="stripe-checkout"></div><div class="checkout-loading" role="status">Loading secure payment…</div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p></section>`);
-  $('embedded-payment-close').onclick=()=>{haptic();destroyEmbeddedCheckout();restoreCheckoutOffer();if(!launchOffer())videoLanding();requestAnimationFrame(()=>$('sim-buy')?.scrollIntoView({block:'center'}));};
-  requestAnimationFrame(()=>$('embedded-payment')?.scrollIntoView({block:'start',behavior:simReduced()?'auto':'smooth'}));
+  document.querySelector('.checkout-promise strong').textContent=`$${result.amount} once. Yours for good.`;
   // Embedded Checkout has no stable ready callback. Once Stripe initializes
   // successfully, accept its mounted, visible iframe; Stripe owns the loading
   // and payment UI inside it. Optional analytics must never block a buyer.
@@ -1121,6 +1160,7 @@ async function showEmbeddedCheckout(result){
         clientSecret:result.clientSecret,
         onComplete:()=>{
           if(!alive())return;
+          paymentStep.request.handedOff=true;
           finish();destroyEmbeddedCheckout();
           location.assign(`${location.pathname}?sim=1&checkout=success&session=${encodeURIComponent(result.sessionId)}`);
         },
@@ -1307,7 +1347,7 @@ function bindSimOffer(){
   if($('sim-keep'))$('sim-keep').onclick=()=>{haptic();simKeep();};
   const offer=$('sim-offer'),bar=$('sim-paybar'),barBuy=$('sim-paybar-buy');
   if(barBuy){
-    barBuy.onclick=event=>{$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
+    barBuy.onclick=event=>{if(toolId()!=='claims')$('sim-buy').scrollIntoView({block:'center',behavior:simReduced()?'auto':'smooth'});simBuy(event.currentTarget);};
     if(typeof IntersectionObserver==='function'){
       const watch=new IntersectionObserver(entries=>{bar.classList.toggle('is-stood-down',entries.some(entry=>entry.isIntersecting));},{threshold:0.3});
       watch.observe(offer);
@@ -1365,6 +1405,7 @@ function videoBuyMarkup({declined=false}={}){
   return simOfferMarkup({declined,heading:'Pay once. Keep it for good.'});
 }
 function videoLanding({declined=false}={}){
+  if(!paymentStep&&history.state?.marketelPayment)history.replaceState(null,'',`${location.pathname}${location.search}`);
   destroyEmbeddedCheckout();
   enterScreen('offer');
   offerOnVideo=true;
@@ -1379,6 +1420,9 @@ function videoLanding({declined=false}={}){
   $('app').innerHTML=`<section class="offer-landing${gated?' is-pick':''}"><div class="offer-intro"${gated?' inert':''}><div class="eyebrow">${esc(arm.eyebrow||'')}</div><h1>${title}</h1><p class="muted">${esc(sub)}</p>${offerTrust()}${payOnce()?guaranteeBadge():''}</div>${gated?'':offerTape()}<figure class="offer-video"><h2 class="offer-video-title">See a real report built in ${v.seconds} seconds</h2>${gated?`<p class="pick-label" id="pick-label">A damage report made in ${v.seconds} seconds</p>`:''}<video id="offer-video" src="${esc(v.src)}"${v.poster?` poster="${esc(v.poster)}"`:''} muted loop playsinline preload="auto" disablepictureinpicture aria-label="${esc(v.label)}"></video><figcaption>Real time, start to finish</figcaption>${gated?`<div class="pick-bar" id="pick-bar"><button type="button" id="pick-yes" class="wide">I want this &rarr;</button><button type="button" id="pick-no" class="secondary">I don't want this</button></div>`:''}</figure><div class="offer-buy"${gated?' inert':''}>${videoBuyMarkup({declined})}</div></section><aside class="sim-paybar${payOnce()?' has-guarantee':''}" id="sim-paybar"><div><strong>${copy.barHtml||esc(copy.bar)}</strong><small${copy.barClock?' class="bar-clock"':''}>${esc(copy.barSmall)}</small></div><button type="button" id="sim-paybar-buy">${esc(copy.barCta)}</button>${payOnce()?guaranteeBadge():''}</aside>`;
   bindSimOffer();
   bindOfferVideo();
+  // Match GuestInfoPage: warm Stripe.js early, mount the heavy form only on
+  // the payment step. No Session, checkout event or account is created here.
+  if(!native&&toolId()==='claims'&&payOnce())loadStripeJs().catch(()=>{});
   watchEngagement();
   watchScroll();
   tickLaunch();
@@ -1463,7 +1507,7 @@ function tickLaunch(){
     if(!clock||!offerOnVideo){clearInterval(launchTimer);launchTimer=null;return;}
     // The Session has a fixed price. Crossing the offer deadline must not
     // destroy a payment form while the buyer is entering their card.
-    if(checkoutAttempt)return;
+    if(checkoutAttempt||paymentStep)return;
     if(!launchOffer()){clearInterval(launchTimer);launchTimer=null;videoLanding();return;}
     const left=launchLeft();
     clock.textContent=left;
@@ -1485,7 +1529,7 @@ function watchEngagement(){
   if(engagedTimer)return;
   let seen=0;
   engagedTimer=setInterval(()=>{
-    if(document.visibilityState!=='visible')return;
+    if(document.visibilityState!=='visible'||paymentStep)return;
     if(++seen<OFFER_STAYED_SECONDS)return;
     clearInterval(engagedTimer);
     track('OfferStayed20');
@@ -1507,7 +1551,7 @@ function watchScroll(){
     pending=true;
     requestAnimationFrame(()=>{
       pending=false;
-      if(!offerOnVideo)return;
+      if(!offerOnVideo||paymentStep)return;
       const page=document.documentElement,height=Math.max(page.scrollHeight,document.body.scrollHeight);
       if(height<=window.innerHeight*1.05)return;
       const depth=((window.scrollY||page.scrollTop||0)+window.innerHeight)/height;

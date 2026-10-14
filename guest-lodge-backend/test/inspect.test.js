@@ -2144,7 +2144,9 @@ test('a rendered payment form reaches Meta as InitiateCheckout; a raw tap stays 
   let h = moneyHarness();
   try {
     assert.equal((await send(h, 'SimCheckoutTapped')).status, 200);
+    assert.equal((await send(h, 'SimPaymentStepViewed')).status, 200);
     assert.deepEqual(h.calls.capi, [], 'a failed loading attempt is not an optimization event');
+    assert.ok(h.calls.events.some(e => e.name === 'SimPaymentStepViewed' && e.visitorId === visitorId), 'the focused step is on our ladder, not sent to Meta');
     assert.ok(h.calls.events.some(e => e.name === 'SimCheckoutTapped' && e.detail === 'month' && e.visitorId === visitorId), 'our own ladder counts it too');
     assert.equal((await send(h, 'SimCheckoutRendered')).status, 200);
     assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 25, contentName: 'Marketel Claims month plan', eventId: `inspect-sim-ready.${visitorId}` }]);
