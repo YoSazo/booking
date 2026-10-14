@@ -24,6 +24,10 @@ model InspectAccount {
   // Paid once, for good (the pay-once offer). Active whatever any subscription
   // on the account is doing; nothing renews and nothing expires it.
   lifetimeSince        DateTime?
+  // Claims' paid trial is NOT a recurring subscription. Server-owned durable
+  // ledger: consent/version, verified Stripe IDs, deadline, reminder and state.
+  // Only a successful, verified balance payment sets lifetimeSince.
+  claimsPaidTrial      Json?
   // Single-report purchases not yet spent on a finalized report.
   reportCredits        Int              @default(0)
   // What a report is sent under. Snapshotted into each finalized document.
@@ -65,6 +69,14 @@ model InspectChallenge {
 model InspectFreeClaim {
   emailHash String   @id
   claimedAt DateTime @default(now())
+}
+
+// Minimal, non-readable paid-trial receipt. Survives account deletion so a
+// delayed/replayed $1 webhook cannot recreate a trial and schedule $48 again.
+model InspectPaidTrialClaim {
+  emailHash String   @id
+  sessionId String   @unique
+  createdAt DateTime @default(now())
 }
 
 model InspectSession {

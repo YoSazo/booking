@@ -623,13 +623,17 @@ const reportPrice = () => toolOffer().reportPrice || 0;
 // after it (lifetimeCents on the server). Date.now only, so tests can set it.
 const launchOffer = () => { const launch = toolOffer().launch; return launch && (launch.paused || Date.now() < Date.parse(launch.until)) ? launch : null; };
 const lifetimePrice = () => launchOffer()?.price || toolOffer().lifetime || 0;
+const paidTrialOffer = () => !native && payOnce() ? toolOffer().paidTrial || null : null;
+const checkoutPlan = () => paidTrialOffer() ? 'lifetime_trial' : 'lifetime';
+const checkoutAppLive = () => appLive() && (!paidTrialOffer() || MANIFESTS[toolId()]?.appStore?.paidTrialLive === true);
+const trialDisclosure = () => { const t=paidTrialOffer();return t?`$${t.upfront} today. $${t.balance} charged automatically after ${t.days} days unless you cancel. $${t.upfront+t.balance} total for lifetime access. No subscription.`:''; };
 const SUPPORT_EMAIL='support@bookmarketel.com';
 const guaranteeLine = () => `Try Marketel ${skin().product}. If it's not right for you, request a refund within 3 days of purchase.`;
-const guaranteeBadge = () => `<p class="guarantee-badge">${icon('circle-check',18)}<span>3-day money-back guarantee</span></p>`;
+const guaranteeBadge = () => `<p class="guarantee-badge">${icon('circle-check',18)}<span>${paidTrialOffer()?'3 days of full access · Cancel online':'3-day money-back guarantee'}</span></p>`;
 // What the minute after paying looks like, so the buy button is not a leap of
 // faith. The app step appears only once the App Store build carries this wedge.
-const nextSteps = () => `<div class="next-steps" id="next-steps"><h3>What happens next?</h3><ol><li>Pay $${lifetimePrice()} once with a card, Apple Pay or Google Pay.</li><li>Start your first ${esc(skin().doc)} right here in your browser. No install, no waiting.</li>${appLive()?'<li>Get the new iPhone app too. Sign in with the same email and your reports are there.</li>':''}</ol></div>`;
-const guaranteeBlock = () => `<div class="guarantee"><p class="guarantee-title">${icon('circle-check',18)}<strong>3-day money-back guarantee</strong></p><p class="guarantee-line">${esc(guaranteeLine())}</p></div>`;
+const nextSteps = () => `<div class="next-steps" id="next-steps"><h3>What happens next?</h3><ol><li>${paidTrialOffer()?'Pay $1 to start your 3-day trial.':`Pay $${lifetimePrice()} once with a card, Apple Pay or Google Pay.`}</li><li>Start your first ${esc(skin().doc)} right here in your browser. No install, no waiting.</li>${paidTrialOffer()?'<li>We email a reminder before the remaining $48. Cancel online before the charge to stop it, even if you sent a report.</li>':''}${checkoutAppLive()?'<li>Get the new iPhone app too. Sign in with the same email and your reports are there.</li>':''}</ol></div>`;
+const guaranteeBlock = () => `<div class="guarantee"><p class="guarantee-title">${icon('circle-check',18)}<strong>${paidTrialOffer()?'Try everything for 3 days':'3-day money-back guarantee'}</strong></p><p class="guarantee-line">${esc(paidTrialOffer()?trialDisclosure():guaranteeLine())}</p></div>`;
 const launchEnds = () => { const launch = toolOffer().launch; return launch ? `${new Date(Date.parse(launch.until)).toLocaleString('en-US',{timeZone:'America/Los_Angeles',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} PT` : ''; };
 // The pinned bar's second line during a launch: the price after it and when.
 const launchBarLine = () => toolOffer().launch?.paused ? 'Countdown paused' : `Then $${toolOffer().lifetime} in ${launchLeft()}`;
@@ -779,10 +783,32 @@ function simThanks(){
       try{localStorage.setItem('inspect.email',r.email);}catch{}
       const where=$('sim-paid-email');
       if(where)where.textContent=r.email;
+      if(r.paidTrial){
+        const heading=$('app').querySelector('.sim-thanks h1'),note=$('app').querySelector('.sim-trial-note');
+        if(heading)heading.textContent=r.paidTrial.status==='paid'?'Your lifetime access is ready.':r.paidTrial.cancelled?'Your trial is cancelled.':'Your $1 trial has started.';
+        if(note)note.textContent=r.paidTrial.status==='paid'?'$49 total paid. No subscription. Nothing renews.':r.paidTrial.cancelled?'The remaining $48 will not be charged.':`$1 paid. The remaining $48 will be charged automatically on ${new Date(r.paidTrial.endsAt).toLocaleString()} unless you cancel. $49 total. No subscription.`;
+        if(r.manageUrl&&!$('paid-trial-manage'))note?.insertAdjacentHTML('afterend',`<p><a id="paid-trial-manage" href="${esc(r.manageUrl)}">Manage or cancel my trial</a></p>`);
+        if(MANIFESTS[toolId()]?.appStore?.paidTrialLive!==true){
+          $('sim-get-app')?.remove();
+          const intro=$('app').querySelector('.sim-thanks > p.muted');
+          if(intro)intro.textContent='Start a report in this browser now. Your work is saved to your account.';
+        }
+      }
+      if(r.lifetime&&!r.alreadyHad){
+        const heading=$('app').querySelector('.sim-thanks h1'),note=$('app').querySelector('.sim-trial-note');
+        if(heading)heading.textContent=`Marketel ${sk.product} is yours.`;
+        if(note)note.textContent=`Paid once. No subscription, and nothing renews. Covered by our 3-day money-back guarantee: email ${SUPPORT_EMAIL} if it is not for you.`;
+      }
+      if(r.trialClosed){
+        const heading=$('app').querySelector('.sim-thanks h1'),note=$('app').querySelector('.sim-trial-note');
+        if(heading)heading.textContent='This trial is closed.';
+        if(note)note.textContent='No new trial or payment has been scheduled. Sign in or contact support if you need help.';
+        $('sim-get-app')?.remove();
+      }
       // They already pay: the webhook cancels this new plan before it charges.
       if(r.alreadyHad){
         const heading=$('app').querySelector('.sim-thanks h1');
-        if(heading)heading.textContent='You already have Marketel.';
+        if(heading)heading.textContent=r.trialUsed?'This email has already tried Claims.':'You already have Marketel.';
         const note=$('app').querySelector('.sim-trial-note');
         const words=r.refunded?'<small>We refunded this payment. Sign in to keep using the one you have.</small>':'<small>Nothing was charged for this one. Sign in to keep using your plan.</small>';
         if(note)note.innerHTML=words;
@@ -790,9 +816,11 @@ function simThanks(){
       }
     }).catch(()=>{});
   let trial=0,once=false;try{trial=Number(sessionStorage.getItem('inspect.sim.trial'))||0;once=sessionStorage.getItem('inspect.sim.once')==='1';}catch{}
-  const thanksHeading=once?`Marketel ${esc(sk.product)} is yours.`:trial?`Your ${trial} free days have started.`:`You're subscribed to Marketel ${esc(sk.product)}.`;
-  const thanksNote=once?`Paid once. No subscription, and nothing renews. Covered by our 3-day money-back guarantee: email ${SUPPORT_EMAIL} if it is not for you.`:trial?`Nothing is charged until they end. We'll email you the day before.`:'';
-  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${thanksHeading}</h1>${thanksNote?`<p class="sim-trial-note"><small>${thanksNote}</small></p>`:''}${appLive()
+  let paidTrial=false;try{paidTrial=sessionStorage.getItem('inspect.sim.paidTrial')==='1';}catch{}
+  const thanksHeading=paidTrial?'Your $1 trial has started.':once?`Marketel ${esc(sk.product)} is yours.`:trial?`Your ${trial} free days have started.`:`Checking your Marketel ${esc(sk.product)} payment…`;
+  const thanksNote=paidTrial?'$1 paid. The remaining $48 will be charged automatically after 3 days unless you cancel. $49 total. No subscription. We email a reminder before the charge.':once?`Paid once. No subscription, and nothing renews. Covered by our 3-day money-back guarantee: email ${SUPPORT_EMAIL} if it is not for you.`:trial?`Nothing is charged until they end. We'll email you the day before.`:'Checking your payment details. Sign in with the email you used at checkout.';
+  const canOfferApp=appLive()&&(!paidTrial||MANIFESTS[toolId()]?.appStore?.paidTrialLive===true);
+  $('app').innerHTML=`<section class="sim sim-thanks"><h1>${thanksHeading}</h1>${thanksNote?`<p class="sim-trial-note"><small>${thanksNote}</small></p>`:''}${canOfferApp
     ?`<p class="muted">Start a ${esc(sk.doc)} in this browser now. The iPhone app is new on the App Store — same account, camera in your hand.</p><button type="button" id="sim-signin" class="wide">Continue in this browser →</button><a class="button secondary wide" id="sim-get-app" href="${esc(appStoreUrl)}">Get the new iPhone app →</a><p class="muted"><small>Sign in with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and we'll send you a six-digit code.</small></p>`
     :`<p class="muted">It works right here in your browser, on your phone or your computer. Photograph it, talk it through, send it.</p><button type="button" id="sim-signin" class="wide">Start your first ${esc(sk.doc)} →</button><p class="muted"><small>Sign in with <strong id="sim-paid-email">${esc(storedEmail()||'the email you used at checkout')}</strong> and we'll send you a six-digit code.</small></p>`}</section>`;
   track('SimSubscribed');
@@ -978,6 +1006,9 @@ function simOffer(plan=PLANS[planInterval]||PLANS.month){
   const sk=skin();
   if(payOnce()){
     const price=lifetimePrice(),launch=launchOffer();
+    if(paidTrialOffer())return {save:`3 days of full access · $49 total for lifetime access`,terms:trialDisclosure(),
+      cta:'Try it for $1 →',bar:'$1 today',barSmall:'Then $48 after 3 days unless cancelled',barCta:'Try for $1 →',barHtml:'',barClock:false,
+      lede:'Use the email you want to sign in with. Your trial starts after payment.',go:'Continue to payment →',small:trialDisclosure()};
     return {save:`Unlimited ${sk.docPlural} · No monthly fees`,
       terms:`One payment of $${price}. No subscription, and nothing renews. Unlimited ${sk.docPlural} within fair use.${launch?(launch.paused?' Launch countdown paused. A new deadline will be published before this offer ends.':` Launch price until ${launchEnds()}, then $${toolOffer().lifetime}.`):''}`,
       cta:`Get it for $${price} →`,bar:`$${price} once`,barSmall:launch?launchBarLine():'No subscription',barCta:'Get it →',
@@ -1033,7 +1064,7 @@ function simCheckout(email,trigger){
     if(wantsEmbedded)loadStripeJs().catch(()=>{});
     let r;
     try{
-      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:'lifetime'}:{}),embedded:wantsEmbedded,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:checkoutPlan(),...(paidTrialOffer()?{trialVersion:paidTrialOffer().version}:{})}:{}),embedded:wantsEmbedded,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
     }catch(error){
       if(request.closed)return;
       // Already paying, from a second ad or another device: charging them
@@ -1048,7 +1079,7 @@ function simCheckout(email,trigger){
     }
     if(request.closed)return;
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
-    try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));sessionStorage.setItem('inspect.sim.once',r.lifetime?'1':'');}catch{}
+    try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));sessionStorage.setItem('inspect.sim.once',r.lifetime?'1':'');sessionStorage.setItem('inspect.sim.paidTrial',r.paidTrial?'1':'');}catch{}
     if(r.embedded){
       try{
         if(!r.clientSecret||!r.publishableKey||!r.sessionId)throw new Error('Secure checkout is unavailable.');
@@ -1060,7 +1091,7 @@ function simCheckout(email,trigger){
         // must not turn a willing buyer into an error toast. Create a normal
         // hosted Session and move them forward instead.
         destroyEmbeddedCheckout();
-        r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,plan:'lifetime',embedded:false,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+        r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,plan:checkoutPlan(),...(paidTrialOffer()?{trialVersion:paidTrialOffer().version}:{}),embedded:false,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
         if(request.closed)return;
       }
     }
@@ -1084,7 +1115,7 @@ function paymentReview(){
   return review?`<p class="checkout-review" aria-label="Customer review">${Number(review.stars)>0?reviewStars(review.stars):''}<span class="checkout-review-quote">“${esc(review.checkoutQuote)}”</span><span class="checkout-review-by">— ${esc(review.name)}${review.role?`, ${esc(review.role)}`:''}</span></p>`:'';
 }
 function paymentNextSteps(){
-  return `<section class="checkout-next" aria-labelledby="checkout-next-heading"><h2 id="checkout-next-heading">After payment</h2><p>Start your first ${esc(skin().doc)} immediately in your browser.</p>${appLive()?'<p>Prefer the iPhone app? Sign in with the same email—your reports follow you.</p>':''}</section>`;
+  return `<section class="checkout-next" aria-labelledby="checkout-next-heading"><h2 id="checkout-next-heading">After payment</h2><p>Start your first ${esc(skin().doc)} immediately in your browser.</p>${checkoutAppLive()?'<p>Prefer the iPhone app? Sign in with the same email—your reports follow you.</p>':''}</section>`;
 }
 function openPaymentStep(request){
   const nodes=Array.from($('app').children),bar=$('sim-paybar');
@@ -1095,7 +1126,10 @@ function openPaymentStep(request){
   document.documentElement.classList.add('checkout-open');
   currentScreen='payment';
   history.pushState({...history.state,marketelPayment:true},'',`${location.pathname}${location.search}#payment`);
-  $('app').insertAdjacentHTML('beforeend',`<section class="payment-step" id="payment-step" aria-label="Payment"><button type="button" class="quiet payment-back" id="embedded-payment-close">← Back to the offer</button><section class="card embedded-payment" id="embedded-payment" aria-label="Secure payment"><p class="payment-progress" id="payment-progress">Step 2 of 2 — Payment</p><h1 tabindex="-1" id="payment-heading">Complete your purchase</h1><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${lifetimePrice()} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span>${paymentReview()}</div></div><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span></div><div class="checkout-frame-shell"><div id="stripe-checkout"></div><div class="checkout-loading" role="status"><span class="checkout-spinner" aria-hidden="true"></span><span>Preparing secure payment…</span></div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}" target="_blank" rel="noopener">Terms</a></span></div>${paymentNextSteps()}</section></section>`);
+  const trial=paidTrialOffer();
+  const promise=trial?'<strong>$1 today. Try it for 3 days.</strong><span>$48 automatically after 3 days unless cancelled.</span><span>$49 total · Lifetime access · No subscription.</span>':`<strong>$${lifetimePrice()} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span>`;
+  $('app').insertAdjacentHTML('beforeend',`<section class="payment-step" id="payment-step" aria-label="Payment"><button type="button" class="quiet payment-back" id="embedded-payment-close">← Back to the offer</button><section class="card embedded-payment" id="embedded-payment" aria-label="Secure payment"><p class="payment-progress" id="payment-progress">Step 2 of 2 — Payment</p><h1 tabindex="-1" id="payment-heading">${trial?'Start your $1 trial':'Complete your purchase'}</h1><div class="checkout-promise">${icon('circle-check',22)}<div>${promise}${paymentReview()}</div></div><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span></div><div class="checkout-frame-shell"><div id="stripe-checkout"></div><div class="checkout-loading" role="status"><span class="checkout-spinner" aria-hidden="true"></span><span>Preparing secure payment…</span></div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p><div class="checkout-refund"><strong>${trial?'Cancel online before the $48 charge':'3-day money-back guarantee'}</strong><span>${trial?'Use your account or the link we email you. Cancelling stops the $48, not the $1 already paid. Sending a report does not end your trial early.':"Full refund if you contact us within 3 days and haven't sent a report."} <a href="${esc(skin().terms)}" target="_blank" rel="noopener">Terms</a></span></div>${paymentNextSteps()}</section></section>`);
+  if(trial)$('embedded-payment').classList.add('paid-trial-payment');
   $('embedded-payment-close').onclick=()=>{haptic();closePaymentStep();};
   track('SimPaymentStepViewed');
   requestAnimationFrame(()=>{if(paymentStep?.request!==request)return;window.scrollTo({top:0,behavior:'instant'});$('payment-heading')?.focus({preventScroll:true});});
@@ -1150,7 +1184,7 @@ async function showEmbeddedCheckout(result){
   const closedError=()=>Object.assign(new Error('Payment form closed.'),{checkoutClosed:true});
   const alive=()=>checkoutAttempt===attempt&&!attempt.closed&&!!$('embedded-payment');
   document.documentElement.classList.add('checkout-open');
-  document.querySelector('.checkout-promise strong').textContent=`$${result.amount} once. Yours for good.`;
+  document.querySelector('.checkout-promise strong').textContent=result.paidTrial?`$${result.amount} today. Try it for ${result.trialDays} days.`:`$${result.amount} once. Yours for good.`;
   // Embedded Checkout has no stable ready callback. Once Stripe initializes
   // successfully, accept its mounted, visible iframe; Stripe owns the loading
   // and payment UI inside it. Optional analytics must never block a buyer.
@@ -1202,11 +1236,11 @@ function simCheckoutTapped(){
   if(ownerBrowser)return;
   // On the video landing, tapping start free is also staying engaged.
   if(offerOnVideo)track('OfferEngaged');
-  api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:payOnce()?'lifetime':planInterval,attribution:inspectAttribution}}).catch(()=>{});
+  api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:payOnce()?checkoutPlan():planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simCheckoutRendered(){
   if(ownerBrowser)return;
-  api('/events/anon',{method:'POST',keepalive:true,body:{name:'SimCheckoutRendered',tool:toolId(),visitorId,detail:payOnce()?'lifetime':planInterval,attribution:inspectAttribution}}).catch(()=>{});
+  api('/events/anon',{method:'POST',keepalive:true,body:{name:'SimCheckoutRendered',tool:toolId(),visitorId,detail:payOnce()?checkoutPlan():planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simBuy(trigger){
   simCheckoutTapped();
@@ -1322,7 +1356,7 @@ function simGetThis(){
 }
 function simOfferMarkup({declined=false,heading='That was a sample. Make real ones.'}={}){
   const sk=skin(),plan=PLANS[planInterval]||PLANS.month,copy=simOffer(plan);
-  if(payOnce())return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p>${launchOffer()?`<p class="price-anchor">Instead of <s>$${toolOffer().lifetime}</s></p>`:''}<div class="price">$${lifetimePrice()} <small>once</small></div><p class="price-save">${esc(copy.save)}</p>${launchOffer()?`<p class="launch-clock">${toolOffer().launch.paused?'Launch price · countdown paused':`Launch price ends in <strong data-launch-left>${launchLeft()}</strong> · then $${toolOffer().lifetime}`}</p>`:''}<button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button>${guaranteeBlock()}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>${nextSteps()}<p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section>`;
+  if(payOnce())return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p>${launchOffer()?`<p class="price-anchor">Instead of <s>$${toolOffer().lifetime}</s></p>`:''}<div class="price">$${paidTrialOffer()?paidTrialOffer().upfront:lifetimePrice()} <small>${paidTrialOffer()?'today':'once'}</small></div><p class="price-save">${esc(copy.save)}</p>${paidTrialOffer()?`<p class="offer-reversal">${esc(copy.terms)}</p>`:''}${launchOffer()?`<p class="launch-clock">${toolOffer().launch.paused?'Launch price · countdown paused':`Launch price ends in <strong data-launch-left>${launchLeft()}</strong> · then $${toolOffer().lifetime}`}</p>`:''}<button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button>${guaranteeBlock()}<ul class="offer-points">${(sk.offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>${nextSteps()}<p><small>Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p></section>`;
   return `<section class="card sim-offer" id="sim-offer">${declined?'<p class="sim-declined">Nothing was charged.</p>':''}<h2>${esc(heading)}</h2><p class="muted">Your photos, your voice, and a finished ${esc(sk.doc)} before you leave the ${esc(sk.placeSingular)}.</p><div class="price">$${plan.price} <small>${esc(plan.per)}</small></div><p class="price-save">${esc(copy.save)}</p><button type="button" id="sim-buy" class="wide">${esc(copy.cta)}</button><p class="offer-reversal"><small>${esc(copy.terms)}</small></p><p><small><button type="button" class="quiet sim-plan-switch" data-sim-plan="${planInterval==='year'?'month':'year'}">${planInterval==='year'?`Or $${PLANS.month.price}/month`:`Or $${PLANS.year.price}/year — ${esc(PLANS.year.save)}`}</button> · Payment by Stripe. <a href="${esc(sk.terms)}">${esc(sk.termsLabel)}</a></small></p><p class="sim-keep"><button type="button" id="sim-keep" class="${declined?'secondary wide':'quiet'}">${esc(simKeepLabel())}</button></p></section>`;
 }
 // The offer, on its own page: the price, three days free, the real app. On a
@@ -1407,7 +1441,7 @@ function offerTape(){
 }
 function videoBuyMarkup({declined=false}={}){
   if(!payOnce())return `${simOfferMarkup({declined})}<ul class="offer-points">${(skin().offerPoints||[]).map(point=>`<li>${esc(point)}</li>`).join('')}</ul>`;
-  return simOfferMarkup({declined,heading:'Pay once. Keep it for good.'});
+  return simOfferMarkup({declined,heading:paidTrialOffer()?'Try everything for $1.':'Pay once. Keep it for good.'});
 }
 function videoLanding({declined=false}={}){
   if(!paymentStep&&history.state?.marketelPayment)history.replaceState(null,'',`${location.pathname}${location.search}`);
@@ -3438,7 +3472,9 @@ $('account-button').onclick=async()=>{
   // What this account can actually do, in the order it matters. Claims has no
   // free report, so promising one there was false — and a review account
   // holding credits was being told the same.
-  const standing=account.lifetime ? `Unlimited ${esc(sk.docPlural)}. Paid once; nothing renews.`
+  const trial=account.paidTrial;
+  const trialWords=trial&&trial.status!=='paid'?(trial.cancelled?'Trial cancelled. No remaining payment is scheduled.':trial.status==='failed'?(native?'Your remaining payment did not complete. Your reports are saved. Finish your purchase on the website with this email.':'The remaining $48 did not complete. Your reports are saved. Pay it once to finish your $49 lifetime purchase.'):trial.status==='refunded'?'Trial payment refunded. No remaining payment is scheduled.':native&&storefront!=='USA'?`Your trial ends ${new Date(trial.endsAt).toLocaleString()}. Manage or cancel it here.`:`Your $1 trial ends ${new Date(trial.endsAt).toLocaleString()}. The remaining $48 will be charged automatically unless you cancel. $49 total. No subscription.`):'';
+  const standing=trialWords?esc(trialWords):account.lifetime ? `Unlimited ${esc(sk.docPlural)}. Paid once; nothing renews.`
     : account.active
     ? `${account.remaining>0?`Unlimited ${esc(sk.docPlural)}.`:esc(FAIR_USE_REACHED)}${account.periodEnd&&!Number.isNaN(new Date(account.periodEnd).getTime())?` ${account.cancellationScheduled?'Access ends':'Renews'} ${new Date(account.periodEnd).toLocaleDateString()}.`:''}`
     : account.credits>0 ? `${account.credits} ${esc(account.credits===1?sk.doc:sk.docPlural)} ready to send.`
@@ -3447,8 +3483,10 @@ $('account-button').onclick=async()=>{
   // Managing a subscription needs one to exist; offering it to an account
   // without one opened an error. Front Desk is not part of this product, so
   // it is no longer a button here — its own customers still open straight in.
-  const manageable=!account.lifetime&&(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
-  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${manageable?'<button id="manage">Manage subscription</button>':''}${mayBuy()?'<button id="see-plans">See plans</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
+  const manageable=!account.lifetime&&account.interval!=='paid-trial'&&(account.active||account.cancellationScheduled)&&(!native||storefront==='USA');
+  modal(`<h2>${esc(sk.product)} account</h2><p>${esc(account.email)}</p><p>${standing}</p><div class="stack">${trial&&['active','collecting'].includes(trial.status)?'<button id="cancel-paid-trial">Cancel my trial</button>':''}${trial&&trial.status==='failed'&&!native?'<button id="pay-paid-trial">Pay the remaining $48</button>':''}${manageable?'<button id="manage">Manage subscription</button>':''}${mayBuy()&&!trial?'<button id="see-plans">See plans</button>':''}<button id="logout" class="quiet">Sign out of Marketel</button></div><details class="more-actions"><summary>More</summary><div class="stack"><button id="refresh" class="secondary">Refresh billing status</button><button id="delete-account" class="quiet danger">Delete ${esc(sk.product)} account</button></div></details><p><a href="${esc(sk.terms)}">${esc(sk.product)} terms &amp; privacy</a></p>`);
+  if($('pay-paid-trial'))$('pay-paid-trial').onclick=event=>run(async()=>{const r=await api('/claims-trial/pay-link',{method:'POST'});if(!r.url)throw new Error('Please try again.');location.assign(r.url);},event.currentTarget);
+  if($('cancel-paid-trial'))$('cancel-paid-trial').onclick=event=>run(async()=>{await api('/claims-trial/cancel',{method:'POST'});await refresh();$('dialog').close();notice('Trial cancelled. No remaining payment will be charged.','success');},event.currentTarget);
   $('refresh').onclick=()=>run(async()=>{await api('/billing/refresh',{method:'POST'});await refresh();$('dialog').close();notice('Account refreshed.');});
   if($('manage'))$('manage').onclick=()=>run(async()=>openPurchase((await api('/billing',{method:'POST',body:{native}})).url));
   if($('see-plans'))$('see-plans').onclick=()=>{haptic();offer();};

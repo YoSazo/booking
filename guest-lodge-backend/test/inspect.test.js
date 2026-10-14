@@ -503,6 +503,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
     document: { propertyName: 'Pine Ave', type: 'damage', date: '2026-09-19', eventTime: 'unknown', author: 'Sam',
       rooms: [{ name: 'Kitchen', observation: 'Chipped counter.', issue: true, photos: ['p1'] }], signatures: [] }, ...reportOverrides };
   const seenEvents = new Set();
+  const paidTrialClaims = [];
   let sessionExpiry = new Date(Date.now() + 60000);
   // Enough of a store for the property routes to be exercised honestly: what is
   // added, counted and deleted is really kept, scoped to the account.
@@ -510,7 +511,11 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   let reports = [report];
   const mine = where => row => row.accountId === where.accountId;
   const db = {
-    $queryRaw: async () => [],
+    $queryRaw: async () => [{ now: new Date() }],
+    inspectPaidTrialClaim: {
+      findUnique: async ({ where }) => paidTrialClaims.find(row => Object.entries(where).every(([key, value]) => row[key] === value)) || null,
+      create: async ({ data }) => { paidTrialClaims.push(data); return data; },
+    },
     inspectSession: { findUnique: async () => ({ tokenHash: 'h', expiresAt: sessionExpiry, account }), deleteMany: async () => ({ count: 0 }),
       update: async ({ data }) => { calls.sessionExtensions = (calls.sessionExtensions || 0) + 1; sessionExpiry = data.expiresAt; return {}; },
       findMany: async () => [], create: async ({ data }) => { calls.sessionsCreated = (calls.sessionsCreated || 0) + 1; return data; } },
@@ -535,6 +540,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
         calls.accountUpdates.push(data);
         if ('stripeCustomerId' in data) account.stripeCustomerId = data.stripeCustomerId;
         if ('lifetimeSince' in data) account.lifetimeSince = data.lifetimeSince;
+        if ('claimsPaidTrial' in data) account.claimsPaidTrial = data.claimsPaidTrial;
         if ('metaAttribution' in data) account.metaAttribution = data.metaAttribution;
         if (typeof data.reportCredits === 'number') account.reportCredits = data.reportCredits;
         if (data.reportCredits?.increment) account.reportCredits += data.reportCredits.increment;
@@ -615,7 +621,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
     },
   });
   const headers = { Authorization: `Bearer ${'b'.repeat(43)}`, 'Content-Type': 'application/json' };
-  return { app, registration, calls, account, report, headers };
+  return { app, registration, calls, account, report, headers, prisma };
 }
 
 test('Manage subscription opens the default portal when the configured one is rejected', async () => {
@@ -2167,8 +2173,8 @@ test('a rendered payment form reaches Meta as InitiateCheckout; a raw tap stays 
 
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
   assert.match(client, /function simBuy\(trigger\)\{\n  simCheckoutTapped\(\);/);
-  assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:payOnce\(\)\?'lifetime':planInterval,attribution:inspectAttribution/);
-  assert.match(client, /name:'SimCheckoutRendered',tool:toolId\(\),visitorId,detail:payOnce\(\)\?'lifetime':planInterval,attribution:inspectAttribution/);
+  assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:payOnce\(\)\?checkoutPlan\(\):planInterval,attribution:inspectAttribution/);
+  assert.match(client, /name:'SimCheckoutRendered',tool:toolId\(\),visitorId,detail:payOnce\(\)\?checkoutPlan\(\):planInterval,attribution:inspectAttribution/);
 });
 
 test('"keep it free" emails the link once, and only when asked', async () => {
@@ -2959,6 +2965,104 @@ const onceSession = (overrides = {}) => ({
 const sendWebhook = (h, object, type = 'checkout.session.completed') => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
   headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify({ type, created: 1760000000, data: { object } }) });
 
+test('Claims paid trial checkout collects exactly $1, saves the card with consent, and never creates a subscription', async () => {
+  const h = moneyHarness();
+  const buy = patch => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: 'lifetime_trial', trialVersion: 'claims-1-48-v1', tool: 'claims', embedded: true, ...patch }) });
+  try {
+    const response = await buy({ amount: 1, balance: 1 });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.amount, 1); assert.equal(result.balance, 48); assert.equal(result.total, 49);
+    assert.equal(result.paidTrial, true); assert.equal(result.lifetime, false); assert.equal(result.trialDays, 3);
+    const p = h.calls.sessions[0].params;
+    assert.equal(p.mode, 'payment'); assert.equal(p.ui_mode, 'embedded');
+    assert.equal(p.line_items[0].price_data.unit_amount, 100);
+    assert.equal(p.payment_intent_data.setup_future_usage, 'off_session');
+    assert.deepEqual(p.consent_collection, { terms_of_service: 'required' });
+    assert.equal(p.metadata.plan, 'lifetime_trial');
+    assert.equal(p.metadata.trialVersion, 'claims-1-48-v1');
+    assert.match(p.custom_text.submit.message, /authorize a further \$48 charge 3 days after payment unless you cancel/);
+    assert.match(p.custom_text.terms_of_service_acceptance.message, /Claims trial terms/);
+    assert.ok(!p.subscription_data);
+    for (const patch of [{ tool: 'inspect' }, { tool: 'incident' }, { trialVersion: 'bad' }]) assert.equal((await buy(patch)).status, 400);
+    assert.equal(h.calls.sessions.length, 1);
+  } finally { h.registration.close(); }
+});
+
+test('Claims paid trial is web-only; hosted recovery retains the same offer and native purchases stay unchanged', async () => {
+  const h = moneyHarness();
+  const body = { plan: 'lifetime_trial', trialVersion: 'claims-1-48-v1', tool: 'claims', embedded: false };
+  try {
+    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: h.headers, body: JSON.stringify(body) });
+    assert.equal((await response.json()).paidTrial, true);
+    assert.match(h.calls.sessions[0].params.success_url, /claims\?sim=1&checkout=success/);
+    assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, 100);
+    assert.equal((await request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { ...h.headers, Origin: 'capacitor://localhost' }, body: JSON.stringify(body) })).status, 400);
+  } finally { h.registration.close(); }
+});
+
+test('trial webhook and return verification grant temporary access, and signed management GET cannot cancel', async () => {
+  const session = onceSession({ amount_total: 100, consent: { terms_of_service: 'accepted' },
+    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1' } });
+  const h = moneyHarness({ stripe: {
+    paymentIntents: { retrieve: async () => ({ id: 'pi_once', status: 'succeeded', amount_received: 100, currency: 'usd', customer: 'cus_once', payment_method: 'pm_once', setup_future_usage: 'off_session', latest_charge: { refunded: false } }) },
+    checkout: { sessions: { retrieve: async () => session } },
+  } });
+  try {
+    assert.equal((await sendWebhook(h, session)).status, 200);
+    assert.equal(h.account.lifetimeSince, undefined);
+    assert.equal(h.account.claimsPaidTrial.status, 'active');
+    const result = await (await request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST', headers: h.headers, body: JSON.stringify({ sessionId: session.id }) })).json();
+    assert.equal(result.paidTrial.balance, 48);
+    const url = new URL(result.manageUrl);
+    assert.equal((await request(h.app, url.pathname + url.search)).status, 200);
+    assert.equal(h.account.claimsPaidTrial.status, 'active', 'GET is safe for email scanners');
+    assert.equal((await request(h.app, url.pathname + url.search, { method: 'POST' })).status, 200);
+    assert.equal(h.account.claimsPaidTrial.status, 'cancelled');
+    const plan = await (await request(h.app, '/api/inspect/account', { headers: h.headers })).json();
+    assert.equal(plan.active, true, 'cancelling does not confiscate the paid three days');
+    assert.equal(plan.paidTrial.cancelled, true);
+    assert.equal(plan.lifetime, false);
+  } finally { h.registration.close(); }
+});
+
+test('paid trial checkout readiness is $1 InitiateCheckout, not a $49 Purchase', async () => {
+  const h = moneyHarness();
+  try {
+    await request(h.app, '/api/inspect/events/anon', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'SimCheckoutRendered', tool: 'claims', visitorId: 'v_abcdefghijkl', detail: 'lifetime_trial' }) });
+    assert.equal(h.calls.capi[0].name, 'InitiateCheckout');
+    assert.equal(h.calls.capi[0].value, 1);
+    assert.ok(!h.calls.capi.some(e => e.name === 'Purchase'));
+  } finally { h.registration.close(); }
+});
+
+test('a missing paid-trial migration fails closed before a payable Stripe session exists', async () => {
+  const h=moneyHarness();
+  h.prisma.$queryRaw=async()=>{throw new Error('column not installed');};
+  try{
+    const response=await request(h.app,'/api/inspect/checkout/sim',{method:'POST',headers:h.headers,
+      body:JSON.stringify({plan:'lifetime_trial',trialVersion:'claims-1-48-v1',tool:'claims'})});
+    assert.equal(response.status,503);
+    assert.equal(h.calls.sessions.length,0);
+  }finally{h.registration.close();}
+});
+
+test('an old cached $49 purchase cancels its pending trial balance and credits back the $1', async()=>{
+  const refunds=[];
+  const h=moneyHarness({account:{claimsPaidTrial:{version:'claims-1-48-v1',status:'active',sessionId:'cs_trial_prior',initialIntentId:'pi_trial_prior',endsAt:new Date(Date.now()+86400000).toISOString()}},
+    stripe:{refunds:{create:async(params,options)=>{refunds.push({params,options});return{id:'re_credit'};}}}});
+  try{
+    assert.equal((await sendWebhook(h,onceSession({amount_total:4900}))).status,200);
+    assert.equal(h.account.claimsPaidTrial.status,'cancelled');
+    assert.ok(h.account.lifetimeSince);
+    assert.equal(refunds.length,1);
+    assert.equal(refunds[0].params.payment_intent,'pi_trial_prior');
+    assert.equal(refunds[0].options.idempotencyKey,'claims-trial-upgrade-credit:cs_trial_prior');
+  }finally{h.registration.close();}
+});
+
 // The launch price's end is fixed, so these tests fix the clock either side of it.
 const atTime = async (iso, run) => { const real = Date.now; Date.now = () => Date.parse(iso); try { return await run(); } finally { Date.now = real; } };
 const OFFER = require('../wedges/claims').offer;
@@ -3090,7 +3194,7 @@ test('Claims charges its standing price whatever the date, and the launch mechan
   // ends at a fixed UTC moment; a vague or reversed one never loads.
   const { validate } = require('../wedges/registry');
   const claims = require('../wedges/claims');
-  const withLaunch = launch => ({ ...claims, offer: { ...claims.offer, launch } });
+  const withLaunch = launch => { const offer = { ...claims.offer, launch }; delete offer.paidTrial; return { ...claims, offer }; };
   assert.throws(() => validate(withLaunch({ price: 249, until: '2026-10-02T06:59:59Z' })), /offer\.launch/);
   assert.throws(() => validate(withLaunch({ price: 99, until: 'next week' })), /offer\.launch/);
   assert.throws(() => validate(withLaunch({ price: 29, until: '2026-10-14T05:09:00Z', paused: 'true' })), /paused must be a boolean/);
@@ -3163,7 +3267,7 @@ test('the thank-you page does not wait on the webhook, and says when a second pa
   try {
     const response = await ask(h);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { email: 'Buyer@Example.com ' });
+    assert.deepEqual(await response.json(), { email: 'Buyer@Example.com ', lifetime: true });
     assert.ok(h.calls.accountUpdates.some(update => update.lifetimeSince), 'granted before the webhook');
   } finally { h.registration.close(); }
 
@@ -3203,3 +3307,50 @@ test('a ready pay-once form reaches Meta at its own price', () => atTime(DURING_
     assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.lifetime, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-ready.${visitorId}` }]);
   } finally { h.registration.close(); }
 }));
+
+test('a declined trial balance can be paid from the emailed link, and only the checkout session grants access', async () => {
+  const trial = onceSession({ amount_total: 100, consent: { terms_of_service: 'accepted' },
+    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1' } });
+  let recovery;
+  const intents = { pi_once: { id: 'pi_once', status: 'succeeded', amount_received: 100, currency: 'usd', customer: 'cus_once', payment_method: 'pm_once', setup_future_usage: 'off_session', latest_charge: { refunded: false } } };
+  const h = moneyHarness({ stripe: {
+    paymentIntents: { retrieve: async id => intents[id] },
+    checkout: { sessions: {
+      retrieve: async id => id === trial.id ? trial : recovery,
+      create: async params => {
+        recovery = { id: 'cs_recover_http', url: 'https://checkout.stripe.test/recover', mode: 'payment', status: 'open', payment_status: 'unpaid',
+          amount_total: 4800, currency: 'usd', customer: params.customer, metadata: params.metadata, payment_intent: 'pi_recover_http' };
+        return recovery;
+      } } },
+  } });
+  try {
+    assert.equal((await sendWebhook(h, trial)).status, 200);
+    const result = await (await request(h.app, '/api/inspect/checkout/sim/email', { method: 'POST', headers: h.headers, body: JSON.stringify({ sessionId: trial.id }) })).json();
+    const url = new URL(result.manageUrl);
+    const pay = new URL(url.pathname.replace('/manage', '/pay') + url.search, 'https://x.test');
+    h.account.claimsPaidTrial.status = 'active';
+    assert.equal((await request(h.app, pay.pathname + pay.search, { method: 'POST' })).status, 409, 'an active trial has no balance to recover');
+    h.account.claimsPaidTrial.status = 'failed';
+    const page = await request(h.app, url.pathname + url.search);
+    assert.match(await page.text(), /Pay the remaining \$48/);
+    assert.match(page.headers.get('content-security-policy'), /form-action 'self' https:\/\/checkout\.stripe\.com/);
+    assert.equal((await request(h.app, pay.pathname + pay.search.replace(/token=[a-f0-9]+/, 'token=' + '0'.repeat(64)), { method: 'POST' })).status, 403);
+    const redirect = await request(h.app, pay.pathname + pay.search, { method: 'POST', redirect: 'manual' });
+    assert.equal(redirect.status, 303);
+    assert.equal(redirect.headers.get('location'), 'https://checkout.stripe.test/recover');
+    assert.equal(h.account.lifetimeSince, undefined, 'opening the payment grants nothing');
+    const link = await (await request(h.app, '/api/inspect/claims-trial/pay-link', { method: 'POST', headers: h.headers })).json();
+    assert.equal(link.url, 'https://checkout.stripe.test/recover');
+    // The payment intent event can arrive first and must not fail or grant.
+    intents.pi_recover_http = { id: 'pi_recover_http', status: 'succeeded', amount_received: 4800, currency: 'usd', customer: 'cus_once',
+      metadata: recovery.metadata, latest_charge: { refunded: false } };
+    assert.equal((await sendWebhook(h, intents.pi_recover_http, 'payment_intent.succeeded')).status, 200);
+    assert.equal(h.account.lifetimeSince, undefined);
+    Object.assign(recovery, { status: 'complete', payment_status: 'paid' });
+    assert.equal((await sendWebhook(h, recovery)).status, 200);
+    assert.ok(h.account.lifetimeSince);
+    assert.equal(h.account.claimsPaidTrial.status, 'paid');
+    const plan = await (await request(h.app, '/api/inspect/account', { headers: h.headers })).json();
+    assert.equal(plan.lifetime, true);
+  } finally { h.registration.close(); }
+});

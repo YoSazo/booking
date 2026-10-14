@@ -28,18 +28,20 @@ const choose = async (h, which = 'yes', reason = 'price') => {
 };
 const SECONDS = require('../../wedges/claims').landing.video.seconds;
 const count = (h, name) => h.events.filter(event => event.name === name).length;
-test('Claims is $49 whatever the date: no clock, no crossed-out price, no deadline in the terms', async () => {
+test('Claims offers $1 today and $48 after three days whatever the date, with no countdown', async () => {
   for (const when of [at(-42 * HOUR), at(365 * 24 * HOUR)]) {
     const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone, now: when });
     try {
       await h.page.waitForSelector('#sim-buy');
-      assert.match(await h.page.textContent('#sim-buy'), /Get it for \$49/);
+      assert.match(await h.page.textContent('#sim-buy'), /Try it for \$1/);
+      assert.match(await h.page.textContent('#sim-offer'), /\$48 charged automatically after 3 days unless you cancel/);
       assert.equal(await h.page.$('[data-launch-left]'), null);
       assert.equal(await h.page.$('#sim-paybar s'), null);
       assert.doesNotMatch(`${await h.page.textContent('#sim-offer')} ${await h.page.textContent('#sim-paybar')}`, /Launch price|Instead of|then \$199|Countdown/);
       await h.page.click('#sim-buy');
       for (let i = 0; i < 30 && !h.purchases.length; i++) await h.page.waitForTimeout(100);
-      assert.equal(h.purchases[0]?.plan, 'lifetime');
+      assert.equal(h.purchases[0]?.plan, 'lifetime_trial');
+      assert.equal(h.purchases[0]?.trialVersion, 'claims-1-48-v1');
       h.assertClean();
     } finally { await h.close(); }
   }
@@ -184,9 +186,9 @@ test('the offer says what happens next, and the app step needs the app to be liv
     const steps = (await h.page.locator('#next-steps li').allTextContents()).map(text => text.trim());
     assert.equal(await h.page.textContent('#next-steps h3'), 'What happens next?');
     assert.deepEqual(steps, [
-      'Pay $49 once with a card, Apple Pay or Google Pay.',
+      'Pay $1 to start your 3-day trial.',
       'Start your first report right here in your browser. No install, no waiting.',
-      'Get the new iPhone app too. Sign in with the same email and your reports are there.',
+      'We email a reminder before the remaining $48. Cancel online before the charge to stop it, even if you sent a report.',
     ]);
     const order = await h.page.evaluate(() => { const top = id => document.querySelector(id).getBoundingClientRect().top; return { buy: top('#sim-buy'), guarantee: top('.guarantee'), points: top('.offer-points'), next: top('#next-steps'), terms: top('#sim-offer > p:last-of-type') }; });
     assert.ok(order.buy < order.guarantee && order.guarantee < order.points && order.points < order.next && order.next < order.terms, 'price, guarantee, what you get, what happens next, then the fine print: ' + JSON.stringify(order));

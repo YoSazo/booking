@@ -10,11 +10,12 @@ module.exports = {
     "guest": "Guest"
   },
   "chooser": "Record damage and keep the original uploaded photos.",
-  "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan or the pay-once purchase ($49). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
+  "termsIntro": "Claims reports are free to build and $12 each to send, or included in a plan. The website also offers a $1 paid trial: 3 days of full access, then $48 automatically unless cancelled ($49 total for lifetime access, no subscription). Claims produces documentation; it does not file, submit or manage claims with any platform or insurer.",
   "offer": {
     "mode": "pay-at-export",
     "reportPrice": 12,
-    "lifetime": 49
+    "lifetime": 49,
+    "paidTrial": { "version": "claims-1-48-v1", "upfront": 1, "balance": 48, "days": 3 }
   },
   "listTypes": [
     "damage"
@@ -258,6 +259,7 @@ module.exports = {
   },
   "appStore": {
     "live": true,
+    "paidTrialLive": false,
     "screens": [
       { "file": "claims-app-1.webp", "caption": "Snap the damage. Say what you see." },
       { "file": "claims-app-2.webp", "caption": "A clean, dated report." },

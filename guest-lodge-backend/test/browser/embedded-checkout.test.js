@@ -15,8 +15,8 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
     const body = JSON.parse(route.request().postData());
     requests.push(body);
     const response = body.embedded
-      ? { embedded: true, publishableKey: 'pk_test_fixture', clientSecret: 'cs_test_fixture_secret', sessionId: 'cs_test_fixture000001', amount: 49, lifetime: true, trialDays: 0 }
-      : { embedded: false, url: 'https://checkout.stripe.com/c/pay/cs_test_hosted', lifetime: true, trialDays: 0 };
+      ? { embedded: true, publishableKey: 'pk_test_fixture', clientSecret: 'cs_test_fixture_secret', sessionId: 'cs_test_fixture000001', amount: body.plan==='lifetime_trial'?1:49, balance:48, total:49, lifetime: body.plan!=='lifetime_trial', paidTrial:body.plan==='lifetime_trial', trialDays:body.plan==='lifetime_trial'?3:0 }
+      : { embedded: false, url: 'https://checkout.stripe.com/c/pay/cs_test_hosted', lifetime:body.plan!=='lifetime_trial',paidTrial:body.plan==='lifetime_trial',trialDays:body.plan==='lifetime_trial'?3:0 };
     return route.fulfill({ status: !body.embedded && failHosted ? 503 : 200,
       headers: { 'content-type': 'application/json' }, body: JSON.stringify(!body.embedded && failHosted ? { error: 'Payment is unavailable. Please try again.' } : response) });
   });
@@ -38,6 +38,7 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
             frame.title = 'Stripe payment form';
             frame.style.cssText = 'width:100%;height:0;border:0;display:block';
             frame.srcdoc = '<html><body style="margin:0;padding:16px;box-sizing:border-box;font:16px system-ui"><strong>$49.00</strong><p>Email</p><input style="box-sizing:border-box;width:100%" type="email"><p>Card information</p><input style="box-sizing:border-box;width:100%" placeholder="Card number"><p>Your card details stay inside Stripe.</p><button style="width:100%;padding:14px;background:#2e7d5b;color:white;border:0;border-radius:8px">Pay $49.00</button></body></html>';
+            if(window.MARKETEL_WEDGES.claims.offer.paidTrial)frame.srcdoc=frame.srcdoc.replaceAll('$49.00','$1.00');
             document.querySelector(selector).appendChild(frame);
             if (${render}) setTimeout(() => { frame.style.height = '470px'; }, ${renderDelay});
           },
@@ -88,9 +89,10 @@ for (const width of [320, 390, 1280]) {
       assert.ok(formTop<420,'the card form starts high on the screen, not below a stack of copy: '+formTop);
       assert.equal((await h.page.textContent('#payment-progress')).trim(), 'Step 2 of 2 — Payment', 'they know this is the last step');
       assert.equal((await h.page.textContent('#embedded-payment-close')).trim(), '← Back to the offer', 'Back says where it goes');
-      assert.match(await h.page.textContent('.checkout-promise'), /\$49 once\. Yours for good\./);
-      assert.match(await h.page.textContent('.checkout-promise'), /No subscription\. Nothing renews\./);
-      assert.match(await h.page.textContent('.checkout-refund'), /within 3 days and haven't sent a report/);
+      assert.match(await h.page.textContent('.checkout-promise'), /\$1 today\. Try it for 3 days\./);
+      assert.match(await h.page.textContent('.checkout-promise'), /\$48 automatically after 3 days unless cancelled/);
+      assert.match(await h.page.textContent('.checkout-promise'), /\$49 total.*No subscription/);
+      assert.match(await h.page.textContent('.checkout-refund'), /Cancelling stops the \$48, not the \$1/);
       const layout = await h.page.evaluate(() => ({ width: window.innerWidth, content: document.documentElement.scrollWidth,
         form: document.getElementById('stripe-checkout').getBoundingClientRect().toJSON() }));
       assert.ok(layout.content <= layout.width && layout.form.left >= 0 && layout.form.right <= layout.width, JSON.stringify(layout));
@@ -128,7 +130,7 @@ test('the payment next steps mention the iPhone app only when this wedge is live
   try{
     await paymentFixture(h);
     for(const live of [true,false]){
-      await h.page.evaluate(value=>{window.MARKETEL_WEDGES.claims.appStore.live=value;},live);
+      await h.page.evaluate(value=>{window.MARKETEL_WEDGES.claims.appStore.live=value;window.MARKETEL_WEDGES.claims.appStore.paidTrialLive=value;},live);
       await h.page.click('#sim-buy');
       await h.page.waitForSelector('#stripe-checkout.is-ready');
       const text=await h.page.textContent('.checkout-next');
@@ -283,7 +285,9 @@ test('a Stripe initialization error recovers through hosted Checkout with the sa
     await h.page.click('#sim-buy');
     await h.page.waitForURL('https://checkout.stripe.com/**');
     assert.deepEqual(requests.map(r => r.embedded), [true, false]);
-    assert.equal(requests[0].plan, 'lifetime');
+    assert.equal(requests[0].plan, 'lifetime_trial');
+    assert.equal(requests[1].plan, 'lifetime_trial');
+    assert.equal(requests[1].trialVersion, 'claims-1-48-v1');
     assert.deepEqual(requests[1].attribution, requests[0].attribution);
     assert.match(requests[1].attribution.fbc, /fixtureclick/);
     assert.equal(count(h, 'SimCheckoutRendered'), 1, 'only the successful fallback is sent');
@@ -312,7 +316,7 @@ test('an iframe that never renders falls back; a failed fallback restores the pu
 });
 
 test('a completed embedded payment returns through the existing verified Session fulfillment path', async () => {
-  const h = await open({ signedIn: false, query: '', now: beforeDeadline, simEmail: { email: 'buyer@example.test' } });
+  const h = await open({ signedIn: false, query: '', now: beforeDeadline, simEmail: { email: 'buyer@example.test', paidTrial: { status:'active',endsAt:'2026-10-18T12:00:00Z',cancelled:false },manageUrl:'https://bookmarketel.com/api/inspect/claims-trial/manage?account=fixture&token=fixture' } });
   try {
     await paymentFixture(h);
     await h.page.click('#sim-buy');
@@ -321,8 +325,9 @@ test('a completed embedded payment returns through the existing verified Session
     await h.page.waitForSelector('.sim-thanks');
     assert.match(h.page.url(), /session=cs_test_fixture000001/);
     await h.page.waitForFunction(() => document.getElementById('sim-paid-email')?.textContent === 'buyer@example.test');
-    assert.match(await h.body(), /Marketel Claims is yours/);
-    assert.match(await h.body(), /No subscription, and nothing renews/);
+    assert.match(await h.body(), /Your \$1 trial has started/);
+    assert.match(await h.body(), /remaining \$48 will be charged automatically/);
+    assert.match(await h.body(), /No subscription/);
     h.assertClean();
   } finally { await h.close(); }
 });

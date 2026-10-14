@@ -7,6 +7,21 @@ const at = minutes => new Date(Date.UTC(2026, 8, 24, 12, minutes)).toISOString()
 let seq = 0;
 const ev = (name, who, extra = {}) => ({ id: `e${++seq}`, name, visitorId: who.startsWith('v_') ? who : null, accountId: who.startsWith('v_') ? null : who, detail: null, createdAt: at(seq), ...extra });
 
+test('$1 paid trial is not a paid-in-full customer; the balance and cancellation remain separate', () => {
+  const events = [ev('OfferLanded', 'v_trial'), ev('PaidTrialStarted', 'v_trial')];
+  let f = buildWedgeFunnel(events);
+  assert.equal(f.steps.find(s => s.key === 'trial').people, 1);
+  assert.equal(f.steps.find(s => s.key === 'paid').people, 0);
+  events.push(ev('PaidTrialCancelled', 'v_trial'));
+  f = buildWedgeFunnel(events);
+  assert.equal(f.steps.find(s => s.key === 'paid').people, 0);
+  events.push(ev('PaidTrialConverted', 'v_full'));
+  f = buildWedgeFunnel(events);
+  assert.equal(f.steps.find(s => s.key === 'paid').people, 1);
+  assert.equal(f.branches.find(b => b.key === 'paid-trial').steps.find(s => s.label === 'Cancelled before the balance').people, 1);
+  for (const name of ['PaidTrialStarted', 'PaidTrialConverted', 'PaidTrialCancelled']) assert.equal(VISITOR_EVENTS.includes(name), false);
+});
+
 test('the funnel counts people, not taps, and reads each step against the one before', () => {
   const events = [
     ev('OfferLanded', 'v_a', { detail: 'phone' }), ev('OfferLanded', 'v_a', { detail: 'phone' }), // a reload is one person

@@ -40,17 +40,18 @@ const STEPS = Object.freeze([
   { key: 'payment-step', label: 'Opened the payment step', names: ['SimPaymentStepViewed'], hideWhenEmpty: true },
   { key: 'stripe', label: 'Stripe session created', names: ['SimCheckoutStarted'] },
   { key: 'checkout-ready', label: 'Payment form ready (what Meta hears)', names: ['SimCheckoutRendered'] },
-  { key: 'trial', label: 'Paid once or started a trial', names: ['TrialStarted', 'SimPurchased', 'LifetimePurchased'] },
+  { key: 'trial', label: 'Paid once or started a trial', names: ['TrialStarted', 'SimPurchased', 'LifetimePurchased', 'PaidTrialStarted'] },
   { key: 'welcome', label: 'Saw the welcome page', names: ['SimSubscribed'] },
   { key: 'next', label: 'Got the app or started on the web', names: ['SimAppTapped', 'SimWebStarted'] },
   { key: 'signin', label: 'Signed in', names: ['AccountVerified'] },
   { key: 'sent', label: 'Sent a report', names: ['ReportFinalized'] },
   // Paying once is paid on the spot; a trial is paid at its first invoice.
-  { key: 'paid', label: 'Paid', names: ['FirstPayment', 'LifetimePurchased'] },
+  { key: 'paid', label: 'Paid in full', names: ['FirstPayment', 'LifetimePurchased', 'PaidTrialConverted'] },
 ]);
 
 // Paths off the main line, each worth watching on its own.
 const BRANCHES = Object.freeze([
+  { key: 'paid-trial', hideWhenEmpty: true, label: '$1 paid trial → $49 lifetime access', steps: [['Paid $1 to start', ['PaidTrialStarted']], ['Reminder sent', ['PaidTrialReminderSent']], ['Remaining $48 paid', ['PaidTrialConverted']], ['Cancelled before the balance', ['PaidTrialCancelled']], ['Balance payment failed', ['PaidTrialPaymentFailed']], ['Payment refunded or disputed', ['PaidTrialRefunded']]] },
   // How far down the landing page they went. Each is people who got that far at
   // any point; a page that fits the screen records no scroll at all.
   { key: 'scroll', label: 'How far down the page', steps: [['Saw the video on screen', ['OfferSawVideo']], ['Saw the offer card on screen', ['OfferSawOffer']], ['Scrolled to 25%', ['OfferScroll25']], ['Scrolled to 50%', ['OfferScroll50']], ['Scrolled to 75%', ['OfferScroll75']], ['Scrolled to the bottom', ['OfferScroll100']], ['Tapped "see a report built"', ['OfferCueTapped']]] },

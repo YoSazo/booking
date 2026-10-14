@@ -223,11 +223,54 @@ On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
 ad must say the same thing: an ad promising "free to try" that lands on "$99
 once" is the mismatch that sinks a week.
 
+**Claims paid trial (2026-10-14).** The Claims web video landing offers an
+actual $1 payment for three days of full access, then $48 automatically unless
+cancelled: $49 total for lifetime access, not a recurring subscription.
+`offer.paidTrial` is the versioned contract. Existing pay-once buyers, cached
+$49 checkout requests, other wedges and native purchases keep their existing
+paths. No new Stripe Price IDs are needed. The initial payment saves the card
+with `setup_future_usage: off_session` and Stripe's required terms checkbox,
+explicitly linking `/claims/terms`. Configure a public terms URL in Stripe's
+business settings before launching.
+
+`claims-paid-trial.js` owns the server-only `InspectAccount.claimsPaidTrial`
+ledger. Its migration MUST run before the new server starts. A verified $1
+never sets `lifetimeSince`; only a verified successful $48 balance does.
+The verified return and email give the actual scheduled charge date and a
+direct signed management link. GET never cancels; POST does. Account settings
+also offer cancellation. Sending a report does not end the trial early or
+remove the right to cancel. Cancelling retains the paid trial window and stops
+$48, but does not automatically refund $1. Saved reports are not deleted.
+`InspectPaidTrialClaim` retains a keyed email derivative and checkout ID after
+deletion, preventing delayed webhooks from restarting a deleted trial. See
+`CLAIMS-PAID-TRIAL-RELEASE.md` for the migration, live Stripe and rollout gates.
+
+A minute sweep and startup reconciliation resume durable work after a restart.
+The balance requires a successfully sent reminder at least 24 hours earlier.
+Outages defer collection rather than shorten notice. One persisted balance
+PaymentIntent is reconciled/confirmed on retries, never a fresh charge. A card
+decline or required authentication ends access without automatic retries and
+emails the owner to contact support. Deleting an account cancels pending
+collection first. Duplicate trial payments are refunded. Refund/dispute events
+stop pending collection; reversal of the balance revokes its own lifetime grant.
+
+`PaidTrialStarted`/$1 is Meta StartTrial, NOT Purchase. `PaidTrialConverted`
+means the remaining $48 succeeded; Meta Purchase carries $48 (the $1 was a
+separate event). `/funnel` separates starts, reminders, cancellations,
+failures, full purchases and refunds. No-track checkouts send no advertising
+conversions. The existing Inspect webhook needs checkout.session.completed,
+payment_intent.succeeded, charge.refunded and charge.dispute.created (or all
+events). Run test-mode end-to-end billing QA before publishing. Add the DB-clock
+FunnelReset marker only AFTER deployment. Update priced ads to match the new
+offer; never change campaign optimization automatically.
+`appStore.paidTrialLive` remains false until an approved native build carries
+the new cancellation UI; trial-specific handoffs stay on the web meanwhile.
+
 **Claims payment.** On the web video landing, preload Stripe.js immediately,
 as GuestInfoPage does, but create no Session and send no checkout signal until
 the buy tap. The button opens a focused same-site payment step (`#payment`),
 not a scroll down the offer. It adds no account or email screen; Stripe takes
-the email and payment. Show the price/no-renewal summary with a compact review
+the email and payment. Show the price/automatic-balance summary with a compact review
 inside it above the fields. Its manifest `checkoutQuote` must be a short exact
 excerpt of the same review; preserve the author's name and actual rating. No
 full review card or carousel on the payment screen. Show

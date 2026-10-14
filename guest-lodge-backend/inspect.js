@@ -9,6 +9,7 @@ const PDFDocument = require('pdfkit');
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { marketelMetaRequestContext } = require('./marketel-meta-capi');
 const { load: loadWedges } = require('./wedges/registry');
+const { OFFER: CLAIMS_TRIAL, createClaimsPaidTrial, trialAccess, trialSummary } = require('./claims-paid-trial');
 const WEDGE_REGISTRY = loadWedges();
 const TYPE_CONFIG = Object.fromEntries(Object.entries(WEDGE_REGISTRY.byType).map(([id, value]) => [id, value.type]));
 const typeConfig = type => TYPE_CONFIG[type] || TYPE_CONFIG.routine;
@@ -330,9 +331,16 @@ function entitlement(account, now = Date.now()) {
       credits: Math.max(0, Number(account.reportCredits) || 0), businessName: account.businessName || '', hasLogo: !!account.logoKey,
       periodEnd: null, cancellationScheduled: false, price: null, interval: 'lifetime', limits: { ...LIMITS } };
   }
+  if (trialAccess(account, now)) {
+    return { active: true, lifetime: false, paidTrial: trialSummary(account), freeAvailable: !account.freeReportUsed,
+      remaining: LIMITS.reports, credits: Math.max(0, Number(account.reportCredits) || 0),
+      businessName: account.businessName || '', hasLogo: !!account.logoKey,
+      periodEnd: account.claimsPaidTrial.endsAt, cancellationScheduled: account.claimsPaidTrial.status === 'cancelled',
+      price: null, interval: 'paid-trial', limits: { ...LIMITS } };
+  }
   const active = ['active', 'trialing'].includes(account.subscriptionStatus) && new Date(account.periodEnd).getTime() > now;
   const plan = accountPlan(account);
-  return { active, freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
+  return { active, ...(account.claimsPaidTrial ? { paidTrial: trialSummary(account) } : {}), freeAvailable: !account.freeReportUsed, remaining: active ? Math.max(0, plan.reports - account.reportsUsed) : 0,
     credits: Math.max(0, Number(account.reportCredits) || 0), businessName: account.businessName || '', hasLogo: !!account.logoKey,
     periodEnd: account.periodEnd, cancellationScheduled: account.cancelAtPeriodEnd === true,
     price: plan.amount / 100, interval: plan.interval, limits: { ...LIMITS, reports: plan.reports } };
@@ -603,6 +611,8 @@ function registerInspect(app, {
     await tx.$queryRaw`SELECT "id" FROM "InspectAccount" WHERE "id" = ${id} FOR UPDATE`;
     return tx.inspectAccount.findUniqueOrThrow({ where: { id } });
   };
+  const paidTrials = createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccount,
+    record, queueCapi: queueInspectCapi, saveAttribution });
   const owned = async (db, accountId, id) => {
     const row = await db.inspectReport.findFirst({ where: { id, accountId }, include: {
       attachments: true,
@@ -939,7 +949,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // Where a landing came from (ad, social, direct, other) and in which browser.
     'OfferFrom', 'OfferBrowser'];
   const ANON_EVENTS = new Set(['VoiceNoteRecorded', ...LADDER_EVENTS, ...SIM_EVENTS]);
-  const simDetail = value => (/^[a-z][a-z-]{1,19}$/.test(String(value || '')) ? String(value) : null);
+  const simDetail = value => (/^[a-z][a-z_-]{1,19}$/.test(String(value || '')) ? String(value) : null);
   // A step taken inside the iOS app says so: the app's own start screen is not
   // a visit from an ad, and /funnel must not count it as one.
   const fromAppOrigin = req => /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
@@ -977,6 +987,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const plan = inspectPlan(req.body?.name === 'SimCheckoutRendered' && req.body?.detail === 'year' ? 'year' : 'month');
     // A ready "pay once" checkout is worth its one-time price.
     const once = req.body?.name === 'SimCheckoutRendered' && req.body?.detail === 'lifetime' && lifetimeCents(tool) > 0;
+    const paidTrial = req.body?.name === 'SimCheckoutRendered' && req.body?.detail === 'lifetime_trial' && tool === 'claims';
     await queueCapi(signal.event, {
       product: 'marketel-inspect',
       hotelId: `inspect-visitor:${visitor}`,
@@ -986,10 +997,10 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       sourceUrl: attribution.sourceUrl || `${origin}${TOOLS[tool].home}`,
       fbp: attribution.fbp || '',
       fbc: attribution.fbc || '',
-      value: (once ? lifetimeCents(tool) : plan.amount) / 100,
+      value: (paidTrial ? CLAIMS_TRIAL.upfront : once ? lifetimeCents(tool) : plan.amount) / 100,
       currency: 'USD',
       eventId: `${signal.id}.${visitor}`,
-      contentName: once ? `${TOOLS[tool].label} paid once` : signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
+      contentName: paidTrial ? 'Marketel Claims $1 paid trial' : once ? `${TOOLS[tool].label} paid once` : signal.what === 'plan' ? `${TOOLS[tool].label} ${plan.interval} plan` : `${TOOLS[tool].label} ${signal.what}`,
     });
   };
   router.post('/events/anon', guarded(async (req, res) => {
@@ -1048,15 +1059,21 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // Pay once, for good: the video landing's offer where the wedge sets a
   // price for it. One payment and no subscription, so there are no free days to
   // give and nothing to remind anyone of; the webhook grants it (adoptLifetime).
-  async function lifetimeCheckout(req, res, tool) {
-    const amount = lifetimeCents(tool);
+  async function lifetimeCheckout(req, res, tool, paidTrial = false) {
+    if (paidTrial && (tool !== 'claims' || fromAppOrigin(req) || req.body?.trialVersion !== CLAIMS_TRIAL.version)) throw fail(400, 'This trial is available from the current Claims website. Please reload the offer.');
+    if (paidTrial) {
+      // Fail before creating a payable Session when hosting skipped migration.
+      try { await prisma.$queryRaw`SELECT "claimsPaidTrial" FROM "InspectAccount" LIMIT 1`; }
+      catch { throw fail(503, 'The trial is being set up. Please try again shortly.'); }
+    }
+    const amount = paidTrial ? CLAIMS_TRIAL.upfront : lifetimeCents(tool);
     if (!amount) throw fail(400, 'That offer is not available.');
     const atLaunch = amount < TOOLS[tool].lifetime;
     const visitor = visitorOf(req.body?.visitorId);
     const email = req.body?.email ? emailOf(req.body.email) : '';
     if (email) {
       const account = await prisma.inspectAccount.findUnique({ where: { email } });
-      if (account && entitlement(account).active) throw fail(409, 'You already have Marketel. Sign in with this email to use it.');
+      if (account && (entitlement(account).active || paidTrial && account.claimsPaidTrial)) throw fail(409, 'You already have a Marketel account or trial. Sign in with this email to manage it.');
     }
     // The ad click rides along on the checkout: the account is only created
     // when the payment comes back, and without the click Meta would never hear
@@ -1064,11 +1081,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const click = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const carried = Object.fromEntries(Object.entries({ fbp: click.fbp, fbc: click.fbc, src: click.sourceUrl, ip: click.ipAddress, ua: click.userAgent,
       campaign: click.utmCampaign, content: click.utmContent }).filter(([, value]) => value).map(([key, value]) => [`ad_${key}`, String(value).slice(0, 500)]));
-    const metadata = { product: 'marketel-inspect', sim: '1', plan: 'lifetime', tool, visitorId: visitor || '', ...carried };
+    const metadata = { product: 'marketel-inspect', sim: '1', plan: paidTrial ? 'lifetime_trial' : 'lifetime', tool, visitorId: visitor || '', ...carried,
+      ...(paidTrial ? { trialVersion: CLAIMS_TRIAL.version, noTrack: ownerBrowser(req) || automatedBrowser(req) ? '1' : '0' } : {}) };
     const publishableKey = inspectPublishableKey(env);
     const embedded = tool === 'claims' && !fromAppOrigin(req) && req.body?.embedded === true && !!publishableKey;
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      ...(paidTrial ? { adaptive_pricing: { enabled: false } } : {}),
       ...(embedded ? {
         ui_mode: 'embedded',
         redirect_on_completion: 'if_required',
@@ -1079,18 +1098,23 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
-      custom_text: { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
+      ...(paidTrial ? { consent_collection: { terms_of_service: 'required' } } : {}),
+      custom_text: paidTrial ? { submit: { message: '$1 charged today. By paying, you authorize a further $48 charge 3 days after payment unless you cancel. $49 total for lifetime access. No subscription. Cancel from your account or the link we email you. Sending a report does not end the trial early.' },
+        terms_of_service_acceptance: { message: 'I agree to the [Claims trial terms](https://bookmarketel.com/claims/terms): $1 today, then $48 automatically after 3 days unless I cancel.' } }
+        : { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
-        product_data: { name: `${TOOLS[tool].label}: unlimited reports, paid once`,
-          description: `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
+        product_data: { name: paidTrial ? 'Marketel Claims: 3-day paid trial' : `${TOOLS[tool].label}: unlimited reports, paid once`,
+          description: paidTrial ? '$1 now; remaining $48 automatically after 3 days unless cancelled. $49 total. No subscription.' : `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
       ...(email ? { customer_email: email } : {}),
-      metadata, payment_intent_data: { metadata },
+      metadata, payment_intent_data: { metadata, ...(paidTrial ? { setup_future_usage: 'off_session' } : {}) },
       ...(!embedded ? {
         success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
         cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
       } : {}),
     });
-    if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: 'lifetime' });
+    if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: paidTrial ? 'lifetime_trial' : 'lifetime' });
+    if (paidTrial) return res.json({ ...(embedded ? { embedded: true, clientSecret: session.client_secret, publishableKey, sessionId: session.id } : { embedded: false, url: session.url }),
+      amount: 1, balance: 48, total: 49, trialDays: 3, lifetime: false, paidTrial: true });
     res.json(embedded
       ? { embedded: true, clientSecret: session.client_secret, publishableKey, sessionId: session.id, amount: amount / 100, trialDays: 0, lifetime: true }
       : { embedded: false, url: session.url, trialDays: 0, lifetime: true });
@@ -1099,6 +1123,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     requireBilling();
     rate(`inspect-sim-checkout:${req.ip}`, 12, 3600000);
     const tool = toolOf(req.body?.tool);
+    if (req.body?.plan === 'lifetime_trial') return lifetimeCheckout(req, res, tool, true);
     if (req.body?.plan === 'lifetime') return lifetimeCheckout(req, res, tool);
     const interval = req.body?.interval === 'year' ? 'year' : 'month';
     const plan = inspectPlan(interval);
@@ -1171,22 +1196,47 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // because the screen behind this reads fine without it.
     if (!session || session.metadata?.sim !== '1' || session.status !== 'complete') return res.json({ email: '' });
     const email = String(session.customer_details?.email || '');
+    if (session.metadata?.plan === 'lifetime_trial') {
+      const outcome = await paidTrials.adopt(session, req);
+      if (!outcome) throw fail(409, 'Trial payment has not been verified. Please retry shortly.');
+      if (outcome.retired) return res.json({ email, trialClosed: true });
+      return res.json({ email, ...(outcome.duplicate ? { alreadyHad: true, refunded: true, ...(outcome.trialUsed ? { trialUsed: true } : {}) } : { paidTrial: trialSummary(outcome.account), manageUrl: paidTrials.manageUrl(outcome.account) }) });
+    }
     if (session.metadata?.plan === 'lifetime') {
       // Granted here as well as by the webhook, whichever comes first, so the
       // sign-in they are about to do finds it. A second purchase is refunded.
       const outcome = await adoptLifetime(session, req).catch(error => { console.error('Inspect pay-once grant failed:', error.message); return null; });
-      return res.json({ email, ...(outcome?.duplicate ? { alreadyHad: true, refunded: true } : {}) });
+      return res.json({ email, ...(outcome?.duplicate ? { alreadyHad: true, refunded: true } : outcome?.account ? { lifetime: true } : {}) });
     }
     // Paid again while already subscribed: the webhook cancels the new plan, and
     // the page says so rather than welcoming them to free days they don't need.
     let alreadyHad = false;
     try {
       const account = await prisma.inspectAccount.findUnique({ where: { email: emailOf(email) } });
-      alreadyHad = !!account?.stripeSubscriptionId && account.stripeSubscriptionId !== String(session.subscription || '') && entitlement(account).active;
+      alreadyHad = !!account?.lifetimeSince || ['active', 'collecting'].includes(account?.claimsPaidTrial?.status)
+        || !!account?.stripeSubscriptionId && account.stripeSubscriptionId !== String(session.subscription || '') && entitlement(account).active;
     } catch {}
     res.json({ email, ...(alreadyHad ? { alreadyHad: true } : {}) });
   }));
 
+  // GET is deliberately read-only: email scanners must never cancel a trial.
+  router.get('/claims-trial/manage', guarded(async (req, res) => {
+    let a = await paidTrials.authorized(req.query.account, req.query.token);
+    // Coming back from the recovery checkout: reconcile before showing a status.
+    if (a.claimsPaidTrial.status === 'failed' && a.claimsPaidTrial.recoverySessionId) {
+      a = await paidTrials.recover(a.claimsPaidTrial.recoverySessionId).catch(() => null) || await prisma.inspectAccount.findUnique({ where: { id: a.id } });
+    }
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'self' 'unsafe-inline'; form-action 'self' https://checkout.stripe.com; base-uri 'none'; frame-ancestors 'none'");
+    res.type('html').send(paidTrials.page(a));
+  }));
+  router.post('/claims-trial/pay', express.urlencoded({ extended: false }), guarded(async (req, res) => {
+    const a = await paidTrials.authorized(req.query.account, req.query.token);
+    res.redirect(303, (await paidTrials.startRecovery(a.id)).url);
+  }));
+  router.post('/claims-trial/manage', express.urlencoded({ extended: false }), guarded(async (req, res) => {
+    const a = await paidTrials.authorized(req.query.account, req.query.token);
+    res.type('html').send(paidTrials.page(await paidTrials.cancel(a.id)));
+  }));
   router.use((req, res, next) => {
     const raw = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization || '')?.[1];
     if (!raw) return next(fail(401, 'Please sign in again.'));
@@ -1201,6 +1251,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     }).catch(next);
   });
   router.get('/account', guarded(async (req, res) => res.json({ email: req.inspect.email, ...entitlement(req.inspect), plans: purchasablePlans(), priorReports: await priorReports(req.inspect.id) })));
+  router.post('/claims-trial/pay-link', guarded(async (req, res) => {
+    res.json({ url: (await paidTrials.startRecovery(req.inspect.id)).url });
+  }));
+  router.post('/claims-trial/cancel', guarded(async (req, res) => {
+    res.json(entitlement(await paidTrials.cancel(req.inspect.id)));
+  }));
   // What a report is sent under. Snapshotted into each report at finalize, so
   // changing the logo later never rewrites a document someone already has.
   router.put('/branding', guarded(async (req, res) => {
@@ -2009,6 +2065,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   }));
   router.delete('/account', guarded(async (req, res) => {
     if (req.body.confirm !== 'DELETE') throw fail(400, 'Type DELETE to confirm account deletion.');
+    if (['active', 'collecting'].includes(req.inspect.claimsPaidTrial?.status)) await paidTrials.cancel(req.inspect.id);
     if (req.inspect.stripeSubscriptionId) {
       requireStripe();
       const current = await stripe.subscriptions.retrieve(req.inspect.stripeSubscriptionId);
@@ -2099,6 +2156,8 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     for (const customer of customers.data || []) {
       // Never in the way of the subscription search below.
       const sessions = await Promise.resolve().then(() => stripe.checkout.sessions.list({ customer: customer.id, status: 'complete', limit: 10 })).catch(() => ({ data: [] }));
+      const paidTrial = (sessions.data || []).find(s => s.metadata?.plan === 'lifetime_trial' && s.payment_status === 'paid');
+      if (paidTrial) return !!(await paidTrials.adopt(paidTrial, null));
       const paidOnce = (sessions.data || []).find(s => s.metadata?.plan === 'lifetime' && s.payment_status === 'paid');
       if (paidOnce) return !!(await adoptLifetime(paidOnce, null));
       const subscriptions = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 10 });
@@ -2129,7 +2188,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // sign in to the plan they have (/checkout/sim/email).
     const liveElsewhere = account.stripeSubscriptionId && account.stripeSubscriptionId !== String(session.subscription)
       && ['active', 'trialing', 'past_due'].includes(account.subscriptionStatus || '');
-    if (liveElsewhere) {
+    if (liveElsewhere || account.lifetimeSince || ['active', 'collecting'].includes(account.claimsPaidTrial?.status)) {
       await Promise.resolve().then(() => stripe.subscriptions.cancel(String(session.subscription)))
         .catch(error => console.error('Inspect duplicate sim subscription cancel failed:', error.message));
       if (Number(session.amount_total) > 0) console.error('Inspect duplicate sim checkout was charged; refund by hand:', session.id);
@@ -2176,6 +2235,19 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const tool = toolOf(session.metadata?.tool);
     const visitorId = visitorOf(session.metadata?.visitorId);
     const sourceId = `inspect-lifetime:${session.id}`;
+    // A stale cached $49 checkout can arrive during the new $1 trial. Stop
+    // its pending balance before granting paid-once access, and credit the $1
+    // back so that this upgrade still costs $49 in total, not $50/$98.
+    const prior = await prisma.inspectAccount.findUnique({ where: { email } });
+    if (prior?.claimsPaidTrial && !prior.lifetimeSince) {
+      if (['active', 'collecting'].includes(prior.claimsPaidTrial.status)) {
+        try { await paidTrials.cancel(prior.id); }
+        catch (e) { if (e.status !== 409 || !(await prisma.inspectAccount.findUnique({ where: { id: prior.id } }))?.lifetimeSince) throw e; }
+      }
+      const current = await prisma.inspectAccount.findUnique({ where: { id: prior.id } });
+      if (!current.lifetimeSince && prior.claimsPaidTrial.status !== 'refunded') await stripe.refunds.create({ payment_intent: prior.claimsPaidTrial.initialIntentId },
+        { idempotencyKey: `claims-trial-upgrade-credit:${prior.claimsPaidTrial.sessionId}` });
+    }
     const outcome = await prisma.$transaction(async tx => {
       const priorFreeClaim = await tx.inspectFreeClaim.findUnique({ where: { emailHash: freeClaimHash(email) } });
       const row = await tx.inspectAccount.upsert({ where: { email }, create: { email, freeReportUsed: !!priorFreeClaim }, update: {} });
@@ -2215,6 +2287,26 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     let event;
     try { event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], env.STRIPE_INSPECT_WEBHOOK_SECRET); }
     catch { return res.sendStatus(400); }
+    if (event.type === 'charge.refunded') await paidTrials.refunded(event.data.object.id);
+    if (event.type === 'charge.dispute.created') await paidTrials.refunded(typeof event.data.object.charge === 'string' ? event.data.object.charge : event.data.object.charge?.id);
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type) && event.data.object?.metadata?.plan === 'lifetime_trial') {
+      await paidTrials.adopt(event.data.object, req);
+      return res.json({ received: true });
+    }
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)
+      && event.data.object?.metadata?.product === 'marketel-claims-trial-balance' && event.data.object.metadata.recovery === '1') {
+      await paidTrials.recover(event.data.object.id);
+      return res.json({ received: true });
+    }
+    // A recovery payment is adopted by its checkout session, which may arrive
+    // after this event; adopting from here would only fail and be retried.
+    if (event.type === 'payment_intent.succeeded' && event.data.object?.metadata?.product === 'marketel-claims-trial-balance' && event.data.object.metadata.recovery === '1') {
+      return res.json({ received: true });
+    }
+    if (event.type === 'payment_intent.succeeded' && event.data.object?.metadata?.product === 'marketel-claims-trial-balance') {
+      await paidTrials.complete(await stripe.paymentIntents.retrieve(event.data.object.id));
+      return res.json({ received: true });
+    }
     if (event.type === 'checkout.session.completed' && event.data.object?.metadata?.product === 'marketel-inspect-report') {
       await grantReportPurchase(event, req);
       return res.json({ received: true });
@@ -2312,10 +2404,14 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     // keeps someone from being charged for a report they never made.
     try { await remindTrials(); }
     catch (error) { console.error('Inspect trial reminders failed:', error.name); }
+    try { await paidTrials.sweep(); }
+    catch (error) { console.error('Claims paid trials failed:', error.name); }
     finally { running = false; }
   };
   const timer = setInterval(sweep, 3600000); timer.unref();
-  return { sweep, close: () => clearInterval(timer) };
+  const paidTrialTimer = setInterval(() => { if (enabled) paidTrials.sweep().catch(error => console.error('Claims paid trial sweep failed:', error.name)); }, 60000); paidTrialTimer.unref();
+  const paidTrialStartup = setTimeout(() => { if (enabled) paidTrials.sweep().catch(error => console.error('Claims paid trial startup failed:', error.name)); }, 10000); paidTrialStartup.unref();
+  return { sweep, close: () => { clearInterval(timer); clearInterval(paidTrialTimer); clearTimeout(paidTrialStartup); } };
 }
 
 module.exports = {

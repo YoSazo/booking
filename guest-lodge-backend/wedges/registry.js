@@ -15,6 +15,9 @@ function validate(manifest, filename = '') {
   // Pay once, for good, in whole dollars: what the video landing sells instead
   // of a subscription trial when it is set.
   if (manifest.offer.lifetime !== undefined && (!Number.isInteger(manifest.offer.lifetime) || manifest.offer.lifetime < 19 || manifest.offer.lifetime > 999)) bad('offer.lifetime must be whole dollars from 19 to 999');
+  const paidTrial = manifest.offer.paidTrial;
+  if (paidTrial !== undefined && (manifest.id !== 'claims' || manifest.offer.launch || manifest.offer.lifetime !== 49
+    || paidTrial?.version !== 'claims-1-48-v1' || paidTrial.upfront !== 1 || paidTrial.balance !== 48 || paidTrial.days !== 3)) bad('offer.paidTrial must match the supported Claims $1/$48 three-day contract');
   // A launch price is real: lower than the price after it, and it ends at a
   // fixed moment, the same for everyone, after which checkout charges the full
   // price. Never a timer that resets.
@@ -28,6 +31,7 @@ function validate(manifest, filename = '') {
   // Whether the approved iPhone app carries this wedge. Until it does, buyers stay
   // on the web app; flipping it to true is the whole switch once Apple approves.
   if (typeof manifest.appStore?.live !== 'boolean') bad('appStore.live must be true or false');
+  if (manifest.appStore.paidTrialLive !== undefined && typeof manifest.appStore.paidTrialLive !== 'boolean') bad('appStore.paidTrialLive must be true or false');
   // Screens of the real app, shown under the demo's offer once the app is live.
   if (manifest.appStore.screens !== undefined && (!Array.isArray(manifest.appStore.screens)
     || manifest.appStore.screens.some(shot => !/^[a-z0-9-]+\.(webp|jpg|png)$/.test(String(shot?.file || '')) || typeof shot.caption !== 'string' || !shot.caption.trim()))) bad('appStore.screens must be files with captions');

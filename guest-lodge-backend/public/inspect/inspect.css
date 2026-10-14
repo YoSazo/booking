@@ -658,6 +658,10 @@ html.checkout-open #account-button { visibility: hidden; pointer-events: none; }
 .checkout-promise strong, .checkout-promise span { display: block; line-height: 1.5; }
 .checkout-promise strong { font-size: 15px; }
 .checkout-promise span { color: var(--muted); font-size: 12px; }
+/* Keep the automatic balance terms ABOVE the card fields without burying
+   those fields. The trial adds a line of disclosure, not a second pitch. */
+.payment-step .paid-trial-payment h1 { margin-bottom: 8px; }
+.paid-trial-payment .checkout-promise { padding: 10px; margin-bottom: 8px; }
 .checkout-refund { margin: 0 10px 14px; }
 .checkout-refund strong, .checkout-refund span { display: block; }
 .checkout-refund strong { color: var(--green-dark); font-size: 13px; }
