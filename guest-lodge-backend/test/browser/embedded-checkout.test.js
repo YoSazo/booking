@@ -75,10 +75,12 @@ for (const width of [320, 390, 1280]) {
       assert.match(await h.page.textContent('.checkout-next'), /Start your first report immediately in your browser/);
       assert.equal(await h.page.locator('.checkout-next').count(),1,'next steps are not repeated below the form');
       assert.equal(await h.page.evaluate(()=>{
-        const next=document.querySelector('.checkout-next');
-        return !!(document.querySelector('.checkout-review').compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING)
-          &&!!(next.compareDocumentPosition(document.getElementById('stripe-checkout'))&Node.DOCUMENT_POSITION_FOLLOWING);
-      }),true,'next steps sit between the review and payment form');
+        const follows=(a,b)=>!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
+        const form=document.getElementById('stripe-checkout'),next=document.querySelector('.checkout-next'),review=document.querySelector('.checkout-review');
+        return follows(form,next)&&follows(next,review);
+      }),true,'the form comes first; what happens after payment and the review sit under it');
+      const formTop=await h.page.evaluate(()=>document.getElementById('stripe-checkout').getBoundingClientRect().top);
+      assert.ok(formTop<420,'the card form starts high on the screen, not below a stack of copy: '+formTop);
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 once\. Yours for good\./);
       assert.match(await h.page.textContent('.checkout-promise'), /No subscription\. Nothing renews\./);
       assert.match(await h.page.textContent('.checkout-refund'), /within 3 days and haven't sent a report/);
