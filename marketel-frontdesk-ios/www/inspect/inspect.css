@@ -639,7 +639,10 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .checkout-review .tape-card { width: auto; min-height: 0; padding: 12px 14px; margin: 0; background: #f7faf8; box-shadow: none; }
 .checkout-review .tape-card blockquote { display: block; margin: 6px 0; font-size: 13px; -webkit-line-clamp: unset; }
 .checkout-review figcaption { font-size: 12px; }
-.checkout-next { margin: 14px 10px 0; color: var(--muted); font-size: 13px; }
+.checkout-next { margin: 0 6px 16px; color: var(--muted); font-size: 13px; }
+.checkout-next h2 { margin: 0 0 4px; color: var(--green-dark); font-size: 14px; letter-spacing: 0; }
+.checkout-next p { margin: 0 0 4px; line-height: 1.45; }
+.checkout-next p:last-child { margin-bottom: 0; }
 html.checkout-open body { padding-bottom: 20px; }
 html.checkout-open #account-button { visibility: hidden; pointer-events: none; }
 .embedded-payment-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 0 6px 12px; }

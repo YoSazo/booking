@@ -72,6 +72,13 @@ for (const width of [320, 390, 1280]) {
       assert.equal(await h.page.isVisible('.offer-landing'), false, 'the long pitch is not the payment screen');
       assert.equal(await h.page.isVisible('.checkout-review'), true, 'trust carries onto the payment screen');
       assert.match(await h.page.textContent('.checkout-review'), /Daniel Harris/);
+      assert.match(await h.page.textContent('.checkout-next'), /Start your first report immediately in your browser/);
+      assert.equal(await h.page.locator('.checkout-next').count(),1,'next steps are not repeated below the form');
+      assert.equal(await h.page.evaluate(()=>{
+        const next=document.querySelector('.checkout-next');
+        return !!(document.querySelector('.checkout-review').compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING)
+          &&!!(next.compareDocumentPosition(document.getElementById('stripe-checkout'))&Node.DOCUMENT_POSITION_FOLLOWING);
+      }),true,'next steps sit between the review and payment form');
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 once\. Yours for good\./);
       assert.match(await h.page.textContent('.checkout-promise'), /No subscription\. Nothing renews\./);
       assert.match(await h.page.textContent('.checkout-refund'), /within 3 days and haven't sent a report/);
@@ -90,6 +97,25 @@ for (const width of [320, 390, 1280]) {
     } finally { await h.close(); }
   });
 }
+
+test('the payment next steps mention the iPhone app only when this wedge is live in it', async () => {
+  const h=await open({signedIn:false,query:''});
+  try{
+    await paymentFixture(h);
+    for(const live of [true,false]){
+      await h.page.evaluate(value=>{window.MARKETEL_WEDGES.claims.appStore.live=value;},live);
+      await h.page.click('#sim-buy');
+      await h.page.waitForSelector('#stripe-checkout.is-ready');
+      const text=await h.page.textContent('.checkout-next');
+      assert.equal(text.includes('Prefer the iPhone app?'),live);
+      assert.equal(text.includes('same email'),live);
+      assert.doesNotMatch(text,/\$49|Pay .*once/,'do not repeat the price as another step');
+      await h.page.click('#embedded-payment-close');
+      await h.page.waitForURL('http://app.test/claims');
+    }
+    h.assertClean();
+  }finally{await h.close();}
+});
 
 test('closing during Stripe initialization cancels the attempt without redirecting or reporting readiness', async () => {
   const h = await open({ signedIn: false, query: '', now: beforeDeadline });
