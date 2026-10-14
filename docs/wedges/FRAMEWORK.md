@@ -295,6 +295,10 @@ mode. Without it, the existing hosted checkout remains available. Startup
 registers the public payment domain with the Inspect billing account for
 wallets. Fulfillment stays on the existing webhook and verified Session path.
 
+On phones, give Stripe's iframe the full viewport width and inset our copy
+separately. Nested page/card padding squeezes its card-number placeholder
+under Stripe's own network icons. Do not scale the iframe or patch its fields.
+
 **Money-back.** Claims pay-once carries a 3-day money-back guarantee: full
 refund if they email support@bookmarketel.com within 3 days and have not sent a
 report. It is on the landing (badge and block by the button), Stripe

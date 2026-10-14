@@ -682,7 +682,20 @@ html.checkout-open #account-button { visibility: hidden; pointer-events: none; }
 .embedded-payment-note { margin: 8px 10px 0; text-align: center; color: var(--muted); }
 html.checkout-open .sim-paybar { display: none; }
 @media (max-width: 520px) {
-  .payment-step .embedded-payment { padding: 16px 10px; }
+  /* Stripe owns the padding and card-network icons INSIDE its iframe. Do not
+     squeeze it inside main padding + card padding as well: at 390px that
+     left only 338px and clipped the last card-number placeholder group.
+     Give the secure form the full phone width; keep our copy inset. */
+  html.checkout-open #app { padding-left: 0; padding-right: 0; }
+  .payment-step .embedded-payment { padding: 16px 0; border-left: 0; border-right: 0; }
+  .payment-step .payment-back { margin-left: 16px; margin-right: 16px; }
+  .payment-step .payment-progress,
+  .payment-step h1,
+  .payment-step .checkout-promise,
+  .payment-step .embedded-payment-head,
+  .payment-step .checkout-refund,
+  .payment-step .checkout-next { margin-left: 16px; margin-right: 16px; }
+  .checkout-frame-shell, #stripe-checkout { width: 100%; min-width: 0; }
 }
 @media (max-width: 360px) {
   .payment-step h1 { font-size: 23px; }

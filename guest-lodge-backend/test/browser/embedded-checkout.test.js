@@ -50,7 +50,7 @@ async function paymentFixture(h, { initDelay = 0, renderDelay = 0, fail = false,
   return requests;
 }
 
-for (const width of [320, 390, 1280]) {
+for (const width of [320, 375, 390, 414, 1280]) {
   test(`Claims ${width}px: focused payment keeps trust, waits for a visible frame, and can reopen`, async () => {
     const h = await open({ signedIn: false, query: '', viewport: { width, height: 900 }, now: beforeDeadline });
     try {
@@ -96,6 +96,14 @@ for (const width of [320, 390, 1280]) {
       const layout = await h.page.evaluate(() => ({ width: window.innerWidth, content: document.documentElement.scrollWidth,
         form: document.getElementById('stripe-checkout').getBoundingClientRect().toJSON() }));
       assert.ok(layout.content <= layout.width && layout.form.left >= 0 && layout.form.right <= layout.width, JSON.stringify(layout));
+      if(width<=520){
+        assert.ok(layout.form.width>=width-2,'Stripe gets the full phone width instead of nested padding: '+JSON.stringify(layout));
+        const insets=await h.page.evaluate(()=>{
+          const price=document.querySelector('.checkout-promise').getBoundingClientRect();
+          return {left:price.left,right:window.innerWidth-price.right};
+        });
+        assert.ok(insets.left>=16&&insets.right>=16,'our price and trust copy remain inset');
+      }
       if (width === 390) await h.page.screenshot({ path: '/tmp/claims-embedded-checkout-390.png', fullPage: true });
       await h.page.click('#embedded-payment-close');
       assert.equal(await h.page.$('#embedded-payment'), null);
