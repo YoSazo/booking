@@ -16,6 +16,10 @@ for (const id of ['moveout', 'fixture']) {
     };
     try {
       await h.page.waitForSelector('#new-report');
+      // The skeleton already has New report while auth is still loading.
+      // Check copy once the account/header have finished opening too.
+      await h.page.waitForFunction(product => document.querySelector('#product-switch span')?.textContent === product
+        && document.getElementById('account-button')?.textContent === 'Account', config.product);
       await checkCopy('reports');
       await h.page.click('[data-page="properties"]');
       await h.page.waitForSelector('[data-baseline]');

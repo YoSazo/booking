@@ -106,7 +106,7 @@ test('polish can be declined or applied without losing the original note', async
 
 test('Claims uploads while editing, computes the filing date, sends dated photos, and starts fresh', async () => {
   const h = await open({ native: true, accountData: { businessName: 'Pine Stays', active: true, remaining: 5 },
-    properties: ['Pine Cottage'], sentPhoto: sample('claims-carpet-thumb.jpg') });
+    properties: ['Pine Cottage'], sentPhoto: sample('claims-carpet-thumb.jpg'), now: '2026-09-25T12:00:00Z' });
   try {
     await newAppReport(h);
     // The details step opened by the camera has the filing date on it.

@@ -37,7 +37,8 @@ const STEPS = Object.freeze([
   { key: 'scroll100', label: 'Scrolled to the bottom', names: ['OfferScroll100'], aside: true },
   // The button is "pay once" where the wedge sells that, "start free" otherwise.
   { key: 'tapped', label: 'Tapped the button', names: ['SimCheckoutTapped'] },
-  { key: 'stripe', label: 'Opened Stripe', names: ['SimCheckoutStarted'] },
+  { key: 'stripe', label: 'Stripe session created', names: ['SimCheckoutStarted'] },
+  { key: 'checkout-ready', label: 'Payment form ready (what Meta hears)', names: ['SimCheckoutRendered'] },
   { key: 'trial', label: 'Paid once or started a trial', names: ['TrialStarted', 'SimPurchased', 'LifetimePurchased'] },
   { key: 'welcome', label: 'Saw the welcome page', names: ['SimSubscribed'] },
   { key: 'next', label: 'Got the app or started on the web', names: ['SimAppTapped', 'SimWebStarted'] },
@@ -76,7 +77,7 @@ const BRANCHES = Object.freeze([
 // already sent) guard against doing things twice and are never deleted.
 const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
-  'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped',
+  'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimCheckoutRendered',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
   'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',

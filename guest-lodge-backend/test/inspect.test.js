@@ -592,7 +592,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
   const stripe = {
     prices: { retrieve: async () => ({}) },
     customers: { create: async () => ({ id: 'cus_new' }), retrieve: async id => ({ id }) },
-    checkout: { sessions: { create: async (params, options) => { calls.sessions.push({ params, options }); return { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1' }; } } },
+    checkout: { sessions: { create: async (params, options) => { calls.sessions.push({ params, options }); return { id: 'cs_1', url: 'https://checkout.stripe.test/cs_1', client_secret: 'cs_1_secret_embedded' }; } } },
     webhooks: { constructEvent: body => body },
     ...stripeOverrides,
   };
@@ -608,6 +608,7 @@ function moneyHarness({ account: accountOverrides = {}, report: reportOverrides 
       INSPECT_R2_BUCKET: 'private', R2_BUCKET: 'public', R2_ENDPOINT: 'https://acct.r2.cloudflarestorage.com',
       R2_ACCESS_KEY_ID: 'key', R2_SECRET_ACCESS_KEY: 'secret',
       STRIPE_MARKETEL_SECRET_KEY: 'sk_test_marketel',
+      STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_test_marketel',
       STRIPE_INSPECT_PRICE_ID: 'price_test', STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_test',
       STRIPE_INSPECT_PORTAL_CONFIGURATION_ID: 'bpc_test',
       ...envOverrides,
@@ -1952,6 +1953,7 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
     R2_ACCESS_KEY_ID: 'key',
     R2_SECRET_ACCESS_KEY: 'secret',
     STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
+    STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_live_marketel',
     STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
     STRIPE_INSPECT_YEARLY_PRICE_ID: 'price_inspect_199',
     STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
@@ -1969,6 +1971,7 @@ test('Inspect launch-readiness stays non-blocking while disabled and blocks when
     INSPECT_R2_ACCESS_KEY_ID: 'inspect-key',
     INSPECT_R2_SECRET_ACCESS_KEY: 'inspect-secret',
     STRIPE_MARKETEL_SECRET_KEY: 'sk_live_marketel',
+    STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_live_marketel',
     STRIPE_INSPECT_PRICE_ID: 'price_inspect_29',
     STRIPE_INSPECT_YEARLY_PRICE_ID: 'price_inspect_199',
     STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_inspect',
@@ -2132,20 +2135,22 @@ test('a demo checkout tells Meta a trial started, or the sale, under one id', as
   } finally { h.registration.close(); }
 });
 
-test('the demo start-button tap reaches Meta as InitiateCheckout, once per visitor, never from the app', async () => {
+test('a rendered payment form reaches Meta as InitiateCheckout; a raw tap stays internal', async () => {
   const visitorId = `v_${'a'.repeat(12)}`;
-  const tap = (h, body = {}, origin = 'https://bookmarketel.com') => request(h.app, '/api/inspect/events/anon', { method: 'POST',
+  const send = (h, name, body = {}, origin = 'https://bookmarketel.com') => request(h.app, '/api/inspect/events/anon', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: origin },
-    body: JSON.stringify({ name: 'SimCheckoutTapped', tool: 'claims', visitorId, detail: 'month', attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' }, ...body }) });
+    body: JSON.stringify({ name, tool: 'claims', visitorId, detail: 'month', attribution: { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.abc' }, ...body }) });
 
   let h = moneyHarness();
   try {
-    assert.equal((await tap(h)).status, 200);
-    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 25, contentName: 'Marketel Claims month plan', eventId: `inspect-sim-tap.${visitorId}` }]);
+    assert.equal((await send(h, 'SimCheckoutTapped')).status, 200);
+    assert.deepEqual(h.calls.capi, [], 'a failed loading attempt is not an optimization event');
     assert.ok(h.calls.events.some(e => e.name === 'SimCheckoutTapped' && e.detail === 'month' && e.visitorId === visitorId), 'our own ladder counts it too');
+    assert.equal((await send(h, 'SimCheckoutRendered')).status, 200);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: 25, contentName: 'Marketel Claims month plan', eventId: `inspect-sim-ready.${visitorId}` }]);
     // The yearly plan carries its own price; the id is the visitor's, so Meta
-    // counts one however many times they tap.
-    assert.equal((await tap(h, { detail: 'year' })).status, 200);
+    // counts one however many forms they render.
+    assert.equal((await send(h, 'SimCheckoutRendered', { detail: 'year' })).status, 200);
     assert.equal(h.calls.capi[1].value, 199);
     assert.equal(h.calls.capi[1].eventId, h.calls.capi[0].eventId);
   } finally { h.registration.close(); }
@@ -2153,14 +2158,15 @@ test('the demo start-button tap reaches Meta as InitiateCheckout, once per visit
   // From the app, or with no visitor to count once: our ladder only.
   h = moneyHarness();
   try {
-    assert.equal((await tap(h, {}, 'capacitor://localhost')).status, 200);
-    assert.equal((await tap(h, { visitorId: 'nope' })).status, 200);
+    assert.equal((await send(h, 'SimCheckoutRendered', {}, 'capacitor://localhost')).status, 200);
+    assert.equal((await send(h, 'SimCheckoutRendered', { visitorId: 'nope' })).status, 200);
     assert.equal(h.calls.capi.length, 0);
   } finally { h.registration.close(); }
 
   const client = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'public', 'inspect', 'inspect.js'), 'utf8');
   assert.match(client, /function simBuy\(trigger\)\{\n  simCheckoutTapped\(\);/);
   assert.match(client, /name:'SimCheckoutTapped',tool:toolId\(\),visitorId,detail:payOnce\(\)\?'lifetime':planInterval,attribution:inspectAttribution/);
+  assert.match(client, /name:'SimCheckoutRendered',tool:toolId\(\),visitorId,detail:payOnce\(\)\?'lifetime':planInterval,attribution:inspectAttribution/);
 });
 
 test('"keep it free" emails the link once, and only when asked', async () => {
@@ -2908,19 +2914,22 @@ test('staying on the video landing reaches Meta as ViewContent; arriving and the
   } finally { h.registration.close(); }
 });
 
-test('the Inspect pages allow Clarity and no other third party', () => {
+test('the Inspect pages allow Clarity plus the narrow Stripe surface needed for embedded Checkout', () => {
   const source = require('node:fs').readFileSync(require('node:path').join(__dirname, '../server.js'), 'utf8');
   const gate = source.slice(source.indexOf('function inspectGate'), source.indexOf('for (const slug of Object.keys(INSPECT_ARMS))'));
   const policy = (gate.match(/'Content-Security-Policy', "([^"]+)"/) || [])[1] || '';
   assert.ok(policy, 'the gate sets a policy');
   const directive = name => (policy.split(';').map(part => part.trim()).find(part => part.startsWith(`${name} `)) || '').split(/\s+/).slice(1);
-  assert.deepEqual(directive('script-src'), ["'self'", 'https://www.clarity.ms', 'https://scripts.clarity.ms']);
-  assert.deepEqual(directive('connect-src'), ["'self'", 'https://*.clarity.ms', 'https://c.bing.com']);
-  assert.deepEqual(directive('img-src'), ["'self'", 'blob:', 'data:', 'https://res.cloudinary.com', 'https://*.clarity.ms', 'https://c.bing.com']);
+  assert.deepEqual(directive('script-src'), ["'self'", 'https://www.clarity.ms', 'https://scripts.clarity.ms', 'https://js.stripe.com', 'https://*.js.stripe.com', 'https://checkout.stripe.com']);
+  assert.deepEqual(directive('connect-src'), ["'self'", 'https://*.clarity.ms', 'https://c.bing.com', 'https://api.stripe.com', 'https://r.stripe.com', 'https://checkout.stripe.com', 'https://link.com', 'https://*.link.com']);
+  assert.deepEqual(directive('img-src'), ["'self'", 'blob:', 'data:', 'https://res.cloudinary.com', 'https://*.clarity.ms', 'https://c.bing.com', 'https://*.stripe.com', 'https://*.link.com']);
   assert.deepEqual(directive('media-src'), ["'self'", 'https://res.cloudinary.com']);
+  assert.deepEqual(directive('frame-src'), ['https://js.stripe.com', 'https://*.js.stripe.com', 'https://hooks.stripe.com', 'https://checkout.stripe.com', 'https://link.com', 'https://*.link.com']);
   assert.deepEqual(directive('default-src'), ["'self'"]);
   assert.doesNotMatch(policy, /unsafe-eval/);
   assert.equal(directive('frame-ancestors').join(' '), "'none'");
+  assert.match(gate, /payment=\(self .*https:\/\/checkout\.stripe\.com/);
+  assert.doesNotMatch(gate, /payment=\(\)/, 'the policy must permit wallets inside Stripe');
 });
 
 test('the scroll and on-screen marks of the video landing are accepted from anonymous visitors, without reaching Meta', async () => {
@@ -2966,6 +2975,54 @@ test('a headless or crawler browser opening Checkout is not counted as someone w
     assert.deepEqual(h.calls.events.filter(event => event.name === 'SimCheckoutStarted'), [], 'no row for any of them');
     assert.equal((await buy('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Instagram 300.0')).status, 200);
     assert.equal(h.calls.events.filter(event => event.name === 'SimCheckoutStarted').length, 1, 'a phone in the Instagram app is counted');
+  } finally { h.registration.close(); }
+}));
+
+test('Claims embeds Checkout on-page and safely falls back when its public key is unavailable', () => atTime(DURING_LAUNCH, async () => {
+  const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: 'lifetime', embedded: true, tool: 'claims', visitorId: `v_${'c'.repeat(12)}` }) });
+  let h = moneyHarness();
+  try {
+    const response = await buy(h);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      embedded: true, clientSecret: 'cs_1_secret_embedded', publishableKey: 'pk_test_marketel', sessionId: 'cs_1', amount: LAUNCH_CENTS / 100, trialDays: 0, lifetime: true,
+    });
+    const { params } = h.calls.sessions[0];
+    assert.equal(params.ui_mode, 'embedded');
+    assert.equal(params.redirect_on_completion, 'if_required');
+    assert.equal(params.return_url, 'https://bookmarketel.com/claims?sim=1&checkout=success&session={CHECKOUT_SESSION_ID}');
+    assert.ok(!('success_url' in params));
+    assert.ok(!('cancel_url' in params));
+  } finally { h.registration.close(); }
+
+  h = moneyHarness({ env: { STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_live_wrong_mode' } });
+  try {
+    const response = await buy(h);
+    const body = await response.json();
+    assert.equal(body.embedded, false);
+    assert.equal(body.url, 'https://checkout.stripe.test/cs_1');
+    const { params } = h.calls.sessions[0];
+    assert.ok(!('ui_mode' in params));
+    assert.match(params.success_url, /checkout=success/);
+    assert.match(params.cancel_url, /checkout=cancelled/);
+  } finally { h.registration.close(); }
+
+  h = moneyHarness({ env: {
+    STRIPE_MARKETEL_SECRET_KEY: 'sk_test_51AAAAAAAAAAAAAAAsecret',
+    STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_test_51BBBBBBBBBBBBBBBpublic',
+  } });
+  try {
+    const response = await buy(h);
+    assert.equal((await response.json()).embedded, false, 'same mode but different account falls back');
+  } finally { h.registration.close(); }
+
+  h = moneyHarness();
+  try {
+    const response = await request(h.app, '/api/inspect/checkout/sim', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'capacitor://localhost' },
+      body: JSON.stringify({ plan: 'lifetime', embedded: true, tool: 'claims' }) });
+    assert.equal((await response.json()).embedded, false, 'native payment keeps its browser handoff');
   } finally { h.registration.close(); }
 }));
 
@@ -3134,14 +3191,14 @@ test('paid once is a plan for good: unlimited, nothing renews, nothing more to b
   } finally { h.registration.close(); }
 });
 
-test('a tap on pay once reaches Meta at its own price', () => atTime(DURING_LAUNCH, async () => {
+test('a ready pay-once form reaches Meta at its own price', () => atTime(DURING_LAUNCH, async () => {
   const visitorId = `v_${'b'.repeat(12)}`;
   const h = moneyHarness();
   try {
     const response = await request(h.app, '/api/inspect/events/anon', { method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' },
-      body: JSON.stringify({ name: 'SimCheckoutTapped', tool: 'claims', visitorId, detail: 'lifetime', attribution: { fbp: 'fb.1.1700000000.123' } }) });
+      body: JSON.stringify({ name: 'SimCheckoutRendered', tool: 'claims', visitorId, detail: 'lifetime', attribution: { fbp: 'fb.1.1700000000.123' } }) });
     assert.equal(response.status, 200);
-    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.launch.price, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-tap.${visitorId}` }]);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.launch.price, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-ready.${visitorId}` }]);
   } finally { h.registration.close(); }
 }));

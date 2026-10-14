@@ -89,7 +89,7 @@ test('/funnel draws every step, the answers under the question and the reasons u
       'Landed from the ad', 'Saw the video', 'Did something on purpose (what Meta hears)', 'Stayed 20 seconds (not sent to Meta)', 'Answered the first question',
       '↳ Said "I want this"', '↳ Said "I don\'t want this"', '↳ The price is too expensive', '↳ Does not rent out property', '↳ Does not need it', '↳ Not sure it works', '↳ Skipped the reason',
       'Saw the offer card', 'Scrolled a quarter of the way', 'Scrolled halfway', 'Scrolled three quarters', 'Scrolled to the bottom',
-      'Tapped the button', 'Opened Stripe', 'Paid once or started a trial',
+      'Tapped the button', 'Stripe session created', 'Payment form ready (what Meta hears)',
     ]);
     assert.deepEqual(rows.slice(0, 20).map(r => r.people), ['3', '2', '1', '0', '2', '1', '1', '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0']);
     assert.ok(rows[1].cls.includes('aside') && rows[3].cls.includes('aside') && rows[4].cls.includes('aside') && rows[5].cls.includes('child') && rows[7].cls.includes('depth2'));

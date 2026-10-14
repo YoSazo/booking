@@ -631,6 +631,33 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-offer .sim-declined { margin: 0 0 6px; font-size: 14px; font-weight: 750; color: var(--green-dark); }
 .sim-offer .sim-keep { margin: 6px 0 0; text-align: center; }
 .sim-offer .sim-keep .quiet { font-size: 13px; white-space: normal; }
+.embedded-payment { margin: 12px -8px 4px; padding: 16px 8px 4px; border-top: 1px solid var(--border); text-align: left; scroll-margin-top: calc(84px + env(safe-area-inset-top)); }
+.sim-offer.is-checkout > .guarantee { display: none; }
+.sim-offer.is-checkout > .launch-clock { display: none; }
+.embedded-payment-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 0 6px 12px; }
+.checkout-secure { display: flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 13px; font-weight: 700; }
+.checkout-stripe { display: inline-flex; align-items: center; gap: 5px; color: #475569; white-space: nowrap; }
+.checkout-stripe small { font-size: 10px; }
+.checkout-stripe strong { font-size: 20px; letter-spacing: -.7px; }
+.embedded-payment-head .quiet { width: auto; min-height: 36px; margin: 0 -6px 0 0; padding: 6px 8px; font-size: 13px; }
+.checkout-promise { display: flex; align-items: flex-start; gap: 10px; margin: 0 6px 12px; padding: 14px; background: var(--green-pale); border: 1px solid var(--border); border-radius: 14px; }
+.checkout-promise .icon { flex-shrink: 0; color: var(--green); margin-top: 2px; }
+.checkout-promise strong, .checkout-promise span { display: block; line-height: 1.5; }
+.checkout-promise strong { font-size: 15px; }
+.checkout-promise span { color: var(--muted); font-size: 12px; }
+.checkout-refund { margin: 0 10px 14px; }
+.checkout-refund strong, .checkout-refund span { display: block; }
+.checkout-refund strong { color: var(--green-dark); font-size: 13px; }
+.checkout-refund span { margin-top: 3px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+#stripe-checkout { position: relative; min-height: 320px; }
+.checkout-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
+#stripe-checkout.is-ready .checkout-loading { display: none; }
+.embedded-payment-note { margin: 8px 10px 0; text-align: center; color: var(--muted); }
+html.checkout-open .sim-paybar { display: none; }
+@media (max-width: 520px) {
+  .sim-offer.is-checkout { padding-left: 12px; padding-right: 12px; }
+  .embedded-payment { margin-left: -6px; margin-right: -6px; padding-left: 0; padding-right: 0; }
+}
 .sim-trial-note { margin: -4px 0 12px; color: var(--muted); }
 
 /* Nobody arriving from an ad needs the banner: they did not navigate here and

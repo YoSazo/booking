@@ -29,7 +29,13 @@ async function open({ launchPaused = false, firstQuestion = false, native = fals
   await context.exposeBinding('__shell', (_, message) => shell.push(message));
   // The page's clock at a fixed moment that keeps ticking from there, for
   // offers that change at a set time (a launch price ending).
-  if (now) await context.addInitScript(at => { const offset = at - Date.now(); const real = Date.now.bind(Date); Date.now = () => real() + offset; }, Date.parse(now));
+  if (now) await context.addInitScript(at => {
+    const RealDate = Date, offset = at - RealDate.now();
+    window.Date = class extends RealDate {
+      constructor(...args) { super(...(args.length ? args : [window.Date.now()])); }
+      static now() { return RealDate.now() + offset; }
+    };
+  }, Date.parse(now));
   // Chromium does not hand test code the body of an upload that carries a file,
   // so each photo is read in the page, stored here by key, and the upload URL
   // carries the key. Without this every photo came back as the fallback.

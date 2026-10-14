@@ -1263,13 +1263,14 @@ function inspectGate(req, res, next) {
     if (process.env.INSPECT_ENABLED !== 'true') return res.sendStatus(404);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-    // Clarity (www/scripts.clarity.ms to load, *.clarity.ms and c.bing.com to report) is the one
-    // third party allowed, and the page only loads it for an anonymous ad visitor.
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.clarity.ms https://scripts.clarity.ms; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://res.cloudinary.com https://*.clarity.ms https://c.bing.com; media-src 'self' https://res.cloudinary.com; connect-src 'self' https://*.clarity.ms https://c.bing.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    // Clarity is loaded only for an anonymous ad visitor. Stripe.js is loaded
+    // only after the buyer taps the Claims payment button; its embedded frame
+    // keeps card data out of Marketel while avoiding an off-site redirect.
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.clarity.ms https://scripts.clarity.ms https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://res.cloudinary.com https://*.clarity.ms https://c.bing.com https://*.stripe.com https://*.link.com; media-src 'self' https://res.cloudinary.com; connect-src 'self' https://*.clarity.ms https://c.bing.com https://api.stripe.com https://r.stripe.com https://checkout.stripe.com https://link.com https://*.link.com; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://link.com https://*.link.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.stripe.com");
     // Same empty-allowlist trap as the microphone: geolocation=() disables it
     // for every origin including this one, so navigator.geolocation was dead
     // on arrival in Chrome. A report says where it was made now.
-    res.setHeader('Permissions-Policy', 'geolocation=(self), microphone=(self), payment=()');
+    res.setHeader('Permissions-Policy', 'geolocation=(self), microphone=(self), payment=(self "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com" "https://checkout.stripe.com")');
     next();
 }
 

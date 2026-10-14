@@ -26,6 +26,7 @@ const PLANS = Object.freeze({
 // Monthly leads everywhere a price is shown. A year is not a decision cold
 // traffic makes, and defaulting to it is what made the sheet read as a trap.
 let planInterval = 'month';
+let stripeJsPromise = null, checkoutAttempt = null, checkoutBusy = false;
 let editorStep = 'details';
 const urls = new Map();
 const attributionKey = 'inspect.metaAttribution.v1';
@@ -319,6 +320,7 @@ async function run(fn, trigger = tappedButton()) {
 // a long editor instead of at the top of the report.
 let currentScreen='';
 function enterScreen(key){
+  if(checkoutAttempt&&key!=='offer')destroyEmbeddedCheckout();
   if(key==='sim')simSide('done');
   const framed = document.documentElement.classList.contains('sim-framed');
   const keep = currentScreen===key ? (framed ? $('app').scrollTop : window.scrollY) : 0;
@@ -1014,11 +1016,18 @@ function simPrices(){
   }
 }
 function simCheckout(email,trigger){
+  if(checkoutBusy)return;
+  if(checkoutAttempt){$('embedded-payment')?.scrollIntoView({block:'start'});return;}
+  checkoutBusy=true;
   return run(async()=>{
     haptic();
+    const wantsEmbedded=!native&&offerOnVideo&&payOnce()&&toolId()==='claims';
+    // Download Stripe.js while the server creates the Session. Do not wait on
+    // that download before the request, and do not load it on customer reports.
+    if(wantsEmbedded)loadStripeJs().catch(()=>{});
     let r;
     try{
-      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:'lifetime'}:{}),tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+      r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,...(payOnce()?{plan:'lifetime'}:{}),embedded:wantsEmbedded,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
     }catch(error){
       // Already paying, from a second ad or another device: charging them
       // again is the one thing that must not happen, and getting them into
@@ -1031,8 +1040,97 @@ function simCheckout(email,trigger){
     }
     if(email){try{localStorage.setItem('inspect.email',email);}catch{}}
     try{sessionStorage.setItem('inspect.sim.trial',String(Number(r.trialDays)||0));sessionStorage.setItem('inspect.sim.once',r.lifetime?'1':'');}catch{}
+    if(r.embedded){
+      try{
+        if(!r.clientSecret||!r.publishableKey||!r.sessionId)throw new Error('Secure checkout is unavailable.');
+        return await showEmbeddedCheckout(r);
+      }
+      catch(error){
+        if(error.checkoutClosed){destroyEmbeddedCheckout();return;}
+        // A content blocker, old in-app browser or transient Stripe.js failure
+        // must not turn a willing buyer into an error toast. Create a normal
+        // hosted Session and move them forward instead.
+        destroyEmbeddedCheckout();
+        restoreCheckoutOffer();
+        r=await api('/checkout/sim',{method:'POST',body:{interval:planInterval,plan:'lifetime',embedded:false,tool:toolId(),visitorId,...(email?{email}:{}),attribution:inspectAttribution}});
+      }
+    }
+    if(!r.url)throw new Error('Secure checkout did not load. Please try again.');
+    simCheckoutRendered();
     openPurchase(r.url);
-  },trigger);
+  },trigger).finally(()=>{checkoutBusy=false;});
+}
+function loadStripeJs(){
+  if(typeof window.Stripe==='function')return Promise.resolve(window.Stripe);
+  if(stripeJsPromise)return stripeJsPromise;
+  stripeJsPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    const failed=()=>{clearTimeout(timer);script.remove();reject(new Error('Secure checkout did not load.'));};
+    const timer=setTimeout(failed,12000);
+    script.src='https://js.stripe.com/v3/';script.async=true;script.crossOrigin='anonymous';
+    script.onload=()=>{clearTimeout(timer);typeof window.Stripe==='function'?resolve(window.Stripe):reject(new Error('Secure checkout did not load.'));};
+    script.onerror=failed;
+    document.head.appendChild(script);
+  }).catch(error=>{stripeJsPromise=null;throw error;});
+  return stripeJsPromise;
+}
+function destroyEmbeddedCheckout(){
+  const attempt=checkoutAttempt;checkoutAttempt=null;
+  if(attempt){
+    attempt.closed=true;
+    attempt.cancel?.();
+    try{attempt.instance?.destroy();}catch{}
+  }
+  document.documentElement.classList.remove('checkout-open');
+}
+function restoreCheckoutOffer(){
+  $('embedded-payment')?.remove();
+  $('sim-offer')?.classList.remove('is-checkout');
+  if($('sim-buy'))$('sim-buy').hidden=false;
+}
+async function showEmbeddedCheckout(result){
+  destroyEmbeddedCheckout();
+  const offer=$('sim-offer'),bar=$('sim-paybar');
+  if(!offer)throw new Error('The payment form has nowhere to open.');
+  const attempt={closed:false,instance:null,cancel:null};
+  checkoutAttempt=attempt;
+  const closedError=()=>Object.assign(new Error('Payment form closed.'),{checkoutClosed:true});
+  const alive=()=>checkoutAttempt===attempt&&!attempt.closed&&!!$('embedded-payment');
+  offer.classList.add('is-checkout');
+  document.documentElement.classList.add('checkout-open');
+  $('sim-buy').hidden=true;
+  bar?.classList.add('is-stood-down');
+  $('offer-video')?.pause();
+  $('sim-buy').insertAdjacentHTML('afterend',`<section class="embedded-payment" id="embedded-payment" aria-label="Secure payment"><div class="embedded-payment-head"><div class="checkout-secure">${icon('lock',18)}<span>Secure checkout</span></div><span class="checkout-stripe"><small>Powered by</small><strong>stripe</strong></span><button type="button" class="quiet" id="embedded-payment-close" aria-label="Close payment form">Back</button></div><div class="checkout-promise">${icon('circle-check',22)}<div><strong>$${esc(result.amount)} once. Yours for good.</strong><span>No subscription. Nothing renews.</span><span>Unlimited reports. Start after payment.</span></div></div><div class="checkout-refund"><strong>3-day money-back guarantee</strong><span>Full refund if you contact us within 3 days and haven't sent a report. <a href="${esc(skin().terms)}">Terms</a></span></div><div id="stripe-checkout"><div class="checkout-loading" role="status">Loading secure payment…</div></div><p class="embedded-payment-note"><small>Your card details go directly to Stripe.</small></p></section>`);
+  $('embedded-payment-close').onclick=()=>{haptic();destroyEmbeddedCheckout();restoreCheckoutOffer();if(!launchOffer())videoLanding();requestAnimationFrame(()=>$('sim-buy')?.scrollIntoView({block:'center'}));};
+  requestAnimationFrame(()=>$('embedded-payment')?.scrollIntoView({block:'start',behavior:simReduced()?'auto':'smooth'}));
+  // Stripe's own rendered event is the source of truth. An empty iframe can
+  // exist for seconds (or forever behind a blocker) and cannot be counted.
+  await new Promise((resolve,reject)=>{
+    let settled=false;
+    const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);attempt.cancel=null;error?reject(error):resolve();};
+    const timer=setTimeout(()=>finish(alive()?new Error('Secure checkout did not appear.'):closedError()),20000);
+    attempt.cancel=()=>finish(closedError());
+    loadStripeJs().then(async Stripe=>{
+      if(!alive())throw closedError();
+      const instance=await Stripe(result.publishableKey).initEmbeddedCheckout({
+        clientSecret:result.clientSecret,
+        onAnalyticsEvent:event=>{
+          if(event.eventType!=='checkoutRendered'||!alive()||settled)return;
+          $('stripe-checkout')?.classList.add('is-ready');
+          simCheckoutRendered();finish();
+        },
+        onComplete:()=>{
+          if(!alive())return;
+          finish();destroyEmbeddedCheckout();
+          location.assign(`${location.pathname}?sim=1&checkout=success&session=${encodeURIComponent(result.sessionId)}`);
+        },
+      });
+      if(!alive()||settled){instance.destroy();return;}
+      attempt.instance=instance;
+      instance.mount('#stripe-checkout');
+    }).catch(error=>finish(error));
+  });
 }
 // Hosted Checkout wants an email whatever the wallet, so the only question is
 // whose page it is typed on. Here it prefills Stripe's field, leaving Apple
@@ -1041,15 +1139,17 @@ function simCheckout(email,trigger){
 // It is always shown, even when an address is remembered: Stripe shows a
 // prefilled email read-only, so a typo remembered once would otherwise send
 // every later checkout off with an address the buyer can never sign in with.
-// The tap on either start button, on either plan, is Meta's InitiateCheckout —
-// the event the ads optimize for at launch. Sent on every tap; the server
-// counts one per visitor. The attribution goes with it, since there is no
-// account yet to carry it.
+// The raw tap stays on our ladder. Meta's InitiateCheckout is the separate
+// SimCheckoutRendered event below: a buyer must actually have a usable form.
 function simCheckoutTapped(){
   if(ownerBrowser)return;
   // On the video landing, tapping start free is also staying engaged.
   if(offerOnVideo)track('OfferEngaged');
   api('/events/anon',{method:'POST',body:{name:'SimCheckoutTapped',tool:toolId(),visitorId,detail:payOnce()?'lifetime':planInterval,attribution:inspectAttribution}}).catch(()=>{});
+}
+function simCheckoutRendered(){
+  if(ownerBrowser)return;
+  api('/events/anon',{method:'POST',keepalive:true,body:{name:'SimCheckoutRendered',tool:toolId(),visitorId,detail:payOnce()?'lifetime':planInterval,attribution:inspectAttribution}}).catch(()=>{});
 }
 function simBuy(trigger){
   simCheckoutTapped();
@@ -1253,6 +1353,7 @@ function videoBuyMarkup({declined=false}={}){
   return simOfferMarkup({declined,heading:'Pay once. Keep it for good.'});
 }
 function videoLanding({declined=false}={}){
+  destroyEmbeddedCheckout();
   enterScreen('offer');
   offerOnVideo=true;
   simUnframe();
@@ -1348,6 +1449,9 @@ function tickLaunch(){
   launchTimer=setInterval(()=>{
     const clock=document.querySelector('[data-launch-left]');
     if(!clock||!offerOnVideo){clearInterval(launchTimer);launchTimer=null;return;}
+    // The Session has a fixed price. Crossing the offer deadline must not
+    // destroy a payment form while the buyer is entering their card.
+    if(checkoutAttempt)return;
     if(!launchOffer()){clearInterval(launchTimer);launchTimer=null;videoLanding();return;}
     const left=launchLeft();
     clock.textContent=left;
@@ -3342,6 +3446,7 @@ function openNativeCamera(i){
 let hudDictation=null;
 const hudShell = () => !!window.webkit?.messageHandlers?.marketelShell;
 const LUCIDE = {
+  'lock': '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
   'circle-check': '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',

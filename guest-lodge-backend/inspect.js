@@ -382,6 +382,20 @@ function mergeInspectAttribution(existingValue, incoming) {
   };
 }
 
+function inspectPublishableKey(env) {
+  const secretKey = String(env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '').trim();
+  const publicKey = String(env.STRIPE_INSPECT_PUBLISHABLE_KEY || env.STRIPE_MARKETEL_PUBLISHABLE_KEY || '').trim();
+  const secretMode = (secretKey.match(/^sk_(test|live)_/) || [])[1];
+  const publicMode = (publicKey.match(/^pk_(test|live)_/) || [])[1];
+  if (!secretMode || publicMode !== secretMode || /replace|paste[_-]?me/i.test(publicKey)) return '';
+  // Modern keys carry the account prefix. Reject a key from the guest booking
+  // account even when both accounts are live. Older keys only encode mode.
+  const secretAccount = (secretKey.match(/^sk_(?:test|live)_(51[A-Za-z0-9]{15})/) || [])[1];
+  const publicAccount = (publicKey.match(/^pk_(?:test|live)_(51[A-Za-z0-9]{15})/) || [])[1];
+  if ((secretAccount || publicAccount) && secretAccount !== publicAccount) return '';
+  return publicKey;
+}
+
 /** Sync env checks for /api/admin/launch-readiness. Critical only when Inspect is enabled. */
 function inspectEnvReadiness(env = process.env) {
   const clean = name => String(env[name] || '').trim();
@@ -405,6 +419,7 @@ function inspectEnvReadiness(env = process.env) {
   const storageCredsOk = [inspectEndpoint, inspectAccessKey, inspectSecretKey].every(value => usable(value));
   const stripeKey = clean('STRIPE_INSPECT_SECRET_KEY') || clean('STRIPE_MARKETEL_SECRET_KEY');
   const stripeKeyOk = stripeKey.startsWith('sk_');
+  const stripePublishableOk = !!inspectPublishableKey(env);
   const priceIdOk = present('STRIPE_INSPECT_PRICE_ID') && clean('STRIPE_INSPECT_PRICE_ID').startsWith('price_');
   const yearlyPriceIdOk = present('STRIPE_INSPECT_YEARLY_PRICE_ID') && clean('STRIPE_INSPECT_YEARLY_PRICE_ID').startsWith('price_');
   const webhookOk = present('STRIPE_INSPECT_WEBHOOK_SECRET') && clean('STRIPE_INSPECT_WEBHOOK_SECRET').startsWith('whsec_');
@@ -430,6 +445,10 @@ function inspectEnvReadiness(env = process.env) {
       item('inspect-stripe-yearly-price', 'Inspect $199/yr Stripe price id', yearlyPriceIdOk, 'Create a USD 199 yearly Price and set STRIPE_INSPECT_YEARLY_PRICE_ID. Until then the paywall can only sell monthly.', false),
       item('inspect-stripe-webhook', 'Inspect Stripe webhook secret', webhookOk, 'Point a webhook at /api/inspect-stripe-webhook and set STRIPE_INSPECT_WEBHOOK_SECRET.', requireWhenEnabled),
       item('inspect-stripe-portal', 'Inspect billing portal configuration', portalOk, 'Create a Customer Portal config and set STRIPE_INSPECT_PORTAL_CONFIGURATION_ID.', requireWhenEnabled),
+      // Hosted Checkout remains a safe fallback, so a missing publishable key
+      // must not take the product dark. Claims only needs it to keep payment on
+      // the page instead of sending the buyer to checkout.stripe.com.
+      item('inspect-stripe-publishable', 'Inspect embedded Checkout publishable key', stripePublishableOk, 'Set STRIPE_INSPECT_PUBLISHABLE_KEY from the same Stripe mode/account as STRIPE_INSPECT_SECRET_KEY. Until then Claims falls back to hosted Checkout.', false),
       item('inspect-price-validation', 'Inspect Stripe price can be retrieved', priceValidationReady, 'Set STRIPE_INSPECT_SECRET_KEY or reuse STRIPE_MARKETEL_SECRET_KEY with STRIPE_INSPECT_PRICE_ID so checkout can validate USD 29/mo.', requireWhenEnabled),
       item('inspect-enabled-flag', 'Inspect enabled only when configured', !enabled || (authOk && privateBucketOk && storageCredsOk && priceIdOk && webhookOk && portalOk && priceValidationReady), 'Do not set INSPECT_ENABLED=true until the Inspect auth, R2, and Stripe values above are present.', true),
     ],
@@ -450,6 +469,15 @@ function registerInspect(app, {
   const router = express.Router();
   const bucket = env.INSPECT_R2_BUCKET;
   const origin = env.INSPECT_PUBLIC_ORIGIN || 'https://bookmarketel.com';
+  // Wallets in embedded Checkout need the payment domain registered in the
+  // account that bills Inspect (the guest booking Stripe account is separate).
+  // Provision once at startup so the buyer's tap does not wait on this API.
+  if (enabled && inspectPublishableKey(env) && stripe?.paymentMethodDomains) {
+    try {
+      require('./stripe-payment-domains').ensurePaymentMethodDomain(stripe, new URL(origin).hostname)
+        .catch(error => console.error('Inspect payment domain registration failed:', error.code || error.type || 'unavailable'));
+    } catch { console.error('Inspect payment domain registration failed: invalid public origin'); }
+  }
   const configuredAppStoreUrl = String(env.MARKETEL_FRONTDESK_APP_STORE_URL
     || 'https://apps.apple.com/us/app/marketel/id6801005750').trim();
   const appStoreUrl = (() => {
@@ -899,7 +927,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimCheckoutRendered', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
     // The video landing: arriving, then how much of the video they watched.
     'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
     // How far down the landing they scrolled, and whether they ever saw the video and the offer card.
@@ -928,14 +956,16 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // the see-a-report pill, the pay button), never time on the page, which is
   // OfferStayed20 and stays on /funnel. Otherwise the demo's three, from the shallowest with
   // the most volume to the deepest: the report seen (ViewContent), "Get this"
-  // (AddToCart), and the start-free tap (InitiateCheckout). There is no
+  // (AddToCart), and a ready checkout (InitiateCheckout). There is no
   // account yet, so each goes with the browser's Meta ids and the visitor id,
   // counted once per visitor however often it happens. Never from the app.
   const SIM_SIGNALS = Object.freeze({
     OfferEngaged: { event: 'ViewContent', id: 'inspect-offer-engaged', what: 'landing' },
     SimReportShown: { event: 'ViewContent', id: 'inspect-sim-report', what: 'demo report' },
     SimGetThisTapped: { event: 'AddToCart', id: 'inspect-sim-getthis', what: 'plan' },
-    SimCheckoutTapped: { event: 'InitiateCheckout', id: 'inspect-sim-tap', what: 'plan' },
+    // The tap remains on our own ladder. Meta only hears InitiateCheckout once
+    // a usable embedded form (or hosted fallback URL) is actually ready.
+    SimCheckoutRendered: { event: 'InitiateCheckout', id: 'inspect-sim-ready', what: 'plan' },
   });
   const queueSimSignal = async req => {
     const signal = SIM_SIGNALS[req.body?.name];
@@ -944,9 +974,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     if (!signal || !capiConfigured || typeof queueCapi !== 'function' || !visitor || fromApp) return;
     const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const tool = toolOf(req.body?.tool);
-    const plan = inspectPlan(req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'year' ? 'year' : 'month');
-    // A tap on "pay once" is worth the one price, where the wedge sells it.
-    const once = req.body?.name === 'SimCheckoutTapped' && req.body?.detail === 'lifetime' && lifetimeCents(tool) > 0;
+    const plan = inspectPlan(req.body?.name === 'SimCheckoutRendered' && req.body?.detail === 'year' ? 'year' : 'month');
+    // A ready "pay once" checkout is worth its one-time price.
+    const once = req.body?.name === 'SimCheckoutRendered' && req.body?.detail === 'lifetime' && lifetimeCents(tool) > 0;
     await queueCapi(signal.event, {
       product: 'marketel-inspect',
       hotelId: `inspect-visitor:${visitor}`,
@@ -1035,8 +1065,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const carried = Object.fromEntries(Object.entries({ fbp: click.fbp, fbc: click.fbc, src: click.sourceUrl, ip: click.ipAddress, ua: click.userAgent,
       campaign: click.utmCampaign, content: click.utmContent }).filter(([, value]) => value).map(([key, value]) => [`ad_${key}`, String(value).slice(0, 500)]));
     const metadata = { product: 'marketel-inspect', sim: '1', plan: 'lifetime', tool, visitorId: visitor || '', ...carried };
+    const publishableKey = inspectPublishableKey(env);
+    const embedded = tool === 'claims' && !fromAppOrigin(req) && req.body?.embedded === true && !!publishableKey;
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      ...(embedded ? {
+        ui_mode: 'embedded',
+        redirect_on_completion: 'if_required',
+        return_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
+      } : {}),
       // A customer, so the receipt and the billing page have somewhere to live.
       customer_creation: 'always',
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
@@ -1048,11 +1085,15 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
           description: `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
       ...(email ? { customer_email: email } : {}),
       metadata, payment_intent_data: { metadata },
-      success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
-      cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
+      ...(!embedded ? {
+        success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
+        cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
+      } : {}),
     });
     if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: 'lifetime' });
-    res.json({ url: session.url, trialDays: 0, lifetime: true });
+    res.json(embedded
+      ? { embedded: true, clientSecret: session.client_secret, publishableKey, sessionId: session.id, amount: amount / 100, trialDays: 0, lifetime: true }
+      : { embedded: false, url: session.url, trialDays: 0, lifetime: true });
   }
   router.post('/checkout/sim', guarded(async (req, res) => {
     requireBilling();

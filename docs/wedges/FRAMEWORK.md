@@ -114,8 +114,10 @@ while it is still free, and records a repeat trial. The try-it simulation still
 asks for the email first. Server and client copy agree. The
 trial is the full three days (the price bar says "Free for 3 days"): nothing
 sent in them ends it early, and every trialist is emailed the day before.
-`SimCheckoutTapped` fires Meta InitiateCheckout on the CTA tap with a
-deduplicating event ID. The server sends StartTrial and Purchase, excludes
+`SimCheckoutTapped` records the CTA tap internally. `SimCheckoutRendered`
+fires Meta InitiateCheckout with a deduplicating event ID when Stripe reports
+that the embedded payment form has rendered (or the hosted fallback URL is
+ready). The server sends StartTrial and Purchase, excludes
 owner/test emails with normalized plus aliases, and excludes app purchases
 (`metadata.source='app'`). Native purchases open the default browser only in
 the US storefront. Outside the US, show no prices, purchase links, or “need a
@@ -221,6 +223,22 @@ On `/funnel` it counts as both "Paid once or started a trial" and "Paid". The
 ad must say the same thing: an ad promising "free to try" that lands on "$99
 once" is the mismatch that sinks a week.
 
+**Claims payment.** On the web video landing, the payment button embeds Stripe
+Checkout inside the offer card. It adds no account or email screen; Stripe
+takes the email and payment. The amount in the payment reassurance comes from
+the server, with no renewal, access after payment, secure Stripe payment and
+the exact refund condition. Keep the video and reviews in the page. Hide the
+sticky purchase bar while the form is open so it cannot cover inputs. The form
+has a Back action, closing while it loads never redirects, and the launch
+deadline cannot destroy a form while someone is paying. Stripe's rendered
+callback sends `SimCheckoutRendered`; inserting an iframe does not. If Stripe
+fails to load, recover with hosted Checkout. Purchases in the iPhone app keep
+their default-browser handoff. `STRIPE_INSPECT_PUBLISHABLE_KEY` (or
+`STRIPE_MARKETEL_PUBLISHABLE_KEY`) must match the billing secret's account and
+mode. Without it, the existing hosted checkout remains available. Startup
+registers the public payment domain with the Inspect billing account for
+wallets. Fulfillment stays on the existing webhook and verified Session path.
+
 **Money-back.** Claims pay-once carries a 3-day money-back guarantee: full
 refund if they email support@bookmarketel.com within 3 days and have not sent a
 report. It is on the landing (badge and block by the button), Stripe
@@ -299,8 +317,9 @@ through `loadClarity` in `inspect.js`. It loads for an anonymous web visitor and
 never for the iPhone app, a signed-in visit (reports hold customers' photos and
 notes), the owner's browser (`?notrack=1`) or `localhost`; every sign-in calls
 `stopClarity`. The Inspect pages' content policy allows `www`/`scripts.clarity.ms`
-for scripts and `*.clarity.ms` and `c.bing.com` for reports, and nothing else
-third party; the terms page says so. Heatmaps need about 30 sessions to mean
+for scripts and `*.clarity.ms` and `c.bing.com` for reports, plus Stripe and
+Link origins for payment. Stripe.js loads only on a purchase attempt. The terms
+page describes the providers. Heatmaps need about 30 sessions to mean
 anything. Three diagnostics on the first question say why nobody answers: `OfferPickReady`
 or `OfferPickBlocked` (could the button be reached), `OfferPickTouched` (did the
 screen get touched at all), each with the browser's name (instagram, facebook,
