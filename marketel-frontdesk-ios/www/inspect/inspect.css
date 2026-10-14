@@ -633,6 +633,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 .sim-offer .sim-keep .quiet { font-size: 13px; white-space: normal; }
 .payment-step { max-width: 620px; margin: 0 auto; padding-bottom: env(safe-area-inset-bottom); }
 .payment-back { margin: 0 0 10px; }
+.payment-progress { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .payment-step .embedded-payment { margin: 0; padding: 20px; text-align: left; }
 .payment-step h1 { margin: 0 0 16px; font-size: 26px; letter-spacing: -.7px; outline: none; }
 .checkout-review { margin: 0 6px 16px; }

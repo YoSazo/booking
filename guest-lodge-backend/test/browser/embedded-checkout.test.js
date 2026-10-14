@@ -81,6 +81,8 @@ for (const width of [320, 390, 1280]) {
       }),true,'the form comes first; what happens after payment and the review sit under it');
       const formTop=await h.page.evaluate(()=>document.getElementById('stripe-checkout').getBoundingClientRect().top);
       assert.ok(formTop<420,'the card form starts high on the screen, not below a stack of copy: '+formTop);
+      assert.equal((await h.page.textContent('#payment-progress')).trim(), 'Step 2 of 2 — Payment', 'they know this is the last step');
+      assert.equal((await h.page.textContent('#embedded-payment-close')).trim(), '← Back to the offer', 'Back says where it goes');
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 once\. Yours for good\./);
       assert.match(await h.page.textContent('.checkout-promise'), /No subscription\. Nothing renews\./);
       assert.match(await h.page.textContent('.checkout-refund'), /within 3 days and haven't sent a report/);
