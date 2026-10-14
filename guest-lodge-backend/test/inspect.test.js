@@ -2960,8 +2960,10 @@ const sendWebhook = (h, object, type = 'checkout.session.completed') => request(
 // The launch price's end is fixed, so these tests fix the clock either side of it.
 const atTime = async (iso, run) => { const real = Date.now; Date.now = () => Date.parse(iso); try { return await run(); } finally { Date.now = real; } };
 const OFFER = require('../wedges/claims').offer;
-const LAUNCH_END = Date.parse(OFFER.launch.until);
-const LAUNCH_CENTS = OFFER.launch.price * 100, STANDING_CENTS = OFFER.lifetime * 100;
+// Claims has no launch window now ($49 is its standing price); the clock still
+// moves across the old deadline to prove nothing about the price changes with it.
+const LAUNCH_END = Date.parse('2026-10-14T05:09:00Z');
+const LAUNCH_CENTS = OFFER.lifetime * 100;
 const DURING_LAUNCH = new Date(LAUNCH_END - 36 * 3600000).toISOString(), AFTER_LAUNCH = new Date(LAUNCH_END + 3600000).toISOString();
 
 test('a headless or crawler browser opening Checkout is not counted as someone who opened Stripe', () => atTime(DURING_LAUNCH, async () => {
@@ -3066,26 +3068,22 @@ test('paying once is one payment at the launch price with no subscription, and i
   } finally { had.registration.close(); }
 }));
 
-test('checkout honors the launch deadline and a paused launch remains available after it', async () => {
+test('Claims charges its standing price whatever the date, and the launch mechanism stays valid for other offers', async () => {
   const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', tool: 'claims', visitorId: `v_${'a'.repeat(12)}` }) });
-  await atTime(DURING_LAUNCH, async () => {
-    const h = moneyHarness();
-    try {
-      assert.equal((await buy(h)).status, 200);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, LAUNCH_CENTS);
-      assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
-    } finally { h.registration.close(); }
-  });
-  await atTime(AFTER_LAUNCH, async () => {
-    const h = moneyHarness();
-    try {
-      assert.equal((await buy(h)).status, 200);
-      assert.equal(h.calls.sessions[0].params.line_items[0].price_data.unit_amount, OFFER.launch.paused ? LAUNCH_CENTS : STANDING_CENTS);
-      if (OFFER.launch.paused) assert.match(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, /^Launch price\./);
-      else assert.equal(h.calls.sessions[0].params.line_items[0].price_data.product_data.description, 'No subscription. Nothing renews. 3-day money-back guarantee.');
-    } finally { h.registration.close(); }
-  });
+  assert.equal(OFFER.launch, undefined, 'no countdown on Claims');
+  assert.equal(OFFER.lifetime, 49);
+  for (const moment of [DURING_LAUNCH, AFTER_LAUNCH]) {
+    await atTime(moment, async () => {
+      const h = moneyHarness();
+      try {
+        assert.equal((await buy(h)).status, 200);
+        const item = h.calls.sessions[0].params.line_items[0].price_data;
+        assert.equal(item.unit_amount, LAUNCH_CENTS);
+        assert.equal(item.product_data.description, 'No subscription. Nothing renews. 3-day money-back guarantee.');
+      } finally { h.registration.close(); }
+    });
+  }
   // A launch price the registry would accept is lower than the full price and
   // ends at a fixed UTC moment; a vague or reversed one never loads.
   const { validate } = require('../wedges/registry');
@@ -3093,12 +3091,13 @@ test('checkout honors the launch deadline and a paused launch remains available 
   const withLaunch = launch => ({ ...claims, offer: { ...claims.offer, launch } });
   assert.throws(() => validate(withLaunch({ price: 249, until: '2026-10-02T06:59:59Z' })), /offer\.launch/);
   assert.throws(() => validate(withLaunch({ price: 99, until: 'next week' })), /offer\.launch/);
-  assert.throws(() => validate(withLaunch({ ...OFFER.launch, paused: 'true' })), /paused must be a boolean/);
+  assert.throws(() => validate(withLaunch({ price: 29, until: '2026-10-14T05:09:00Z', paused: 'true' })), /paused must be a boolean/);
   const { priceForOffer } = require('../inspect');
-  const offer = { lifetime: STANDING_CENTS, launch: { price: LAUNCH_CENTS, until: LAUNCH_END, paused: false } };
-  assert.equal(priceForOffer(offer, LAUNCH_END - 1), LAUNCH_CENTS);
+  const STANDING_CENTS = 19900;
+  const offer = { lifetime: STANDING_CENTS, launch: { price: 4900, until: LAUNCH_END, paused: false } };
+  assert.equal(priceForOffer(offer, LAUNCH_END - 1), 4900);
   assert.equal(priceForOffer(offer, LAUNCH_END), STANDING_CENTS);
-  assert.equal(priceForOffer({ ...offer, launch: { ...offer.launch, paused: true } }, LAUNCH_END + 365 * 86400000), LAUNCH_CENTS);
+  assert.equal(priceForOffer({ ...offer, launch: { ...offer.launch, paused: true } }, LAUNCH_END + 365 * 86400000), 4900);
 });
 
 test('paying once grants the plan for good, exactly once, and Meta hears the sale', async () => {
@@ -3199,6 +3198,6 @@ test('a ready pay-once form reaches Meta at its own price', () => atTime(DURING_
       headers: { 'Content-Type': 'application/json', Origin: 'https://bookmarketel.com' },
       body: JSON.stringify({ name: 'SimCheckoutRendered', tool: 'claims', visitorId, detail: 'lifetime', attribution: { fbp: 'fb.1.1700000000.123' } }) });
     assert.equal(response.status, 200);
-    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.launch.price, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-ready.${visitorId}` }]);
+    assert.deepEqual(h.calls.capi, [{ name: 'InitiateCheckout', value: OFFER.lifetime, contentName: 'Marketel Claims paid once', eventId: `inspect-sim-ready.${visitorId}` }]);
   } finally { h.registration.close(); }
 }));
