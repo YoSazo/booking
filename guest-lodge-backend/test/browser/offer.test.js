@@ -188,8 +188,8 @@ test('the offer says what happens next, and the app step needs the app to be liv
       'Start your first report right here in your browser. No install, no waiting.',
       'Get the new iPhone app too. Sign in with the same email and your reports are there.',
     ]);
-    const order = await h.page.evaluate(() => { const top = id => document.querySelector(id).getBoundingClientRect().top; return { buy: top('#sim-buy'), next: top('#next-steps') }; });
-    assert.ok(order.next > order.buy, 'it sits under the buy button, not above the price');
+    const order = await h.page.evaluate(() => { const top = id => document.querySelector(id).getBoundingClientRect().top; return { buy: top('#sim-buy'), guarantee: top('.guarantee'), points: top('.offer-points'), next: top('#next-steps'), terms: top('#sim-offer > p:last-of-type') }; });
+    assert.ok(order.buy < order.guarantee && order.guarantee < order.points && order.points < order.next && order.next < order.terms, 'price, guarantee, what you get, what happens next, then the fine print: ' + JSON.stringify(order));
     const fit = await h.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     assert.ok(fit, 'no sideways scroll');
     h.assertClean();

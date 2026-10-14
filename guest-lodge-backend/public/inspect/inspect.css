@@ -653,7 +653,7 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 #stripe-checkout { min-height: 320px; }
 .checkout-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
 #stripe-checkout.is-ready + .checkout-loading { display: none; }
-.next-steps { margin: 14px 0 4px; padding: 12px 14px; border-radius: 12px; background: var(--green-pale); text-align: left; }
+.next-steps { margin: 16px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--green-pale); text-align: left; }
 .next-steps h3 { margin: 0 0 8px; font-size: 14px; color: var(--green-dark); }
 .next-steps ol { margin: 0; padding: 0; list-style: none; counter-reset: next; }
 .next-steps li { position: relative; margin: 0 0 7px; padding-left: 28px; font-size: 13px; line-height: 1.45; counter-increment: next; }
@@ -929,7 +929,7 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .sim-offer .offer-points { margin: 18px 2px 14px; }
 .offer-points { list-style: none; margin: 16px 4px 8px; padding: 0; display: grid; gap: 8px; }
 .offer-points li { position: relative; padding-left: 26px; line-height: 1.35; }
-.offer-points li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 750; }
+.offer-points li::before { content: "✓"; position: absolute; left: 0; color: var(--green-dark); font-weight: 900; }
 /* Social proof: stars under the job, then a short moving tape of real quotes. */
 .offer-trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2px 2px 4px; flex-wrap: wrap; }
 .review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
