@@ -653,6 +653,12 @@ p.check-in-line { margin: 4px 0 0; font-size: 13px; }
 #stripe-checkout { min-height: 320px; }
 .checkout-loading { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; background: #fff; color: var(--muted); font-size: 14px; font-weight: 650; pointer-events: none; }
 #stripe-checkout.is-ready + .checkout-loading { display: none; }
+.next-steps { margin: 14px 0 4px; padding: 12px 14px; border-radius: 12px; background: var(--green-pale); text-align: left; }
+.next-steps h3 { margin: 0 0 8px; font-size: 14px; color: var(--green-dark); }
+.next-steps ol { margin: 0; padding: 0; list-style: none; counter-reset: next; }
+.next-steps li { position: relative; margin: 0 0 7px; padding-left: 28px; font-size: 13px; line-height: 1.45; counter-increment: next; }
+.next-steps li:last-child { margin-bottom: 0; }
+.next-steps li::before { content: counter(next); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--green-dark); color: #fff; font-size: 12px; font-weight: 700; text-align: center; line-height: 20px; }
 .embedded-payment-note { margin: 8px 10px 0; text-align: center; color: var(--muted); }
 html.checkout-open .sim-paybar { display: none; }
 @media (max-width: 520px) {

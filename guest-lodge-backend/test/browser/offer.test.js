@@ -177,6 +177,25 @@ test('the launch price ends for real: at its moment the page redraws at the stan
   } finally { await after.close(); }
 });
 
+test('the offer says what happens next, and the app step needs the app to be live', async () => {
+  const h = await open({ arm: 'claims', signedIn: false, query: '', viewport: phone });
+  try {
+    await h.page.waitForSelector('#sim-buy');
+    const steps = (await h.page.locator('#next-steps li').allTextContents()).map(text => text.trim());
+    assert.equal(await h.page.textContent('#next-steps h3'), 'What happens next?');
+    assert.deepEqual(steps, [
+      'Pay $49 once with a card, Apple Pay or Google Pay.',
+      'Start your first report right here in your browser. No install, no waiting.',
+      'Get the new iPhone app too. Sign in with the same email and your reports are there.',
+    ]);
+    const order = await h.page.evaluate(() => { const top = id => document.querySelector(id).getBoundingClientRect().top; return { buy: top('#sim-buy'), next: top('#next-steps') }; });
+    assert.ok(order.next > order.buy, 'it sits under the buy button, not above the price');
+    const fit = await h.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    assert.ok(fit, 'no sideways scroll');
+    h.assertClean();
+  } finally { await h.close(); }
+});
+
 test('after paying once, the thank-you page says it is theirs and nothing renews', async () => {
   const h = await open({ arm: 'claims', signedIn: false, query: 'sim=1&checkout=success&session=cs_test_a1GoodSessionIdentifier000001',
     simEmail: { email: 'buyer@example.com' }, viewport: phone });
