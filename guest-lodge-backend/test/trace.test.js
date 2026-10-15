@@ -147,6 +147,7 @@ test('checkout sells one $14.99 unlock and returns to the page with the session 
     assert.equal(res.body.url, 'https://checkout.stripe.com/c/pay/cs_test_new');
     const params = calls.creates[0];
     assert.equal(params.mode, 'payment');
+    assert.deepEqual(params.payment_method_types, ['card'], 'no bank payments that would leave the buyer locked for days');
     assert.equal(params.line_items[0].price_data.unit_amount, TRACE.priceCents);
     assert.equal(params.line_items[0].price_data.currency, 'usd');
     assert.match(params.line_items[0].price_data.product_data.description, /No subscription/);

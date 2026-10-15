@@ -173,6 +173,9 @@ function registerTrace(app, {
     const params = {
       mode: 'payment',
       submit_type: 'pay',
+      // Cards only (Apple Pay and Google Pay are cards). A bank payment takes
+      // days to clear, so the buyer would come back to a page that can't unlock.
+      payment_method_types: ['card'],
       line_items: [{ quantity: 1, price_data: { currency: TRACE.currency, unit_amount: TRACE.priceCents,
         product_data: { name: `${TRACE.name}: yours for good`, description: 'Trace any picture onto paper. One payment. No subscription. Nothing renews.' } } }],
       success_url: `${origin}/trace?paid={CHECKOUT_SESSION_ID}`,
