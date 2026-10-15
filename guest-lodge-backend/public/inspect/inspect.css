@@ -1009,3 +1009,19 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .launch-clock strong, .sim-paybar small { font-variant-numeric: tabular-nums; }
 .sim-paybar .bar-was { font-size: 14px; font-weight: 600; color: var(--muted); margin-right: 3px; text-decoration-thickness: 2px; }
 .sim-paybar small.bar-clock { color: #aa382b; }
+
+/* "How do I cancel?": a plain, obviously tappable answer with the real screens. */
+.cancel-help { margin: 12px 0; border: 1.5px solid var(--green); border-radius: 12px; background: #fff; text-align: left; }
+.cancel-help > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 0 14px; color: var(--green-dark); font-weight: 700; font-size: 15px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.cancel-help > summary::-webkit-details-marker { display: none; }
+.cancel-help > summary::after { content: '+'; flex: 0 0 auto; width: 24px; height: 24px; line-height: 22px; text-align: center; border-radius: 50%; background: var(--green-pale); font-size: 18px; }
+.cancel-help[open] > summary::after { content: '−'; }
+.cancel-help-body { padding: 0 14px 14px; font-size: 14px; line-height: 1.5; }
+.cancel-help-body p { margin: 0 0 8px; }
+.cancel-help-body ol { margin: 0 0 10px; padding: 0; list-style: none; counter-reset: cancel; }
+.cancel-help-body li { position: relative; margin: 0 0 12px; padding-left: 28px; counter-increment: cancel; }
+.cancel-help-body li::before { content: counter(cancel); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--green-dark); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.cancel-help-body li img { display: block; width: 100%; max-width: 320px; height: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; }
+.checkout-refund .cancel-help { margin: 10px 0 0; }
+
+.checkout-promise .cancel-help-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }

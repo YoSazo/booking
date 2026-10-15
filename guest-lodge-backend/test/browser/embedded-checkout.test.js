@@ -91,6 +91,13 @@ for (const width of [320, 375, 390, 414, 1280]) {
       assert.equal((await h.page.textContent('#embedded-payment-close')).trim(), '← Back to the offer', 'Back says where it goes');
       assert.match(await h.page.textContent('.checkout-promise'), /\$1 today\. Try it for 3 days\./);
       assert.match(await h.page.textContent('.checkout-promise'), /\$48 automatically after 3 days unless cancelled/);
+      // The doubt "how do I get out?" is answered where it is raised, and "cancelled online" is itself the way in.
+      assert.equal(await h.page.locator('.checkout-refund .cancel-help').count(), 1);
+      assert.equal(await h.page.locator('.checkout-refund .cancel-help').evaluate(el => el.open), false);
+      await h.page.click('.checkout-promise .cancel-help-link');
+      assert.equal(await h.page.locator('.checkout-refund .cancel-help').evaluate(el => el.open), true);
+      assert.match(await h.page.textContent('.checkout-refund .cancel-help'), /If you do nothing, the \$48 is charged on \w{3}, \w{3} \d{1,2}/);
+      assert.equal(h.page.url().includes('#payment'), true, 'opening the help does not leave the payment step');
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 total.*No subscription/);
       assert.match(await h.page.textContent('.checkout-refund'), /Cancelling stops the \$48, not the \$1/);
       const layout = await h.page.evaluate(() => ({ width: window.innerWidth, content: document.documentElement.scrollWidth,

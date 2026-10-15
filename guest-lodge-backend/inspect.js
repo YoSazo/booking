@@ -937,7 +937,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
   // The simulation's own ladder. It is a different funnel with different
   // joints, so it is measured separately rather than folded into the one
   // above — comparing them is the entire reason both exist.
-  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimPaymentStepViewed', 'SimCheckoutRendered', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
+  const SIM_EVENTS = ['SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed', 'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimPaymentStepViewed', 'SimCancelHelpOpened', 'SimCheckoutRendered', 'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
     // The video landing: arriving, then how much of the video they watched.
     'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
     // How far down the landing they scrolled, and whether they ever saw the video and the offer card.

@@ -51,6 +51,7 @@ const STEPS = Object.freeze([
 
 // Paths off the main line, each worth watching on its own.
 const BRANCHES = Object.freeze([
+  { key: 'cancel-help', hideWhenEmpty: true, label: 'Looked up how to cancel the trial', steps: [['Opened "How do I cancel?"', ['SimCancelHelpOpened']]] },
   { key: 'paid-trial', hideWhenEmpty: true, label: '$1 paid trial → $49 lifetime access', steps: [['Paid $1 to start', ['PaidTrialStarted']], ['Reminder sent', ['PaidTrialReminderSent']], ['Remaining $48 paid', ['PaidTrialConverted']], ['Cancelled before the balance', ['PaidTrialCancelled']], ['Balance payment failed', ['PaidTrialPaymentFailed']], ['Payment refunded or disputed', ['PaidTrialRefunded']]] },
   // How far down the landing page they went. Each is people who got that far at
   // any point; a page that fits the screen records no scroll at all.
@@ -79,7 +80,7 @@ const BRANCHES = Object.freeze([
 // already sent) guard against doing things twice and are never deleted.
 const VISITOR_EVENTS = Object.freeze([
   'SimStarted', 'SimFindingPicked', 'SimPhotoTaken', 'SimNoteWritten', 'SimReportShown', 'SimOfferViewed',
-  'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimPaymentStepViewed', 'SimCheckoutRendered',
+  'SimEmailGiven', 'SimSubscribed', 'SimAppTapped', 'SimKeepFreeOpened', 'SimKeptFree', 'SimCheckoutTapped', 'SimPaymentStepViewed', 'SimCancelHelpOpened', 'SimCheckoutRendered',
   'SimRealReportTapped', 'SimBackTapped', 'SimWebStarted', 'SimScreensViewed', 'SimScreensSwiped', 'SimGetThisTapped',
   'OfferLanded', 'OfferEngaged', 'OfferStayed20', 'OfferVideoQuarter', 'OfferVideoHalf', 'OfferVideoEnded',
   'OfferScroll25', 'OfferScroll50', 'OfferScroll75', 'OfferScroll100', 'OfferSawVideo', 'OfferSawOffer', 'OfferCueTapped', 'OfferWantTapped', 'OfferUnsureTapped', 'OfferDeclineTapped',
