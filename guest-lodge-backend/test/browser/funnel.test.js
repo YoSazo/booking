@@ -86,7 +86,7 @@ test('/funnel draws every step, the answers under the question and the reasons u
     const rows = await page.$$eval('#ladder tbody tr', trs => trs.map(tr => ({ cls: tr.className, label: tr.querySelector('td.step').textContent.replace(/\s+/g, ' ').trim(), people: tr.querySelector('td:nth-child(3)').textContent.trim() })));
     const labels = rows.map(r => r.label);
     assert.deepEqual(labels.slice(0, 20), [
-      'Landed from the ad', 'Saw the video', 'Did something on purpose (what Meta hears)', 'Stayed 20 seconds (not sent to Meta)', 'Answered the first question',
+      'Landed on the page', 'Saw the video', 'Did something on purpose (what Meta hears)', 'Stayed 20 seconds (not sent to Meta)', 'Answered the first question',
       '↳ Said "I want this"', '↳ Said "I don\'t want this"', '↳ The price is too expensive', '↳ Does not rent out property', '↳ Does not need it', '↳ Not sure it works', '↳ Skipped the reason',
       'Saw the offer card', 'Scrolled a quarter of the way', 'Scrolled halfway', 'Scrolled three quarters', 'Scrolled to the bottom',
       'Tapped the button', 'Stripe session created', 'Payment form ready (what Meta hears)',
@@ -122,7 +122,7 @@ test('/funnel for a page with no first question shows the page and scroll metric
     await page.goto('http://funnel.test/funnel');
     await page.waitForSelector('#ladder tbody tr');
     const rows = await page.$$eval('#ladder tbody tr', trs => trs.map(tr => [tr.querySelector('td.step').textContent.replace(/\s+/g, ' ').trim(), tr.querySelector('td:nth-child(3)').textContent.trim()]));
-    assert.deepEqual(rows.slice(0, 10), [['Landed from the ad', '4'], ['Saw the video', '2'], ['Did something on purpose (what Meta hears)', '1'], ['Stayed 20 seconds (not sent to Meta)', '0'], ['Saw the offer card', '2'], ['Scrolled a quarter of the way', '2'], ['Scrolled halfway', '1'], ['Scrolled three quarters', '0'], ['Scrolled to the bottom', '0'], ['Tapped the button', '1']]);
+    assert.deepEqual(rows.slice(0, 10), [['Landed on the page', '4'], ['Saw the video', '2'], ['Did something on purpose (what Meta hears)', '1'], ['Stayed 20 seconds (not sent to Meta)', '0'], ['Saw the offer card', '2'], ['Scrolled a quarter of the way', '2'], ['Scrolled halfway', '1'], ['Scrolled three quarters', '0'], ['Scrolled to the bottom', '0'], ['Tapped the button', '1']]);
     assert.ok(!rows.some(([label]) => /first question|I want this|I don't want|reason|Skipped/i.test(label)), 'no question rows');
     const cards = await page.$$eval('#branches .card h2', hs => hs.map(h => h.textContent));
     assert.ok(cards.includes('How far down the page') && !cards.some(c => /first question|Why they did not|Could they answer/.test(c)), JSON.stringify(cards));
@@ -155,4 +155,103 @@ test('/funnel has an "Only ad clicks" switch that asks the server for just those
     await page.waitForFunction(() => document.getElementById('ad-only').getAttribute('aria-pressed') === 'false');
     assert.equal(seen[seen.length - 1], null);
   } finally { await browser.close(); }
+});
+
+async function dateDashboard(viewport = { width: 390, height: 844 }) {
+  const { wedgeFunnelRange } = require('../../wedge-funnel-range');
+  const clock = new Date('2026-10-15T14:12:00Z');
+  const events = [
+    { id: 'ad', name: 'OfferFrom', detail: 'ad', visitorId: 'v_one', createdAt: '2026-10-15T03:48:28Z' },
+    { id: 'arrival', name: 'OfferLanded', detail: 'phone', visitorId: 'v_one', createdAt: '2026-10-15T03:48:28Z' },
+    { id: 'ready', name: 'SimCheckoutRendered', detail: 'lifetime_trial', visitorId: 'v_one', createdAt: '2026-10-15T03:50:11.755Z' },
+    { id: 'new', name: 'OfferLanded', detail: 'phone', visitorId: 'v_two', createdAt: '2026-10-15T13:00:00Z' },
+  ];
+  const { onlyAdClicks } = require('../../wedge-funnel');
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport, timezoneId: 'Asia/Tokyo' });
+  const seen = [];
+  await page.addInitScript(() => {
+    localStorage.setItem('marketelAdminToken', 'test');
+    // An existing seven-day preference must not bring yesterday into Today.
+    if (!localStorage.getItem('marketelWedgeFunnel')) localStorage.setItem('marketelWedgeFunnel', JSON.stringify({ days: '7', tool: 'claims' }));
+  });
+  await page.route('http://funnel.test/**', route => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/funnel/wedge') {
+      const query = Object.fromEntries(url.searchParams);
+      seen.push(query);
+      try {
+        const r = wedgeFunnelRange(query, clock);
+        let filtered = events.filter(e => new Date(e.createdAt) >= r.since && new Date(e.createdAt) <= r.until);
+        if (query.ad === '1') filtered = onlyAdClicks(filtered, events);
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+          wedges: [{ id: 'claims', product: 'Claims' }], tool: 'claims', period: r.period, timezone: r.timeZone,
+          from: r.since.toISOString(), to: r.until.toISOString(), countingSince: '2026-10-15T06:00:00Z',
+          adOnly: query.ad === '1', ...buildWedgeFunnel(filtered),
+        }) });
+      } catch (e) { return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: e.message }) }); }
+    }
+    if (url.pathname === '/funnel') return route.fulfill({ status: 200, contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')) });
+    return route.fulfill({ status: 404, body: '' });
+  });
+  await page.goto('http://funnel.test/funnel');
+  await page.waitForSelector('#tiles .tile');
+  return { browser, page, seen };
+}
+
+test('/funnel separates calendar Today from Yesterday and 24h, and displays Chicago dates even in a Tokyo browser', async () => {
+  const h = await dateDashboard();
+  try {
+    assert.equal(h.seen[0].period, 'today');
+    assert.equal(h.seen[0].timezone, 'America/Chicago');
+    assert.match(await h.page.textContent('#range-summary'), /Oct 15, 2026.*12:00:00 AM.*America\/Chicago/);
+    assert.match(await h.page.textContent('#since-note'), /does not shorten your selected range/);
+    const ready = () => h.page.locator('#tiles .tile').filter({ has: h.page.locator('small', { hasText: /^Payment form ready$/ }) });
+    assert.equal(await ready().locator('strong').textContent(), '0');
+    await h.page.click('[data-period="yesterday"]');
+    await h.page.waitForFunction(() => document.getElementById('range-summary').textContent.includes('Oct 14, 2026'));
+    assert.equal(await ready().locator('strong').textContent(), '1');
+    assert.match(await ready().locator('.last-event').textContent(), /Oct 14, 2026.*10:50:11 PM/);
+    assert.match(await h.page.locator('#feed time').first().textContent(), /Oct 14, 2026.*10:50:11 PM/);
+    await h.page.click('[data-period="24h"]');
+    await h.page.waitForFunction(() => document.querySelector('[data-period="24h"]').getAttribute('aria-pressed') === 'true');
+    assert.equal(h.seen.at(-1).period, '24h');
+    assert.equal(await ready().locator('strong').textContent(), '1');
+    assert.equal(await h.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'phone dashboard does not overflow horizontally');
+  } finally { await h.browser.close(); }
+});
+
+test('/funnel applies custom times, persists them, changes timezone, and reports invalid DST times without stale totals', async () => {
+  const h = await dateDashboard({ width: 1280, height: 1000 });
+  try {
+    await h.page.click('[data-period="custom"]');
+    await h.page.fill('#range-from', '2026-10-14T22:45');
+    await h.page.fill('#range-to', '2026-10-14T22:55');
+    await h.page.click('#apply-range');
+    await h.page.waitForFunction(() => document.getElementById('range-summary').textContent.includes('10:45:00 PM'));
+    assert.equal(h.seen.at(-1).from, '2026-10-14T22:45');
+    assert.equal(h.seen.at(-1).to, '2026-10-14T22:55');
+    assert.match(await h.page.textContent('#range-summary'), /10:55:59 PM/);
+    await h.page.reload();
+    await h.page.waitForSelector('#tiles .tile');
+    assert.equal(await h.page.inputValue('#range-from'), '2026-10-14T22:45');
+    assert.equal(await h.page.getAttribute('[data-period="custom"]', 'aria-pressed'), 'true');
+    await h.page.selectOption('#timezone', 'UTC');
+    await h.page.waitForFunction(() => document.getElementById('range-summary').textContent.endsWith('All sources') && document.getElementById('range-summary').textContent.includes('· UTC ·'));
+    assert.equal(h.seen.at(-1).timezone, 'UTC');
+    await h.page.selectOption('#timezone', 'America/Chicago');
+    await h.page.waitForFunction(() => document.getElementById('range-summary').textContent.includes('· America/Chicago ·'));
+    await h.page.fill('#range-from', '2026-03-08T02:30');
+    await h.page.fill('#range-to', '2026-03-08T04:00');
+    await h.page.click('#apply-range');
+    await h.page.waitForSelector('#range-error', { state: 'visible' });
+    assert.match(await h.page.textContent('#range-error'), /daylight saving/);
+    assert.equal(await h.page.locator('#tiles .tile').count(), 0, 'an API range error cannot leave stale totals under the new selection');
+    await h.page.fill('#range-from', '2026-10-16T09:00');
+    await h.page.fill('#range-to', '2026-10-15T09:00');
+    const before = h.seen.length;
+    await h.page.click('#apply-range');
+    assert.match(await h.page.textContent('#range-error'), /start at or before the end/);
+    assert.equal(h.seen.length, before, 'inverted ranges never hit the server');
+  } finally { await h.browser.close(); }
 });

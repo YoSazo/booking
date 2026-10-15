@@ -29,15 +29,28 @@
   h1 { margin: 0; font-size: 22px; letter-spacing: -.3px; }
   h1 small { color: var(--muted); font-weight: 500; }
   .spacer { flex: 1 1 auto; }
-  select, button { font: inherit; }
-  select { padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
-  .range { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  select, button, input { font: inherit; }
+  select, input { min-width: 0; max-width: 100%; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  .range { display: inline-flex; flex-wrap: wrap; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
   .range button { border: 0; background: transparent; color: var(--soft); padding: 6px 11px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
   .range button[aria-pressed="true"] { background: var(--green); color: #fff; }
   .quiet { border: 0; background: transparent; color: var(--green); font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; text-decoration: none; font-size: 13px; }
   .quiet:hover { background: var(--subtle); }
   .quiet.danger { color: var(--danger); }
   .updated { color: var(--muted); font-size: 12px; }
+  .date-controls { margin-bottom: 14px; }
+  .date-controls label { display: flex; flex-direction: column; gap: 4px; color: var(--soft); font-size: 13px; }
+  .date-controls input, .date-controls select { font-size: 16px; }
+  .date-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+  .date-fields label { flex: 1 1 200px; min-width: 0; }
+  #custom-range { margin-top: 12px; }
+  #custom-range[hidden] { display: none; }
+  #apply-range { padding: 9px 16px; border: 0; border-radius: 10px; background: var(--green); color: #fff; font-weight: 600; cursor: pointer; }
+  #range-summary { margin: 12px 0 4px; font-size: 14px; font-weight: 600; }
+  #range-error { margin: 6px 0 0; }
+  .date-help { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .when time { display: block; color: var(--soft); }
+  .when small { display: block; }
   .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
   .tile, .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); }
   .tile { padding: 14px 16px; }
@@ -73,7 +86,7 @@
   .branches li b { color: var(--text); font-variant-numeric: tabular-nums; }
   .feed { width: 100%; border-collapse: collapse; font-size: 13px; }
   .feed td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border-soft); vertical-align: top; }
-  .feed td.when { color: var(--muted); white-space: nowrap; width: 90px; }
+  .feed td.when { color: var(--muted); white-space: normal; width: 145px; }
   .feed td.who { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; width: 70px; }
   .feed td.detail { color: var(--muted); }
   .empty { color: var(--muted); padding: 18px 0; text-align: center; }
@@ -91,6 +104,13 @@
     .branches { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ladder td.bar { display: none; } .ladder th:nth-child(2) { display: none; }
   }
+  @media (max-width: 520px) {
+    .feed { table-layout: fixed; }
+    .feed td { overflow-wrap: anywhere; }
+    .feed td.when { width: 115px; }
+    .feed td.detail { display: none; }
+    .feed td.who { width: 52px; }
+  }
 </style>
 </head>
 <body>
@@ -100,10 +120,14 @@
     <select id="wedge" aria-label="Wedge"></select>
     <button type="button" class="filter-toggle" id="ad-only" aria-pressed="false">Only ad clicks</button>
     <div class="range" role="group" aria-label="Date range">
-      <button type="button" data-days="1">Today</button>
-      <button type="button" data-days="7">7 days</button>
-      <button type="button" data-days="30">30 days</button>
-      <button type="button" data-days="all">All time</button>
+      <button type="button" data-period="today">Today</button>
+      <button type="button" data-period="yesterday">Yesterday</button>
+      <button type="button" data-period="24h">Last 24 hours</button>
+      <button type="button" data-period="7d">7 days</button>
+      <button type="button" data-period="30d">30 days</button>
+      <button type="button" data-period="since-reset">Since latest change</button>
+      <button type="button" data-period="all">All time</button>
+      <button type="button" data-period="custom">Custom</button>
     </div>
     <span class="spacer"></span>
     <button type="button" class="count-toggle" id="track-toggle" aria-pressed="true"></button>
@@ -112,13 +136,30 @@
     <a class="quiet" href="/funnel/legacy">Bookings &amp; support →</a>
   </header>
 
+  <section class="card date-controls" aria-label="Reporting time range">
+    <div class="date-fields"><label>Reporting timezone<select id="timezone">
+      <option value="America/Chicago">Chicago — Central time</option>
+      <option value="America/New_York">New York — Eastern time</option>
+      <option value="America/Los_Angeles">Los Angeles — Pacific time</option>
+      <option value="UTC">UTC</option>
+    </select></label></div>
+    <form id="custom-range" class="date-fields" hidden>
+      <label>From<input type="datetime-local" id="range-from" required></label>
+      <label>Through<input type="datetime-local" id="range-to" required></label>
+      <button type="submit" id="apply-range">Apply range</button>
+    </form>
+    <p id="range-summary" aria-live="polite">Loading reporting range…</p>
+    <p id="range-error" class="error" role="alert" hidden></p>
+    <p class="date-help">Today and Yesterday are calendar days in the selected timezone. Custom ranges include the entire end minute. Counts are activity within this range, not a cohort's eventual conversion.</p>
+    <p class="date-help" id="range-warning" hidden></p>
+  </section>
   <p class="track-note" id="track-note"></p>
   <p class="track-note" id="since-note" hidden></p>
-  <p class="track-note" id="ad-note" hidden>Showing only people who arrived with Meta's click id, and everything they did. Visits from before the source was recorded are left out, so this starts near zero.</p>
+  <p class="track-note" id="ad-note" hidden>Only visitors with a recorded Meta click id. Their activity must occur inside the selected range; the ad click may have happened earlier. This is not a campaign-specific filter.</p>
   <section class="tiles" id="tiles" aria-live="polite"></section>
 
   <section class="card">
-    <h2>From the ad to paying</h2>
+    <h2>From arrival to paying</h2>
     <p class="muted">People at each step. "Of the step before" is the share who went on from the previous row on the main line; rows marked <em>of landed</em> run beside the line (someone can answer without staying twenty seconds), so they are measured against everyone who landed, and the indented rows are the answers to the question above them. Hover a row for details.</p>
     <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>Of the step before</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
   </section>
@@ -132,7 +173,7 @@
 
   <section class="card">
     <h2>Latest activity</h2>
-    <p class="muted">Newest first. Visitors are an anonymous id until they sign in; owner and App Review accounts are left out.</p>
+    <p class="muted">Newest first, with exact dates and times in the reporting timezone. Visitors are an anonymous id until they sign in; owner and App Review accounts are left out.</p>
     <table class="feed" id="feed"><tbody></tbody></table>
     <button type="button" class="quiet" id="feed-more" hidden>Show more</button>
   </section>
@@ -150,10 +191,34 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
 let adminToken = '';
 try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
-let state = { tool: '', days: '7', everything: false, adOnly: false };
+let state = { version: 2, tool: '', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false };
 let feedAll = false, lastData = null;
-try { Object.assign(state, JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}')); } catch (_) {}
+try {
+  const saved = JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}');
+  // Retain source/wedge preferences, but migrate the old misleading rolling
+  // "Today" and seven-day default to a genuine calendar Today.
+  if (saved.version === 2) Object.assign(state, saved);
+  else Object.assign(state, { tool: saved.tool || '', adOnly: !!saved.adOnly });
+} catch (_) {}
+if (!['today','yesterday','24h','7d','30d','all','since-reset','custom'].includes(state.period)) state.period = 'today';
+try { new Intl.DateTimeFormat('en-US', { timeZone: state.timezone }); } catch (_) { state.timezone = 'America/Chicago'; }
 const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
+const zoned = (iso, options = {}) => new Date(iso).toLocaleString('en-US', { timeZone: state.timezone,
+  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', ...options });
+function inputTime(iso) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: state.timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso)).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}
+function paintRangeControls() {
+  if (!Array.from($('timezone').options).some(o => o.value === state.timezone)) $('timezone').add(new Option(state.timezone, state.timezone));
+  $('timezone').value = state.timezone;
+  $('custom-range').hidden = state.period !== 'custom';
+  $('range-from').value = state.from;
+  $('range-to').value = state.to;
+  document.querySelectorAll('.range button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.period === state.period)));
+}
 
 // Same token as the old dashboard, asked for once and kept.
 async function adminFetch(url, options = {}, retry = true) {
@@ -187,23 +252,24 @@ function render(data) {
   $('wedge').innerHTML = (data.wedges || []).map(w => `<option value="${esc(w.id)}"${w.id === data.tool ? ' selected' : ''}>${esc(w.product)}</option>`).join('');
   $('wedge').hidden = (data.wedges || []).length < 2;
   $('wedge-name').textContent = data.tool ? `· Marketel ${(data.wedges.find(w => w.id === data.tool) || {}).product || data.tool}` : '· no live wedges';
-  document.querySelectorAll('.range button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.days === state.days)));
+  paintRangeControls();
   $('ad-only').setAttribute('aria-pressed', String(!!state.adOnly));
   $('ad-only').textContent = state.adOnly ? '✓ Only ad clicks' : 'Only ad clicks';
   if (!data.tool) { $('tiles').innerHTML = ''; return; }
-  const since = data.countingSince ? new Date(data.countingSince).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  if (data.from && data.to) $('range-summary').textContent = `${zoned(data.from)} → ${zoned(data.to)} · ${state.timezone} · ${data.adOnly ? 'Ad-attributed visitors' : 'All sources'}`;
+  $('range-warning').hidden = !data.truncated;
+  $('range-warning').textContent = data.truncated ? 'This range exceeds 20,000 events. Only the newest 20,000 are counted; choose a shorter range for complete totals.' : '';
+  const since = data.countingSince ? zoned(data.countingSince) : '';
   $('since-note').hidden = !since;
   $('ad-note').hidden = !data.adOnly;
-  $('since-note').innerHTML = since ? (data.everything
-    ? `Showing everything, including before the reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Count from the reset</button>`
-    : `Counting from your reset on ${esc(since)}. <button type="button" class="quiet" id="since-toggle">Show everything</button>`) : '';
-  if ($('since-toggle')) $('since-toggle').onclick = () => { state.everything = !state.everything; saveState(); load(); };
+  $('since-note').innerHTML = since ? `Latest change marker: ${esc(since)} · ${esc(state.timezone)}. ${state.period === 'since-reset' ? 'Counting since this marker.' : 'It does not shorten your selected range.'} <button type="button" class="quiet" id="since-toggle">${state.period === 'since-reset' ? 'Show today' : 'Count since latest change'}</button>` : '';
+  if ($('since-toggle')) $('since-toggle').onclick = () => { state.period = state.period === 'since-reset' ? 'today' : 'since-reset'; saveState(); load(); };
   const rows = data.steps.flatMap(s => [s, ...(s.children || [])]);
   const step = key => rows.find(s => s.key === key) || { people: 0, ofLanded: null };
   const tiles = [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Did something on purpose', 'engaged'], ['Stayed 20s', 'stayed'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Scrolled halfway', 'scroll50'], ['Tapped the button', 'tapped'], ['Stripe session', 'stripe'], ['Payment form ready', 'checkout-ready'], ['Paid once or trial', 'trial'], ['Paid', 'paid']].filter(([, key]) => rows.some(row => row.key === key));
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
     const s = step(key);
-    return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : 'people from the ad'}</span></div>`;
+    return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : data.adOnly ? 'ad-attributed visitors' : 'visitors from all sources'}</span>${s.lastAt ? `<small class="last-event">Last: ${esc(zoned(s.lastAt))}</small>` : ''}</div>`;
   }).join('');
   // The biggest drop between two steps, once there are enough people to mean something.
   let worst = null;
@@ -224,7 +290,7 @@ function render(data) {
       <td class="muted">${pct(c.ofLanded)}</td></tr>`).join('')}`).join('');
   $('ladder').querySelectorAll('tbody tr[data-i]').forEach(row => {
     const s = data.steps[Number(row.dataset.i)], prev = data.steps[Number(row.dataset.i) - 1];
-    row.onmousemove = e => tip(e, `<b>${esc(s.label)}</b><br>${s.people} ${s.people === 1 ? 'person' : 'people'}${prev ? `<br>${pct(s.ofPrevious)} of the ${prev.people} who ${esc(prev.label.toLowerCase())}` : ''}<br>${pct(s.ofLanded)} of everyone who landed`);
+    row.onmousemove = e => tip(e, `<b>${esc(s.label)}</b><br>${s.people} ${s.people === 1 ? 'person' : 'people'}${prev ? `<br>${pct(s.ofPrevious)} of the ${prev.people} who ${esc(prev.label.toLowerCase())}` : ''}<br>${pct(s.ofLanded)} of everyone who landed${s.lastAt ? `<br>Last: ${esc(zoned(s.lastAt))}` : ''}`);
     row.onmouseleave = () => $('tip').classList.remove('on');
   });
   const split = data.split || {};
@@ -235,9 +301,9 @@ function render(data) {
   const shown = feedAll ? data.recent : data.recent.slice(0, 25);
   $('feed-more').hidden = feedAll || data.recent.length <= 25;
   $('feed').querySelector('tbody').innerHTML = shown.length
-    ? shown.map(e => `<tr><td class="when" title="${esc(new Date(e.at).toLocaleString())}">${esc(ago(e.at))}</td><td>${esc(e.label)}</td><td class="detail">${esc(e.detail || '')}</td><td class="who">${esc(e.who)}</td></tr>`).join('')
+    ? shown.map(e => `<tr><td class="when" title="${esc(e.at)}"><time datetime="${esc(e.at)}">${esc(zoned(e.at))}</time><small>${esc(ago(e.at))}</small></td><td>${esc(e.label)}</td><td class="detail">${esc(e.detail || '')}</td><td class="who">${esc(e.who)}</td></tr>`).join('')
     : '<tr><td class="empty" colspan="4">Nothing in this range yet.</td></tr>';
-  $('updated').textContent = `Updated ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  $('updated').textContent = `Updated ${zoned(new Date())} · ${state.timezone}`;
 }
 
 function tip(event, html) {
@@ -247,16 +313,29 @@ function tip(event, html) {
   t.style.left = `${x}px`; t.style.top = `${y}px`;
 }
 
+let loadVersion = 0;
 async function load() {
+  const version = ++loadVersion;
+  paintRangeControls();
+  $('range-error').hidden = true;
   try {
-    const params = new URLSearchParams({ days: state.days, ...(state.everything ? { everything: '1' } : {}), ...(state.adOnly ? { ad: '1' } : {}) });
+    const params = new URLSearchParams({ period: state.period, timezone: state.timezone, ...(state.adOnly ? { ad: '1' } : {}) });
+    if (state.period === 'custom') { params.set('from', state.from); params.set('to', state.to); }
     if (state.tool) params.set('tool', state.tool);
     const data = await adminFetch(`/api/funnel/wedge?${params}`);
+    if (version !== loadVersion) return;
     if (data.tool && data.tool !== state.tool) { state.tool = data.tool; saveState(); }
     lastData = data;
     render(data);
   } catch (error) {
-    $('tiles').innerHTML = `<div class="tile error">${esc(error.message)}</div>`;
+    if (version !== loadVersion) return;
+    $('range-error').textContent = error.message;
+    $('range-error').hidden = false;
+    $('range-summary').textContent = 'Could not load this range. Displayed totals have been cleared.';
+    $('tiles').innerHTML = ''; $('ladder').querySelector('tbody').innerHTML = '';
+    $('branches').innerHTML = ''; $('split').innerHTML = ''; $('feed').querySelector('tbody').innerHTML = '';
+    $('feed-more').hidden = true; $('since-note').hidden = true; $('range-warning').hidden = true;
+    lastData = null;
   }
 }
 
@@ -277,7 +356,24 @@ function paintTrack() {
 if (trackState() === null) setTrack('1');
 paintTrack();
 $('track-toggle').onclick = () => setTrack(trackState() === '1' ? '0' : '1');
-document.querySelectorAll('.range button').forEach(button => button.onclick = () => { state.days = button.dataset.days; saveState(); load(); });
+document.querySelectorAll('.range button').forEach(button => button.onclick = () => {
+  state.period = button.dataset.period; feedAll = false;
+  if (state.period === 'custom') {
+    ++loadVersion;
+    state.from = state.from || inputTime(lastData?.from || new Date(Date.now() - 86400000));
+    state.to = state.to || inputTime(new Date());
+    paintRangeControls(); $('range-from').focus(); return;
+  }
+  saveState(); load();
+});
+$('timezone').onchange = () => { state.timezone = $('timezone').value; saveState(); load(); };
+$('custom-range').onsubmit = event => {
+  event.preventDefault(); state.from = $('range-from').value; state.to = $('range-to').value;
+  if (!state.from || !state.to || state.from > state.to) {
+    $('range-error').textContent = 'Choose a start at or before the end.'; $('range-error').hidden = false; return;
+  }
+  state.period = 'custom'; feedAll = false; saveState(); load();
+};
 $('ad-only').onclick = () => { state.adOnly = !state.adOnly; saveState(); load(); };
 $('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load(); };
 $('refresh').onclick = load;
@@ -292,7 +388,7 @@ $('reset').onclick = async () => {
   } catch (error) { window.alert(error.message); }
 };
 load();
-setInterval(() => { if (document.visibilityState === 'visible') load(); }, 60000);
+setInterval(() => { if (document.visibilityState === 'visible' && !$('custom-range').contains(document.activeElement)) load(); }, 60000);
 </script>
 </body>
 </html>

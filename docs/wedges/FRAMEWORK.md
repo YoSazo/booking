@@ -364,6 +364,19 @@ browser off ("Not counting this browser"): it sends no steps, every request is
 marked `x-marketel-no-track`, and the server records nothing and tells Meta
 nothing for it. `?notrack=1` on any page does the same for in-app browsers.
 
+Date ranges are explicit: Today/Yesterday are calendar days in the selected
+IANA reporting timezone (Chicago by default), not rolling 24-hour windows.
+Last 24 hours is a separate preset; 7/30 days include today. Custom From/Through
+fields include the end minute. The API's `period` and `timezone` parameters
+use `wedge-funnel-range.js`; exact offset-bearing timestamps also work. Only
+"Since latest change" clips a new dashboard request to the reset marker.
+Activity and step tiles show exact local timestamps; all counts are activity
+within the selected window, not a cohort's eventual conversion. An earlier
+recorded Meta click can attribute current activity without importing its older
+events. Large ranges warn if the newest 20,000-event limit truncates totals.
+Changing these admin reporting controls never resets/deletes visitor history
+or changes the customer landing, payment flow, or Meta campaign settings.
+
 **Where a visit came from.** Each landing records `OfferFrom` (`ad` when Meta's
 click id `fbclid` is on the link, `social` from Facebook or Instagram without one,
 `direct` with no referrer: typed, a QR code, a bookmark or the owner's own

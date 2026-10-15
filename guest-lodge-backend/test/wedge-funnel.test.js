@@ -61,6 +61,23 @@ test('an empty range reads as zeros, never a division by zero', () => {
   assert.deepEqual(f.recent, []);
 });
 
+test('each step exposes its latest timestamp, so yesterday\'s checkout is not mistaken for today', () => {
+  const f = buildWedgeFunnel([ev('OfferLanded', 'v_a'),
+    ev('SimCheckoutRendered', 'v_a', { createdAt: '2026-10-15T03:50:11.755Z' }),
+    ev('SimCheckoutRendered', 'v_b', { createdAt: '2026-10-14T22:00:00.000Z' })]);
+  assert.equal(f.steps.find(s => s.key === 'checkout-ready').lastAt, '2026-10-15T03:50:11.755Z');
+  assert.equal(f.steps.find(s => s.key === 'paid').lastAt, null);
+});
+
+test('an earlier ad attribution keeps today\'s activity, without importing earlier events', () => {
+  const sources = [ev('OfferFrom', 'v_ad', { detail: 'ad' }), ev('OfferFrom', 'v_direct', { detail: 'direct' })];
+  const today = [ev('SimCheckoutRendered', 'v_ad'), ev('SimCheckoutRendered', 'v_direct')];
+  const filtered = onlyAdClicks(today, sources);
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].visitorId, 'v_ad');
+  assert.equal(filtered.some(e => e.name === 'OfferFrom'), false);
+});
+
 test('a reset can only clear visitor steps, never the server records that prevent doing things twice', () => {
   for (const kept of ['TrialStarted', 'FirstPayment', 'PaymentSucceeded', 'TrialReminderSent', 'KeptFree', 'AccountVerified', 'ReportFinalized', 'SimCheckoutStarted', 'SimPurchased'])
     assert.ok(!VISITOR_EVENTS.includes(kept), `${kept} must never be reset`);

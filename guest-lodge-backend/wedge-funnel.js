@@ -5,7 +5,7 @@
 // share between two steps reads "of those who reached the step before".
 
 const STEPS = Object.freeze([
-  { key: 'landed', label: 'Landed from the ad', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
+  { key: 'landed', label: 'Landed on the page', names: ['OfferLanded', 'SimStarted', 'LandingViewed:!app'] },
   // `aside` rows are parallel to the main line, not in it: a visitor can answer
   // in five seconds without ever staying twenty, and an older version of the
   // page never recorded them. They are measured against everyone who landed.
@@ -116,7 +116,9 @@ function buildWedgeFunnel(events) {
   let previous = null;
   const steps = STEPS.map(step => {
     const count = people(events, step.names);
+    const latest = events.filter(event => matches(event, step.names)).reduce((last, event) => Math.max(last, new Date(event.createdAt).getTime()), 0);
     const row = { key: step.key, label: step.label, people: count,
+      lastAt: latest ? new Date(latest).toISOString() : null,
       ofPrevious: previous === null ? null : previous ? count / previous : null,
       ofLanded: landed ? count / landed : null };
     if (step.hideWhenEmpty) row.hideWhenEmpty = true;
@@ -174,8 +176,8 @@ async function countingSince(prisma, tool) {
 
 // Only the people who arrived with Meta's click id, with everything they did (a payment record
 // carries the visitor id too). Visits from before the source was recorded are left out.
-function onlyAdClicks(events) {
-  const ads = new Set(events.filter(event => event.name === 'OfferFrom' && event.detail === 'ad' && event.visitorId).map(event => event.visitorId));
+function onlyAdClicks(events, sources = events) {
+  const ads = new Set(sources.filter(event => event.name === 'OfferFrom' && event.detail === 'ad' && event.visitorId).map(event => event.visitorId));
   return events.filter(event => event.visitorId && ads.has(event.visitorId));
 }
 
