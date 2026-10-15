@@ -13,9 +13,9 @@ native purchases retain their current offers.
    `npm start` already does this; a hosting override of `node server.js` does
    not. Apply migration `20261014190000_claims_paid_trial`. Do not launch this
    server with an old schema. No existing customer rows are rewritten.
-3. In the actual LIVE Inspect billing account, verify the public terms URL is
-   configured in Stripe's public business settings. The session requires a
-   terms checkbox and explicitly links `https://bookmarketel.com/claims/terms`.
+3. The session has no terms checkbox; paying authorizes the $48. It shows
+   “$1 today. $48 one-time after 3 days unless canceled.” on the item and
+   above the pay button, and links `https://bookmarketel.com/claims/terms`.
 4. Verify the existing `/api/inspect-stripe-webhook` endpoint receives
    `checkout.session.completed`, `payment_intent.succeeded`, `charge.refunded`
    and `charge.dispute.created` (or all events). Keep its existing subscription
@@ -35,7 +35,7 @@ native purchases retain their current offers.
 ## Rollout and checking
 
 - This branch does not publish itself. Push to main deploys the web product.
-- After deployment, check the $1/$48 disclosure, terms checkbox, verified
+- After deployment, check the $1/$48 disclosure above the pay button (no checkbox), verified
   return date, cancellation link, and account cancellation on an actual phone.
   QA URLs use `?notrack=1`; do not manufacture ad conversions.
 - Insert a `FunnelReset` marker using the DATABASE clock after the live version

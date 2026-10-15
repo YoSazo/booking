@@ -1082,7 +1082,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     const carried = Object.fromEntries(Object.entries({ fbp: click.fbp, fbc: click.fbc, src: click.sourceUrl, ip: click.ipAddress, ua: click.userAgent,
       campaign: click.utmCampaign, content: click.utmContent }).filter(([, value]) => value).map(([key, value]) => [`ad_${key}`, String(value).slice(0, 500)]));
     const metadata = { product: 'marketel-inspect', sim: '1', plan: paidTrial ? 'lifetime_trial' : 'lifetime', tool, visitorId: visitor || '', ...carried,
-      ...(paidTrial ? { trialVersion: CLAIMS_TRIAL.version, noTrack: ownerBrowser(req) || automatedBrowser(req) ? '1' : '0' } : {}) };
+      ...(paidTrial ? { trialVersion: CLAIMS_TRIAL.version, authorization: CLAIMS_TRIAL.authorization, noTrack: ownerBrowser(req) || automatedBrowser(req) ? '1' : '0' } : {}) };
     const publishableKey = inspectPublishableKey(env);
     const embedded = tool === 'claims' && !fromAppOrigin(req) && req.body?.embedded === true && !!publishableKey;
     const session = await stripe.checkout.sessions.create({
@@ -1098,15 +1098,13 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
-      ...(paidTrial ? { consent_collection: { terms_of_service: 'required' } } : {}),
-      custom_text: paidTrial ? { submit: { message: '$1 charged today. By paying, you authorize a further $48 charge 3 days after payment unless you cancel. $49 total for lifetime access. No subscription. Cancel from your account or the link we email you. Sending a report does not end the trial early.' },
-        terms_of_service_acceptance: { message: 'I agree to the [Claims trial terms](https://bookmarketel.com/claims/terms): $1 today, then $48 automatically after 3 days unless I cancel.' } }
+      custom_text: paidTrial ? { submit: { message: `${CLAIMS_TRIAL.disclosure} By paying, you authorize Marketel to charge this card $48 once, 3 days after payment, unless you cancel first. $49 total for lifetime access. No subscription. Cancel from your account or the link we email you. Sending a report does not end the trial early. [Trial terms](https://bookmarketel.com/claims/terms)` } }
         : { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
         product_data: { name: paidTrial ? 'Marketel Claims: 3-day paid trial' : `${TOOLS[tool].label}: unlimited reports, paid once`,
-          description: paidTrial ? '$1 now; remaining $48 automatically after 3 days unless cancelled. $49 total. No subscription.' : `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
+          description: paidTrial ? `${CLAIMS_TRIAL.disclosure} $49 total. No subscription.` : `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
       ...(email ? { customer_email: email } : {}),
-      metadata, payment_intent_data: { metadata, ...(paidTrial ? { setup_future_usage: 'off_session' } : {}) },
+      metadata, payment_intent_data: { metadata, ...(paidTrial ? { setup_future_usage: 'off_session', description: `Marketel Claims paid trial. ${CLAIMS_TRIAL.disclosure}` } : {}) },
       ...(!embedded ? {
         success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
         cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),

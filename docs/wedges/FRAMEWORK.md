@@ -229,9 +229,14 @@ cancelled: $49 total for lifetime access, not a recurring subscription.
 `offer.paidTrial` is the versioned contract. Existing pay-once buyers, cached
 $49 checkout requests, other wedges and native purchases keep their existing
 paths. No new Stripe Price IDs are needed. The initial payment saves the card
-with `setup_future_usage: off_session` and Stripe's required terms checkbox,
-explicitly linking `/claims/terms`. Configure a public terms URL in Stripe's
-business settings before launching.
+with `setup_future_usage: off_session`. There is no terms checkbox: paying is
+the authorization. Checkout puts “$1 today. $48 one-time after 3 days unless
+canceled.” in the item description and at the start of the text directly above
+the pay button, followed by the $48 authorization and a `/claims/terms` link.
+The server stamps `metadata.authorization` (`OFFER.authorization`) on the
+session, and only a session carrying it, or a pre-change session with an
+accepted terms checkbox, starts a trial. The ledger records `consentMethod`
+and the exact `consentTerms`.
 
 `claims-paid-trial.js` owns the server-only `InspectAccount.claimsPaidTrial`
 ledger. Its migration MUST run before the new server starts. A verified $1

@@ -2965,7 +2965,7 @@ const onceSession = (overrides = {}) => ({
 const sendWebhook = (h, object, type = 'checkout.session.completed') => request(h.app, '/api/inspect-stripe-webhook', { method: 'POST',
   headers: { 'Content-Type': 'application/json', 'stripe-signature': 't' }, body: JSON.stringify({ type, created: 1760000000, data: { object } }) });
 
-test('Claims paid trial checkout collects exactly $1, saves the card with consent, and never creates a subscription', async () => {
+test('Claims paid trial checkout collects exactly $1, saves the card with pay-button authorization, and never creates a subscription', async () => {
   const h = moneyHarness();
   const buy = patch => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime_trial', trialVersion: 'claims-1-48-v1', tool: 'claims', embedded: true, ...patch }) });
@@ -2979,11 +2979,18 @@ test('Claims paid trial checkout collects exactly $1, saves the card with consen
     assert.equal(p.mode, 'payment'); assert.equal(p.ui_mode, 'embedded');
     assert.equal(p.line_items[0].price_data.unit_amount, 100);
     assert.equal(p.payment_intent_data.setup_future_usage, 'off_session');
-    assert.deepEqual(p.consent_collection, { terms_of_service: 'required' });
+    // No terms checkbox: the disclosure sits on the item and opens the text
+    // directly above the pay button, so paying is the authorization.
+    assert.equal(p.consent_collection, undefined);
+    assert.equal(p.custom_text.terms_of_service_acceptance, undefined);
+    const disclosure = '$1 today. $48 one-time after 3 days unless canceled.';
+    assert.ok(p.custom_text.submit.message.startsWith(`${disclosure} By paying, you authorize Marketel to charge this card $48 once, 3 days after payment, unless you cancel first.`));
+    assert.match(p.custom_text.submit.message, /\[Trial terms\]\(https:\/\/bookmarketel\.com\/claims\/terms\)/);
+    assert.ok(p.line_items[0].price_data.product_data.description.startsWith(disclosure));
+    assert.ok(p.payment_intent_data.description.endsWith(disclosure));
     assert.equal(p.metadata.plan, 'lifetime_trial');
     assert.equal(p.metadata.trialVersion, 'claims-1-48-v1');
-    assert.match(p.custom_text.submit.message, /authorize a further \$48 charge 3 days after payment unless you cancel/);
-    assert.match(p.custom_text.terms_of_service_acceptance.message, /Claims trial terms/);
+    assert.equal(p.metadata.authorization, 'claims-1-48-pay-v1');
     assert.ok(!p.subscription_data);
     for (const patch of [{ tool: 'inspect' }, { tool: 'incident' }, { trialVersion: 'bad' }]) assert.equal((await buy(patch)).status, 400);
     assert.equal(h.calls.sessions.length, 1);
@@ -3003,8 +3010,8 @@ test('Claims paid trial is web-only; hosted recovery retains the same offer and 
 });
 
 test('trial webhook and return verification grant temporary access, and signed management GET cannot cancel', async () => {
-  const session = onceSession({ amount_total: 100, consent: { terms_of_service: 'accepted' },
-    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1' } });
+  const session = onceSession({ amount_total: 100,
+    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1', authorization: 'claims-1-48-pay-v1' } });
   const h = moneyHarness({ stripe: {
     paymentIntents: { retrieve: async () => ({ id: 'pi_once', status: 'succeeded', amount_received: 100, currency: 'usd', customer: 'cus_once', payment_method: 'pm_once', setup_future_usage: 'off_session', latest_charge: { refunded: false } }) },
     checkout: { sessions: { retrieve: async () => session } },
@@ -3309,8 +3316,8 @@ test('a ready pay-once form reaches Meta at its own price', () => atTime(DURING_
 }));
 
 test('a declined trial balance can be paid from the emailed link, and only the checkout session grants access', async () => {
-  const trial = onceSession({ amount_total: 100, consent: { terms_of_service: 'accepted' },
-    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1' } });
+  const trial = onceSession({ amount_total: 100,
+    metadata: { product: 'marketel-inspect', sim: '1', plan: 'lifetime_trial', tool: 'claims', trialVersion: 'claims-1-48-v1', authorization: 'claims-1-48-pay-v1' } });
   let recovery;
   const intents = { pi_once: { id: 'pi_once', status: 'succeeded', amount_received: 100, currency: 'usd', customer: 'cus_once', payment_method: 'pm_once', setup_future_usage: 'off_session', latest_charge: { refunded: false } } };
   const h = moneyHarness({ stripe: {

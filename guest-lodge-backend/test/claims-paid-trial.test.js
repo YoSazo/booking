@@ -16,8 +16,8 @@ function fixture(extra = {}) {
     payment_method: 'pm_trial', setup_future_usage: 'off_session', latest_charge: { refunded: false, disputed: false } };
   intents.set(initial.id, initial);
   const session = { id: 'cs_trial_123456', mode: 'payment', status: 'complete', payment_status: 'paid', amount_total: 100, currency: 'usd',
-    payment_intent: initial.id, customer: initial.customer, customer_details: { email: account.email }, consent: { terms_of_service: 'accepted' },
-    metadata: { product: 'marketel-inspect', plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version, visitorId: 'v_abcdefghijklm' } };
+    payment_intent: initial.id, customer: initial.customer, customer_details: { email: account.email }, consent: null,
+    metadata: { product: 'marketel-inspect', plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version, authorization: OFFER.authorization, visitorId: 'v_abcdefghijklm' } };
   let tail = Promise.resolve();
   const db = {
     inspectPaidTrialClaim: {
@@ -96,6 +96,8 @@ test('a verified $1 with explicit consent grants only three days, never lifetime
   await h.service.adopt(h.session);
   const ends = h.account.claimsPaidTrial.endsAt;
   assert.equal(Date.parse(ends) - h.clock().getTime(), 3 * DAY);
+  assert.equal(h.account.claimsPaidTrial.consentMethod, 'pay_button');
+  assert.match(h.account.claimsPaidTrial.consentTerms, /^\$1 today\. \$48 one-time after 3 days unless canceled\./);
   assert.equal(h.account.lifetimeSince, null);
   assert.equal(trialAccess(h.account, h.clock().getTime()), true);
   assert.equal(entitlement(h.account, h.clock().getTime()).interval, 'paid-trial');
@@ -112,9 +114,20 @@ test('a verified $1 with explicit consent grants only three days, never lifetime
   assert.doesNotMatch(JSON.stringify(summary), /pm_trial|cus_trial|pi_initial|sessionId|consentTerms/);
 });
 
+test('a checkout opened with the terms checkbox before the pay-button disclosure still starts its trial', async () => {
+  const h = fixture();
+  const { authorization, ...metadata } = h.session.metadata;
+  await h.service.adopt({ ...h.session, metadata, consent: { terms_of_service: 'accepted' } });
+  assert.equal(h.account.claimsPaidTrial.consentMethod, 'terms_checkbox');
+  assert.match(h.account.claimsPaidTrial.consentTerms, /\$48 automatically after 3 days/);
+});
+
 test('unpaid, wrong amount/currency/version/tool, missing consent and refunded initial charges grant nothing', async () => {
   for (const patch of [{ payment_status: 'unpaid' }, { amount_total: 1 }, { amount_total: 4900 }, { currency: 'eur' },
-    { mode: 'setup' }, { consent: null }, { consent: { terms_of_service: 'declined' } },
+    { mode: 'setup' },
+    { metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version } },
+    { metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version, authorization: 'forged' } },
+    { metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version }, consent: { terms_of_service: 'declined' } },
     { metadata: { plan: 'lifetime_trial', tool: 'incident', trialVersion: OFFER.version } },
     { metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: 'forged' } }]) {
     const h = fixture();
