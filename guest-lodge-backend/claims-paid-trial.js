@@ -2,8 +2,8 @@
 
 const crypto = require('crypto');
 const OFFER = Object.freeze({ version: 'claims-1-48-v1', upfront: 100, balance: 4800, days: 3, currency: 'usd',
-  // Paying is the authorization: Checkout shows the disclosure on the item and
-  // directly above the pay button, and the server stamps which disclosure it
+  // Paying is the authorization: Checkout shows the disclosure on the item,
+  // Stripe's line under the pay button allows the future payment, and the server stamps which disclosure it
   // built into the session's metadata, which the buyer cannot change.
   authorization: 'claims-1-48-pay-v1', disclosure: '$1 today. $48 one-time after 3 days unless canceled.' });
 const DAY = 86400000;

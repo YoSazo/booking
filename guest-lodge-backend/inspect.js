@@ -1098,8 +1098,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
-      custom_text: paidTrial ? { submit: { message: `${CLAIMS_TRIAL.disclosure} No subscription. [Trial terms](https://bookmarketel.com/claims/terms)` } }
-        : { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
+      ...(paidTrial ? {} : { custom_text: { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } } }),
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
         product_data: { name: paidTrial ? 'Marketel Claims: 3-day paid trial' : `${TOOLS[tool].label}: unlimited reports, paid once`,
           description: paidTrial ? `${CLAIMS_TRIAL.disclosure} $49 total. No subscription.` : `${atLaunch ? 'Launch price. ' : ''}No subscription. Nothing renews. 3-day money-back guarantee.` } } }],
