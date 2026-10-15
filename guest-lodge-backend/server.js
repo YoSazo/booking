@@ -18866,6 +18866,18 @@ require('./inspect').registerInspect(app, {
         normalizeExcludedEmail(email)
     ),
 });
+// Trace Anything: a consumer test sold once from a Meta ad. Same Stripe account
+// and Meta pixel as Inspect; its own page, events (tool "trace") and unlock.
+require('./trace').registerTrace(app, {
+    prisma,
+    mail: emailTransporter,
+    stripe: inspectStripe,
+    queueCapi: queueMarketelCAPI,
+    capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
+    isCapiExcludedEmail: (email) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(
+        normalizeExcludedEmail(email)
+    ),
+});
 telemetry.setupRoutes(app);
 
 function startServer() {
