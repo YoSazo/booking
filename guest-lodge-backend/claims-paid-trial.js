@@ -1,13 +1,20 @@
 'use strict';
 
 const crypto = require('crypto');
-const OFFER = Object.freeze({ version: 'claims-1-48-v1', upfront: 100, balance: 4800, days: 3, currency: 'usd' });
+const OFFER = Object.freeze({ version: 'claims-1-48-v1', upfront: 100, balance: 4800, days: 3, currency: 'usd',
+  // Paying is the authorization: Checkout shows the disclosure on the item and
+  // directly above the pay button, and the server stamps which disclosure it
+  // built into the session's metadata, which the buyer cannot change.
+  authorization: 'claims-1-48-pay-v1', disclosure: '$1 today. $48 one-time after 3 days unless canceled.' });
 const DAY = 86400000;
 const SUPPORT = 'support@bookmarketel.com';
 const error = (status, message) => Object.assign(new Error(message), { status });
 const idOf = object => typeof object === 'string' ? object : object?.id;
 const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const when = value => new Date(value).toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' UTC';
+// Sessions created before the pay-button disclosure carry Stripe's terms checkbox.
+const authorizedBy = session => session.metadata?.authorization === OFFER.authorization ? 'pay_button'
+  : session.consent?.terms_of_service === 'accepted' ? 'terms_checkbox' : null;
 const trialAccess = (account, now = Date.now()) => {
   const trial = account.claimsPaidTrial;
   return !!trial && trial.version === OFFER.version && ['active', 'cancelled'].includes(trial.status)
@@ -61,7 +68,7 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
     if (session?.mode !== 'payment' || session.metadata?.plan !== 'lifetime_trial' || session.metadata?.tool !== 'claims'
       || session.metadata?.trialVersion !== OFFER.version || session.payment_status !== 'paid' || session.status !== 'complete'
       || Number(session.amount_total) !== OFFER.upfront || session.currency !== OFFER.currency
-      || session.consent?.terms_of_service !== 'accepted') return null;
+      || !authorizedBy(session)) return null;
     const email = String(session.customer_details?.email || session.customer_email || '').trim().toLowerCase();
     if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
     const intent = await stripe.paymentIntents.retrieve(idOf(session.payment_intent), { expand: ['latest_charge'] });
@@ -87,7 +94,8 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
       const trial = { version: OFFER.version, status: 'active', sessionId: session.id,
         initialIntentId: intent.id, customerId: idOf(session.customer), paymentMethodId: idOf(intent.payment_method),
         startedAt: clock.toISOString(), endsAt: new Date(clock.getTime() + OFFER.days * DAY).toISOString(),
-        consentAt: clock.toISOString(), consentTerms: '$1 today; $48 automatically after 3 days unless cancelled; $49 total; no subscription.',
+        consentAt: clock.toISOString(), consentMethod: authorizedBy(session), consentTerms: authorizedBy(session) === 'pay_button'
+          ? `${OFFER.disclosure} $49 total; no subscription.` : '$1 today; $48 automatically after 3 days unless cancelled; $49 total; no subscription.',
         visitorId: /^v_[A-Za-z0-9]{8,40}$/.test(session.metadata.visitorId || '') ? session.metadata.visitorId : null,
         noTrack: session.metadata.noTrack === '1', source: session.metadata.source || 'web' };
       await tx.inspectPaidTrialClaim.create({ data: { emailHash, sessionId: session.id } });

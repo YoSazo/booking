@@ -49,7 +49,7 @@ async function main() {
       // tested Checkout consent contract to a real captured/saved card.
       await service.adopt({ id: `cs_qa_${runId}`, mode: 'payment', status: 'complete', payment_status: 'paid', amount_total: 100,
         currency: 'usd', customer: customer.id, payment_intent: initial.id, customer_details: { email: account.email },
-        consent: { terms_of_service: 'accepted' }, metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version } });
+        metadata: { plan: 'lifetime_trial', tool: 'claims', trialVersion: OFFER.version, authorization: OFFER.authorization } });
       assert.equal(account.claimsPaidTrial.status, 'active');
       assert.equal(account.lifetimeSince, null);
       await service.sweep();
