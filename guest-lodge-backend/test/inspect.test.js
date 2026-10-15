@@ -2985,7 +2985,6 @@ test('Claims paid trial checkout collects exactly $1, saves the card with pay-bu
     // Said once, on the item. Stripe's own line under the button says paying
     // allows the future payment, and the page box says how to cancel.
     assert.equal(p.custom_text, undefined);
-    assert.match(p.custom_text.submit.message, /\[Trial terms\]\(https:\/\/bookmarketel\.com\/claims\/terms\)/);
     assert.ok(p.line_items[0].price_data.product_data.description.startsWith(disclosure));
     assert.ok(p.payment_intent_data.description.endsWith(disclosure));
     assert.equal(p.metadata.plan, 'lifetime_trial');
