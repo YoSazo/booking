@@ -1025,3 +1025,6 @@ html.pick-open, html.pick-open body { overflow: hidden; overscroll-behavior: non
 .checkout-refund .cancel-help { margin: 10px 0 0; }
 
 .checkout-promise .cancel-help-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 700; }
+
+.sim-thanks .paid-trial-where { margin: 10px 0 6px; font-size: 14px; line-height: 1.45; }
+.sim-thanks #paid-trial-manage { display: block; padding: 13px 14px; border: 1.5px solid var(--green); border-radius: 12px; color: var(--green-dark); font-weight: 700; text-align: center; text-decoration: none; }

@@ -462,3 +462,40 @@ test('refunding a recovery payment revokes only the access it granted', async ()
   assert.equal(h.account.lifetimeSince, null);
   assert.equal(h.account.claimsPaidTrial.status, 'refunded');
 });
+
+const welcomes = h => h.calls.mail.filter(m => m.subject.includes('has started'));
+const flush = () => new Promise(resolve => setTimeout(resolve, 20));
+test('the welcome email with the cancel link goes out the moment the $1 clears, once, even if the sweep runs at the same time', async () => {
+  const h = fixture();
+  await h.service.adopt(h.session);
+  await Promise.all([h.service.sweep(), h.service.sweep(), flush()]);
+  assert.equal(welcomes(h).length, 1);
+  assert.match(welcomes(h)[0].text, /Manage or cancel your trial: https:\/\/bookmarketel\.com\/api\/inspect\/claims-trial\/manage\?account=/);
+  assert.equal(welcomes(h)[0].to, 'buyer@example.test');
+  await h.service.sweep(); await h.service.sendWelcome(h.account.id);
+  assert.equal(welcomes(h).length, 1, 'never twice');
+  assert.ok(h.account.claimsPaidTrial.welcomeSentAt);
+});
+
+test('a failed welcome send is retried by the sweep, and a crashed claim is retaken after two minutes', async () => {
+  const h = fixture();
+  let failing = true;
+  const sendMail = h.options.mail.sendMail;
+  h.options.mail.sendMail = async m => { if (failing) throw new Error('smtp down'); return sendMail(m); };
+  await h.service.adopt(h.session); await flush();
+  assert.equal(welcomes(h).length, 0);
+  assert.equal(h.account.claimsPaidTrial.welcomeClaimedAt, null, 'the claim is released when the send fails');
+  failing = false;
+  await h.service.sweep();
+  assert.equal(welcomes(h).length, 1);
+  const crashed = fixture();
+  await crashed.service.adopt(crashed.session); await flush();
+  crashed.account.claimsPaidTrial.welcomeSentAt = undefined;
+  crashed.account.claimsPaidTrial.welcomeClaimedAt = crashed.clock().toISOString();
+  const before = welcomes(crashed).length;
+  await crashed.service.sendWelcome(crashed.account.id);
+  assert.equal(welcomes(crashed).length, before, 'a fresh claim belongs to whoever holds it');
+  crashed.advance(3 * 60000);
+  await crashed.service.sendWelcome(crashed.account.id);
+  assert.equal(welcomes(crashed).length, before + 1);
+});

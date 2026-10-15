@@ -98,6 +98,7 @@ for (const width of [320, 375, 390, 414, 1280]) {
       assert.equal(await h.page.locator('.checkout-refund .cancel-help').evaluate(el => el.open), true);
       assert.match(await h.page.textContent('.checkout-refund .cancel-help'), /If you do nothing, the \$48 is charged on \w{3}, \w{3} \d{1,2}/);
       assert.equal(h.page.url().includes('#payment'), true, 'opening the help does not leave the payment step');
+      assert.match(await h.page.textContent('.embedded-payment-note'), /If a card is declined, nothing is charged\. We email your cancel link to the address you enter/);
       assert.match(await h.page.textContent('.checkout-promise'), /\$49 total.*No subscription/);
       assert.match(await h.page.textContent('.checkout-refund'), /Cancelling stops the \$48, not the \$1/);
       const layout = await h.page.evaluate(() => ({ width: window.innerWidth, content: document.documentElement.scrollWidth,

@@ -113,6 +113,8 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
       { fbp: m.ad_fbp, fbc: m.ad_fbc, sourceUrl: m.ad_src, utmCampaign: m.ad_campaign, utmContent: m.ad_content },
       { ip: m.ad_ip, headers: { 'user-agent': m.ad_ua } });
     outcome.account = await recordStarted(outcome.account, req);
+    // Do not hold the buyer's thank-you page for the mail server.
+    sendWelcome(outcome.account.id).catch(e => console.error('Claims welcome email failed:', e.code || e.name));
     return outcome;
   }
 
@@ -249,6 +251,33 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
     return complete(pi);
   }
 
+  // The welcome email carries the cancel link, so it goes out the moment the $1
+  // clears (adopt) and again from the sweep if that failed. Claiming it under
+  // the row lock means two callers never both send it; a claim older than two
+  // minutes is treated as a crash and may be retaken.
+  async function sendWelcome(accountId) {
+    if (!mail) return prisma.inspectAccount.findUnique({ where: { id: accountId } });
+    const stamp = (await now()).getTime();
+    let claimed = false;
+    const account = await transition(accountId, a => {
+      const t = a.claimsPaidTrial;
+      if (!t || t.welcomeSentAt || !['active', 'collecting'].includes(t.status)) return null;
+      if (t.welcomeClaimedAt && stamp - Date.parse(t.welcomeClaimedAt) < 2 * 60000) return null;
+      claimed = true;
+      return { claimsPaidTrial: { ...t, welcomeClaimedAt: new Date(stamp).toISOString() } };
+    });
+    if (!claimed) return account;
+    const t = account.claimsPaidTrial;
+    try {
+      await send(account, 'Your $1 Marketel Claims trial has started',
+        `You paid $1 for 3 days of full access. Your remaining $48 is scheduled for ${when(t.endsAt)}, unless you cancel first. $49 total for lifetime access. No subscription. Cancelling stops the $48, not the $1 already paid. Your reports stay saved.\n\nStart now: ${origin}/claims`);
+    } catch (e) {
+      await transition(accountId, a => a.claimsPaidTrial.welcomeSentAt ? null : { claimsPaidTrial: { ...a.claimsPaidTrial, welcomeClaimedAt: null } });
+      throw e;
+    }
+    return transition(accountId, a => ({ claimsPaidTrial: { ...a.claimsPaidTrial, welcomeSentAt: new Date(stamp).toISOString() } }));
+  }
+
   async function processAccount(row) {
     let account = await prisma.inspectAccount.findUnique({ where: { id: row.id } });
     let t = account?.claimsPaidTrial;
@@ -279,12 +308,7 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
       return;
     }
     if (!['active', 'collecting'].includes(t.status)) return;
-    if (!t.welcomeSentAt) {
-      await send(account, 'Your $1 Marketel Claims trial has started',
-        `You paid $1 for 3 days of full access. Your remaining $48 is scheduled for ${when(t.endsAt)}, unless you cancel first. $49 total for lifetime access. No subscription. Cancelling stops the $48, not the $1 already paid. Your reports stay saved.\n\nStart now: ${origin}/claims`);
-      account = await transition(account.id, a => ({ claimsPaidTrial: { ...a.claimsPaidTrial, welcomeSentAt: clock.toISOString() } }));
-      t = account.claimsPaidTrial;
-    }
+    if (!t.welcomeSentAt) { account = await sendWelcome(account.id); t = account.claimsPaidTrial; }
     if ((!t.reminderSentAt || t.status === 'active' && clock.getTime() - Date.parse(t.endsAt) > DAY) && Date.parse(t.endsAt) <= clock.getTime() + DAY) {
       // Never collect after an outage without a full day's reminder. Extend
       // access/deadline, rather than move a charge earlier than consented.
@@ -402,7 +426,7 @@ function createClaimsPaidTrial({ prisma, stripe, mail, secret, origin, lockAccou
       : `$1 paid. The remaining $48 is scheduled for ${when(t.endsAt)}. $49 total for lifetime access. No subscription. Cancel below to stop the $48, even if you have already sent a report.`;
     return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Manage your Claims trial</title><link rel="stylesheet" href="/inspect/inspect.css"><body><main style="max-width:540px;margin:60px auto;padding:20px"><section class="card"><h1>Your Claims trial</h1><p>${esc(text)}</p>${cancellable ? `<form method="post" action="${esc(manageUrl(account))}"><button type="submit">Cancel trial — stop the $48 payment</button></form>` : ''}${t.status === 'failed' ? `<form method="post" action="${esc(manageUrl(account).replace('/claims-trial/manage', '/claims-trial/pay'))}"><button type="submit">Pay the remaining $48</button></form>` : ''}<p><a href="/claims">Back to Claims</a> · <a href="mailto:${SUPPORT}">Contact support</a></p></section></main></body></html>`;
   }
-  return { adopt, cancel, complete, sweep, authorized, page, manageUrl, refunded, startRecovery, recover };
+  return { adopt, cancel, complete, sweep, sendWelcome, authorized, page, manageUrl, refunded, startRecovery, recover };
 }
 
 module.exports = { OFFER, createClaimsPaidTrial, trialAccess, trialSummary };

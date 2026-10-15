@@ -15,6 +15,8 @@ test('verified return shows the actual charge date and direct cancellation, not 
     assert.match(text, /unless you cancel/);
     assert.doesNotMatch(text, /free days have started|is yours\.|Paid once\./);
     assert.match(await h.page.getAttribute('#paid-trial-manage', 'href'), /claims-trial\/manage/);
+    assert.match(text, /We emailed your cancel link to buyer@example\.test/);
+    assert.match(text, /save this one/);
     h.assertClean();
   } finally { await h.close(); }
 });
@@ -67,6 +69,9 @@ test('"How do I cancel?" names the exact path, shows the real screens, and count
     assert.match(text, /Cancel trial — stop the \$48 payment/);
     assert.match(text, /Account.*Cancel my trial/);
     assert.match(text, /\$1 stays paid/);
+    assert.match(text, /Cancel before day 3 and you’ve spent \$1/);
+    assert.match(text, /support@bookmarketel\.com/);
+    assert.equal(await h.page.locator('#sim-offer a[href="mailto:support@bookmarketel.com"]').count() >= 1, true);
     assert.equal(await help.locator('img').count(), 2);
     for (let i = 0; i < 2; i++) {
       const image = help.locator('img').nth(i);
