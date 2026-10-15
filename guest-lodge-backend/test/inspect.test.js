@@ -2984,7 +2984,9 @@ test('Claims paid trial checkout collects exactly $1, saves the card with pay-bu
     assert.equal(p.consent_collection, undefined);
     assert.equal(p.custom_text.terms_of_service_acceptance, undefined);
     const disclosure = '$1 today. $48 one-time after 3 days unless canceled.';
-    assert.ok(p.custom_text.submit.message.startsWith(`${disclosure} By paying, you authorize Marketel to charge this card $48 once, 3 days after payment, unless you cancel first.`));
+    // Short on purpose: Stripe's own mandate line under the button already
+    // says paying allows the future payment, and the page box says how to cancel.
+    assert.equal(p.custom_text.submit.message, `${disclosure} No subscription. [Trial terms](https://bookmarketel.com/claims/terms)`);
     assert.match(p.custom_text.submit.message, /\[Trial terms\]\(https:\/\/bookmarketel\.com\/claims\/terms\)/);
     assert.ok(p.line_items[0].price_data.product_data.description.startsWith(disclosure));
     assert.ok(p.payment_intent_data.description.endsWith(disclosure));
