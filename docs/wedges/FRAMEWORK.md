@@ -231,10 +231,9 @@ $49 checkout requests, other wedges and native purchases keep their existing
 paths. No new Stripe Price IDs are needed. The initial payment saves the card
 with `setup_future_usage: off_session`. There is no terms checkbox: paying is
 the authorization. Checkout puts “$1 today. $48 one-time after 3 days unless
-canceled.” in the item description and at the start of the text directly above
-the pay button, followed only by “No subscription.” and a `/claims/terms` link;
-Stripe's own line under the button says paying allows the future payment, and
-the page's box under Checkout says how to cancel. Keep that text short.
+canceled.” in the item description and nowhere else in Checkout: Stripe's own
+line under the button says paying allows the future payment, and the page's
+box under Checkout says how to cancel and links the terms. Say it once.
 The server stamps `metadata.authorization` (`OFFER.authorization`) on the
 session, and only a session carrying it, or a pre-change session with an
 accepted terms checkbox, starts a trial. The ledger records `consentMethod`

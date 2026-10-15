@@ -2979,14 +2979,12 @@ test('Claims paid trial checkout collects exactly $1, saves the card with pay-bu
     assert.equal(p.mode, 'payment'); assert.equal(p.ui_mode, 'embedded');
     assert.equal(p.line_items[0].price_data.unit_amount, 100);
     assert.equal(p.payment_intent_data.setup_future_usage, 'off_session');
-    // No terms checkbox: the disclosure sits on the item and opens the text
-    // directly above the pay button, so paying is the authorization.
+    // No terms checkbox: paying is the authorization.
     assert.equal(p.consent_collection, undefined);
-    assert.equal(p.custom_text.terms_of_service_acceptance, undefined);
     const disclosure = '$1 today. $48 one-time after 3 days unless canceled.';
-    // Short on purpose: Stripe's own mandate line under the button already
-    // says paying allows the future payment, and the page box says how to cancel.
-    assert.equal(p.custom_text.submit.message, `${disclosure} No subscription. [Trial terms](https://bookmarketel.com/claims/terms)`);
+    // Said once, on the item. Stripe's own line under the button says paying
+    // allows the future payment, and the page box says how to cancel.
+    assert.equal(p.custom_text, undefined);
     assert.match(p.custom_text.submit.message, /\[Trial terms\]\(https:\/\/bookmarketel\.com\/claims\/terms\)/);
     assert.ok(p.line_items[0].price_data.product_data.description.startsWith(disclosure));
     assert.ok(p.payment_intent_data.description.endsWith(disclosure));
