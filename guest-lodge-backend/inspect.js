@@ -1098,7 +1098,7 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       // Card only, which includes Apple Pay and Google Pay. A bank debit takes
       // days to clear, and the page after paying says it is theirs now.
       payment_method_types: ['card'],
-      custom_text: paidTrial ? { submit: { message: `${CLAIMS_TRIAL.disclosure} By paying, you authorize Marketel to charge this card $48 once, 3 days after payment, unless you cancel first. $49 total for lifetime access. No subscription. Cancel from your account or the link we email you. Sending a report does not end the trial early. [Trial terms](https://bookmarketel.com/claims/terms)` } }
+      custom_text: paidTrial ? { submit: { message: `${CLAIMS_TRIAL.disclosure} No subscription. [Trial terms](https://bookmarketel.com/claims/terms)` } }
         : { submit: { message: `3-day money-back guarantee. Full refund within 3 days if you haven't sent a report. Email ${SUPPORT_EMAIL}.` } },
       line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: amount,
         product_data: { name: paidTrial ? 'Marketel Claims: 3-day paid trial' : `${TOOLS[tool].label}: unlimited reports, paid once`,
