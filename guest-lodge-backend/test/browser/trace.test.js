@@ -178,15 +178,16 @@ test('a photo from the phone becomes see-through lines, with the photo one tap a
   } finally { await browser.close(); w.close(); }
 });
 
-test("inside Facebook's browser a blocked camera says how to open it in Safari, and the free drawing is not spent", async () => {
+test("inside Facebook's browser a camera they said no to asks again, with Safari as the fallback, and the free drawing is not spent", async () => {
   const w = await world();
   const { browser, page, errors } = await phone({ userAgent: FACEBOOK, camera: 'denied' });
   try {
     await page.goto(`${w.base}/trace`);
     await page.locator('.tile[data-id="heart"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
-    assert.match(await page.textContent('#help-title'), /Open this in your browser/);
-    assert.match(await page.textContent('#help-body'), /Safari/);
+    assert.match(await page.textContent('#help-title'), /Allow your camera/);
+    assert.match(await page.textContent('#help-body'), /Tap Try again, then Allow/);
+    assert.match(await page.textContent('#help-body'), /Open in Safari/);
     assert.equal(await page.isVisible('#help-copy'), true);
     assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
     await page.locator('#help-home').tap();

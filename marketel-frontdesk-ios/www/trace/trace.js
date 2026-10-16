@@ -400,9 +400,14 @@
     const inApp = inAppBrowser() && reason !== 'nocamera';
     track('TraceCameraHelpShown', inApp ? 'inapp' : reason, { once: false });
     let title = 'Allow your camera', body;
-    if (inApp) {
+    const openIn = `Tap ••• at the top right, then “Open in ${isIOS() ? 'Safari' : 'browser'}”, or copy the link into your browser.`;
+    if (inApp && reason === 'denied') {
+      // Facebook's and Instagram's browsers do share the camera; this person
+      // said no to the question. Asking again usually works.
+      body = `Tap Try again, then Allow. The camera only shows your paper under the picture; nothing is recorded. Still blocked? ${openIn}`;
+    } else if (inApp) {
       title = 'Open this in your browser';
-      body = `This app's built-in browser won't share the camera. Tap ••• at the top right, then “Open in ${isIOS() ? 'Safari' : 'browser'}”. Or copy the link and paste it into your browser.`;
+      body = `The camera didn't start in this app's browser. ${openIn}`;
     } else if (reason === 'denied') {
       body = isIOS()
         ? 'Tap “aA” in the address bar, then Website Settings, then set Camera to Allow. Then tap Try again.'
