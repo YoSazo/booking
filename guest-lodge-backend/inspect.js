@@ -470,6 +470,7 @@ function registerInspect(app, {
   queueCapi = null,
   capiConfigured = false,
   isCapiExcludedEmail = () => false,
+  handleTraceStripeEvent = null,
   env = process.env,
 }) {
   const enabled = env.INSPECT_ENABLED === 'true';
@@ -2280,10 +2281,12 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
     return outcome;
   };
   app.post('/api/inspect-stripe-webhook', guarded(async (req, res) => {
-    if (!enabled || !stripe || !env.STRIPE_INSPECT_WEBHOOK_SECRET) return res.sendStatus(503);
+    if (!stripe || !env.STRIPE_INSPECT_WEBHOOK_SECRET) return res.sendStatus(503);
     let event;
     try { event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], env.STRIPE_INSPECT_WEBHOOK_SECRET); }
     catch { return res.sendStatus(400); }
+    if (handleTraceStripeEvent && await handleTraceStripeEvent(event, req)) return res.json({ received: true });
+    if (!enabled) return res.sendStatus(503);
     if (event.type === 'charge.refunded') await paidTrials.refunded(event.data.object.id);
     if (event.type === 'charge.dispute.created') await paidTrials.refunded(typeof event.data.object.charge === 'string' ? event.data.object.charge : event.data.object.charge?.id);
     if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type) && event.data.object?.metadata?.plan === 'lifetime_trial') {

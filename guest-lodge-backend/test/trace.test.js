@@ -7,7 +7,7 @@ const { TRACE, TRACE_EVENTS, registerTrace, unlockToken, unlockCode, verifyUnloc
 const SECRET = 'trace-test-secret';
 const PAID = 'cs_test_paidSession1234';
 
-function fakeWorld({ failMailOnce = false, rejectSuffix = false } = {}) {
+function fakeWorld({ failMailOnce = false, rejectSuffix = false, env = {}, withWebhook = false } = {}) {
   const rows = [];
   const unique = sourceId => rows.find(row => row.sourceId && row.sourceId === sourceId);
   const prisma = { inspectEvent: {
@@ -37,14 +37,20 @@ function fakeWorld({ failMailOnce = false, rejectSuffix = false } = {}) {
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('No such session'), { statusCode: 404, code: 'resource_missing' }); return structuredClone(sessions.get(id)); },
     list: async params => { calls.lists.push(params); return { data: [...sessions.values()].filter(s => s.customer_details?.email?.toLowerCase() === params.customer_details.email) }; },
   } } };
+  stripe.webhooks = require('stripe')('sk_test_trace_tests').webhooks;
   const mail = { sendMail: async message => { if (mailFailures > 0) { mailFailures -= 1; throw new Error('smtp down'); } calls.mail.push(message); } };
   const queueCapi = async (event, input) => { calls.capi.push({ event, ...input }); return { queued: true }; };
   const app = express();
   app.set('trust proxy', true);
+  app.use('/api/inspect-stripe-webhook', express.raw({ type: 'application/json' }));
   app.use(express.json());
-  registerTrace(app, { prisma, stripe, mail, queueCapi, capiConfigured: true, isCapiExcludedEmail: email => email === 'owner@example.test',
-    env: { TRACE_UNLOCK_SECRET: SECRET, TRACE_PUBLIC_ORIGIN: 'https://bookmarketel.com' } });
-  return { app, rows, calls };
+  const registration = registerTrace(app, { prisma, stripe, mail, queueCapi, capiConfigured: true, isCapiExcludedEmail: email => email === 'owner@example.test',
+    env: { TRACE_UNLOCK_SECRET: SECRET, TRACE_PUBLIC_ORIGIN: 'https://bookmarketel.com', ...env } });
+  const inspectRegistration = withWebhook ? require('../inspect').registerInspect(app, {
+    prisma, stripe, mail, handleTraceStripeEvent: registration.handleStripeEvent,
+    env: { INSPECT_ENABLED: 'false', INSPECT_AUTH_SECRET: SECRET, STRIPE_INSPECT_WEBHOOK_SECRET: 'whsec_trace_tests' },
+  }) : null;
+  return { app, rows, calls, registration, inspectRegistration, stripe };
 }
 
 async function serve(app, fn) {
@@ -170,6 +176,14 @@ test('checkout still opens when the account refuses a descriptor suffix', async 
   });
 });
 
+test('checkout refuses to collect money without an unlock signing secret', async () => {
+  const { app, calls } = fakeWorld({ env: { TRACE_UNLOCK_SECRET: '', INSPECT_AUTH_SECRET: '' } });
+  await serve(app, async ({ post }) => {
+    assert.equal((await post('/api/trace/checkout', { visitorId: 'v_abcdefghijk' })).status, 503);
+    assert.equal(calls.creates.length, 0);
+  });
+});
+
 test('unlock confirms the payment with Stripe and records, reports and emails it exactly once', async () => {
   const { app, rows, calls } = fakeWorld();
   await serve(app, async ({ post }) => {
@@ -197,11 +211,47 @@ test('unlock confirms the payment with Stripe and records, reports and emails it
 });
 
 test("the owner's own purchase is not reported to Meta", async () => {
-  const { app, calls } = fakeWorld();
+  const { app, calls, rows } = fakeWorld();
   await serve(app, async ({ post }) => {
     assert.equal((await post('/api/trace/unlock', { sessionId: 'cs_test_ownerSession123' })).status, 200);
     assert.equal(calls.capi.length, 0);
+    assert.ok(!rows.some(row => row.name === 'TracePaid'), 'test purchases must not inflate the paid funnel');
   });
+});
+
+test('a verified webhook fulfills a purchase without a browser return, safely replayed with the return', async () => {
+  const { app, rows, calls, stripe, inspectRegistration } = fakeWorld({ withWebhook: true });
+  const event = { type: 'checkout.session.completed', data: { object: { id: PAID, metadata: { product: 'trace' } } } };
+  try {
+    await serve(app, async ({ base, post }) => {
+      const body = JSON.stringify(event);
+      const signature = stripe.webhooks.generateTestHeaderString({ payload: body, secret: 'whsec_trace_tests' });
+      const webhook = signed => fetch(`${base}/api/inspect-stripe-webhook`, { method: 'POST',
+        headers: { 'content-type': 'application/json', 'stripe-signature': signed }, body });
+      assert.equal((await webhook('invalid')).status, 400);
+      assert.equal(calls.mail.length, 0, 'an invalid signature cannot trigger fulfillment');
+      assert.equal((await webhook(signature)).status, 200);
+      assert.equal((await webhook(signature)).status, 200);
+      assert.equal(calls.mail.length, 1, 'payment is emailed even though the buyer never returned');
+      assert.equal(rows.filter(row => row.name === 'TracePaid').length, 1);
+      assert.equal(calls.capi.find(call => call.event === 'Purchase').ip, '');
+      assert.equal(calls.capi.find(call => call.event === 'Purchase').userAgent, '');
+      assert.equal((await post('/api/trace/unlock', { sessionId: PAID })).status, 200);
+      assert.equal(calls.mail.length, 1, 'return and webhook share one fulfillment');
+      assert.equal(rows.filter(row => row.name === 'TracePaid').length, 1);
+    });
+  } finally { inspectRegistration.close(); }
+});
+
+test('a webhook email failure releases the claim for a retry, without duplicating the purchase', async () => {
+  const { registration, calls, rows } = fakeWorld({ failMailOnce: true });
+  const event = { type: 'checkout.session.completed', data: { object: { id: PAID, metadata: { product: 'trace' } } } };
+  const req = { headers: {}, ip: '127.0.0.1' };
+  await assert.rejects(registration.handleStripeEvent(event, req), /smtp down/);
+  assert.equal(await registration.handleStripeEvent(event, req), true);
+  assert.equal(calls.mail.length, 1);
+  assert.equal(rows.filter(row => row.name === 'TracePaid').length, 1);
+  assert.equal(await registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: { metadata: { product: 'marketel-inspect' } } } }, req), false);
 });
 
 test('a failed unlock email is retried on the next load instead of being lost', async () => {
@@ -272,6 +322,25 @@ test('the 6-digit code in the email unlocks only with the email that paid', asyn
     // Six tries an hour per email, then it stops answering.
     for (let i = 0; i < 4; i++) await post("/api/trace/restore-code", { email: "buyer@example.test", code: wrongCode });
     assert.equal((await post('/api/trace/restore-code', { email: 'buyer@example.test', code })).status, 429);
+  });
+});
+
+test("the owner's own email unlocks through 'Already paid?' without a purchase, and nothing counts as a sale", async () => {
+  const { app, rows, calls } = fakeWorld();
+  await serve(app, async ({ post }) => {
+    assert.deepEqual((await post('/api/trace/restore', { email: 'owner@example.test' })).body, { success: true });
+    assert.equal(calls.mail.length, 1);
+    assert.equal(calls.mail[0].to, 'owner@example.test');
+    const link = calls.mail[0].text.match(/trace\?unlock=([^\s]+)/)[1];
+    assert.ok(verifyUnlock(SECRET, decodeURIComponent(link)), 'the emailed link unlocks the web');
+    const code = calls.mail[0].text.match(/code: (\d{6})/)[1];
+    const unlocked = await post('/api/trace/restore-code', { email: 'owner@example.test', code });
+    assert.equal(unlocked.status, 200, 'the emailed code unlocks the app');
+    assert.ok(verifyUnlock(SECRET, unlocked.body.token));
+    assert.equal(calls.lists.length, 0, 'no Stripe lookup for the owner');
+    assert.equal(rows.filter(r => r.name === 'TracePaid').length, 0);
+    assert.equal(calls.capi.length, 0);
+    assert.equal((await post('/api/trace/restore-code', { email: 'owner@example.test', code: '000000' === code ? '111111' : '000000' })).status, 400);
   });
 });
 

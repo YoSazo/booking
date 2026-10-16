@@ -293,3 +293,114 @@ test('the page assets exist and reference only same-origin files', () => {
   const routes = { '/trace/terms': 'terms.html' };
   for (const ref of html.matchAll(/(?:src|href)="(\/trace\/[^"?]+)/g)) assert.ok(fs.existsSync(path.join(root, routes[ref[1]] || ref[1].replace(/^\/trace\//, ''))), ref[1]);
 });
+
+test('the native opaque origin starts without constructing a web attribution URL', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.addInitScript(base => {
+      window.__nativeLocation = { origin: 'null', protocol: 'capacitor:', pathname: '/trace/index.html', search: '', href: 'capacitor://localhost/trace/index.html' };
+      window.webkit = { messageHandlers: { marketelShell: { postMessage(message) {
+        if (message.type === 'inspectStorefront') setTimeout(() => window.marketelInspectStorefront('USA'), 10);
+      } } } };
+      const realFetch = window.fetch;
+      window.fetch = (url, options) => realFetch(String(url).replace('https://bookmarketel.com', base), options);
+    }, w.base);
+    // The normal browser harness has an HTTP origin even when the bridge is
+    // mocked. Exercise the location exposed by Capacitor's actual scheme.
+    await page.route('**/trace/trace.js?*', route => route.fulfill({
+      contentType: 'application/javascript',
+      body: fs.readFileSync(path.resolve(__dirname, '../../trace-web/trace.js'), 'utf8').replace(/\blocation\b/g, 'window.__nativeLocation'),
+    }));
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('.tile');
+    assert.equal(await page.locator('.tile').count(), 6);
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.metaAttribution.v1')), null);
+    assert.doesNotMatch(await page.evaluate(() => document.cookie), /_fb[p c]=/);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('Back while camera permission is pending stops a late stream and preserves the free drawing', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.addInitScript(() => {
+      const getMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = constraints => new Promise(resolve => {
+        window.__allowCamera = async () => { window.__lateStream = await getMedia(constraints); resolve(window.__lateStream); };
+      });
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.locator('.tile[data-id="cat"]').tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    await page.locator('#back').tap();
+    await page.evaluate(() => window.__allowCamera());
+    await until(page, () => window.__lateStream.getTracks().every(track => track.readyState === 'ended'));
+    assert.equal(await page.evaluate(() => !!document.getElementById('cam').srcObject), false);
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
+    assert.equal(await page.isVisible('#home'), true);
+    await settle();
+    assert.ok(!names(w.events).some(name => name.startsWith('TraceStarted')));
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('a camera playback failure offers help without spending the free drawing', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.addInitScript(() => {
+      HTMLMediaElement.prototype.play = () => Promise.reject(new Error('Playback failed'));
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.locator('.tile[data-id="cat"]').tap();
+    await page.waitForSelector('#camera-help:not([hidden])');
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
+    assert.equal(await page.evaluate(() => !!document.getElementById('cam').srcObject), false);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('reloading an interrupted paid return recovers the purchase after the URL has been cleaned', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.route('**/api/trace/unlock', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Temporarily unavailable"}' }));
+    await page.goto(`${w.base}/trace?paid=cs_test_paidSession1234`);
+    assert.equal(new URL(page.url()).search, '');
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), 'cs_test_paidSession1234');
+    await page.unroute('**/api/trace/unlock');
+    await page.reload();
+    await page.waitForSelector('#welcome:not([hidden])');
+    assert.ok(await page.evaluate(() => localStorage.getItem('trace.unlock')));
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('closing the paywall while checkout loads never redirects when the late response arrives', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  let release;
+  try {
+    const waiting = new Promise(resolve => { release = resolve; });
+    let requested = false;
+    await page.route('**/api/trace/checkout', async route => {
+      requested = true;
+      await waiting;
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'cs_test_lateSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_lateSession123' }) });
+    });
+    await page.goto(`${w.base}/trace?cancelled=1`);
+    await page.locator('#buy').tap();
+    assert.equal(requested, true);
+    await page.locator('#pay-later').tap();
+    release();
+    await settle();
+    assert.equal(new URL(page.url()).origin, w.base);
+    assert.equal(await page.isVisible('#paywall'), false);
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null);
+    assert.ok(!names(w.events).includes('TraceCheckoutOpened'));
+    assert.deepEqual(errors, []);
+  } finally { release(); await browser.close(); w.close(); }
+});

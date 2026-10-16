@@ -125,6 +125,10 @@ function registerTrace(app, {
     return queueCapi(eventName, { product: 'trace-anything', currency: 'USD', contentName: TRACE.name, ...input })
       .catch(error => { console.error('Trace CAPI queue failed:', eventName, error.message); return { queued: false }; });
   };
+  // The owner's own emails (the /funnel exclusion list) unlock through "Already
+  // paid?" without a purchase, for recordings and testing. Their stand-in
+  // session id never exists in Stripe, so nothing is recorded as a sale.
+  const ownerSession = email => `cs_live_owner${crypto.createHash('sha256').update(`trace-owner:${email}`).digest('hex').slice(0, 24)}`;
   const unlockUrl = sessionId => `${origin}/trace?unlock=${encodeURIComponent(unlockToken(secret, sessionId))}`;
   const sendUnlockEmail = (to, sessionId) => mail.sendMail({
     from: `"Marketel" <${TRACE.supportEmail}>`,
@@ -179,7 +183,8 @@ function registerTrace(app, {
   }));
 
   router.post('/checkout', guarded(async (req, res) => {
-    if (!stripe) throw fail(503, 'Payments are not available right now.');
+    // Never collect money when we cannot issue the purchased unlock.
+    if (!stripe || !secret) throw fail(503, 'Payments are not available right now.');
     rate(`trace-checkout:${req.ip}`, 20, 3600000);
     const visitorId = visitorOf(req.body?.visitorId) || '';
     const app = fromApp(req);
@@ -199,7 +204,7 @@ function registerTrace(app, {
       cancel_url: `${origin}/trace?cancelled=1${back}`,
       payment_intent_data: { statement_descriptor_suffix: TRACE.descriptorSuffix, metadata: { product: TRACE.product } },
       metadata: { product: TRACE.product, visitorId, fbp: (attribution.fbp || '').slice(0, 200), fbc: (attribution.fbc || '').slice(0, 200),
-        sourceUrl: (attribution.sourceUrl || '').slice(0, 450), owner: ownerBrowser(req) ? '1' : '', app: app ? '1' : '' },
+        sourceUrl: (attribution.sourceUrl || '').slice(0, 450), owner: ownerBrowser(req) || automatedBrowser(req) ? '1' : '', app: app ? '1' : '' },
     };
     let session;
     try {
@@ -214,31 +219,26 @@ function registerTrace(app, {
     res.json({ url: session.url, id: session.id });
   }));
 
-  // Called by the page Stripe returns to. Confirms the payment with Stripe,
-  // records it once, tells Meta once, emails the unlock link once.
-  router.post('/unlock', guarded(async (req, res) => {
-    if (!stripe || !secret) throw fail(503, 'Unlocking is not available right now.');
-    rate(`trace-unlock:${req.ip}`, 60, 3600000);
-    const sessionId = sessionIdOf(req.body?.sessionId);
-    if (!sessionId) throw fail(400, 'That payment link is not valid.');
-    let session;
-    try { session = await stripe.checkout.sessions.retrieve(sessionId); }
-    catch (error) { if (error?.statusCode === 404 || error?.code === 'resource_missing') throw fail(404, 'We could not find that payment.'); throw error; }
-    if (session?.metadata?.product !== TRACE.product) throw fail(404, 'We could not find that payment.');
-    if (!isTracePurchase(session)) throw fail(402, 'The payment has not finished yet.');
+  // Shared by the verified Stripe webhook and the browser return. A buyer
+  // must receive their unlock even when they close Stripe before returning.
+  async function fulfillPurchase(session, req, { retryMail = false, webhook = false } = {}) {
+    const sessionId = session.id;
     const visitorId = visitorOf(session.metadata.visitorId);
     const email = emailOf(session.customer_details?.email);
-    await record('TracePaid', { visitorId, sourceId: `trace-paid:${sessionId}` });
     const owner = session.metadata.owner === '1' || ownerBrowser(req) || (email && isCapiExcludedEmail(email))
-      || session.metadata.app === '1' || fromApp(req);
-    if (!owner) {
+      || session.livemode === false;
+    if (!owner) await record('TracePaid', { visitorId, sourceId: `trace-paid:${sessionId}` });
+    const appPurchase = session.metadata.app === '1' || fromApp(req);
+    if (!owner && !appPurchase) {
       await sendCapi('Purchase', {
         eventId: `trace-purchase.${sessionId}`,
         hotelId: visitorId ? `trace-visitor:${visitorId}` : `trace-session:${sessionId}`,
         externalId: visitorId ? `trace-visitor:${visitorId}` : `trace-session:${sessionId}`,
         email: email || '',
-        ip: req.ip || '',
-        userAgent: req.headers['user-agent'] || '',
+        // A webhook request belongs to Stripe, not the buyer. Never send
+        // Stripe's IP or user-agent as the customer's matching information.
+        ip: webhook ? '' : req.ip || '',
+        userAgent: webhook ? '' : req.headers['user-agent'] || '',
         sourceUrl: session.metadata.sourceUrl || `${origin}/trace`,
         fbp: session.metadata.fbp || '',
         fbc: session.metadata.fbc || '',
@@ -257,10 +257,36 @@ function registerTrace(app, {
         catch (error) {
           console.error('Trace unlock email failed:', error.message);
           await prisma.inspectEvent.delete({ where: { sourceId: claim } }).catch(() => {});
+          if (retryMail) throw error; // Let Stripe retry delivery after SMTP recovers.
         }
       }
     }
-    res.json({ token: unlockToken(secret, sessionId), email: email || '' });
+    return { token: unlockToken(secret, sessionId), email: email || '' };
+  }
+
+  // Called only after registerInspect has verified Stripe's signature, using
+  // the existing endpoint/secret on the same Stripe account. Other products
+  // fall through to their unchanged handlers.
+  async function handleStripeEvent(event, req) {
+    if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)
+      || event.data?.object?.metadata?.product !== TRACE.product) return false;
+    if (!stripe || !secret) throw fail(503, 'Unlocking is not available right now.');
+    const session = await stripe.checkout.sessions.retrieve(event.data.object.id);
+    if (isTracePurchase(session)) await fulfillPurchase(session, req, { retryMail: true, webhook: true });
+    return true;
+  }
+
+  router.post('/unlock', guarded(async (req, res) => {
+    if (!stripe || !secret) throw fail(503, 'Unlocking is not available right now.');
+    rate(`trace-unlock:${req.ip}`, 60, 3600000);
+    const sessionId = sessionIdOf(req.body?.sessionId);
+    if (!sessionId) throw fail(400, 'That payment link is not valid.');
+    let session;
+    try { session = await stripe.checkout.sessions.retrieve(sessionId); }
+    catch (error) { if (error?.statusCode === 404 || error?.code === 'resource_missing') throw fail(404, 'We could not find that payment.'); throw error; }
+    if (session?.metadata?.product !== TRACE.product) throw fail(404, 'We could not find that payment.');
+    if (!isTracePurchase(session)) throw fail(402, 'The payment has not finished yet.');
+    res.json(await fulfillPurchase(session, req));
   }));
 
   router.post('/verify', guarded(async (req, res) => {
@@ -278,7 +304,9 @@ function registerTrace(app, {
     const email = emailOf(req.body?.email);
     if (!email) throw fail(400, 'Enter the email you paid with.');
     rate(`trace-restore-email:${email}`, 3, 3600000);
-    if (stripe && secret && mail) {
+    if (secret && mail && isCapiExcludedEmail(email)) {
+      await sendUnlockEmail(email, ownerSession(email)).catch(error => console.error('Trace owner unlock email failed:', error.message));
+    } else if (stripe && secret && mail) {
       try {
         const list = await stripe.checkout.sessions.list({ customer_details: { email }, limit: 20 });
         const purchase = (list?.data || []).find(isTracePurchase);
@@ -297,6 +325,9 @@ function registerTrace(app, {
     const code = String(req.body?.code || '').replace(/\D/g, '');
     if (!email || code.length !== 6) throw fail(400, 'Enter your email and the 6-digit code from the email.');
     rate(`trace-code-email:${email}`, 6, 3600000);
+    if (isCapiExcludedEmail(email) && crypto.timingSafeEqual(Buffer.from(unlockCode(secret, ownerSession(email))), Buffer.from(code))) {
+      return res.json({ token: unlockToken(secret, ownerSession(email)) });
+    }
     const list = await stripe.checkout.sessions.list({ customer_details: { email }, limit: 20 });
     const purchase = (list?.data || []).find(session => isTracePurchase(session)
       && crypto.timingSafeEqual(Buffer.from(unlockCode(secret, session.id)), Buffer.from(code)));
@@ -310,6 +341,7 @@ function registerTrace(app, {
     res.status(status).json({ error: status >= 500 ? 'Something went wrong. Please try again.' : error.message });
   });
   app.use('/api/trace', router);
+  return { handleStripeEvent };
 }
 
 module.exports = { TRACE, TRACE_EVENTS, TRACE_SIGNALS, registerTrace, unlockToken, unlockCode, verifyUnlock, isTracePurchase, tracePageHeaders };

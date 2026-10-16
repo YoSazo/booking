@@ -18856,7 +18856,9 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
     : marketelStripe;
-require('./inspect').registerInspect(app, {
+// Trace owns its fulfillment; the existing verified webhook dispatches its
+// checkout events without changing Claims' or Inspect's payment handlers.
+const traceRegistration = require('./trace').registerTrace(app, {
     prisma,
     mail: emailTransporter,
     stripe: inspectStripe,
@@ -18866,9 +18868,7 @@ require('./inspect').registerInspect(app, {
         normalizeExcludedEmail(email)
     ),
 });
-// Trace Anything: a consumer test sold once from a Meta ad. Same Stripe account
-// and Meta pixel as Inspect; its own page, events (tool "trace") and unlock.
-require('./trace').registerTrace(app, {
+require('./inspect').registerInspect(app, {
     prisma,
     mail: emailTransporter,
     stripe: inspectStripe,
@@ -18877,6 +18877,7 @@ require('./trace').registerTrace(app, {
     isCapiExcludedEmail: (email) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(
         normalizeExcludedEmail(email)
     ),
+    handleTraceStripeEvent: traceRegistration.handleStripeEvent,
 });
 telemetry.setupRoutes(app);
 

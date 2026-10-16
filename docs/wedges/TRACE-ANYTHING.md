@@ -14,8 +14,8 @@ money line: one paying customer must cost about $8–12 or less in ads.
   It's registered in `server.js` next to Inspect.
 - `guest-lodge-backend/trace-web/`: `index.html`, `trace.js`, `trace.css`,
   `terms.html`, `pictures/*.svg` (original drawings). These files
-  are served only through `trace.js`. They aren't under `public/` and aren't in
-  the iOS app.
+  are served only through `trace.js`. They aren't under `public/`; the build
+  script mirrors them into the iOS app's `www/trace` directory.
 - Tests: `test/trace.test.js` and `test/browser/trace.test.js` (Chromium with
   a fake camera).
 
@@ -32,10 +32,18 @@ money line: one paying customer must cost about $8–12 or less in ads.
     `/trace?unlock=` link once.
 - **"Already paid?"** looks up paid sessions by email in Stripe and emails the
   link. It gives the same answer whether or not that email bought.
-- **No webhook.** The unlock, the `TracePaid` row and Meta's Purchase all
-  happen when Stripe returns the buyer to `/trace?paid=…`. Someone who closes
-  the tab before returning is still paid in Stripe. They use "Already paid?",
-  but Meta never hears about that purchase.
+- **Payment fulfillment:** the existing `/api/inspect-stripe-webhook` verifies
+  the signature and dispatches Trace checkout completions to Trace's handler.
+  It confirms the paid session, records `TracePaid`, queues Meta's Purchase
+  and emails the unlock even if the buyer never returns from Stripe. The browser
+  return uses the same fulfillment and email claim, so replays don't duplicate
+  the purchase or email. Failed email sends release the claim and make the
+  webhook retry. Keep `checkout.session.completed` enabled on that Stripe
+  webhook and `STRIPE_INSPECT_WEBHOOK_SECRET` configured.
+- The pending checkout id is saved before leaving for Stripe on both web and
+  native. Reloading an interrupted return can recover the paid unlock without
+  needing the removed `?paid=` parameter. Checkout refuses to create a session
+  if the server cannot sign unlocks.
 
 ## Funnel and Meta
 
@@ -59,7 +67,11 @@ Three events go to Meta through the same pixel and CAPI queue as Claims:
 | Confirmed payment | Purchase |
 
 Owner browsers (`?notrack=1`, which uses the same `marketel.noTrack` key as
-Claims) and headless browsers are left out.
+Claims) and headless browsers are left out. Owner/test purchases do not create
+`TracePaid` counts. Native startup skips advertising attribution altogether:
+custom-scheme pages have an opaque origin and must not build a web source URL.
+Webhook purchases use the buyer's email and saved click identifiers, never
+Stripe's request IP or user-agent.
 
 ## Turning it off
 

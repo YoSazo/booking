@@ -49,6 +49,9 @@
   const validClickId = value => (/^[A-Za-z0-9._-]{1,180}$/.test(String(value || '')) ? String(value) : '');
   const writeCookie = (name, value) => { if (value) document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=7776000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`; };
   const attribution = (() => {
+    // Custom-scheme pages have an opaque ("null") origin. They must not
+    // construct a web URL or persist advertising identifiers in the app.
+    if (inApp) return {};
     const fbclid = validClickId(params.get('fbclid'));
     let fbp = validMetaId(cookieValue('_fbp'));
     if (!fbp) { const w = new Uint32Array(2); crypto.getRandomValues(w); fbp = `fb.1.${Date.now()}.${w[0]}${w[1]}`; writeCookie('_fbp', fbp); }
@@ -97,11 +100,13 @@
 
   // ----- Screens and sheets -----
   const sheets = ['paywall', 'welcome', 'restore'];
+  let checkoutGeneration = 0;
   function openSheet(id) {
+    checkoutGeneration++;
     for (const other of sheets) $(other).hidden = other !== id;
     $('backdrop').hidden = false;
   }
-  function closeSheets() { for (const id of sheets) $(id).hidden = true; $('backdrop').hidden = true; }
+  function closeSheets() { checkoutGeneration++; for (const id of sheets) $(id).hidden = true; $('backdrop').hidden = true; }
   function busy(text) { $('busy-text').textContent = text || 'One moment…'; $('busy').hidden = !text; }
   let toastTimer = 0;
   function toast(text, ms = 2600) {
@@ -177,9 +182,10 @@
     }
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('That photo could not be opened. Try another one.'));
-      img.src = URL.createObjectURL(file);
+      const url = URL.createObjectURL(file);
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That photo could not be opened. Try another one.')); };
+      img.src = url;
     });
   }
   function boxBlur(src, w, h, r) {
@@ -244,20 +250,34 @@
   // ----- Tracing -----
   const video = $('cam'), overlay = $('overlay'), stage = $('stage');
   let stream = null, current = null, wakeLock = null, locked = false, showingPhoto = false;
+  let cameraGeneration = 0;
   let tracedSince = 0, tracedMs = 0, tickTimer = 0, hintTimer = 0;
   const view = { x: 0, y: 0, s: 1, r: 0 };
   const applyView = () => { overlay.style.transform = `translate(-50%, -50%) translate(${view.x}px, ${view.y}px) rotate(${view.r}rad) scale(${view.s})`; };
 
-  async function startCamera() {
+  async function startCamera(generation) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error('unsupported'), { name: 'Unsupported' });
-    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+    const acquired = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+    // Permission may finish after Back or after another picture was selected.
+    // A stale response must never restart the camera behind the home screen.
+    if (generation !== cameraGeneration) { acquired.getTracks().forEach(track => track.stop()); return false; }
+    stream = acquired;
     video.srcObject = stream;
-    await video.play().catch(() => {});
+    await video.play();
+    return generation === cameraGeneration;
   }
   async function keepAwake() {
-    try { if (navigator.wakeLock && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch { wakeLock = null; }
+    const generation = cameraGeneration;
+    try {
+      if (navigator.wakeLock && document.visibilityState === 'visible') {
+        const acquired = await navigator.wakeLock.request('screen');
+        if (generation !== cameraGeneration) { await acquired.release(); return; }
+        wakeLock = acquired;
+      }
+    } catch { /* Screen locking is optional; never block tracing. */ }
   }
   function stopTracing() {
+    cameraGeneration++;
     clearInterval(tickTimer); clearTimeout(hintTimer);
     if (tracedSince) { tracedMs += Date.now() - tracedSince; tracedSince = 0; }
     if (stream) { for (const t of stream.getTracks()) t.stop(); stream = null; }
@@ -271,6 +291,8 @@
     $('lock-shackle').setAttribute('d', locked ? 'M8 11V8a4 4 0 0 1 8 0v3' : 'M8 11V8a4 4 0 0 1 8 0');
   }
   async function startTracing(picture) {
+    stopTracing();
+    const generation = cameraGeneration;
     current = picture; showingPhoto = false; tracedMs = 0;
     Object.assign(view, { x: 0, y: 0, s: 1, r: 0 }); applyView(); setLocked(false);
     overlay.src = picture.lines;
@@ -278,8 +300,8 @@
     $('mode').hidden = !picture.photo; $('mode').textContent = 'Show photo';
     $('home').hidden = true; $('camera-help').hidden = true; $('tracer').hidden = false;
     track('TraceCameraAsked');
-    try { await startCamera(); }
-    catch (error) { return cameraFailed(error); }
+    try { if (!await startCamera(generation)) return; }
+    catch (error) { if (generation === cameraGeneration) cameraFailed(error); return; }
     // The free drawing is spent only once the camera is actually showing it.
     if (!unlocked() && !freeKey()) store.set('trace.free', picture.key);
     track('TraceStarted', picture.kind);
@@ -335,7 +357,7 @@
   $('help-retry').addEventListener('click', () => { if (current) startTracing(current); });
   $('help-home').addEventListener('click', showHome);
   $('help-copy').addEventListener('click', async () => {
-    const link = `${location.origin}/trace`;
+    const link = inApp ? 'https://bookmarketel.com/trace' : location.href;
     try { await navigator.clipboard.writeText(link); $('help-copy').textContent = 'Link copied'; }
     catch { prompt('Copy this link:', link); }
   });
@@ -408,22 +430,28 @@
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('backdrop').addEventListener('click', () => { if (!$('paywall').hidden) track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('buy').addEventListener('click', async () => {
+    if (!canBuy()) return;
+    const generation = checkoutGeneration;
     const button = $('buy');
     track('TraceCheckoutTapped', '', { once: false });
     button.disabled = true; button.textContent = 'Opening secure checkout…';
     $('pay-error').hidden = true;
     try {
       const { url, id } = await api('/checkout', { visitorId, ...(inApp ? {} : { attribution }) });
+      if (generation !== checkoutGeneration) return;
       if (!/^https:\/\/checkout\.stripe\.com\//.test(String(url || ''))) throw new Error('Checkout could not be opened. Please try again.');
       track('TraceCheckoutOpened', '', { keepalive: true });
+      // Keep the payment reference before leaving, on web as well as native.
+      // A reload or interrupted return must not lose an already-paid unlock.
+      if (id) store.set('trace.pending', id);
       if (inApp) {
         // Paying happens in Safari. The app checks this payment when it comes back.
-        if (id) store.set('trace.pending', id);
         tell({ type: 'openPurchase', url });
         button.disabled = false; button.textContent = 'Unlock for $14.99';
         closeSheets();
       } else location.href = url;
     } catch (error) {
+      if (generation !== checkoutGeneration) return;
       track('TraceCheckoutFailed', error.status === 429 ? 'rate' : 'error', { once: false });
       button.disabled = false; button.textContent = 'Unlock for $14.99';
       $('pay-error').textContent = error.message; $('pay-error').hidden = false;
@@ -434,6 +462,7 @@
   window.addEventListener('pageshow', event => { if (event.persisted) { $('buy').disabled = false; $('buy').textContent = 'Unlock for $14.99'; busy(''); } });
 
   async function confirmPayment(sessionId) {
+    store.set('trace.pending', sessionId);
     busy('Unlocking…');
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
@@ -469,12 +498,12 @@
   let checkingPending = false;
   async function checkPending() {
     const pending = store.get('trace.pending');
-    if (!inApp || !pending || unlocked() || checkingPending) return;
+    if (!pending || unlocked() || checkingPending) return;
     checkingPending = true;
     try {
       const result = await api('/unlock', { sessionId: pending });
       token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
-      track('TraceUnlocked', 'app');
+      track('TraceUnlocked', inApp ? 'app' : 'return');
       renderHome();
       $('welcome-title').textContent = 'You\'re in.'; $('welcome-go').textContent = 'Pick a picture';
       $('welcome-body').textContent = 'Trace anything, for good. Your receipt is in your email.';
@@ -485,6 +514,13 @@
     } finally { checkingPending = false; }
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkPending(); });
+  window.addEventListener('pagehide', stopTracing);
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    // A cached document no longer owns a live camera stream.
+    if (!$('tracer').hidden) showHome();
+    checkPending();
+  });
 
   async function unlockFromLink(value) {
     busy('Unlocking this phone…');
@@ -562,10 +598,10 @@
     history.replaceState(null, '', clean.pathname + clean.search);
   }
   renderHome();
-  if (inApp) checkPending();
   if (paid) confirmPayment(paid);
   else if (unlockLink) unlockFromLink(unlockLink);
-  else if (cancelled) { track('TraceCheckoutCancelled'); showPaywall('cancelled', 'No payment was taken.'); }
+  else if (cancelled) { store.del('trace.pending'); track('TraceCheckoutCancelled'); showPaywall('cancelled', 'No payment was taken.'); }
+  else checkPending();
 
   // Microsoft Clarity recordings for ad visitors only, never the owner.
   if (!ownerBrowser && !inApp && /^https:$/.test(location.protocol)) {
