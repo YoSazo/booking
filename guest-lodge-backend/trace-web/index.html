@@ -7,7 +7,7 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=9">
+<link rel="stylesheet" href="/trace/trace.css?v=10">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
@@ -82,8 +82,12 @@
 <section class="sheet" id="paywall" hidden role="dialog" aria-modal="true" aria-labelledby="pay-title">
   <p class="sheet-note" id="pay-note" hidden></p>
   <h2 id="pay-title">Keep tracing anything</h2>
+  <div class="compare" id="pay-compare">
+    <div class="them"><span>Other tracing apps</span><strong>up to $24.99/week</strong><small>that's up to $1,299 a year</small></div>
+    <div class="us"><span>Marketel Trace</span><strong>$14.99 once</strong><small>yours forever</small></div>
+  </div>
   <p class="price" id="pay-price">$14.99 <small>once</small></p>
-  <p class="sub" id="pay-sub">Yours for good. No subscription. Nothing renews.</p>
+  <p class="sub" id="pay-sub">No subscription. Nothing renews. Pay once, it's yours.</p>
   <p class="sub" id="pay-elsewhere" hidden>Already paid on the web? Unlock it here with the code from your email.</p>
   <ul class="perks" id="pay-perks">
     <li>Your own photos and every picture</li>
@@ -91,7 +95,7 @@
     <li>As many drawings as you like</li>
     <li>Works on any phone. Nothing to install.</li>
   </ul>
-  <button type="button" class="big" id="buy">Unlock for $14.99</button>
+  <button type="button" class="big" id="buy">Unlock forever: $14.99</button>
   <p class="fine" id="pay-fine">Secure payment by Stripe. Not working on your phone? Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a> within 7 days for a full refund.</p>
   <p class="error" id="pay-error" hidden></p>
   <div class="sheet-links">
@@ -125,6 +129,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=9" defer></script>
+<script src="/trace/trace.js?v=10" defer></script>
 </body>
 </html>

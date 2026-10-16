@@ -114,6 +114,14 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
 
     await page.locator('#done').tap();
     await page.waitForSelector('#paywall:not([hidden])');
+    // A win first: confetti and a cheer, then the offer against what others charge.
+    assert.equal(await page.evaluate(() => !!document.getElementById('confetti')), true, 'confetti on Done');
+    assert.match(await page.textContent('#pay-note'), /You just traced your first drawing/);
+    assert.equal(await page.textContent('#pay-title'), 'Keep drawing. Forever.');
+    assert.match(await page.textContent('#pay-compare'), /up to \$24\.99\/week[\s\S]*\$14\.99 once/);
+    assert.equal(await page.textContent('#buy'), 'Unlock forever: $14.99');
+    await new Promise(resolve => setTimeout(resolve, 2100));
+    assert.equal(await page.evaluate(() => !!document.getElementById('confetti')), false, 'the confetti clears itself');
     assert.equal(await page.evaluate(() => !!document.getElementById('cam').srcObject), false, 'the camera is off once tracing is done');
     assert.match(await page.textContent('#paywall'), /\$14\.99/);
     assert.match(await page.textContent('#paywall'), /No subscription/);

@@ -479,26 +479,61 @@
     $('mode').textContent = showingPhoto ? 'Show lines' : 'Show photo';
   });
   $('back').addEventListener('click', showHome);
+  // A finished drawing is a win: celebrate it before any price. Confetti, a
+  // cheer, then the offer slides up. No motion for people who turned it off.
+  const reducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function confetti() {
+    if (reducedMotion()) return;
+    const canvas = document.createElement('canvas');
+    canvas.id = 'confetti'; canvas.className = 'confetti';
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = innerWidth * ratio; canvas.height = innerHeight * ratio;
+    document.body.append(canvas);
+    const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+    const colors = ['#2e7d5b', '#4caf7d', '#ffcc33', '#ff6b6b', '#5aa9ff', '#b07cff'];
+    const bits = Array.from({ length: 140 }, () => ({
+      x: innerWidth / 2 + (Math.random() - 0.5) * 80, y: innerHeight * 0.62,
+      vx: (Math.random() - 0.5) * 13, vy: -9 - Math.random() * 9, size: 5 + Math.random() * 6,
+      spin: Math.random() * 6.3, vs: (Math.random() - 0.5) * 0.4, color: colors[Math.floor(Math.random() * colors.length)] }));
+    const start = performance.now();
+    const frame = now => {
+      const t = now - start;
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      for (const b of bits) {
+        b.vy += 0.35; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.spin += b.vs;
+        ctx.save(); ctx.globalAlpha = Math.max(0, 1 - t / 1800); ctx.translate(b.x, b.y); ctx.rotate(b.spin);
+        ctx.fillStyle = b.color; ctx.fillRect(-b.size / 2, -b.size / 4, b.size, b.size / 2); ctx.restore();
+      }
+      if (t < 1800) requestAnimationFrame(frame); else canvas.remove();
+    };
+    requestAnimationFrame(frame);
+  }
   $('done').addEventListener('click', () => {
     track('TraceDone', '', { once: false });
     showHome();
-    if (!unlocked()) showPaywall('done');
+    if (!unlocked()) {
+      confetti();
+      showPaywall('done', '🎉 You just traced your first drawing!');
+    }
   });
 
   // ----- Paying -----
   let paywallReason = '';
   function renderPaywall() {
     const buy = canBuy();
-    for (const id of ['buy', 'pay-price', 'pay-sub', 'pay-perks', 'pay-fine']) $(id).hidden = !buy;
+    for (const id of ['buy', 'pay-compare', 'pay-price', 'pay-sub', 'pay-perks', 'pay-fine']) $(id).hidden = !buy;
+    // The comparison carries the price; the old big price line stays for no one.
+    $('pay-price').hidden = true;
     $('pay-elsewhere').hidden = buy;
-    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' || paywallReason === 'top' ? 'Unlock everything' : 'Keep tracing anything';
+    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' || paywallReason === 'top' ? 'Unlock everything'
+      : paywallReason === 'done' ? 'Keep drawing. Forever.' : 'Keep tracing anything';
   }
   function showPaywall(reason, note = '') {
     paywallReason = reason;
     track('TracePaywallShown', reason, { once: false });
     $('pay-note').textContent = note; $('pay-note').hidden = !note;
     $('pay-error').hidden = true;
-    $('buy').disabled = false; $('buy').textContent = 'Unlock for $14.99';
+    $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99';
     renderPaywall();
     openSheet('paywall');
   }
@@ -524,19 +559,19 @@
       if (inApp) {
         // Paying happens in Safari. The app checks this payment when it comes back.
         tell({ type: 'openPurchase', url });
-        button.disabled = false; button.textContent = 'Unlock for $14.99';
+        button.disabled = false; button.textContent = 'Unlock forever: $14.99';
         closeSheets();
       } else location.href = url;
     } catch (error) {
       if (generation !== checkoutGeneration) return;
       track('TraceCheckoutFailed', error.status === 429 ? 'rate' : 'error', { once: false });
-      button.disabled = false; button.textContent = 'Unlock for $14.99';
+      button.disabled = false; button.textContent = 'Unlock forever: $14.99';
       $('pay-error').textContent = error.message; $('pay-error').hidden = false;
     }
   });
   // Coming back from Stripe with the browser's back button restores this page
   // from memory with the button still saying "Opening…".
-  window.addEventListener('pageshow', event => { if (event.persisted) { $('buy').disabled = false; $('buy').textContent = 'Unlock for $14.99'; busy(''); } });
+  window.addEventListener('pageshow', event => { if (event.persisted) { $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99'; busy(''); } });
 
   async function confirmPayment(sessionId) {
     store.set('trace.pending', sessionId);

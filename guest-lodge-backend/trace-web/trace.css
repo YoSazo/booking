@@ -147,3 +147,19 @@ h1 { font-size: 34px; line-height: 1.08; letter-spacing: -1.2px; margin: 14px 0 
 
 /* While tracing, nothing behind the camera can scroll (see settleViewport). */
 html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-behavior: none; }
+
+/* After a drawing: the cheer, the comparison, the offer sliding up. */
+.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 50; pointer-events: none; }
+.sheet:not([hidden]) { animation: sheet-up 340ms cubic-bezier(.32, .72, 0, 1); }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } }
+#paywall .sheet-note { font-size: 17px; text-align: center; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
+.compare > div { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 3px; }
+.compare span { font-size: 13px; font-weight: 700; }
+.compare strong { font-size: 19px; line-height: 1.15; }
+.compare small { font-size: 12px; }
+.compare .them { background: #f3f3f3; color: #8a8f8c; }
+.compare .them strong { color: #7a807c; }
+.compare .us { background: var(--green-pale); border: 2px solid var(--green); color: var(--ink); }
+.compare .us strong { color: var(--green-dark); font-size: 22px; }
+@media (prefers-reduced-motion: reduce) { .sheet:not([hidden]) { animation: none; } }
