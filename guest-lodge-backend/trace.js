@@ -1,5 +1,5 @@
 'use strict';
-// Trace Anything: point the phone at paper, follow the lines of a picture laid
+// Marketel Trace: point the phone at paper, follow the lines of a picture laid
 // over the camera. A consumer test sold once ($14.99, no subscription) from a
 // Meta ad. Everything about the picture happens on the phone: no photo, camera
 // frame or drawing ever reaches this server. The server only sells the unlock,
@@ -16,7 +16,7 @@ const { sanitizeInspectAttribution } = require('./inspect');
 
 const TRACE = Object.freeze({
   product: 'trace',
-  name: 'Trace Anything',
+  name: 'Marketel Trace',
   priceCents: 1499,
   currency: 'usd',
   descriptorSuffix: 'TRACE',
@@ -117,9 +117,9 @@ function registerTrace(app, {
   };
   const unlockUrl = sessionId => `${origin}/trace?unlock=${encodeURIComponent(unlockToken(secret, sessionId))}`;
   const sendUnlockEmail = (to, sessionId) => mail.sendMail({
-    from: `"${TRACE.name}" <${TRACE.supportEmail}>`,
+    from: `"Marketel" <${TRACE.supportEmail}>`,
     to,
-    subject: 'Your Trace Anything unlock',
+    subject: 'Your Marketel Trace unlock',
     text: [
       `Thanks for buying ${TRACE.name}. It's yours for good: you paid once, there's no subscription and nothing renews.`,
       '',

@@ -67,7 +67,7 @@ test('unlock tokens are signed for one session and cannot be forged or altered',
   assert.equal(verifyUnlock(SECRET, 'not-a-session.abc'), null);
 });
 
-test('only a paid Trace Anything session counts as a purchase', () => {
+test('only a paid Marketel Trace session counts as a purchase', () => {
   assert.ok(isTracePurchase({ mode: 'payment', payment_status: 'paid', metadata: { product: 'trace' } }));
   assert.ok(!isTracePurchase({ mode: 'payment', payment_status: 'unpaid', metadata: { product: 'trace' } }));
   assert.ok(!isTracePurchase({ mode: 'payment', payment_status: 'paid', metadata: { product: 'marketel-inspect' } }));

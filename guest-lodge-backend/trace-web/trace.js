@@ -1,5 +1,5 @@
 'use strict';
-// Trace Anything. The picture floats over the live camera; the phone rests
+// Marketel Trace. The picture floats over the live camera; the phone rests
 // above the paper and the person draws along the lines they see. Pictures and
 // photos stay on the phone: only anonymous step names are sent to the server.
 (() => {
@@ -460,7 +460,7 @@
     try {
       await api('/restore', { email });
       $('restore-form').hidden = true;
-      $('restore-done').textContent = `If ${email} bought Trace Anything, the unlock link is on its way. Open it on this phone. Check spam if it isn't there in a minute.`;
+      $('restore-done').textContent = `If ${email} bought Marketel Trace, the unlock link is on its way. Open it on this phone. Check spam if it isn't there in a minute.`;
       $('restore-done').hidden = false;
     } catch (error) {
       $('restore-error').textContent = error.message; $('restore-error').hidden = false;

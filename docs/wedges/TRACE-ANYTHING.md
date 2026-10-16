@@ -1,4 +1,4 @@
-# Trace Anything (consumer test)
+# Marketel Trace (consumer test)
 
 `bookmarketel.com/trace`. You pick a picture (six starters, or your own photo
 turned into pencil lines on the phone), it floats over the live rear camera,
@@ -13,7 +13,7 @@ money line: one paying customer must cost about $8–12 or less in ads.
 - `guest-lodge-backend/trace.js`: page routes, `/api/trace/*`, unlock tokens.
   It's registered in `server.js` next to Inspect.
 - `guest-lodge-backend/trace-web/`: `index.html`, `trace.js`, `trace.css`,
-  `terms.html`, `pictures/*.svg` (original drawings), `icon.svg`. These files
+  `terms.html`, `pictures/*.svg` (original drawings). These files
   are served only through `trace.js`. They aren't under `public/` and aren't in
   the iOS app.
 - Tests: `test/trace.test.js` and `test/browser/trace.test.js` (Chromium with
@@ -22,7 +22,7 @@ money line: one paying customer must cost about $8–12 or less in ads.
 ## Money
 
 - Checkout is Stripe's **hosted** page, on the same account as Inspect. The
-  statement reads `MARKETEL* TRACE`, falling back to the plain descriptor if
+  statement reads `MARKETEL* TRACE`. The page uses the Marketel theme (DM Sans, green, the Marketel bar), the same as Claims, so the ad, the page, Stripe's page (which shows Marketel), the email and the statement all read as one company, falling back to the plain descriptor if
   the account refuses a suffix.
 - There is no account and no new table:
   - A paid Checkout Session (`metadata.product = trace`) is the purchase.

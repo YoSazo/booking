@@ -1,5 +1,5 @@
 'use strict';
-// Trace Anything in a phone-sized Chromium with a fake camera: pick a picture,
+// Marketel Trace in a phone-sized Chromium with a fake camera: pick a picture,
 // trace it, meet the paywall, pay (Stripe faked), come back unlocked. Also the
 // two ways the camera can fail, and a photo turned into lines on the phone.
 const test = require('node:test');
