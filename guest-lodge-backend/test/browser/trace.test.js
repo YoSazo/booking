@@ -74,10 +74,21 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     const ownBox = await page.locator('#own-label').boundingBox();
     assert.ok(ownBox.y + ownBox.height <= 664, `own-photo button is below the fold at ${ownBox.y}`);
 
+    // How it works, in three steps, before anything is tapped.
+    assert.deepEqual(await page.$$eval('.steps li', items => items.map(li => li.textContent.replace(/^\d/, '').trim())),
+      ['Pick a picture', 'Phone on a glass over paper', 'Trace the lines']);
+    // Someone who already wants it can pay straight away.
+    await page.locator('#unlock-now').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.textContent('#pay-title'), 'Unlock everything');
+    await page.locator('#pay-later').tap();
+    await page.waitForSelector('#paywall', { state: 'hidden' });
+
     await page.locator('.tile[data-id="cat"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     // waitForFunction evaluates a string, which the page's own CSP forbids; poll instead.
     await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
+    assert.equal(await page.isVisible('#camera-note'), false, 'the camera note goes once the camera shows the paper');
     assert.match(await page.getAttribute('#overlay', 'src'), /cat\.svg$/);
     assert.equal(await page.isVisible('#hint'), true);
 
@@ -123,6 +134,7 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     assert.ok(await page.evaluate(() => localStorage.getItem('trace.unlock')));
     await page.locator('#welcome-go').tap();
     assert.match(await page.textContent('#note'), /Unlocked/);
+    assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button once unlocked');
     await page.locator('.tile[data-id="fish"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
@@ -286,6 +298,7 @@ test('inside the app outside the US there is no price and no buy button, only th
     assert.equal(await page.isVisible('#pay-price'), false);
     assert.doesNotMatch(await page.innerText('#paywall'), /\$/);
     assert.equal(await page.isVisible('#pay-elsewhere'), true);
+    assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button where the app may not sell');
   } finally { await browser.close(); w.close(); }
 });
 
@@ -312,6 +325,8 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
     await page.evaluate(() => window.scrollTo(0, 400));
     await page.locator('#describe-go').tap();
     await page.waitForSelector('#tracer:not([hidden])');
+    // Tracing starts once the camera shows the paper; wait for it before Done.
+    await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
     assert.equal(await page.evaluate(() => window.scrollY), 0, 'tracing pins the page at the top');
     assert.equal(await page.evaluate(() => document.documentElement.classList.contains('tracing')), true);
     assert.notEqual(await page.evaluate(() => document.activeElement?.id), 'describe', 'the keyboard is dismissed');
@@ -339,6 +354,23 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
     const seen = names(w.events);
     for (const step of ['TraceAIAsked', 'TracePicked:ai', 'TraceAIShown', 'TraceStarted:ai', 'TraceAIGenerated:free']) assert.ok(seen.includes(step), `${step} missing from ${seen.join(', ')}`);
     assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('while iOS asks for the camera, the page says why; the note goes once the camera shows', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.addInitScript(() => {
+      const real = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = constraints => new Promise(resolve => { window.__allow = () => resolve(real(constraints)); });
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.locator('.tile[data-id="house"]').tap();
+    await page.waitForSelector('#camera-note:not([hidden])');
+    assert.match(await page.textContent('#camera-note'), /Nothing is recorded/);
+    await page.evaluate(() => window.__allow());
+    await page.waitForSelector('#camera-note', { state: 'hidden' });
   } finally { await browser.close(); w.close(); }
 });
 

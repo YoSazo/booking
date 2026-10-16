@@ -7,13 +7,17 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=6">
+<link rel="stylesheet" href="/trace/trace.css?v=7">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a></header>
 <main id="home" class="home">
   <h1>Trace any picture onto paper.</h1>
-  <p class="lede">Point your phone at paper. Follow the lines. That's it.</p>
+  <ol class="steps" aria-label="How it works">
+    <li><span class="n">1</span><span>Pick a picture</span></li>
+    <li><span class="n">2</span><span>Phone on a glass over paper</span></li>
+    <li><span class="n">3</span><span>Trace the lines</span></li>
+  </ol>
 
   <section class="pick" aria-labelledby="pick-title">
     <h2 id="pick-title">Pick a picture</h2>
@@ -30,6 +34,7 @@
   </section>
 
   <p class="note" id="note">First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.</p>
+  <button type="button" class="ghost unlock-now" id="unlock-now">Unlock everything: $14.99 once</button>
 
   <footer class="foot">
     <a href="/trace/terms">Terms &amp; privacy</a>
@@ -42,6 +47,7 @@
 
 <section id="tracer" class="tracer" hidden aria-label="Tracing">
   <video id="cam" playsinline muted autoplay></video>
+  <p class="camera-note" id="camera-note" hidden>Allow the camera so you can see your paper under the picture. Nothing is recorded.</p>
   <div id="stage" class="stage"><img id="overlay" alt="" draggable="false"></div>
   <div class="topbar">
     <button type="button" class="pill" id="back" aria-label="Back to pictures">‹ Pictures</button>
@@ -119,6 +125,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=6" defer></script>
+<script src="/trace/trace.js?v=7" defer></script>
 </body>
 </html>

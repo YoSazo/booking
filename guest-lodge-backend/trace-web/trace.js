@@ -118,6 +118,8 @@
       ? '<strong>Unlocked.</strong> Trace anything, for good.'
       : canBuy() ? 'First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.'
       : 'Your first drawing is free.';
+    // For anyone who already knows they want it: pay straight away.
+    $('unlock-now').hidden = unlocked() || !canBuy();
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
@@ -360,8 +362,11 @@
     $('mode').hidden = !picture.photo; $('mode').textContent = 'Show photo';
     $('home').hidden = true; $('camera-help').hidden = true; $('tracer').hidden = false;
     track('TraceCameraAsked');
+    // Said before iOS asks, and gone once the camera shows the paper.
+    $('camera-note').hidden = false;
     try { if (!await startCamera(generation)) return; }
     catch (error) { if (generation === cameraGeneration) cameraFailed(error); return; }
+    finally { if (generation === cameraGeneration) $('camera-note').hidden = true; }
     // The free drawing is spent only once the camera is actually showing it.
     if (!unlocked() && !freeKey()) store.set('trace.free', picture.key);
     track('TraceStarted', picture.kind);
@@ -473,13 +478,15 @@
   });
 
   // ----- Paying -----
+  let paywallReason = '';
   function renderPaywall() {
     const buy = canBuy();
     for (const id of ['buy', 'pay-price', 'pay-sub', 'pay-perks', 'pay-fine']) $(id).hidden = !buy;
     $('pay-elsewhere').hidden = buy;
-    $('pay-title').textContent = buy ? 'Keep tracing anything' : 'That was your free drawing';
+    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' ? 'Unlock everything' : 'Keep tracing anything';
   }
   function showPaywall(reason, note = '') {
+    paywallReason = reason;
     track('TracePaywallShown', reason, { once: false });
     $('pay-note').textContent = note; $('pay-note').hidden = !note;
     $('pay-error').hidden = true;
@@ -487,6 +494,7 @@
     renderPaywall();
     openSheet('paywall');
   }
+  $('unlock-now').addEventListener('click', () => showPaywall('home'));
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('backdrop').addEventListener('click', () => { if (!$('paywall').hidden) track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('buy').addEventListener('click', async () => {
