@@ -7,7 +7,7 @@ const { TRACE, TRACE_EVENTS, registerTrace, unlockToken, unlockCode, verifyUnloc
 const SECRET = 'trace-test-secret';
 const PAID = 'cs_test_paidSession1234';
 
-function fakeWorld({ failMailOnce = false, rejectSuffix = false, env = {}, withWebhook = false } = {}) {
+function fakeWorld({ failMailOnce = false, rejectSuffix = false, env = {}, withWebhook = false, openai = null } = {}) {
   const rows = [];
   const unique = sourceId => rows.find(row => row.sourceId && row.sourceId === sourceId);
   const prisma = { inspectEvent: {
@@ -17,6 +17,8 @@ function fakeWorld({ failMailOnce = false, rejectSuffix = false, env = {}, withW
     },
     upsert: async ({ where, create }) => unique(where.sourceId) || (rows.push({ ...create }), create),
     delete: async ({ where }) => { const i = rows.findIndex(row => row.sourceId === where.sourceId); if (i >= 0) rows.splice(i, 1); },
+    count: async ({ where }) => rows.filter(row => Object.entries(where).every(([key, value]) => key === 'createdAt'
+      ? (row.createdAt || new Date()) >= value.gte : row[key] === value)).length,
   } };
   const sessions = new Map([
     [PAID, { id: PAID, mode: 'payment', payment_status: 'paid', status: 'complete', amount_total: 1499,
@@ -44,7 +46,7 @@ function fakeWorld({ failMailOnce = false, rejectSuffix = false, env = {}, withW
   app.set('trust proxy', true);
   app.use('/api/inspect-stripe-webhook', express.raw({ type: 'application/json' }));
   app.use(express.json());
-  const registration = registerTrace(app, { prisma, stripe, mail, queueCapi, capiConfigured: true, isCapiExcludedEmail: email => email === 'owner@example.test',
+  const registration = registerTrace(app, { prisma, stripe, mail, queueCapi, openai, capiConfigured: true, isCapiExcludedEmail: email => email === 'owner@example.test',
     env: { TRACE_UNLOCK_SECRET: SECRET, TRACE_PUBLIC_ORIGIN: 'https://bookmarketel.com', ...env } });
   const inspectRegistration = withWebhook ? require('../inspect').registerInspect(app, {
     prisma, stripe, mail, handleTraceStripeEvent: registration.handleStripeEvent,
@@ -341,6 +343,89 @@ test("the owner's own email unlocks through 'Already paid?' without a purchase, 
     assert.equal(rows.filter(r => r.name === 'TracePaid').length, 0);
     assert.equal(calls.capi.length, 0);
     assert.equal((await post('/api/trace/restore-code', { email: 'owner@example.test', code: '000000' === code ? '111111' : '000000' })).status, 400);
+  });
+});
+
+function fakeOpenAI({ refuse = false, fail = false } = {}) {
+  const prompts = [];
+  return { prompts, images: { generate: async params => {
+    prompts.push(params);
+    if (refuse) throw Object.assign(new Error('Your request was rejected by the safety system.'), { status: 400, code: 'moderation_blocked' });
+    if (fail) throw Object.assign(new Error('upstream'), { status: 500 });
+    return { data: [{ b64_json: 'UklGRg==' }] };
+  } } };
+}
+
+test('Describe it: one free AI picture per visitor, line-art prompt, counted only when drawn', async () => {
+  const openai = fakeOpenAI();
+  const { app, rows } = fakeWorld({ openai });
+  await serve(app, async ({ post }) => {
+    assert.equal((await post('/api/trace/generate', { prompt: 'x', visitorId: 'v_freevisitor1' })).status, 400);
+    const first = await post('/api/trace/generate', { prompt: '  a cat \n wearing a crown ', visitorId: 'v_freevisitor1' });
+    assert.equal(first.status, 200);
+    assert.equal(first.body.image, 'data:image/webp;base64,UklGRg==');
+    assert.match(openai.prompts[0].prompt, /black-and-white line drawing made for tracing[\s\S]*Subject: a cat wearing a crown$/);
+    assert.equal(openai.prompts[0].model, 'gpt-image-1-mini');
+    assert.equal(openai.prompts[0].quality, 'low');
+    assert.equal(openai.prompts[0].moderation, 'auto');
+    assert.equal(rows.filter(r => r.name === 'TraceAIGenerated' && r.detail === 'free').length, 1);
+    const second = await post('/api/trace/generate', { prompt: 'a dog', visitorId: 'v_freevisitor1' });
+    assert.equal(second.status, 402, 'the second free picture asks to unlock');
+    assert.equal(openai.prompts.length, 1, 'and costs nothing');
+    assert.equal((await post('/api/trace/generate', { prompt: 'a dog', visitorId: 'v_freevisitor1' }, { 'user-agent': 'Mozilla/5.0 HeadlessChrome/120' })).status, 403);
+  });
+});
+
+test('Describe it: a purchase gets its monthly allowance, then a clear limit', async () => {
+  const openai = fakeOpenAI();
+  const { app } = fakeWorld({ openai, env: { TRACE_AI_MONTHLY: '2' } });
+  await serve(app, async ({ post }) => {
+    const token = unlockToken(SECRET, PAID);
+    assert.equal((await post('/api/trace/generate', { prompt: 'a rocket', visitorId: 'v_buyerbuyer1', token })).status, 200);
+    assert.equal((await post('/api/trace/generate', { prompt: 'a robot', visitorId: 'v_buyerbuyer2', token })).status, 200);
+    const over = await post('/api/trace/generate', { prompt: 'a tree', visitorId: 'v_buyerbuyer3', token });
+    assert.equal(over.status, 429);
+    assert.match(over.body.error, /2 AI pictures this month/);
+    assert.equal((await post('/api/trace/generate', { prompt: 'a tree', visitorId: 'v_buyerbuyer3', token: unlockToken('forged', PAID) })).status, 200,
+      'a forged token is just a visitor, who still has their one free picture');
+  });
+});
+
+test('Describe it: the daily spending cap stops everyone, and 0 turns it off', async () => {
+  const openai = fakeOpenAI();
+  const capped = fakeWorld({ openai, env: { TRACE_AI_DAILY_CAP_USD: '0.04', TRACE_AI_COST_USD: '0.02' } });
+  await serve(capped.app, async ({ post }) => {
+    assert.equal((await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_capcapcap01' })).status, 200);
+    assert.equal((await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_capcapcap02' })).status, 200);
+    const rest = await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_capcapcap03' });
+    assert.equal(rest.status, 503);
+    assert.match(rest.body.error, /resting until tomorrow/);
+    assert.equal(openai.prompts.length, 2);
+  });
+  const off = fakeWorld({ openai: fakeOpenAI(), env: { TRACE_AI_DAILY_CAP_USD: '0' } });
+  await serve(off.app, async ({ post }) => {
+    assert.equal((await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_offoffoff01' })).status, 503);
+  });
+  const noKey = fakeWorld();
+  await serve(noKey.app, async ({ post }) => {
+    assert.equal((await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_nokeynokey1' })).status, 503, 'no OpenAI key, no generator');
+  });
+});
+
+test('Describe it: refused and failed drawings cost the visitor nothing and say so plainly', async () => {
+  const refused = fakeWorld({ openai: fakeOpenAI({ refuse: true }) });
+  await serve(refused.app, async ({ post }) => {
+    const res = await post('/api/trace/generate', { prompt: 'something not allowed', visitorId: 'v_refusedone1' });
+    assert.equal(res.status, 422);
+    assert.match(res.body.error, /can't draw that one/);
+    assert.equal(refused.rows.filter(r => r.name === 'TraceAIGenerated').length, 0, 'the free picture is not used up');
+    assert.equal(refused.rows.filter(r => r.name === 'TraceAIRefused').length, 1);
+  });
+  const failed = fakeWorld({ openai: fakeOpenAI({ fail: true }) });
+  await serve(failed.app, async ({ post }) => {
+    const res = await post('/api/trace/generate', { prompt: 'a moon', visitorId: 'v_failedone01' });
+    assert.equal(res.status, 502);
+    assert.equal(failed.rows.filter(r => r.name === 'TraceAIGenerated').length, 0);
   });
 });
 

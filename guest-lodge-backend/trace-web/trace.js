@@ -154,6 +154,52 @@
     if (!mayOpen(key)) return showPaywall('second');
     startTracing({ key, lines: `/trace/pictures/${id}.svg`, photo: '', kind: 'starter' });
   }
+  // ----- Describe it: AI line art to trace -----
+  // The drawing comes back as black lines on white. White becomes see-through
+  // so only the lines float over the camera, the same as a photo's sketch.
+  const aiCache = new Map();
+  async function inkOnly(source) {
+    const img = new Image();
+    img.src = source;
+    await img.decode();
+    const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height), d = pixels.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      let alpha = lum > 235 ? 0 : Math.min(255, Math.round((255 - lum) * 1.4));
+      if (alpha < 30) alpha = 0;
+      d[i] = 22; d[i + 1] = 19; d[i + 2] = 16; d[i + 3] = alpha;
+    }
+    ctx.putImageData(pixels, 0, 0);
+    return toBlobUrl(canvas, 'image/png');
+  }
+  $('describe-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const prompt = $('describe').value.replace(/\s+/g, ' ').trim();
+    if (prompt.length < 2) { $('describe').focus(); return; }
+    track('TraceAIAsked', '', { once: false });
+    track('TracePicked', 'ai', { once: false });
+    const key = `ai:${prompt.toLowerCase()}`;
+    if (!mayOpen(key)) return showPaywall('second');
+    $('describe').blur();
+    if (aiCache.has(key)) return startTracing({ key, lines: aiCache.get(key), photo: '', kind: 'ai' });
+    busy('Drawing your picture… about 10 seconds');
+    try {
+      const { image } = await api('/generate', { prompt, visitorId, ...(token ? { token } : {}) });
+      const lines = await inkOnly(image);
+      aiCache.set(key, lines);
+      busy('');
+      track('TraceAIShown');
+      startTracing({ key, lines, photo: '', kind: 'ai' });
+    } catch (error) {
+      busy('');
+      if (error.status === 402) return showPaywall('ai');
+      alert(error.message || "The drawing didn't come out. Please try again.");
+    }
+  });
+
   $('own').addEventListener('change', async event => {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';

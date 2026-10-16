@@ -14,8 +14,8 @@ const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebK
 const FACEBOOK = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22F76 [FBAN/FBIOS;FBAV/520.0.0.38.101;FBBV/700000000;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/18.5;FBSS/3;FBCR/;FBID/phone;FBLC/en_US;FBOP/80]';
 const PHOTO = path.resolve(__dirname, '../../public/inspect/sample/claims-wall-thumb.jpg');
 
-async function world() {
-  const events = [], creates = [];
+async function world({ drawing = null } = {}) {
+  const events = [], creates = [], prompts = [];
   const sessions = new Map([['cs_test_paidSession1234', { id: 'cs_test_paidSession1234', mode: 'payment', payment_status: 'paid', amount_total: 1499,
     customer_details: { email: 'buyer@example.test' }, metadata: { product: 'trace', visitorId: '' } }]]);
   const rows = [];
@@ -23,7 +23,9 @@ async function world() {
     create: async ({ data }) => { if (data.sourceId && rows.some(r => r.sourceId === data.sourceId)) throw Object.assign(new Error('dup'), { code: 'P2002' }); rows.push(data); events.push(data); return data; },
     upsert: async ({ where, create }) => rows.find(r => r.sourceId === where.sourceId) || (rows.push(create), events.push(create), create),
     delete: async () => {},
+    count: async ({ where }) => rows.filter(row => Object.entries(where).every(([key, value]) => key === 'createdAt' || row[key] === value)).length,
   } };
+  const openai = { images: { generate: async params => { prompts.push(params.prompt); return { data: [{ b64_json: drawing }] }; } } };
   const stripe = { checkout: { sessions: {
     create: async params => { creates.push(params); return { id: 'cs_test_newSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_newSession123' }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { statusCode: 404 }); return sessions.get(id); },
@@ -31,10 +33,10 @@ async function world() {
   } } };
   const app = express();
   app.use(express.json());
-  registerTrace(app, { prisma, stripe, mail: { sendMail: async () => {} }, env: { TRACE_UNLOCK_SECRET: 's', TRACE_PUBLIC_ORIGIN: 'http://127.0.0.1' } });
+  registerTrace(app, { prisma, stripe, openai: drawing ? openai : null, mail: { sendMail: async () => {} }, env: { TRACE_UNLOCK_SECRET: 's', TRACE_PUBLIC_ORIGIN: 'http://127.0.0.1' } });
   const server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
-  return { base: `http://127.0.0.1:${server.address().port}`, events, creates, sessions, close: () => server.close() };
+  return { base: `http://127.0.0.1:${server.address().port}`, events, creates, sessions, prompts, close: () => server.close() };
 }
 
 async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
@@ -284,6 +286,51 @@ test('inside the app outside the US there is no price and no buy button, only th
     assert.equal(await page.isVisible('#pay-price'), false);
     assert.doesNotMatch(await page.innerText('#paywall'), /\$/);
     assert.equal(await page.isVisible('#pay-elsewhere'), true);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('Describe it: type a picture, it is drawn as see-through lines to trace; the second one asks to unlock', async () => {
+  // A real WebP line drawing: black circle on white, made by Chromium itself.
+  const maker = await chromium.launch();
+  const drawing = await (await maker.newPage()).evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 256, 256);
+    x.strokeStyle = '#000'; x.lineWidth = 10; x.beginPath(); x.arc(128, 128, 80, 0, Math.PI * 2); x.stroke();
+    return c.toDataURL('image/webp').split(',')[1];
+  });
+  await maker.close();
+  const w = await world({ drawing });
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#describe');
+    const box = await page.locator('#describe-form').boundingBox();
+    assert.ok(box.y + box.height <= 664, `the describe box is on the first screen (bottom at ${box.y + box.height})`);
+    await page.fill('#describe', 'a cat wearing a crown');
+    await page.locator('#describe-go').tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    assert.match(w.prompts[0], /Subject: a cat wearing a crown$/);
+    const pixels = await page.evaluate(async () => {
+      const img = document.getElementById('overlay'); await img.decode();
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data;
+      return { corner: d[3], ring: d[(128 * c.width + 48) * 4 + 3] };
+    });
+    assert.equal(pixels.corner, 0, 'white paper becomes see-through');
+    assert.ok(pixels.ring > 200, `the line stays dark, alpha ${pixels.ring}`);
+    await page.locator('#done').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.match(await page.textContent('#paywall'), /30 AI pictures a month/);
+    await page.locator('#pay-later').tap();
+    await page.fill('#describe', 'a dog');
+    await page.locator('#describe-go').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(w.prompts.length, 1, 'no second free drawing is paid for');
+    await settle();
+    const seen = names(w.events);
+    for (const step of ['TraceAIAsked', 'TracePicked:ai', 'TraceAIShown', 'TraceStarted:ai', 'TraceAIGenerated:free']) assert.ok(seen.includes(step), `${step} missing from ${seen.join(', ')}`);
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); w.close(); }
 });
 

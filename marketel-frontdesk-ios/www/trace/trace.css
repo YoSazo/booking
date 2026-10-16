@@ -132,3 +132,8 @@ h1 { font-size: 34px; line-height: 1.08; letter-spacing: -1.2px; margin: 18px 0 
 
 .as-button { text-align: center; line-height: 58px; text-decoration: none; margin-bottom: 10px; }
 #code-form input { letter-spacing: 0.3em; text-align: center; }
+
+.describe { display: flex; gap: 8px; margin-top: 12px; }
+.describe input { flex: 1; min-width: 0; min-height: 54px; border-radius: 16px; border: 1.5px solid var(--line); background: #fff; padding: 0 14px; font-size: 16px; color: var(--ink); }
+.describe input:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px #2e7d5b22; }
+.describe button { min-height: 54px; padding: 0 16px; border: 0; border-radius: 16px; background: var(--ink); color: #fff; font-weight: 700; font-size: 16px; white-space: nowrap; }

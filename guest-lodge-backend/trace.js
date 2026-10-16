@@ -30,8 +30,22 @@ const TRACE_EVENTS = Object.freeze([
   'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown', 'TraceStarted',
   'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone',
   'TracePaywallShown', 'TracePaywallClosed', 'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed',
-  'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked',
+  'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown',
 ]);
+
+// "Describe it": OpenAI draws simple line art to trace. Every picture costs
+// money, so the server counts each one (TraceAIGenerated rows), allows one free
+// picture per visitor, a monthly allowance per purchase, and stops for the day
+// at a total spending cap.
+const AI_STYLE = [
+  'A simple, clean black-and-white line drawing made for tracing onto paper.',
+  'Bold, smooth black outlines on a plain white background.',
+  'No shading, no color, no gray fill, no text, no border, no frame.',
+  'One subject, centered, filling most of the picture, with a beginner-friendly amount of detail.',
+  'If the request names a trademarked or copyrighted character, draw an original character in a similar spirit instead.',
+  'Subject:',
+].join(' ');
+const promptOf = value => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 
 // What Meta may optimise for. Starting to trace (camera on, picture over it) is
 // the first deliberate act; a Checkout ready to pay is the checkout signal. The
@@ -48,7 +62,9 @@ const emailOf = value => {
   const email = String(value || '').trim().toLowerCase();
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 };
-const fail = (status, message) => Object.assign(new Error(message), { status });
+// Messages written here are meant for the buyer (shown even for 5xx); any
+// other error keeps its details in the log.
+const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 
 function unlockSignature(secret, sessionId) {
   return crypto.createHmac('sha256', secret).update(`trace-unlock:${sessionId}`).digest('base64url').slice(0, 32);
@@ -94,6 +110,7 @@ function registerTrace(app, {
   queueCapi = null,
   capiConfigured = false,
   isCapiExcludedEmail = () => false,
+  openai = null,
   env = process.env,
 }) {
   const origin = String(env.TRACE_PUBLIC_ORIGIN || env.INSPECT_PUBLIC_ORIGIN || 'https://bookmarketel.com').replace(/\/+$/, '');
@@ -299,6 +316,76 @@ function registerTrace(app, {
   // "Already paid?": the unlock link goes only to the email that paid, and the
   // answer is the same whether or not that email bought, so this cannot be used
   // to find out who has.
+  // ----- Describe it: AI line art -----
+  const aiModel = env.TRACE_IMAGE_MODEL || 'gpt-image-1-mini';
+  const aiCost = Number(env.TRACE_AI_COST_USD) > 0 ? Number(env.TRACE_AI_COST_USD) : 0.02;
+  const aiDailyCap = Number(env.TRACE_AI_DAILY_CAP_USD) >= 0 && env.TRACE_AI_DAILY_CAP_USD !== undefined && env.TRACE_AI_DAILY_CAP_USD !== '' ? Number(env.TRACE_AI_DAILY_CAP_USD) : 5;
+  const aiMonthly = Number(env.TRACE_AI_MONTHLY) > 0 ? Math.floor(Number(env.TRACE_AI_MONTHLY)) : 30;
+  let aiClient = openai;
+  const imageApi = () => {
+    if (aiClient) return aiClient;
+    if (!env.OPENAI_API_KEY) return null;
+    const OpenAI = require('openai');
+    aiClient = new OpenAI({ apiKey: env.OPENAI_API_KEY, timeout: 90000, maxRetries: 0 });
+    return aiClient;
+  };
+  const purchaseKey = sessionId => `p_${crypto.createHash('sha256').update(`trace-ai:${sessionId}`).digest('hex').slice(0, 20)}`;
+  const generated = where => prisma.inspectEvent.count({ where: { tool: TRACE.product, name: 'TraceAIGenerated', ...where } });
+  router.post('/generate', guarded(async (req, res) => {
+    if (automatedBrowser(req)) throw fail(403, 'Not available.');
+    const api = imageApi();
+    if (!api) throw fail(503, "The drawing maker isn't available right now.");
+    rate(`trace-ai:${req.ip}`, 12, 3600000);
+    const prompt = promptOf(req.body?.prompt);
+    if (prompt.length < 2) throw fail(400, 'Type what you want to draw.');
+    const visitorId = visitorOf(req.body?.visitorId);
+    const sessionId = req.body?.token ? verifyUnlock(secret, req.body.token) : null;
+    const now = new Date();
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (aiDailyCap === 0 || (await generated({ createdAt: { gte: dayStart } })) * aiCost >= aiDailyCap) {
+      throw fail(503, 'The drawing maker is resting until tomorrow. Pick a picture or use your own photo.');
+    }
+    let detail;
+    if (sessionId) {
+      detail = purchaseKey(sessionId);
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      if (await generated({ detail, createdAt: { gte: monthStart } }) >= aiMonthly) {
+        throw fail(429, `You've made your ${aiMonthly} AI pictures this month. More next month, and you can still use any picture or photo.`);
+      }
+    } else {
+      if (!visitorId) throw fail(400, 'Reload the page and try again.');
+      // One free picture per visitor, and a few per network a day for anyone
+      // clearing their browser to get more.
+      if (await generated({ visitorId, detail: 'free' }) >= 1) throw fail(402, 'Your free AI picture is used. Unlock to make more.');
+      rate(`trace-ai-free:${req.ip}`, 3, 86400000);
+      detail = 'free';
+    }
+    let image;
+    try {
+      const result = await api.images.generate({
+        model: aiModel,
+        prompt: `${AI_STYLE} ${prompt}`,
+        size: '1024x1024',
+        quality: 'low',
+        output_format: 'webp',
+        moderation: 'auto',
+        n: 1,
+        user: crypto.createHash('sha256').update(`trace:${sessionId || visitorId || req.ip}`).digest('hex').slice(0, 32),
+      });
+      image = result?.data?.[0]?.b64_json;
+    } catch (error) {
+      const refused = error?.code === 'moderation_blocked' || /safety|moderation|content policy/i.test(String(error?.message || ''));
+      await record(refused ? 'TraceAIRefused' : 'TraceAIFailed', { visitorId }).catch(() => {});
+      if (refused) throw fail(422, "We can't draw that one. Try describing something else.");
+      console.error('Trace AI generation failed:', error?.status || '', error?.code || '', String(error?.message || '').slice(0, 200));
+      throw fail(502, "The drawing didn't come out. Please try again.");
+    }
+    if (!image) throw fail(502, "The drawing didn't come out. Please try again.");
+    // Counted only when a picture was actually made (and billed).
+    await record('TraceAIGenerated', { visitorId, detail });
+    res.json({ image: `data:image/webp;base64,${image}` });
+  }));
+
   router.post('/restore', guarded(async (req, res) => {
     rate(`trace-restore:${req.ip}`, 10, 3600000);
     const email = emailOf(req.body?.email);
@@ -337,8 +424,8 @@ function registerTrace(app, {
 
   router.use((error, req, res, _next) => {
     const status = Number(error?.status) || (error?.type === 'entity.parse.failed' ? 400 : 500);
-    if (status >= 500) console.error('Trace route failed:', error?.message || error);
-    res.status(status).json({ error: status >= 500 ? 'Something went wrong. Please try again.' : error.message });
+    if (status >= 500 && !error?.forBuyer) console.error('Trace route failed:', error?.message || error);
+    res.status(status).json({ error: status >= 500 && !error?.forBuyer ? 'Something went wrong. Please try again.' : error.message });
   });
   app.use('/api/trace', router);
   return { handleStripeEvent };

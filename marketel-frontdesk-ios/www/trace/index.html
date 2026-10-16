@@ -7,7 +7,7 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=4">
+<link rel="stylesheet" href="/trace/trace.css?v=5">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a></header>
@@ -18,6 +18,10 @@
   <section class="pick" aria-labelledby="pick-title">
     <h2 id="pick-title">Pick a picture</h2>
     <div class="grid" id="grid"></div>
+    <form class="describe" id="describe-form" novalidate>
+      <input type="text" id="describe" maxlength="200" autocomplete="off" enterkeyhint="go" placeholder="Or describe it: a dragon" aria-label="Describe what you want to draw">
+      <button type="submit" id="describe-go">Draw it</button>
+    </form>
     <label class="own" id="own-label">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
       <span>Use my own photo</span>
@@ -77,6 +81,7 @@
   <p class="sub" id="pay-elsewhere" hidden>Already paid on the web? Unlock it here with the code from your email.</p>
   <ul class="perks" id="pay-perks">
     <li>Your own photos and every picture</li>
+    <li>30 AI pictures a month: describe it, we draw it</li>
     <li>As many drawings as you like</li>
     <li>Works on any phone. Nothing to install.</li>
   </ul>
@@ -114,6 +119,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=4" defer></script>
+<script src="/trace/trace.js?v=5" defer></script>
 </body>
 </html>
