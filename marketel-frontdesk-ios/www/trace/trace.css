@@ -163,3 +163,27 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .compare .us { background: var(--green-pale); border: 2px solid var(--green); color: var(--ink); }
 .compare .us strong { color: var(--green-dark); font-size: 22px; }
 @media (prefers-reduced-motion: reduce) { .sheet:not([hidden]) { animation: none; } }
+
+/* Social proof under the offer, below the first screen: the star line, then a slow tape of real
+   reviews that never stops by itself. The mask, own layer and will-change keep
+   WebKit from skipping the first paint of the moving track. */
+.proof { min-height: 138px; margin: 22px 0 0; }
+.trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 2px 8px; flex-wrap: wrap; }
+.review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
+.review-stars-off { color: var(--line); }
+.trust-text { color: var(--muted); font-size: 14px; font-weight: 600; }
+.tape { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); isolation: isolate; transform: translateZ(0); }
+.tape-track { display: flex; width: max-content; animation: tape 77s linear infinite; will-change: transform; backface-visibility: hidden; }
+.tape-run { display: flex; gap: 10px; padding-right: 10px; }
+.tape-card { flex: 0 0 220px; width: 220px; margin: 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.tape-card .review-stars { display: block; margin-bottom: 4px; font-size: 13px; }
+.tape-card blockquote { margin: 0; padding: 0; white-space: normal; font-size: 13px; line-height: 1.35; letter-spacing: -.15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tape-card figcaption { margin-top: 6px; }
+.review-name { font-weight: 700; font-size: 12px; }
+@keyframes tape { to { transform: translateX(-50%); } }
+@media (hover: hover) and (pointer: fine) { .tape:hover .tape-track { animation-play-state: paused; } }
+@media (prefers-reduced-motion: reduce) {
+  .tape-track { animation: none; }
+  .tape { overflow-x: auto; }
+  .tape-run + .tape-run { display: none; }
+}
