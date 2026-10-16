@@ -58,13 +58,19 @@ server-side `TracePaid`.
 
 `/funnel` doesn't show this tool yet, so read it from the database.
 
-Three events go to Meta through the same pixel and CAPI queue as Claims:
+Four events go to Meta through the same pixel and CAPI queue as Claims, each
+once per visitor. The campaign optimises ViewContent:
 
 | Step | Meta event |
 |---|---|
-| `TraceStarted` | ViewContent |
+| `TracePicked` (first deliberate tap: a picture, a photo or a description) | ViewContent |
+| `TraceStarted` (tracing on camera) | AddToCart ($14.99) |
 | `TraceCheckoutOpened` | InitiateCheckout ($14.99) |
 | Confirmed payment | Purchase |
+
+Until 2026-10-16 ViewContent was `TraceStarted`. It was moved one step earlier
+because 0 of the first 7 visitors started tracing, which left Meta nothing to
+learn from.
 
 Owner browsers (`?notrack=1`, which uses the same `marketel.noTrack` key as
 Claims) and headless browsers are left out. Owner/test purchases do not create
