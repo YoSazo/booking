@@ -164,10 +164,10 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .compare .us strong { color: var(--green-dark); font-size: 22px; }
 @media (prefers-reduced-motion: reduce) { .sheet:not([hidden]) { animation: none; } }
 
-/* Social proof under the offer, below the first screen: the star line, then a slow tape of real
+/* Social proof at the top, under the header: the star line, then a slow tape of real
    reviews that never stops by itself. The mask, own layer and will-change keep
    WebKit from skipping the first paint of the moving track. */
-.proof { min-height: 138px; margin: 22px 0 0; }
+.proof { min-height: 138px; margin: 12px 0 0; }
 .trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 2px 8px; flex-wrap: wrap; }
 .review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
 .review-stars-off { color: var(--line); }
