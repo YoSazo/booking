@@ -44,7 +44,7 @@
   const tapeCard = review => `<figure class="tape-card">${reviewStars(review.stars)}<blockquote>${esc(review.quote)}</blockquote><figcaption><span class="review-name">${esc(review.name)}</span></figcaption></figure>`;
   (() => {
     const average = REVIEWS.reduce((sum, review) => sum + review.stars, 0) / REVIEWS.length;
-    $('trust').innerHTML = reviewStars(average);
+    $('trust').innerHTML = `${reviewStars(average)}<span class="trust-text">${average.toFixed(1)} from ${REVIEWS.length} reviews</span>`;
     const run = REVIEWS.map(tapeCard).join('');
     $('tape-track').innerHTML = `<div class="tape-run">${run}</div><div class="tape-run" aria-hidden="true">${run}</div>`;
   })();
