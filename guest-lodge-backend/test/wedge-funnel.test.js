@@ -209,3 +209,39 @@ test('where they came from is its own card, and "only ad clicks" keeps just thos
   assert.ok(['OfferFrom', 'OfferBrowser'].every(name => VISITOR_EVENTS.includes(name)));
   assert.deepEqual(onlyAdClicks([ev('OfferLanded', 'v_old')]), [], 'a visit from before the source was recorded is left out');
 });
+
+test('Marketel Trace has its own ladder, side cards and ad-click filter', () => {
+  const { buildWedgeFunnel, definitionFor, onlyAdClicks } = require('../wedge-funnel');
+  const at = '2026-10-16T18:00:00Z';
+  const ev = (name, visitorId, detail = null) => ({ id: `${name}-${visitorId}-${detail}`, name, visitorId, detail, accountId: null, createdAt: at });
+  const events = [
+    ev('TraceLanded', 'v_one', 'web'), ev('TraceFrom', 'v_one', 'ad'), ev('TracePicked', 'v_one', 'ai'), ev('TraceAIGenerated', 'v_one', 'free'),
+    ev('TraceStarted', 'v_one', 'ai'), ev('TraceTraced30', 'v_one'), ev('TracePaywallShown', 'v_one', 'done'), ev('TraceCheckoutTapped', 'v_one'),
+    ev('TraceCheckoutOpened', 'v_one'), ev('TracePaid', 'v_one'),
+    ev('TraceLanded', 'v_two', 'web'), ev('TraceFrom', 'v_two', 'direct'), ev('TracePicked', 'v_two', 'starter'), ev('TraceCameraDenied', 'v_two', 'denied'),
+  ];
+  const trace = definitionFor('trace');
+  const f = buildWedgeFunnel(events, trace);
+  const row = key => f.steps.find(step => step.key === key);
+  assert.equal(row('landed').people, 2);
+  assert.equal(row('picked').people, 2);
+  assert.equal(row('started').people, 1);
+  assert.equal(row('started').ofPrevious, 0.5);
+  assert.equal(row('paid').people, 1);
+  assert.equal(row('traced30').aside, true);
+  assert.equal(f.split, null, 'no phone/computer split for Trace');
+  assert.deepEqual(f.tiles.map(([, key]) => key), ['landed', 'picked', 'started', 'traced30', 'paywall', 'tapped', 'checkout', 'paid']);
+  const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
+  assert.equal(card('picked')['Describe it (AI)'], 1);
+  assert.equal(card('picked')['A starter picture'], 1);
+  assert.equal(card('camera')['Blocked by the person'], 1);
+  assert.equal(card('ai')['Picture drawn (costs money)'], 1);
+  assert.equal(card('from')['Clicked the ad (Meta click id)'], 1);
+  assert.ok(f.recent.some(r => r.label === 'Paid $14.99'));
+  assert.ok(f.recent.some(r => r.name === 'TraceFrom' && r.label === 'Where they came from' && r.detail === 'ad'));
+  const adOnly = buildWedgeFunnel(onlyAdClicks(events, events, trace.fromEvent), trace);
+  assert.equal(adOnly.steps.find(s => s.key === 'landed').people, 1, 'only the visitor who clicked the ad');
+  assert.ok(trace.visitorEvents.includes('TraceStarted') && !trace.visitorEvents.includes('TracePaid'), 'a reset never deletes payments');
+  // The report wedges are unchanged.
+  assert.equal(definitionFor('claims').fromEvent, 'OfferFrom');
+});

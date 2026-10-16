@@ -64,7 +64,7 @@ test('explicit dashboard periods bypass reset clipping; server exposes actual bo
   assert.match(route, /timezone: range\.timeZone/);
   assert.match(route, /requestedFrom/);
   assert.match(route, /take: 20001/);
-  assert.match(route, /onlyAdClicks\(visibleEvents, adSources\)/);
+  assert.match(route, /onlyAdClicks\(visibleEvents, adSources, definition\.fromEvent\)/);
   assert.match(route, /if \(e\.status === 400\)/);
 });
 

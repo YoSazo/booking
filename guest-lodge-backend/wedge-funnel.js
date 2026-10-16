@@ -100,6 +100,55 @@ const LABELS = Object.freeze(Object.fromEntries([
   ['TrialReminderSent', 'Trial reminder sent'], ['LifetimePurchased', 'Paid once'], ['LifetimeRefunded', 'Paid once again: refunded'], ['VoiceNoteDrafted', 'Voice note drafted'], ['VoiceNoteRecorded', 'Recorded a voice note'],
 ]));
 
+// Marketel Trace is its own page (trace.js), not a report wedge, so it has its
+// own ladder: landing, picking something, tracing, the price, paying.
+const TRACE_STEPS = Object.freeze([
+  { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
+  { key: 'picked', label: 'Picked a picture, a photo or a description', names: ['TracePicked'] },
+  { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
+  { key: 'started', label: 'Started tracing (what Meta hears)', names: ['TraceStarted'] },
+  { key: 'traced30', label: 'Traced for 30 seconds', names: ['TraceTraced30'], aside: true },
+  { key: 'traced120', label: 'Traced for 2 minutes', names: ['TraceTraced120'], aside: true },
+  { key: 'done', label: 'Tapped Done', names: ['TraceDone'], aside: true },
+  { key: 'paywall', label: 'Saw the price', names: ['TracePaywallShown'] },
+  { key: 'tapped', label: 'Tapped Unlock', names: ['TraceCheckoutTapped'] },
+  { key: 'checkout', label: 'Stripe checkout opened (what Meta hears)', names: ['TraceCheckoutOpened'] },
+  { key: 'paid', label: 'Paid $14.99', names: ['TracePaid'] },
+  { key: 'unlocked', label: 'Came back unlocked', names: ['TraceUnlocked'], aside: true },
+]);
+const TRACE_BRANCHES = Object.freeze([
+  { key: 'picked', label: 'What they picked', steps: [['A starter picture', ['TracePicked:starter']], ['Their own photo', ['TracePicked:photo']], ['Describe it (AI)', ['TracePicked:ai']]] },
+  { key: 'ai', hideWhenEmpty: true, label: 'Describe it (AI)', steps: [['Typed a description', ['TraceAIAsked']], ['Picture drawn (costs money)', ['TraceAIGenerated']], ['Shown to trace', ['TraceAIShown']], ['Refused by the safety filter', ['TraceAIRefused']], ['Failed', ['TraceAIFailed']]] },
+  { key: 'camera', label: 'The camera', steps: [['Camera on, tracing', ['TraceStarted']], ['Blocked by the person', ['TraceCameraDenied:denied']], ['No camera found', ['TraceCameraDenied:nocamera']], ["Browser can't use it", ['TraceCameraDenied:unsupported']], ['Other camera error', ['TraceCameraDenied:error']], ['Told to open in Safari (in-app browser)', ['TraceCameraHelpShown:inapp']]] },
+  { key: 'using', label: 'While tracing', steps: [['Changed the fade', ['TraceFaded']], ['Moved or resized the picture', ['TraceMoved']], ['Locked the picture', ['TraceLocked']], ['Tapped Done', ['TraceDone']]] },
+  { key: 'price', label: 'When they saw the price', steps: [['After tapping Done', ['TracePaywallShown:done']], ['Picked a second picture', ['TracePaywallShown:second']], ['Asked for a second AI picture', ['TracePaywallShown:ai']], ['Came back from Stripe unpaid', ['TracePaywallShown:cancelled']], ['Closed it ("Not now")', ['TracePaywallClosed']]] },
+  { key: 'checkout', label: 'Checkout', steps: [['Tapped Unlock', ['TraceCheckoutTapped']], ["Checkout didn't open", ['TraceCheckoutFailed']], ['Came back without paying', ['TraceCheckoutCancelled']], ['Paid', ['TracePaid']]] },
+  { key: 'restore', hideWhenEmpty: true, label: 'Already paid?', steps: [['Asked to restore', ['TraceRestoreAsked']], ['Unlocked with the code', ['TraceUnlocked:code']], ['Unlocked with the email link', ['TraceUnlocked:link']]] },
+  { key: 'from', label: 'Where they came from', steps: [['Clicked the ad (Meta click id)', ['TraceFrom:ad']], ['From Facebook or Instagram, no click id', ['TraceFrom:social']], ['No referrer: typed, QR, or you', ['TraceFrom:direct']], ['From another site', ['TraceFrom:other']]] },
+  { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['TraceBrowser:instagram']], ['Facebook app', ['TraceBrowser:facebook']], ['Safari', ['TraceBrowser:safari']], ['Chrome', ['TraceBrowser:chrome']], ['Other', ['TraceBrowser:other']]] },
+  { key: 'where', label: 'Web or iPhone app', steps: [['On the web', ['TraceLanded:web']], ['In the iPhone app', ['TraceLanded:app']]] },
+]);
+const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
+  'TraceStarted', 'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone', 'TracePaywallShown', 'TracePaywallClosed',
+  'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed', 'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown']);
+// Branch labels first, so a ladder step's own label wins for the same event.
+const labelsOf = (steps, branches) => Object.fromEntries([
+  ...branches.flatMap(branch => branch.steps.flatMap(([label, names]) => names.map(name => [name.split(':')[0], label]))),
+  ...steps.flatMap(step => step.names.map(name => [name, step.label])),
+]);
+// What each dashboard shows: the report wedges share one definition.
+const DEFINITIONS = Object.freeze({
+  report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
+  trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
+    // Events whose detail says which one (source, browser, what was picked) are
+    // named for the card; the detail column shows the value.
+    labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
+      TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
+      TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
+    tiles: [['Landed', 'landed'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
+});
+const definitionFor = tool => DEFINITIONS[tool] || DEFINITIONS.report;
+
 const personOf = event => event.visitorId || (event.accountId ? `account:${event.accountId}` : `event:${event.id}`);
 // "CancellationScheduled:trial" matches that event with that detail;
 // "LandingViewed:!app" matches it with any other detail.
@@ -111,10 +160,11 @@ const matches = (event, names) => names.some(name => {
 });
 const people = (events, names) => new Set(events.filter(event => matches(event, names)).map(personOf)).size;
 
-function buildWedgeFunnel(events) {
-  const landed = people(events, STEPS[0].names);
+function buildWedgeFunnel(events, definition = DEFINITIONS.report) {
+  const { steps: STEP_LIST, branches: BRANCH_LIST, labels: LABEL_MAP } = definition;
+  const landed = people(events, STEP_LIST[0].names);
   let previous = null;
-  const steps = STEPS.map(step => {
+  const steps = STEP_LIST.map(step => {
     const count = people(events, step.names);
     const latest = events.filter(event => matches(event, step.names)).reduce((last, event) => Math.max(last, new Date(event.createdAt).getTime()), 0);
     const row = { key: step.key, label: step.label, people: count,
@@ -140,17 +190,17 @@ function buildWedgeFunnel(events) {
   });
   // Rows and cards about a feature a wedge does not use stay off the page until someone has used it.
   const shown = steps.filter(row => !(row.hideWhenEmpty && !row.people && !(row.children || []).some(child => child.people)));
-  const branches = BRANCHES.map(branch => ({ key: branch.key, label: branch.label, hideWhenEmpty: !!branch.hideWhenEmpty,
+  const branches = BRANCH_LIST.map(branch => ({ key: branch.key, label: branch.label, hideWhenEmpty: !!branch.hideWhenEmpty,
     steps: branch.steps.map(([label, names]) => ({ label, people: people(events, names) })) }))
     .filter(branch => !(branch.hideWhenEmpty && branch.steps.every(step => !step.people)));
   const starts = events.filter(event => event.name === 'SimStarted' || event.name === 'OfferLanded');
-  const split = { phone: new Set(starts.filter(e => e.detail === 'phone').map(personOf)).size,
+  const split = definition.split ? { phone: new Set(starts.filter(e => e.detail === 'phone').map(personOf)).size,
     desktop: new Set(starts.filter(e => e.detail === 'desktop').map(personOf)).size,
-    unknown: new Set(starts.filter(e => e.detail !== 'phone' && e.detail !== 'desktop').map(personOf)).size };
+    unknown: new Set(starts.filter(e => e.detail !== 'phone' && e.detail !== 'desktop').map(personOf)).size } : null;
   const recent = [...events].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 150).map(event => ({
-    name: event.name, label: LABELS[event.name] || event.name, detail: event.detail || null,
+    name: event.name, label: LABEL_MAP[event.name] || event.name, detail: event.detail || null,
     who: personOf(event).replace(/^(v_|account:|event:)/, '').slice(-6), at: new Date(event.createdAt).toISOString() }));
-  return { steps: shown, branches, split, recent, events: events.length };
+  return { steps: shown, branches, split, recent, events: events.length, ...(definition.tiles ? { tiles: definition.tiles } : {}) };
 }
 
 // Owner and App Review accounts, including plus-aliases of the owner emails
@@ -176,9 +226,10 @@ async function countingSince(prisma, tool) {
 
 // Only the people who arrived with Meta's click id, with everything they did (a payment record
 // carries the visitor id too). Visits from before the source was recorded are left out.
-function onlyAdClicks(events, sources = events) {
-  const ads = new Set(sources.filter(event => event.name === 'OfferFrom' && event.detail === 'ad' && event.visitorId).map(event => event.visitorId));
+function onlyAdClicks(events, sources = events, fromEvent = 'OfferFrom') {
+  const ads = new Set(sources.filter(event => event.name === fromEvent && event.detail === 'ad' && event.visitorId).map(event => event.visitorId));
   return events.filter(event => event.visitorId && ads.has(event.visitorId));
 }
 
-module.exports = { onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince };
+module.exports = { onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince,
+  TRACE_STEPS, TRACE_BRANCHES, TRACE_VISITOR_EVENTS, DEFINITIONS, definitionFor };

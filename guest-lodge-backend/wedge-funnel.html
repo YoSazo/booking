@@ -45,6 +45,7 @@
   .date-fields label { flex: 1 1 200px; min-width: 0; }
   #custom-range { margin-top: 12px; }
   #custom-range[hidden] { display: none; }
+  .split[hidden], #split-card[hidden] { display: none; }
   #apply-range { padding: 9px 16px; border: 0; border-radius: 10px; background: var(--green); color: #fff; font-weight: 600; cursor: pointer; }
   #range-summary { margin: 12px 0 4px; font-size: 14px; font-weight: 600; }
   #range-error { margin: 6px 0 0; }
@@ -164,7 +165,7 @@
     <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>Of the step before</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
   </section>
 
-  <section class="card">
+  <section class="card" id="split-card">
     <h2>Where they landed</h2>
     <div class="split" id="split"></div>
   </section>
@@ -266,7 +267,7 @@ function render(data) {
   if ($('since-toggle')) $('since-toggle').onclick = () => { state.period = state.period === 'since-reset' ? 'today' : 'since-reset'; saveState(); load(); };
   const rows = data.steps.flatMap(s => [s, ...(s.children || [])]);
   const step = key => rows.find(s => s.key === key) || { people: 0, ofLanded: null };
-  const tiles = [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Did something on purpose', 'engaged'], ['Stayed 20s', 'stayed'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Scrolled halfway', 'scroll50'], ['Tapped the button', 'tapped'], ['Stripe session', 'stripe'], ['Payment form ready', 'checkout-ready'], ['Paid once or trial', 'trial'], ['Paid', 'paid']].filter(([, key]) => rows.some(row => row.key === key));
+  const tiles = (data.tiles || [['Landed', 'landed'], ['Saw the video', 'sawvideo'], ['Did something on purpose', 'engaged'], ['Stayed 20s', 'stayed'], ['Answered the question', 'picked'], ['Said I want this', 'want'], ["Said I don't want this", 'decline'], ['Saw the offer card', 'sawoffer'], ['Scrolled halfway', 'scroll50'], ['Tapped the button', 'tapped'], ['Stripe session', 'stripe'], ['Payment form ready', 'checkout-ready'], ['Paid once or trial', 'trial'], ['Paid', 'paid']]).filter(([, key]) => rows.some(row => row.key === key));
   $('tiles').innerHTML = tiles.map(([label, key], i) => {
     const s = step(key);
     return `<div class="tile"><small>${esc(label)}</small><strong>${s.people}</strong><span>${i ? `${pct(s.ofLanded)} of landed` : data.adOnly ? 'ad-attributed visitors' : 'visitors from all sources'}</span>${s.lastAt ? `<small class="last-event">Last: ${esc(zoned(s.lastAt))}</small>` : ''}</div>`;
@@ -293,6 +294,7 @@ function render(data) {
     row.onmousemove = e => tip(e, `<b>${esc(s.label)}</b><br>${s.people} ${s.people === 1 ? 'person' : 'people'}${prev ? `<br>${pct(s.ofPrevious)} of the ${prev.people} who ${esc(prev.label.toLowerCase())}` : ''}<br>${pct(s.ofLanded)} of everyone who landed${s.lastAt ? `<br>Last: ${esc(zoned(s.lastAt))}` : ''}`);
     row.onmouseleave = () => $('tip').classList.remove('on');
   });
+  $('split').hidden = !data.split; $('split-card').hidden = !data.split;
   const split = data.split || {};
   const started = (split.phone || 0) + (split.desktop || 0) + (split.unknown || 0);
   const share = n => started ? ` (${Math.round(n / started * 100)}%)` : '';
@@ -350,7 +352,7 @@ function paintTrack() {
   $('track-toggle').setAttribute('aria-pressed', String(off));
   $('track-toggle').textContent = off ? '✓ Not counting this browser' : 'Counting this browser';
   $('track-note').textContent = off
-    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open bookmarketel.com/claims?notrack=1 once.'
+    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open any page with ?notrack=1 once (bookmarketel.com/trace?notrack=1 or /claims?notrack=1; one covers both).'
     : 'This browser counts like a visitor. Switch it off before looking at the site yourself.';
 }
 if (trackState() === null) setTrack('1');

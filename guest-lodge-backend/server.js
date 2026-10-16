@@ -12010,10 +12010,11 @@ app.get('/api/meta-insights', adminAuth, async (req, res) => {
 // booking and support dashboard lives on at /funnel/legacy.
 const wedgeFunnel = require('./wedge-funnel');
 const wedgeRegistry = require('./wedges/registry');
-// On the dashboard: wedges that are live and in the approved app. Claims today.
-const dashboardWedges = () => wedgeRegistry.load().all
+// On the dashboard: Marketel Trace (the test running ads, first), then the
+// report wedges that are live and in the approved app.
+const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, ...wedgeRegistry.load().all
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
-    .map(wedge => ({ id: wedge.id, product: wedge.product }));
+    .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');
 app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
     try {
@@ -12039,15 +12040,16 @@ app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
         // Attribution can precede midnight/the custom start. Look it up without
         // importing yesterday's checkout events into today's totals.
         const visitorIds = [...new Set(visibleEvents.map(event => event.visitorId).filter(Boolean))];
+        const definition = wedgeFunnel.definitionFor(tool);
         const adSources = req.query.ad === '1' && visitorIds.length ? await withRetry(() => prisma.inspectEvent.findMany({
-            where: { tool, name: 'OfferFrom', detail: 'ad', visitorId: { in: visitorIds }, createdAt: { lte: range.until } },
+            where: { tool, name: definition.fromEvent, detail: 'ad', visitorId: { in: visitorIds }, createdAt: { lte: range.until } },
             distinct: ['visitorId'], select: { name: true, detail: true, visitorId: true },
         })) : [];
         res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), requestedFrom,
             timezone: range.timeZone, period: range.period, resetApplied: range.since.toISOString() !== requestedFrom, truncated,
             countingSince: since ? since.toISOString() : null,
             everything: req.query.everything === '1', adOnly: req.query.ad === '1',
-            ...wedgeFunnel.buildWedgeFunnel((req.query.ad === '1' ? wedgeFunnel.onlyAdClicks(visibleEvents, adSources) : visibleEvents).filter(event => event.name !== wedgeFunnel.RESET_EVENT)) });
+            ...wedgeFunnel.buildWedgeFunnel((req.query.ad === '1' ? wedgeFunnel.onlyAdClicks(visibleEvents, adSources, definition.fromEvent) : visibleEvents).filter(event => event.name !== wedgeFunnel.RESET_EVENT), definition) });
     } catch (e) {
         if (e.status === 400) return res.status(400).json({ success: false, message: e.message });
         console.error('Wedge funnel error:', e.message);
@@ -12060,8 +12062,8 @@ app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
     try {
         if (String(req.body?.confirm || '') !== 'RESET') return res.status(400).json({ success: false, message: 'Send confirm: "RESET".' });
         const tool = String(req.body?.tool || '');
-        if (!wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
-        const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.VISITOR_EVENTS] } } });
+        if (tool !== 'trace' && !wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
+        const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.definitionFor(tool).visitorEvents] } } });
         await prisma.inspectEvent.create({ data: { name: wedgeFunnel.RESET_EVENT, tool } });
         console.log(`wedge funnel reset: removed ${deleted.count} ${tool} visitor steps`);
         res.json({ success: true, deleted: deleted.count });
