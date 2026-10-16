@@ -7,7 +7,7 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=2">
+<link rel="stylesheet" href="/trace/trace.css?v=3">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a></header>
@@ -72,15 +72,16 @@
 <section class="sheet" id="paywall" hidden role="dialog" aria-modal="true" aria-labelledby="pay-title">
   <p class="sheet-note" id="pay-note" hidden></p>
   <h2 id="pay-title">Keep tracing anything</h2>
-  <p class="price">$14.99 <small>once</small></p>
-  <p class="sub">Yours for good. No subscription. Nothing renews.</p>
-  <ul class="perks">
+  <p class="price" id="pay-price">$14.99 <small>once</small></p>
+  <p class="sub" id="pay-sub">Yours for good. No subscription. Nothing renews.</p>
+  <p class="sub" id="pay-elsewhere" hidden>Already paid on the web? Unlock it here with the code from your email.</p>
+  <ul class="perks" id="pay-perks">
     <li>Your own photos and every picture</li>
     <li>As many drawings as you like</li>
     <li>Works on any phone. Nothing to install.</li>
   </ul>
   <button type="button" class="big" id="buy">Unlock for $14.99</button>
-  <p class="fine">Secure payment by Stripe. Not working on your phone? Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a> within 7 days for a full refund.</p>
+  <p class="fine" id="pay-fine">Secure payment by Stripe. Not working on your phone? Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a> within 7 days for a full refund.</p>
   <p class="error" id="pay-error" hidden></p>
   <div class="sheet-links">
     <button type="button" class="linklike" id="pay-later">Not now</button>
@@ -91,23 +92,28 @@
 <section class="sheet" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcome-title">
   <h2 id="welcome-title">You're in.</h2>
   <p class="sub" id="welcome-body">Trace anything, for good.</p>
+  <a class="big as-button" id="welcome-app" href="com.bookmarketel.frontdesk://trace" hidden>Back to the Marketel app</a>
   <button type="button" class="big" id="welcome-go">Pick a picture</button>
 </section>
 
 <section class="sheet" id="restore" hidden role="dialog" aria-modal="true" aria-labelledby="restore-title">
   <h2 id="restore-title">Already paid?</h2>
-  <p class="sub">Enter the email you paid with. We'll send a link that unlocks this phone.</p>
+  <p class="sub">Enter the email you paid with. We'll email you a 6-digit code.</p>
   <form id="restore-form" novalidate>
     <input type="email" id="restore-email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
     <button type="submit" class="big" id="restore-send">Send my link</button>
   </form>
   <p class="sub" id="restore-done" hidden></p>
+  <form id="code-form" novalidate hidden>
+    <input type="text" id="restore-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" required>
+    <button type="submit" class="big" id="code-send">Unlock</button>
+  </form>
   <p class="error" id="restore-error" hidden></p>
   <div class="sheet-links"><button type="button" class="linklike" id="restore-close">Close</button></div>
 </section>
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=2" defer></script>
+<script src="/trace/trace.js?v=3" defer></script>
 </body>
 </html>

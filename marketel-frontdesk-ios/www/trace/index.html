@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eff4f0">
+<title>Marketel Trace: trace any picture onto paper</title>
+<meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
+<link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
+<link rel="stylesheet" href="/trace/trace.css?v=3">
+</head>
+<body>
+<header class="site-bar" id="site-bar"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a></header>
+<main id="home" class="home">
+  <h1>Trace any picture onto paper.</h1>
+  <p class="lede">Point your phone at paper. Follow the lines. That's it.</p>
+
+  <section class="pick" aria-labelledby="pick-title">
+    <h2 id="pick-title">Pick a picture</h2>
+    <div class="grid" id="grid"></div>
+    <label class="own" id="own-label">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Use my own photo</span>
+      <input type="file" id="own" accept="image/*">
+    </label>
+  </section>
+
+  <p class="note" id="note">First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.</p>
+
+  <footer class="foot">
+    <a href="/trace/terms">Terms &amp; privacy</a>
+    <span aria-hidden="true">·</span>
+    <a href="mailto:support@bookmarketel.com">Help</a>
+    <span aria-hidden="true" class="restore-dot">·</span>
+    <button type="button" class="linklike" id="restore-open">Already paid?</button>
+  </footer>
+</main>
+
+<section id="tracer" class="tracer" hidden aria-label="Tracing">
+  <video id="cam" playsinline muted autoplay></video>
+  <div id="stage" class="stage"><img id="overlay" alt="" draggable="false"></div>
+  <div class="topbar">
+    <button type="button" class="pill" id="back" aria-label="Back to pictures">‹ Pictures</button>
+    <button type="button" class="pill" id="mode" hidden>Show photo</button>
+  </div>
+  <p class="hint" id="hint" hidden>Rest your phone on a glass or a stack of books above the paper. Then follow the lines.</p>
+  <p class="toast" id="toast" hidden></p>
+  <div class="controls">
+    <label class="fade"><span>Fade</span><input id="fade" type="range" min="10" max="95" value="60" aria-label="How see-through the picture is"></label>
+    <div class="buttons">
+      <button type="button" class="ctl" id="lock" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path id="lock-shackle" d="M8 11V8a4 4 0 0 1 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span id="lock-label">Lock</span>
+      </button>
+      <button type="button" class="ctl done" id="done">Done</button>
+    </div>
+  </div>
+</section>
+
+<section id="camera-help" class="help" hidden>
+  <div class="help-card">
+    <h2 id="help-title">Your camera is needed</h2>
+    <p id="help-body"></p>
+    <button type="button" class="big" id="help-retry">Try again</button>
+    <button type="button" class="ghost" id="help-copy" hidden>Copy link</button>
+    <button type="button" class="linklike" id="help-home">Back to pictures</button>
+  </div>
+</section>
+
+<div class="backdrop" id="backdrop" hidden></div>
+
+<section class="sheet" id="paywall" hidden role="dialog" aria-modal="true" aria-labelledby="pay-title">
+  <p class="sheet-note" id="pay-note" hidden></p>
+  <h2 id="pay-title">Keep tracing anything</h2>
+  <p class="price" id="pay-price">$14.99 <small>once</small></p>
+  <p class="sub" id="pay-sub">Yours for good. No subscription. Nothing renews.</p>
+  <p class="sub" id="pay-elsewhere" hidden>Already paid on the web? Unlock it here with the code from your email.</p>
+  <ul class="perks" id="pay-perks">
+    <li>Your own photos and every picture</li>
+    <li>As many drawings as you like</li>
+    <li>Works on any phone. Nothing to install.</li>
+  </ul>
+  <button type="button" class="big" id="buy">Unlock for $14.99</button>
+  <p class="fine" id="pay-fine">Secure payment by Stripe. Not working on your phone? Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a> within 7 days for a full refund.</p>
+  <p class="error" id="pay-error" hidden></p>
+  <div class="sheet-links">
+    <button type="button" class="linklike" id="pay-later">Not now</button>
+    <button type="button" class="linklike" id="pay-restore">Already paid?</button>
+  </div>
+</section>
+
+<section class="sheet" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+  <h2 id="welcome-title">You're in.</h2>
+  <p class="sub" id="welcome-body">Trace anything, for good.</p>
+  <a class="big as-button" id="welcome-app" href="com.bookmarketel.frontdesk://trace" hidden>Back to the Marketel app</a>
+  <button type="button" class="big" id="welcome-go">Pick a picture</button>
+</section>
+
+<section class="sheet" id="restore" hidden role="dialog" aria-modal="true" aria-labelledby="restore-title">
+  <h2 id="restore-title">Already paid?</h2>
+  <p class="sub">Enter the email you paid with. We'll email you a 6-digit code.</p>
+  <form id="restore-form" novalidate>
+    <input type="email" id="restore-email" autocomplete="email" inputmode="email" placeholder="you@example.com" required>
+    <button type="submit" class="big" id="restore-send">Send my link</button>
+  </form>
+  <p class="sub" id="restore-done" hidden></p>
+  <form id="code-form" novalidate hidden>
+    <input type="text" id="restore-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" required>
+    <button type="submit" class="big" id="code-send">Unlock</button>
+  </form>
+  <p class="error" id="restore-error" hidden></p>
+  <div class="sheet-links"><button type="button" class="linklike" id="restore-close">Close</button></div>
+</section>
+
+<div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
+
+<script src="/trace/trace.js?v=3" defer></script>
+</body>
+</html>

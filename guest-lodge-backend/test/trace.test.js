@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { TRACE, TRACE_EVENTS, registerTrace, unlockToken, verifyUnlock, isTracePurchase } = require('../trace');
+const { TRACE, TRACE_EVENTS, registerTrace, unlockToken, unlockCode, verifyUnlock, isTracePurchase } = require('../trace');
 
 const SECRET = 'trace-test-secret';
 const PAID = 'cs_test_paidSession1234';
@@ -232,6 +232,46 @@ test('"Already paid?" emails the link only to a buyer and answers the same eithe
     assert.equal(calls.mail.length, 1);
     assert.equal(calls.mail[0].to, 'buyer@example.test');
     assert.ok(calls.mail[0].text.includes('/trace?unlock='));
+  });
+});
+
+test('from the iPhone app: Safari return path, nothing to Meta, and the landing says app', async () => {
+  const { app, rows, calls } = fakeWorld();
+  await serve(app, async ({ post }) => {
+    const appOrigin = { origin: 'capacitor://localhost' };
+    await post('/api/trace/event', { name: 'TraceLanded', visitorId: 'v_appvisitor1' }, appOrigin);
+    assert.equal(rows.at(-1).detail, 'app');
+    await post('/api/trace/event', { name: 'TraceStarted', visitorId: 'v_appvisitor1', attribution: { fbp: 'fb.1.1.2' } }, appOrigin);
+    await post('/api/trace/event', { name: 'TraceCheckoutOpened', visitorId: 'v_appvisitor1' }, appOrigin);
+    const res = await post('/api/trace/checkout', { visitorId: 'v_appvisitor1' }, appOrigin);
+    assert.equal(res.body.id, 'cs_test_new');
+    const params = calls.creates[0];
+    assert.equal(params.success_url, 'https://bookmarketel.com/trace?paid={CHECKOUT_SESSION_ID}&app=1');
+    assert.equal(params.cancel_url, 'https://bookmarketel.com/trace?cancelled=1&app=1');
+    assert.equal(params.metadata.app, '1');
+    assert.equal(params.metadata.fbp, '');
+    await post('/api/trace/unlock', { sessionId: PAID }, appOrigin);
+    assert.equal(calls.capi.length, 0, 'nothing done in the app reaches Meta');
+  });
+});
+
+test('the 6-digit code in the email unlocks only with the email that paid', async () => {
+  const { app, calls } = fakeWorld();
+  await serve(app, async ({ post }) => {
+    await post('/api/trace/unlock', { sessionId: PAID });
+    const code = unlockCode(SECRET, PAID);
+    assert.match(code, /^\d{6}$/);
+    assert.ok(calls.mail[0].text.includes(code), 'the unlock email carries the code');
+    const good = await post('/api/trace/restore-code', { email: 'buyer@example.test', code });
+    assert.equal(good.status, 200);
+    assert.equal(verifyUnlock(SECRET, good.body.token), PAID);
+    const wrongCode = String((Number(code) + 1) % 1000000).padStart(6, '0');
+    assert.equal((await post('/api/trace/restore-code', { email: 'buyer@example.test', code: wrongCode })).status, 400);
+    assert.equal((await post('/api/trace/restore-code', { email: 'stranger@example.test', code })).status, 400);
+    assert.equal((await post('/api/trace/restore-code', { email: 'buyer@example.test', code: '12' })).status, 400);
+    // Six tries an hour per email, then it stops answering.
+    for (let i = 0; i < 4; i++) await post("/api/trace/restore-code", { email: "buyer@example.test", code: wrongCode });
+    assert.equal((await post('/api/trace/restore-code', { email: 'buyer@example.test', code })).status, 429);
   });
 });
 

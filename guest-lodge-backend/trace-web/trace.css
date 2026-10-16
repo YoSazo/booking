@@ -123,9 +123,12 @@ h1 { font-size: 34px; line-height: 1.08; letter-spacing: -1.2px; margin: 18px 0 
 .fine { color: var(--muted); font-size: 13px; margin: 12px 0 0; text-align: center; }
 .error { color: #b3261e; font-weight: 600; margin: 12px 0 0; text-align: center; }
 .sheet-links { display: flex; justify-content: center; gap: 22px; margin-top: 14px; color: var(--muted); }
-#restore-form input { width: 100%; min-height: 54px; border-radius: 14px; border: 2px solid var(--line); padding: 0 14px; font-size: 18px; margin-bottom: 12px; background: #fff; color: var(--ink); }
+#restore-form input, #code-form input { width: 100%; min-height: 54px; border-radius: 14px; border: 2px solid var(--line); padding: 0 14px; font-size: 18px; margin-bottom: 12px; background: #fff; color: var(--ink); }
 
 .busy { position: fixed; inset: 0; z-index: 40; background: rgba(239, 244, 240, 0.92); display: grid; place-content: center; justify-items: center; gap: 14px; font-weight: 700; }
 .spinner { width: 44px; height: 44px; border-radius: 50%; border: 5px solid var(--line); border-top-color: var(--green); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } .tile { transition: none; } }
+
+.as-button { text-align: center; line-height: 58px; text-decoration: none; margin-bottom: 10px; }
+#code-form input { letter-spacing: 0.3em; text-align: center; }

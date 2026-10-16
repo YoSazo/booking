@@ -69,10 +69,12 @@ test('damage voice notes and artifacts use the Claims guardrails and identity', 
   assert.match(client, /const documentFileName = type => typeConfig\(type\)\.file/);
   assert.match(require('../wedges/claims').termsIntro, /Claims produces documentation; it does not file, submit or manage claims/);
   assert.match(terms, /it does not file, submit or manage claims/);
-  // Claims is the only wedge running ads, so it is the only one on the menu.
-  // The others still open if something links straight to them.
-  assert.match(chooser, /data-product="claims"/);
-  for (const hidden of ['inspect', 'incident']) {
+  // Since 2026-10-15 the app's menu offers Marketel Trace in place of Claims.
+  // The report wedges still open if something links straight to them.
+  assert.match(chooser, /data-product="trace"/);
+  assert.match(chooser, /const pages = \{ trace: 'trace\/index\.html' \};/);
+  assert.match(chooser, /if \(!choosing && offered\.length === 1\) return open\(offered\[0\]\);/);
+  for (const hidden of ['claims', 'inspect', 'incident']) {
     assert.doesNotMatch(chooser, new RegExp(`data-product="${hidden}"`), hidden);
   }
   assert.match(chooser, /More tools coming soon/);

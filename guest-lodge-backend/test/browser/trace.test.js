@@ -25,7 +25,7 @@ async function world() {
     delete: async () => {},
   } };
   const stripe = { checkout: { sessions: {
-    create: async params => { creates.push(params); return { id: 'cs_test_new', url: 'https://checkout.stripe.com/c/pay/cs_test_new' }; },
+    create: async params => { creates.push(params); return { id: 'cs_test_newSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_newSession123' }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { statusCode: 404 }); return sessions.get(id); },
     list: async () => ({ data: [] }),
   } } };
@@ -34,7 +34,7 @@ async function world() {
   registerTrace(app, { prisma, stripe, mail: { sendMail: async () => {} }, env: { TRACE_UNLOCK_SECRET: 's', TRACE_PUBLIC_ORIGIN: 'http://127.0.0.1' } });
   const server = app.listen(0);
   await new Promise(resolve => server.once('listening', resolve));
-  return { base: `http://127.0.0.1:${server.address().port}`, events, creates, close: () => server.close() };
+  return { base: `http://127.0.0.1:${server.address().port}`, events, creates, sessions, close: () => server.close() };
 }
 
 async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
@@ -126,7 +126,7 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await settle();
 
     const seen = names(w.events);
-    for (const step of ['TraceLanded', 'TraceFrom:ad', 'TraceBrowser:safari', 'TracePicked:starter', 'TraceCameraAsked', 'TraceStarted:starter',
+    for (const step of ['TraceLanded:web', 'TraceFrom:ad', 'TraceBrowser:safari', 'TracePicked:starter', 'TraceCameraAsked', 'TraceStarted:starter',
       'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceDone', 'TracePaywallShown:done', 'TracePaywallClosed', 'TracePaywallShown:second',
       'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TracePaid', 'TraceUnlocked']) assert.ok(seen.includes(step), `${step} missing from ${seen.join(', ')}`);
     assert.deepEqual(errors, []);
@@ -220,6 +220,70 @@ test('the owner opening ?notrack=1 records nothing', async () => {
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
     assert.deepEqual(w.events, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('inside the Marketel app: the glass bar stands down, US buyers pay in Safari and come back unlocked', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    // The app's shell bridge, the US App Store, and the app's API host pointed at the test server.
+    await page.addInitScript(base => {
+      window.__shell = [];
+      window.webkit = { messageHandlers: { marketelShell: { postMessage(message) {
+        window.__shell.push(message);
+        if (message.type === 'inspectStorefront') setTimeout(() => window.marketelInspectStorefront('USA'), 10);
+      } } } };
+      const realFetch = window.fetch;
+      window.fetch = (url, options) => realFetch(String(url).replace('https://bookmarketel.com', base), options);
+    }, w.base);
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('.tile');
+    const shell = () => page.evaluate(() => window.__shell);
+    assert.deepEqual((await shell()).find(m => m.type === 'visibility'), { type: 'visibility', visible: false });
+    assert.match(await page.textContent('#note'), /\$14\.99 once/);
+    await page.locator('.tile[data-id="cat"]').tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    await page.locator('#done').tap();
+    await page.waitForSelector('#buy:visible');
+    await page.locator('#buy').tap();
+    await until(page, () => window.__shell.some(m => m.type === 'openPurchase'));
+    const purchase = (await shell()).find(m => m.type === 'openPurchase');
+    assert.equal(purchase.url, 'https://checkout.stripe.com/c/pay/cs_test_newSession123');
+    assert.match(new URL(page.url()).href, /\/trace$/, 'the app stays on its own page while Safari takes the payment');
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), 'cs_test_newSession123');
+    // Paid in Safari; the session the app opened is now paid. Coming back unlocks it.
+    w.sessions.set('cs_test_newSession123', { id: 'cs_test_newSession123', mode: 'payment', payment_status: 'paid', amount_total: 1499, customer_details: { email: 'buyer@example.test' }, metadata: { product: 'trace', app: '1' } });
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForSelector('#welcome:not([hidden])');
+    assert.ok(await page.evaluate(() => localStorage.getItem('trace.unlock')));
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null);
+    await settle();
+    assert.ok(names(w.events).includes('TraceLanded:web'), 'served over http here; the real app is recorded as app by its origin');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('inside the app outside the US there is no price and no buy button, only the code for a web purchase', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.addInitScript(() => {
+      window.webkit = { messageHandlers: { marketelShell: { postMessage(message) {
+        if (message.type === 'inspectStorefront') setTimeout(() => window.marketelInspectStorefront('GBR'), 10);
+      } } } };
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('.tile');
+    await page.waitForTimeout(100);
+    assert.doesNotMatch(await page.textContent('#note'), /\$/);
+    await page.evaluate(() => localStorage.setItem('trace.free', 'starter:cat'));
+    await page.locator('.tile[data-id="fish"]').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.isVisible('#buy'), false);
+    assert.equal(await page.isVisible('#pay-price'), false);
+    assert.doesNotMatch(await page.innerText('#paywall'), /\$/);
+    assert.equal(await page.isVisible('#pay-elsewhere'), true);
   } finally { await browser.close(); w.close(); }
 });
 

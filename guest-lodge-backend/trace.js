@@ -56,6 +56,12 @@ function unlockSignature(secret, sessionId) {
 function unlockToken(secret, sessionId) {
   return `${sessionId}.${unlockSignature(secret, sessionId)}`;
 }
+// Six digits for unlocking inside the iPhone app, where an emailed link opens
+// Safari instead. Tied to one purchase; only useful with the email that paid.
+function unlockCode(secret, sessionId) {
+  const digest = crypto.createHmac('sha256', secret).update(`trace-code:${sessionId}`).digest();
+  return String(digest.readUInt32BE(0) % 1000000).padStart(6, '0');
+}
 // The session id a valid token was signed for, or null.
 function verifyUnlock(secret, token) {
   const [sessionId, signature, extra] = String(token || '').split('.');
@@ -94,6 +100,10 @@ function registerTrace(app, {
   const secret = env.TRACE_UNLOCK_SECRET || env.INSPECT_AUTH_SECRET || '';
   const guarded = fn => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
   const ownerBrowser = req => String(req?.headers?.['x-marketel-no-track'] || '') === '1';
+  // The iPhone app loads this page from capacitor://localhost. Nothing done in
+  // the app goes to Meta: pairing app activity with ad identifiers is tracking
+  // under Apple's rules, and the ads land on the website anyway.
+  const fromApp = req => /^(capacitor|ionic):\/\//.test(String(req?.headers?.origin || ''));
   const automatedBrowser = req => /HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(String(req?.headers?.['user-agent'] || ''));
   const hits = new Map();
   const rate = (key, maximum, windowMs) => {
@@ -126,6 +136,8 @@ function registerTrace(app, {
       'To unlock it on another phone, or after clearing your browser, open this link on that phone:',
       unlockUrl(sessionId),
       '',
+      `In the Marketel app, tap "Already paid?" and enter this code: ${unlockCode(secret, sessionId)}`,
+      '',
       `Something not working? Reply to this email or write to ${TRACE.supportEmail}.`,
     ].join('\n'),
   });
@@ -146,9 +158,10 @@ function registerTrace(app, {
     if (ownerBrowser(req) || automatedBrowser(req)) return res.json({ success: true, ignored: true });
     rate(`trace-event:${req.ip}`, 300, 3600000);
     const visitorId = visitorOf(req.body?.visitorId);
-    await record(name, { visitorId, detail: detailOf(req.body?.detail) });
+    const app = fromApp(req);
+    await record(name, { visitorId, detail: name === 'TraceLanded' ? (app ? 'app' : 'web') : detailOf(req.body?.detail) });
     const signal = TRACE_SIGNALS[name];
-    if (signal && visitorId) {
+    if (signal && visitorId && !app) {
       const attribution = meta(req.body?.attribution, req);
       await sendCapi(signal.event, {
         eventId: `${signal.id}.${visitorId}`,
@@ -169,7 +182,11 @@ function registerTrace(app, {
     if (!stripe) throw fail(503, 'Payments are not available right now.');
     rate(`trace-checkout:${req.ip}`, 20, 3600000);
     const visitorId = visitorOf(req.body?.visitorId) || '';
-    const attribution = meta(req.body?.attribution, req);
+    const app = fromApp(req);
+    const attribution = app ? {} : meta(req.body?.attribution, req);
+    // From the app, Stripe opens in Safari; the page it returns to offers the
+    // way back into the app, which unlocks itself when it comes to the front.
+    const back = app ? '&app=1' : '';
     const params = {
       mode: 'payment',
       submit_type: 'pay',
@@ -178,11 +195,11 @@ function registerTrace(app, {
       payment_method_types: ['card'],
       line_items: [{ quantity: 1, price_data: { currency: TRACE.currency, unit_amount: TRACE.priceCents,
         product_data: { name: `${TRACE.name}: yours for good`, description: 'Trace any picture onto paper. One payment. No subscription. Nothing renews.' } } }],
-      success_url: `${origin}/trace?paid={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/trace?cancelled=1`,
+      success_url: `${origin}/trace?paid={CHECKOUT_SESSION_ID}${back}`,
+      cancel_url: `${origin}/trace?cancelled=1${back}`,
       payment_intent_data: { statement_descriptor_suffix: TRACE.descriptorSuffix, metadata: { product: TRACE.product } },
       metadata: { product: TRACE.product, visitorId, fbp: (attribution.fbp || '').slice(0, 200), fbc: (attribution.fbc || '').slice(0, 200),
-        sourceUrl: (attribution.sourceUrl || '').slice(0, 450), owner: ownerBrowser(req) ? '1' : '' },
+        sourceUrl: (attribution.sourceUrl || '').slice(0, 450), owner: ownerBrowser(req) ? '1' : '', app: app ? '1' : '' },
     };
     let session;
     try {
@@ -194,7 +211,7 @@ function registerTrace(app, {
       const { statement_descriptor_suffix: _, ...intent } = params.payment_intent_data;
       session = await stripe.checkout.sessions.create({ ...params, payment_intent_data: intent });
     }
-    res.json({ url: session.url });
+    res.json({ url: session.url, id: session.id });
   }));
 
   // Called by the page Stripe returns to. Confirms the payment with Stripe,
@@ -212,7 +229,8 @@ function registerTrace(app, {
     const visitorId = visitorOf(session.metadata.visitorId);
     const email = emailOf(session.customer_details?.email);
     await record('TracePaid', { visitorId, sourceId: `trace-paid:${sessionId}` });
-    const owner = session.metadata.owner === '1' || ownerBrowser(req) || (email && isCapiExcludedEmail(email));
+    const owner = session.metadata.owner === '1' || ownerBrowser(req) || (email && isCapiExcludedEmail(email))
+      || session.metadata.app === '1' || fromApp(req);
     if (!owner) {
       await sendCapi('Purchase', {
         eventId: `trace-purchase.${sessionId}`,
@@ -270,6 +288,22 @@ function registerTrace(app, {
     res.json({ success: true });
   }));
 
+  // The code from the unlock email, typed into the app (or a browser) with the
+  // email that paid. Few tries per email and per network keep six digits safe.
+  router.post('/restore-code', guarded(async (req, res) => {
+    if (!stripe || !secret) throw fail(503, 'Unlocking is not available right now.');
+    rate(`trace-code:${req.ip}`, 20, 3600000);
+    const email = emailOf(req.body?.email);
+    const code = String(req.body?.code || '').replace(/\D/g, '');
+    if (!email || code.length !== 6) throw fail(400, 'Enter your email and the 6-digit code from the email.');
+    rate(`trace-code-email:${email}`, 6, 3600000);
+    const list = await stripe.checkout.sessions.list({ customer_details: { email }, limit: 20 });
+    const purchase = (list?.data || []).find(session => isTracePurchase(session)
+      && crypto.timingSafeEqual(Buffer.from(unlockCode(secret, session.id)), Buffer.from(code)));
+    if (!purchase) throw fail(400, "That code doesn't match. Check the newest email from Marketel.");
+    res.json({ token: unlockToken(secret, purchase.id) });
+  }));
+
   router.use((error, req, res, _next) => {
     const status = Number(error?.status) || (error?.type === 'entity.parse.failed' ? 400 : 500);
     if (status >= 500) console.error('Trace route failed:', error?.message || error);
@@ -278,4 +312,4 @@ function registerTrace(app, {
   app.use('/api/trace', router);
 }
 
-module.exports = { TRACE, TRACE_EVENTS, TRACE_SIGNALS, registerTrace, unlockToken, verifyUnlock, isTracePurchase, tracePageHeaders };
+module.exports = { TRACE, TRACE_EVENTS, TRACE_SIGNALS, registerTrace, unlockToken, unlockCode, verifyUnlock, isTracePurchase, tracePageHeaders };

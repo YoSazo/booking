@@ -42,7 +42,7 @@
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>Marketel uses the camera only when you choose to add a report, property, or room photo.</string>
+	<string>Marketel uses the camera to show your paper under the picture you're tracing, and when you choose to add a report, property, or room photo. Nothing from the camera is recorded or uploaded while you trace.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Front Desk lets you save the Marketel messaging number as a contact.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

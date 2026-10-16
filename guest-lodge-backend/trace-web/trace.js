@@ -14,6 +14,16 @@
     del: key => { try { localStorage.removeItem(key); } catch { /* private mode */ } },
   };
   const params = new URLSearchParams(location.search);
+  // Inside the Marketel iPhone app the page is a local file and the native
+  // shell is reachable; the API is the website's. Nothing in the app is
+  // recorded by Clarity or sent to Meta.
+  const shell = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.marketelShell;
+  const inApp = !!shell || location.protocol === 'capacitor:';
+  const API = inApp ? 'https://bookmarketel.com' : '';
+  const tell = message => { try { if (shell) shell.postMessage(message); } catch { /* not in the app */ } };
+  // Only the US App Store allows a link out to buy. Unknown until the shell answers.
+  let storefront = inApp ? '' : 'web';
+  const canBuy = () => !inApp || storefront === 'USA';
 
   // The owner's own visits stay out of the numbers and out of Meta. Same key as
   // the Claims page, so the switch on /funnel covers this page too.
@@ -60,7 +70,7 @@
   })();
 
   async function api(path, body, { keepalive = false } = {}) {
-    const response = await fetch(`/api/trace${path}`, {
+    const response = await fetch(`${API}/api/trace${path}`, {
       method: 'POST', keepalive,
       headers: { 'Content-Type': 'application/json', ...(ownerBrowser ? { 'x-marketel-no-track': '1' } : {}) },
       body: JSON.stringify(body),
@@ -75,7 +85,7 @@
     const key = `${name}:${detail}`;
     if (once && sent.has(key)) return;
     sent.add(key);
-    api('/event', { name, visitorId, ...(detail ? { detail } : {}), ...(SIGNALS.has(name) ? { attribution } : {}) }, { keepalive }).catch(() => {});
+    api('/event', { name, visitorId, ...(detail ? { detail } : {}), ...(SIGNALS.has(name) && !inApp ? { attribution } : {}) }, { keepalive }).catch(() => {});
   }
 
   // Unlock state. The token is the signed purchase; without it the first
@@ -101,12 +111,26 @@
   function renderHome() {
     $('note').innerHTML = unlocked()
       ? '<strong>Unlocked.</strong> Trace anything, for good.'
-      : 'First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.';
+      : canBuy() ? 'First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.'
+      : 'Your first drawing is free.';
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
   }
   function showHome() { stopTracing(); $('tracer').hidden = true; $('camera-help').hidden = true; $('home').hidden = false; renderHome(); }
+  if (inApp) {
+    // The page draws its own Marketel bar, so the app's glass bar stands down.
+    tell({ type: 'visibility', visible: false });
+    document.documentElement.classList.add('in-app');
+    document.querySelector('.brand').addEventListener('click', event => event.preventDefault());
+    // Terms open in a browser sheet rather than replacing the app's page.
+    document.querySelector('a[href="/trace/terms"]').addEventListener('click', event => {
+      event.preventDefault();
+      tell({ type: 'openBrowser', url: 'https://bookmarketel.com/trace/terms' });
+    });
+    window.marketelInspectStorefront = country => { storefront = String(country || '').toUpperCase() || 'unknown'; renderHome(); renderPaywall(); };
+    tell({ type: 'inspectStorefront' });
+  }
 
   // ----- Picking a picture -----
   const grid = $('grid');
@@ -367,11 +391,18 @@
   });
 
   // ----- Paying -----
+  function renderPaywall() {
+    const buy = canBuy();
+    for (const id of ['buy', 'pay-price', 'pay-sub', 'pay-perks', 'pay-fine']) $(id).hidden = !buy;
+    $('pay-elsewhere').hidden = buy;
+    $('pay-title').textContent = buy ? 'Keep tracing anything' : 'That was your free drawing';
+  }
   function showPaywall(reason, note = '') {
     track('TracePaywallShown', reason, { once: false });
     $('pay-note').textContent = note; $('pay-note').hidden = !note;
     $('pay-error').hidden = true;
     $('buy').disabled = false; $('buy').textContent = 'Unlock for $14.99';
+    renderPaywall();
     openSheet('paywall');
   }
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
@@ -382,10 +413,16 @@
     button.disabled = true; button.textContent = 'Opening secure checkout…';
     $('pay-error').hidden = true;
     try {
-      const { url } = await api('/checkout', { visitorId, attribution });
+      const { url, id } = await api('/checkout', { visitorId, ...(inApp ? {} : { attribution }) });
       if (!/^https:\/\/checkout\.stripe\.com\//.test(String(url || ''))) throw new Error('Checkout could not be opened. Please try again.');
       track('TraceCheckoutOpened', '', { keepalive: true });
-      location.href = url;
+      if (inApp) {
+        // Paying happens in Safari. The app checks this payment when it comes back.
+        if (id) store.set('trace.pending', id);
+        tell({ type: 'openPurchase', url });
+        button.disabled = false; button.textContent = 'Unlock for $14.99';
+        closeSheets();
+      } else location.href = url;
     } catch (error) {
       track('TraceCheckoutFailed', error.status === 429 ? 'rate' : 'error', { once: false });
       button.disabled = false; button.textContent = 'Unlock for $14.99';
@@ -401,7 +438,7 @@
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const result = await api('/unlock', { sessionId });
-        token = result.token; store.set('trace.unlock', token);
+        token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
         track('TraceUnlocked');
         busy('');
         $('welcome-title').textContent = 'You\'re in.';
@@ -409,6 +446,8 @@
         $('welcome-body').textContent = result.email
           ? `Trace anything, for good. We emailed your receipt and a link that unlocks your other phones to ${result.email}.`
           : 'Trace anything, for good.';
+        // Paid in Safari for the app: the way back in.
+        $('welcome-app').hidden = !(params.get('app') === '1' && !inApp);
         renderHome();
         openSheet('welcome');
         return;
@@ -424,6 +463,28 @@
     openSheet('welcome');
   }
   $('welcome-go').addEventListener('click', closeSheets);
+
+  // Back in the app after paying in Safari: one quiet check of the payment it
+  // opened. Not paid yet (still on Stripe's page) leaves it waiting.
+  let checkingPending = false;
+  async function checkPending() {
+    const pending = store.get('trace.pending');
+    if (!inApp || !pending || unlocked() || checkingPending) return;
+    checkingPending = true;
+    try {
+      const result = await api('/unlock', { sessionId: pending });
+      token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
+      track('TraceUnlocked', 'app');
+      renderHome();
+      $('welcome-title').textContent = 'You\'re in.'; $('welcome-go').textContent = 'Pick a picture';
+      $('welcome-body').textContent = 'Trace anything, for good. Your receipt is in your email.';
+      $('welcome-app').hidden = true;
+      openSheet('welcome');
+    } catch (error) {
+      if (error.status === 400 || error.status === 404) store.del('trace.pending');
+    } finally { checkingPending = false; }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkPending(); });
 
   async function unlockFromLink(value) {
     busy('Unlocking this phone…');
@@ -444,7 +505,7 @@
   // ----- Already paid? -----
   const openRestore = () => {
     track('TraceRestoreAsked', '', { once: false });
-    $('restore-form').hidden = false; $('restore-done').hidden = true; $('restore-error').hidden = true;
+    $('restore-form').hidden = false; $('restore-done').hidden = true; $('restore-error').hidden = true; $('code-form').hidden = true;
     openSheet('restore');
     setTimeout(() => $('restore-email').focus(), 50);
   };
@@ -460,11 +521,32 @@
     try {
       await api('/restore', { email });
       $('restore-form').hidden = true;
-      $('restore-done').textContent = `If ${email} bought Marketel Trace, the unlock link is on its way. Open it on this phone. Check spam if it isn't there in a minute.`;
+      $('restore-done').textContent = `If ${email} bought Marketel Trace, an email with a 6-digit code is on its way. Check spam if it isn't there in a minute.`;
       $('restore-done').hidden = false;
+      $('code-form').hidden = false;
+      setTimeout(() => $('restore-code').focus(), 50);
     } catch (error) {
       $('restore-error').textContent = error.message; $('restore-error').hidden = false;
     } finally { $('restore-send').disabled = false; }
+  });
+
+  $('code-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const email = $('restore-email').value.trim(), code = $('restore-code').value.replace(/\D/g, '');
+    $('restore-error').hidden = true;
+    if (code.length !== 6) { $('restore-error').textContent = 'Enter the 6-digit code from the email.'; $('restore-error').hidden = false; return; }
+    $('code-send').disabled = true;
+    try {
+      const result = await api('/restore-code', { email, code });
+      token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
+      track('TraceUnlocked', 'code');
+      renderHome();
+      $('welcome-title').textContent = 'Unlocked on this phone'; $('welcome-go').textContent = 'Pick a picture';
+      $('welcome-body').textContent = 'Trace anything, for good.'; $('welcome-app').hidden = true;
+      openSheet('welcome');
+    } catch (error) {
+      $('restore-error').textContent = error.message; $('restore-error').hidden = false;
+    } finally { $('code-send').disabled = false; }
   });
 
   // ----- Arrival -----
@@ -476,16 +558,17 @@
   const paid = params.get('paid'), unlockLink = params.get('unlock'), cancelled = params.get('cancelled');
   if (paid || unlockLink || cancelled) {
     const clean = new URL(location.href);
-    for (const key of ['paid', 'unlock', 'cancelled']) clean.searchParams.delete(key);
+    for (const key of ['paid', 'unlock', 'cancelled', 'app']) clean.searchParams.delete(key);
     history.replaceState(null, '', clean.pathname + clean.search);
   }
   renderHome();
+  if (inApp) checkPending();
   if (paid) confirmPayment(paid);
   else if (unlockLink) unlockFromLink(unlockLink);
   else if (cancelled) { track('TraceCheckoutCancelled'); showPaywall('cancelled', 'No payment was taken.'); }
 
   // Microsoft Clarity recordings for ad visitors only, never the owner.
-  if (!ownerBrowser && /^https:$/.test(location.protocol)) {
+  if (!ownerBrowser && !inApp && /^https:$/.test(location.protocol)) {
     window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
     const script = document.createElement('script'); script.async = true; script.src = 'https://www.clarity.ms/tag/y93wrwbvgb';
     document.head.append(script);

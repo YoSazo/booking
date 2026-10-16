@@ -77,3 +77,29 @@ deploy needed.
    if the owner doesn't want to make it.
 3. **The pixel is shared with Claims.** Pause Claims' campaign so its events
    don't mix with these.
+
+## In the iPhone app (from version 3.33)
+
+Marketel Trace replaces Claims on the app's menu. With only one tool on the
+menu, the app opens straight into it. Claims stays live on the web and on
+`/funnel`, and its emailed sign-in links still open Claims in the app.
+
+- **The page:** `npm run wedges:build` copies `trace-web` into
+  `marketel-frontdesk-ios/www/trace`, and `wedges:check` fails when the copy is
+  stale. The page notices it's in the app (the native shell is reachable),
+  calls the API at `https://bookmarketel.com`, hides the app's glass bar and
+  draws its own.
+- **Buying:** only in the US App Store (`inspectStorefront` answers `USA`).
+  - The page creates the Checkout and opens it in Safari with `openPurchase`,
+    then keeps the session id.
+  - When the app comes back to the front, it checks that session and unlocks
+    itself.
+  - Stripe's return page in Safari also shows a "Back to the Marketel app"
+    button (`com.bookmarketel.frontdesk://trace`).
+- **Outside the US:** no price and no buy button. The first drawing is free,
+  and a web purchase can be unlocked with the code.
+- **"Already paid?":** the buyer enters their email and gets a 6-digit code by
+  email. The code works only with the email that paid, with six tries an hour
+  per email. The email still carries the web unlock link too.
+- **Tracking:** nothing done in the app goes to Meta or Clarity. App
+  activity is recorded with `TraceLanded` detail `app`.

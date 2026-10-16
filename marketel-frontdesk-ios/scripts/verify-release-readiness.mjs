@@ -122,12 +122,27 @@ if (/<script[^>]+src=["']https?:/i.test(bundledInspect)) {
 }
 expect(read('www/inspect/inspect.js'), /type:'inspectState'[\s\S]{0,180}selectedTab/,
   'Bundled Inspect does not synchronize its native tab selection');
-// Claims is the only job on the menu while it is the one running ads. The other
-// two stay routable, and a hidden one that someone last used must not skip the
+// Marketel Trace is the one job on the menu (in place of Claims since
+// 2026-10-15), and with one job the app opens straight into it. The report jobs
+// stay routable, and a hidden one that someone last used must not skip the
 // menu and land them straight back in it.
-expect(bundledRoot, /data-product="claims"/,
-  'The native app entry must offer Claims');
-if (/data-product="(inspect|incident)"/.test(bundledRoot)) {
+expect(bundledRoot, /data-product="trace"/,
+  'The native app entry must offer Marketel Trace');
+expect(bundledRoot, /const pages = \{ trace: 'trace\/index\.html' \};/,
+  'The native app entry must open Marketel Trace from its bundled page');
+const bundledTrace = read('www/trace/trace.js');
+expect(bundledTrace, /type: 'visibility', visible: false/,
+  'Bundled Marketel Trace must hand the top of the screen to its own bar');
+expect(bundledTrace, /storefront === 'USA'/,
+  'Bundled Marketel Trace may offer buying outside the app only in the US storefront');
+expect(bundledTrace, /type: 'openPurchase'/,
+  'Bundled Marketel Trace must pay in the default browser, never inside the app');
+if (/<script[^>]+src=["']https?:/i.test(read('www/trace/index.html'))) {
+  failures.push('Bundled Marketel Trace must not load executable JavaScript from a remote origin');
+}
+expect(read('ios/App/App/Info.plist'), /NSCameraUsageDescription<\/key>\s*<string>[^<]*trac/i,
+  'The camera permission text must say it is used for tracing');
+if (/data-product="(claims|inspect|incident)"/.test(bundledRoot)) {
   failures.push('The native app entry offers a tool that is meant to be hidden for now');
 }
 const productList = bundledRoot.match(/const products = \/\* WEDGE_PRODUCTS_START \*\/ (\[[^;]+?\]) \/\* WEDGE_PRODUCTS_END \*\//);

@@ -64,10 +64,10 @@
 <body>
   <main>
     <h1>What are you working on?</h1>
-    <p id="intro">Document guest damage and send a dated report.</p>
+    <p id="intro">Trace any picture onto paper.</p>
     <div id="choices" class="choices hidden">
       <!-- WEDGE_CHOICES_START -->
-      <button class="choice" data-product="claims"><span><strong>Claims</strong><small>Record damage and keep the original uploaded photos.</small></span><span class="arrow" aria-hidden="true">→</span></button>
+      <button class="choice" data-product="trace"><span><strong>Trace</strong><small>Trace any picture onto paper.</small></span><span class="arrow" aria-hidden="true">→</span></button>
       <p class="soon">More tools coming soon.</p>
       <!-- WEDGE_CHOICES_END -->
     </div>
@@ -82,14 +82,18 @@
       const offered = [...document.querySelectorAll('[data-product]')].map(button => button.dataset.product);
       const names = /* WEDGE_NAMES_START */ {"claims":"Claims","incident":"Incident","inspect":"Inspect","intake":"Intake","moveout":"Moveout"} /* WEDGE_NAMES_END */;
       const shell = message => window.webkit?.messageHandlers?.marketelShell?.postMessage(message);
+      // Tools that are their own page rather than a report wedge.
+      const pages = { trace: 'trace/index.html' };
       const open = product => {
         localStorage.setItem('marketel.product', product);
-        location.replace(products.includes(product) ? `inspect/index.html?arm=${product}` : 'frontdesk/index.html?native=ios');
+        location.replace(pages[product] || (products.includes(product) ? `inspect/index.html?arm=${product}` : 'frontdesk/index.html?native=ios'));
       };
       const selected = localStorage.getItem('marketel.product');
       const choosing = new URLSearchParams(location.search).get('choose') === '1';
       if (!choosing && offered.includes(selected)) return open(selected);
       if (!choosing && (selected === 'bookings' || localStorage.getItem('crmToken'))) return open('bookings');
+      // One tool on the menu: open it rather than ask a question with one answer.
+      if (!choosing && offered.length === 1) return open(offered[0]);
       // Only now is this page staying on screen, so only now does the shell
       // show its floating glass bar over it.
       shell({ type: 'chooserState' });
@@ -110,7 +114,7 @@
         const product = button.dataset.product;
         // The bar renames itself while the page underneath changes; the tool
         // page reads this flag and rises in to meet it.
-        shell({ type: 'shellProduct', product: names[product] });
+        shell({ type: 'shellProduct', product: names[product] || button.querySelector('strong')?.textContent || '' });
         shell({ type: 'inspectHaptic' });
         try { sessionStorage.setItem('marketel.enter', '1'); } catch {}
         button.classList.add('chosen');
