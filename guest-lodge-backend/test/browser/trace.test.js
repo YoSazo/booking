@@ -76,7 +76,14 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
 
     // How it works, in three steps, before anything is tapped.
     assert.deepEqual(await page.$$eval('.steps li', items => items.map(li => li.textContent.replace(/^\d/, '').trim())),
-      ['Pick a picture', 'Phone on a glass over paper', 'Trace the lines']);
+      ['Pick a picture', 'Phone on a glass over paper', 'Camera shows the lines']);
+    assert.match(await page.textContent('#pick-title'), /Try it free: pick a picture/);
+    // The other choice, from the first second: buy now, in the top bar.
+    await page.locator('#buy-top').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.textContent('#pay-title'), 'Unlock everything');
+    await page.locator('#pay-later').tap();
+    await page.waitForSelector('#paywall', { state: 'hidden' });
     // Someone who already wants it can pay straight away.
     await page.locator('#unlock-now').tap();
     await page.waitForSelector('#paywall:not([hidden])');
@@ -135,6 +142,7 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.locator('#welcome-go').tap();
     assert.match(await page.textContent('#note'), /Unlocked/);
     assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button once unlocked');
+    assert.equal(await page.isVisible('#buy-top'), false, 'no Buy in the bar once unlocked');
     await page.locator('.tile[data-id="fish"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
@@ -300,6 +308,7 @@ test('inside the app outside the US there is no price and no buy button, only th
     assert.doesNotMatch(await page.innerText('#paywall'), /\$/);
     assert.equal(await page.isVisible('#pay-elsewhere'), true);
     assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button where the app may not sell');
+    assert.equal(await page.isVisible('#buy-top'), false, 'no Buy in the bar where the app may not sell');
   } finally { await browser.close(); w.close(); }
 });
 

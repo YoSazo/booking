@@ -120,6 +120,9 @@
       : 'Your first drawing is free.';
     // For anyone who already knows they want it: pay straight away.
     $('unlock-now').hidden = unlocked() || !canBuy();
+    // The other choice from the first second: try it free (pick a picture,
+    // the camera opens) or buy straight away from the bar.
+    $('buy-top').hidden = unlocked() || !canBuy();
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
@@ -488,7 +491,7 @@
     const buy = canBuy();
     for (const id of ['buy', 'pay-price', 'pay-sub', 'pay-perks', 'pay-fine']) $(id).hidden = !buy;
     $('pay-elsewhere').hidden = buy;
-    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' ? 'Unlock everything' : 'Keep tracing anything';
+    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' || paywallReason === 'top' ? 'Unlock everything' : 'Keep tracing anything';
   }
   function showPaywall(reason, note = '') {
     paywallReason = reason;
@@ -500,6 +503,7 @@
     openSheet('paywall');
   }
   $('unlock-now').addEventListener('click', () => showPaywall('home'));
+  $('buy-top').addEventListener('click', () => showPaywall('top'));
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('backdrop').addEventListener('click', () => { if (!$('paywall').hidden) track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('buy').addEventListener('click', async () => {

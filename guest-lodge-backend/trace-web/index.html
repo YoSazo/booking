@@ -7,20 +7,20 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=8">
+<link rel="stylesheet" href="/trace/trace.css?v=9">
 </head>
 <body>
-<header class="site-bar" id="site-bar"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a></header>
+<header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
 <main id="home" class="home">
   <h1>Trace any picture onto paper.</h1>
   <ol class="steps" aria-label="How it works">
     <li><span class="n">1</span><span>Pick a picture</span></li>
     <li><span class="n">2</span><span>Phone on a glass over paper</span></li>
-    <li><span class="n">3</span><span>Trace the lines</span></li>
+    <li><span class="n">3</span><span>Camera shows the lines</span></li>
   </ol>
 
   <section class="pick" aria-labelledby="pick-title">
-    <h2 id="pick-title">Pick a picture</h2>
+    <h2 id="pick-title">Try it free: pick a picture</h2>
     <div class="grid" id="grid"></div>
     <form class="describe" id="describe-form" novalidate>
       <input type="text" id="describe" maxlength="200" autocomplete="off" enterkeyhint="go" placeholder="Or describe it: a dragon" aria-label="Describe what you want to draw">
@@ -125,6 +125,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=8" defer></script>
+<script src="/trace/trace.js?v=9" defer></script>
 </body>
 </html>
