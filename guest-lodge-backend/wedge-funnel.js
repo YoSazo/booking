@@ -104,9 +104,9 @@ const LABELS = Object.freeze(Object.fromEntries([
 // own ladder: landing, picking something, tracing, the price, paying.
 const TRACE_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
-  { key: 'picked', label: 'Picked a picture, a photo or a description', names: ['TracePicked'] },
+  { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent)', names: ['TracePicked'] },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
-  { key: 'started', label: 'Started tracing (what Meta hears)', names: ['TraceStarted'] },
+  { key: 'started', label: 'Started tracing (Meta: AddToCart)', names: ['TraceStarted'] },
   { key: 'traced30', label: 'Traced for 30 seconds', names: ['TraceTraced30'], aside: true },
   { key: 'traced120', label: 'Traced for 2 minutes', names: ['TraceTraced120'], aside: true },
   { key: 'done', label: 'Tapped Done', names: ['TraceDone'], aside: true },

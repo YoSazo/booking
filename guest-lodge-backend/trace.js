@@ -47,11 +47,15 @@ const AI_STYLE = [
 ].join(' ');
 const promptOf = value => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
 
-// What Meta may optimise for. Starting to trace (camera on, picture over it) is
-// the first deliberate act; a Checkout ready to pay is the checkout signal. The
-// purchase itself is sent from /unlock, where the payment is confirmed.
+// What Meta may optimise for, shallow to deep, each once per visitor. The
+// campaign optimises ViewContent: the first deliberate tap (a picture, a photo
+// or a description), common enough for Meta to learn from but never a stray
+// touch. Tracing on camera is AddToCart, a deeper signal to move to once it is
+// frequent. A Checkout ready to pay is InitiateCheckout; the purchase itself is
+// sent when the payment is confirmed.
 const TRACE_SIGNALS = Object.freeze({
-  TraceStarted: { event: 'ViewContent', id: 'trace-started' },
+  TracePicked: { event: 'ViewContent', id: 'trace-picked' },
+  TraceStarted: { event: 'AddToCart', id: 'trace-started', value: TRACE.priceCents / 100 },
   TraceCheckoutOpened: { event: 'InitiateCheckout', id: 'trace-checkout', value: TRACE.priceCents / 100 },
 });
 

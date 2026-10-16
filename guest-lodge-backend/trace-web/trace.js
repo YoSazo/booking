@@ -82,7 +82,7 @@
     if (!response.ok) throw Object.assign(new Error(data.error || 'Something went wrong. Please try again.'), { status: response.status });
     return data;
   }
-  const SIGNALS = new Set(['TraceStarted', 'TraceCheckoutOpened']);
+  const SIGNALS = new Set(['TracePicked', 'TraceStarted', 'TraceCheckoutOpened']);
   const sent = new Set();
   function track(name, detail = '', { once = true, keepalive = false } = {}) {
     const key = `${name}:${detail}`;

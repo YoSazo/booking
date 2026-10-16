@@ -127,21 +127,25 @@ test('steps are recorded anonymously under the trace tool; the owner and robots 
     assert.deepEqual((await post('/api/trace/event', { name: 'TraceLanded', visitorId: 'v_abcdefghijk' }, { 'x-marketel-no-track': '1' })).body, { success: true, ignored: true });
     assert.deepEqual((await post('/api/trace/event', { name: 'TraceLanded', visitorId: 'v_abcdefghijk' }, { 'user-agent': 'Mozilla/5.0 HeadlessChrome/120' })).body, { success: true, ignored: true });
     assert.equal(rows.length, before);
-    assert.equal(calls.capi.length, 0, 'ordinary steps are not sent to Meta');
+    await post('/api/trace/event', { name: 'TraceFaded', visitorId: 'v_abcdefghijk' });
+    assert.deepEqual(calls.capi.map(c => c.event), ['ViewContent'], 'only the pick went to Meta; ordinary steps and the visitor-less pick do not');
   });
 });
 
-test('starting to trace and opening checkout are the Meta signals, once per visitor by event id', async () => {
+test('picking, tracing and opening checkout are the Meta signals, once per visitor by event id', async () => {
   const { app, calls } = fakeWorld();
   await serve(app, async ({ post }) => {
     const attribution = { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.click', sourceUrl: 'https://bookmarketel.com/trace?fbclid=click' };
+    await post('/api/trace/event', { name: 'TracePicked', visitorId: 'v_abcdefghijk', detail: 'starter', attribution });
     await post('/api/trace/event', { name: 'TraceStarted', visitorId: 'v_abcdefghijk', detail: 'starter', attribution });
     await post('/api/trace/event', { name: 'TraceCheckoutOpened', visitorId: 'v_abcdefghijk', attribution });
     await post('/api/trace/event', { name: 'TraceStarted', visitorId: 'v_abcdefghijk', detail: 'photo', attribution }, { 'x-marketel-no-track': '1' });
+    await post('/api/trace/event', { name: 'TraceLanded', visitorId: 'v_abcdefghijk', attribution });
     assert.deepEqual(calls.capi.map(c => [c.event, c.eventId, c.value]), [
-      ['ViewContent', 'trace-started.v_abcdefghijk', undefined],
+      ['ViewContent', 'trace-picked.v_abcdefghijk', undefined],
+      ['AddToCart', 'trace-started.v_abcdefghijk', 14.99],
       ['InitiateCheckout', 'trace-checkout.v_abcdefghijk', 14.99],
-    ]);
+    ], 'landing alone is never sent');
     assert.equal(calls.capi[0].fbc, 'fb.1.1700000000.click');
     assert.equal(calls.capi[0].product, 'trace-anything');
   });
