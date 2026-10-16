@@ -307,8 +307,14 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
     const box = await page.locator('#describe-form').boundingBox();
     assert.ok(box.y + box.height <= 664, `the describe box is on the first screen (bottom at ${box.y + box.height})`);
     await page.fill('#describe', 'a cat wearing a crown');
+    // As the iPhone keyboard does: the field focused and the page scrolled up.
+    await page.focus('#describe');
+    await page.evaluate(() => window.scrollTo(0, 400));
     await page.locator('#describe-go').tap();
     await page.waitForSelector('#tracer:not([hidden])');
+    assert.equal(await page.evaluate(() => window.scrollY), 0, 'tracing pins the page at the top');
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('tracing')), true);
+    assert.notEqual(await page.evaluate(() => document.activeElement?.id), 'describe', 'the keyboard is dismissed');
     assert.match(w.prompts[0], /Subject: a cat wearing a crown$/);
     const pixels = await page.evaluate(async () => {
       const img = document.getElementById('overlay'); await img.decode();
@@ -319,8 +325,10 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
     });
     assert.equal(pixels.corner, 0, 'white paper becomes see-through');
     assert.ok(pixels.ring > 200, `the line stays dark, alpha ${pixels.ring}`);
+    // Done answers straight away, without touching the picture first.
     await page.locator('#done').tap();
     await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('tracing')), false, 'home scrolls again');
     assert.match(await page.textContent('#paywall'), /30 AI pictures a month/);
     await page.locator('#pay-later').tap();
     await page.fill('#describe', 'a dog');

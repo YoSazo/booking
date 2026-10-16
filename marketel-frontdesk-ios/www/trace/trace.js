@@ -122,7 +122,17 @@
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
   }
-  function showHome() { stopTracing(); $('tracer').hidden = true; $('camera-help').hidden = true; $('home').hidden = false; renderHome(); }
+  // iOS scrolls the page up for the keyboard (after "Describe it") and does
+  // not always scroll it back. The camera screen still looks right, but its
+  // buttons' touch areas sit where the scrolled page puts them, so Done did
+  // nothing until the picture was touched. Tracing pins the page at the top
+  // and freezes it; home lets it scroll again.
+  function settleViewport() {
+    if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
+    window.scrollTo(0, 0);
+  }
+  function showHome() { stopTracing(); document.documentElement.classList.remove('tracing'); $('tracer').hidden = true; $('camera-help').hidden = true; $('home').hidden = false; renderHome(); }
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (!$('tracer').hidden) window.scrollTo(0, 0); });
   if (inApp) {
     // The page draws its own Marketel bar, so the app's glass bar stands down.
     tell({ type: 'visibility', visible: false });
@@ -338,6 +348,10 @@
   }
   async function startTracing(picture) {
     stopTracing();
+    settleViewport();
+    document.documentElement.classList.add('tracing');
+    // Once more after the keyboard has finished closing.
+    setTimeout(() => { if (!$('tracer').hidden) window.scrollTo(0, 0); }, 400);
     const generation = cameraGeneration;
     current = picture; showingPhoto = false; tracedMs = 0;
     Object.assign(view, { x: 0, y: 0, s: 1, r: 0 }); applyView(); setLocked(false);
