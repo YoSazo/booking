@@ -7,7 +7,7 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=28">
+<link rel="stylesheet" href="/trace/trace.css?v=29">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
@@ -71,7 +71,7 @@
   <!-- Step 1 of 3: their drawing, read back, like the booking engine's
        "Review your stay". -->
   <section class="step flow" id="step-review" hidden aria-labelledby="review-title">
-    <div class="flow-top"><button type="button" class="back-pill" id="review-back">‹ Back to drawings</button><button type="button" class="skip" id="review-skip">Skip to tracing ›</button></div>
+    <div class="flow-top"><button type="button" class="back-pill" id="review-back">‹ Back to drawings</button></div>
     <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li><i></i>Set up</li><li><i></i>Trace</li></ol>
     <h2 class="step-count" id="review-title" tabindex="-1">Step 1 of 3 — Your drawing</h2>
     <div class="card details">
@@ -89,12 +89,12 @@
       <p class="free-sub">No card needed. No account.</p>
       <p class="free-after">Want more drawings after this one? <strong>$14.99 once</strong>, yours forever. No subscription.</p>
     </div>
-    <div class="sticky-cta"><button type="button" class="big" id="review-go">Continue to Set Up</button></div>
+    <div class="sticky-cta"><button type="button" class="big" id="review-go">Continue to Set Up</button><button type="button" class="ghost skip" id="review-skip">Skip to Tracing</button></div>
   </section>
 
   <!-- Step 2 of 3: how to set the phone up, before the camera asks. -->
   <section class="step flow" id="step-setup" hidden aria-labelledby="setup-title">
-    <div class="flow-top"><button type="button" class="back-pill" id="setup-back">‹ Back to your drawing</button><button type="button" class="skip" id="setup-skip">Skip to tracing ›</button></div>
+    <div class="flow-top"><button type="button" class="back-pill" id="setup-back">‹ Back to your drawing</button></div>
     <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li class="on"><i></i>Set up</li><li><i></i>Trace</li></ol>
     <h2 class="step-count" id="setup-title" tabindex="-1">Step 2 of 3 — Set up</h2>
     <div class="card setup">
@@ -106,7 +106,7 @@
       </ol>
       <figure class="setup-photo"><img src="/trace/pictures/setup-photo.webp" width="720" height="540" alt="Through the phone: a drawing's lines on lined paper, and a pencil tracing them"><figcaption>What you'll see: the lines on your paper.</figcaption></figure>
     </div>
-    <div class="sticky-cta"><button type="button" class="big" id="setup-go">Continue to Trace</button></div>
+    <div class="sticky-cta"><button type="button" class="big" id="setup-go">Continue to Trace</button><button type="button" class="ghost skip" id="setup-skip">Skip to Tracing</button></div>
   </section>
 
   <section class="step" id="step-pick" hidden aria-labelledby="pick-title">
@@ -226,6 +226,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=28" defer></script>
+<script src="/trace/trace.js?v=29" defer></script>
 </body>
 </html>

@@ -39,6 +39,8 @@ async function world({ drawing = null } = {}) {
   return { base: `http://127.0.0.1:${server.address().port}`, events, creates, sessions, prompts, close: () => server.close() };
 }
 
+// Tracing time comes from Date.now; tests move it forward instead of waiting.
+const skipAhead = (page, ms) => page.evaluate(ms => { window.__skew = (window.__skew || 0) + ms; }, ms);
 async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
   const args = camera === 'fake' ? ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] : [];
   const browser = await chromium.launch({ args });
@@ -46,6 +48,7 @@ async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
   if (camera === 'denied') await context.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }));
   });
+  await context.addInitScript(() => { const real = Date.now.bind(Date); Date.now = () => real() + (window.__skew || 0); });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   const errors = [];
@@ -124,6 +127,8 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.mouse.move(200, 300); await page.mouse.down(); await page.mouse.move(260, 360, { steps: 4 }); await page.mouse.up();
     assert.notEqual(await page.$eval('#overlay', el => el.style.transform), before);
 
+    // Half a minute of tracing earns the cheer.
+    await skipAhead(page, 31000);
     await page.locator('#done').tap();
     await page.waitForSelector('#paywall:not([hidden])');
     // A win first: confetti and a cheer, then the offer against what others charge.
@@ -699,7 +704,13 @@ test('Skip to tracing opens the camera straight from step 1 or step 2', async ()
       await page.goto(`${w.base}/trace`);
       await page.locator('#select-dragon').tap();
       await page.waitForSelector('#step-review:not([hidden])');
-      assert.equal(await page.textContent('#review-skip'), 'Skip to tracing ›');
+      assert.equal(await page.textContent('#review-skip'), 'Skip to Tracing');
+      // The bottom buttons are pinned to the screen from the first frame, not after the step's animation.
+      assert.equal(await page.$eval('#step-review', el => getComputedStyle(el).transform), 'none');
+      // Right under the big button, both on screen.
+      const go = await page.locator('#review-go').boundingBox(), skip = await page.locator('#review-skip').boundingBox();
+      assert.ok(skip.y > go.y + go.height && skip.y - (go.y + go.height) <= 16, `skip sits just under the big button (${go.y + go.height} → ${skip.y})`);
+      assert.ok(skip.y + skip.height <= 664, 'and on screen');
       if (step === 'setup') { await page.locator('#review-go').tap(); await page.waitForSelector('#step-setup:not([hidden])'); }
       await page.locator(`#${step}-skip`).tap();
       await page.waitForSelector('#tracer:not([hidden])');
@@ -714,6 +725,32 @@ test('Skip to tracing opens the camera straight from step 1 or step 2', async ()
       assert.deepEqual(errors, []);
     } finally { await browser.close(); w.close(); }
   }
+});
+
+test('Done before tracing 30 seconds shows the offer without the cheer or "you just traced"', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace`);
+    await page.locator('#select-dragon').tap();
+    await page.locator('#review-skip').tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
+    await page.locator('#done').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.evaluate(() => !!document.getElementById('confetti')), false, 'no confetti');
+    assert.doesNotMatch(await page.innerText('#paywall'), /You just traced/);
+    assert.equal(await page.textContent('#pay-note'), 'Your free drawing is still here. Trace it anytime.');
+    assert.equal(await page.textContent('#pay-title'), 'Trace anything. Forever.');
+    // It's true: the same drawing opens again for free.
+    await page.locator('#pay-later').tap();
+    await page.locator('#select-dragon').tap();
+    await page.locator('#review-skip').tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    await settle();
+    assert.ok(names(w.events).includes('TracePaywallShown:quick'), names(w.events).join());
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
 });
 
 test('an idea under "What do you want to draw?" draws straight away', async () => {

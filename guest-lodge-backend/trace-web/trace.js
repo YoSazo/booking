@@ -244,7 +244,7 @@
   });
   $('why-go').addEventListener('click', () => { track('TraceCameraOk', '', { once: false }); closeSheets(); if (chosen) startTracing(chosen); });
   $('why-later').addEventListener('click', closeSheets);
-  // Skip: straight to the camera from step 1 or 2. iOS still asks, with the note.
+  // Skip, under the big button: straight to the camera from step 1 or 2. iOS still asks, with the note.
   for (const [id, step] of [['review-skip', 'review'], ['setup-skip', 'setup']]) {
     $(id).addEventListener('click', () => { track('TraceSkipped', step, { once: false }); if (chosen) startTracing(chosen); });
   }
@@ -632,13 +632,16 @@
     };
     requestAnimationFrame(frame);
   }
+  // The cheer is for a real drawing: 30 seconds or more with the camera on.
+  // Done before that (to see what's next) shows the offer without claiming a drawing.
   $('done').addEventListener('click', () => {
     track('TraceDone', '', { once: false });
     showHome();
-    if (!unlocked()) {
+    if (unlocked()) return;
+    if (tracedMs >= 30000) {
       confetti();
       showPaywall('done', '🎉 You just traced your first drawing!');
-    }
+    } else showPaywall('quick', 'Your free drawing is still here. Trace it anytime.');
   });
 
   // ----- Paying -----
@@ -650,7 +653,7 @@
     $('pay-price').hidden = true;
     $('pay-elsewhere').hidden = buy;
     $('pay-title').textContent = !buy ? 'That was your free drawing' : ['home', 'top', 'now'].includes(paywallReason) ? 'Unlock everything'
-      : paywallReason === 'done' ? 'Keep drawing. Forever.' : 'Keep tracing anything';
+      : paywallReason === 'done' ? 'Keep drawing. Forever.' : paywallReason === 'quick' ? 'Trace anything. Forever.' : 'Keep tracing anything';
   }
   function showPaywall(reason, note = '') {
     paywallReason = reason;
