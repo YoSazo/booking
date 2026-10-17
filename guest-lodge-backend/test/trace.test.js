@@ -93,6 +93,8 @@ test('the page is served with the camera allowed and nothing else', async () => 
       assert.match(res.headers.get('permissions-policy'), /camera=\(self\)/);
       assert.match(res.headers.get('permissions-policy'), /microphone=\(\)/);
       assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+      assert.match(res.headers.get('content-security-policy'), /script-src [^;]*https:\/\/connect\.facebook\.net/);
+      assert.match(res.headers.get('content-security-policy'), /connect-src [^;]*https:\/\/www\.facebook\.com/);
       assert.equal(res.headers.get('x-robots-tag'), 'noindex, nofollow');
     }
     const terms = await fetch(`${base}/trace/terms`);

@@ -399,6 +399,66 @@ test('while iOS asks for the camera, the page says why; the note goes once the c
   } finally { await browser.close(); w.close(); }
 });
 
+// Meta's pixel only loads on the real https site. Serve the page from an https
+// test origin, stub Meta's script so its queued calls stay readable.
+async function overHttps(page, base) {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
+  await page.route('https://connect.facebook.net/**', route => route.fulfill({ status: 200, body: '', headers: { 'content-type': 'application/javascript' } }));
+  await page.route('https://trace.test/**', async route => {
+    const request = route.request();
+    const url = request.url().replace('https://trace.test', base);
+    const response = await page.request.fetch(url, { method: request.method(), headers: request.headers(), data: request.postDataBuffer() || undefined });
+    await route.fulfill({ response });
+  });
+}
+const pixelCalls = page => page.evaluate(() => (window.fbq && window.fbq.queue || []).map(args => [...args].map(a => (a && typeof a === 'object' ? JSON.parse(JSON.stringify(a)) : a))));
+
+test("Meta's pixel: PageView on arrival, then the same events and event ids the server sends", async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await overHttps(page, w.base);
+    await page.goto('https://trace.test/trace?fbclid=adclick123');
+    await toPicker(page);
+    let calls = await pixelCalls(page);
+    assert.deepEqual(calls.slice(0, 2), [['init', '1545780930244672'], ['track', 'PageView']]);
+    const visitor = await page.evaluate(() => localStorage.getItem('trace.visitor'));
+    await page.locator('.tile').first().tap();
+    await page.waitForSelector('#tracer:not([hidden])');
+    await until(page, () => (window.fbq.queue || []).some(args => args[1] === 'AddToCart'));
+    await page.locator('#back').tap();
+    await toPicker(page);
+    await page.locator('.tile').nth(1).tap();
+    await settle();
+    calls = (await pixelCalls(page)).filter(args => args[0] === 'track' && args[1] !== 'PageView');
+    assert.deepEqual(calls.map(args => [args[1], args[3]?.eventID]), [
+      ['ViewContent', `trace-picked.${visitor}`],
+      ['AddToCart', `trace-started.${visitor}`],
+    ], 'each signal once, with the server event id');
+    assert.equal(calls[1][2].value, 14.99);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test("Meta's pixel never loads for the owner, the app or over http", async () => {
+  const w = await world();
+  for (const setup of ['owner', 'app', 'http']) {
+    const { browser, page } = await phone();
+    try {
+      const facebook = [];
+      page.on('request', request => { if (/facebook\.(net|com)/.test(request.url())) facebook.push(request.url()); });
+      if (setup !== 'http') await overHttps(page, w.base);
+      if (setup === 'app') await page.addInitScript(() => { window.webkit = { messageHandlers: { marketelShell: { postMessage() {} } } }; });
+      await page.goto(setup === 'http' ? `${w.base}/trace` : `https://trace.test/trace${setup === 'owner' ? '?notrack=1' : ''}`);
+      await page.waitForSelector('body');
+      await settle();
+      assert.equal(await page.evaluate(() => typeof window.fbq), 'undefined', setup);
+      assert.deepEqual(facebook, [], setup);
+    } finally { await browser.close(); }
+  }
+  w.close();
+});
+
 test('the page assets exist and reference only same-origin files', () => {
   const root = path.resolve(__dirname, '../../trace-web');
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');

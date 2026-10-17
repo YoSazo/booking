@@ -125,11 +125,36 @@
     return data;
   }
   const SIGNALS = new Set(['TracePicked', 'TraceStarted', 'TraceCheckoutOpened']);
+
+  // Meta's pixel, on the website only (never the app, never the owner, never a
+  // test page over http). It gives Ads Manager landing page views and Meta's own
+  // browser match. Each signal goes with the same event id the server sends, so
+  // Meta counts it once. Mirrors TRACE_SIGNALS in trace.js.
+  const PIXEL_ID = '1545780930244672';
+  const pixelOn = !ownerBrowser && !inApp && location.protocol === 'https:' && !navigator.webdriver;
+  const PIXEL_SIGNALS = {
+    TracePicked: { event: 'ViewContent', id: 'trace-picked' },
+    TraceStarted: { event: 'AddToCart', id: 'trace-started', value: 14.99 },
+    TraceCheckoutOpened: { event: 'InitiateCheckout', id: 'trace-checkout', value: 14.99 },
+  };
+  const pixelSent = new Set();
+  const pixel = (event, data, eventID) => { try { if (pixelOn && window.fbq) window.fbq('track', event, { content_name: 'Marketel Trace', currency: 'USD', ...data }, eventID ? { eventID } : undefined); } catch { /* never break the page */ } };
+  if (pixelOn) {
+    /* eslint-disable */
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    /* eslint-enable */
+    window.fbq('init', PIXEL_ID);
+    window.fbq('track', 'PageView');
+  }
+  const purchasePixel = sessionId => pixel('Purchase', { value: 14.99 }, `trace-purchase.${sessionId}`);
+
   const sent = new Set();
   function track(name, detail = '', { once = true, keepalive = false } = {}) {
     const key = `${name}:${detail}`;
     if (once && sent.has(key)) return;
     sent.add(key);
+    const signal = PIXEL_SIGNALS[name];
+    if (signal && !pixelSent.has(name)) { pixelSent.add(name); pixel(signal.event, signal.value ? { value: signal.value } : {}, `${signal.id}.${visitorId}`); }
     api('/event', { name, visitorId, ...(detail ? { detail } : {}), ...(SIGNALS.has(name) && !inApp ? { attribution } : {}) }, { keepalive }).catch(() => {});
   }
 
@@ -660,6 +685,7 @@
       try {
         const result = await api('/unlock', { sessionId });
         token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
+        purchasePixel(sessionId);
         track('TraceUnlocked');
         busy('');
         $('welcome-title').textContent = 'You\'re in.';
@@ -695,6 +721,7 @@
     try {
       const result = await api('/unlock', { sessionId: pending });
       token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
+      purchasePixel(pending);
       track('TraceUnlocked', inApp ? 'app' : 'return');
       renderHome();
       $('welcome-title').textContent = 'You\'re in.'; $('welcome-go').textContent = 'Pick a picture';
