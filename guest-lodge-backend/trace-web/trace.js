@@ -8,8 +8,6 @@
     { id: 'butterfly', label: 'Butterfly' }, { id: 'flower', label: 'Flower' }, { id: 'cat', label: 'Cat' },
     { id: 'heart', label: 'Heart' }, { id: 'house', label: 'House' }, { id: 'fish', label: 'Fish' },
   ];
-  // Real customer reviews for the moving tape. The star line is their true
-  // average, worked out here so the two cannot drift apart.
   const REVIEWS = [
     { name: "Emily Carter", stars: 5, quote: "I was paying every week for another tracing app so finding this for $14.99 ONCE was honestly a relief. Does exactly what I need and I don't have to download anything." },
     { name: "Marcus J", stars: 5, quote: "Wait so I can literally type what I wanna draw and it makes it for me?? 😭 this is actually so cool" },
@@ -165,7 +163,6 @@
     // The other choice from the first second: try it free (pick a picture,
     // the camera opens) or buy straight away from the bar.
     $('buy-top').hidden = unlocked() || !canBuy();
-    // The reviews talk about the price and about buying on the web: only where a price may be shown.
     $('proof').hidden = !canBuy();
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
