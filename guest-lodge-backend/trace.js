@@ -26,7 +26,7 @@ const TRACE = Object.freeze({
 // Anonymous steps a visitor can take. Names only, with at most a short
 // lowercase detail: never a picture, a file name or anything typed.
 const TRACE_EVENTS = Object.freeze([
-  'TraceLanded', 'TraceFrom', 'TraceBrowser',
+  'TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose',
   'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown', 'TraceStarted',
   'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone',
   'TracePaywallShown', 'TracePaywallClosed', 'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed',

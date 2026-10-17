@@ -56,6 +56,15 @@ async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
 }
 const names = events => events.map(e => e.name + (e.detail ? `:${e.detail}` : ''));
 const settle = () => new Promise(resolve => setTimeout(resolve, 300));
+// The web starts on the idea, then the choice, then the pictures. The app, a
+// buyer and anyone who has seen the pitch land on the pictures.
+async function toPicker(page) {
+  if (await page.isVisible('#step-intro')) {
+    await page.locator('#intro-go').tap();
+    await page.locator('#choose-try').tap();
+  }
+  await page.waitForSelector('.tile', { state: 'visible' });
+}
 async function until(page, predicate, ms = 8000) {
   const end = Date.now() + ms;
   while (Date.now() < end) { if (await page.evaluate(predicate)) return; await new Promise(resolve => setTimeout(resolve, 100)); }
@@ -67,28 +76,16 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
   const { browser, page, errors } = await phone();
   try {
     await page.goto(`${w.base}/trace?fbclid=adclick123`);
+    await toPicker(page);
     await page.waitForSelector('.tile');
     assert.equal(await page.locator('.tile').count(), 6);
     assert.match(await page.textContent('#note'), /First drawing free/);
-    // Kid-simple: the pictures are on the first screen, under the review tape.
-    // The photo button follows within a short scroll.
-    const gridBox = await page.locator('#grid').boundingBox();
-    assert.ok(gridBox.y + gridBox.height <= 664, `the pictures are below the fold at ${gridBox.y + gridBox.height}`);
+    // Kid-simple: the pictures and the photo button are on the first screen.
     const ownBox = await page.locator('#own-label').boundingBox();
-    assert.ok(ownBox.y + ownBox.height <= 664 + 160, `own-photo button is far below the fold at ${ownBox.y}`);
-
-    // How it works, in three steps, before anything is tapped.
-    assert.deepEqual(await page.$$eval('.steps li', items => items.map(li => li.textContent.replace(/^\d/, '').trim())),
-      ['Pick a picture', 'Phone on a glass over paper', 'Camera shows the lines']);
-    assert.match(await page.textContent('#pick-title'), /Try it free: pick a picture/);
+    assert.ok(ownBox.y + ownBox.height <= 664, `own-photo button is below the fold at ${ownBox.y}`);
+    assert.match(await page.textContent('#pick-title'), /Pick a picture/);
     // The other choice, from the first second: buy now, in the top bar.
     await page.locator('#buy-top').tap();
-    await page.waitForSelector('#paywall:not([hidden])');
-    assert.equal(await page.textContent('#pay-title'), 'Unlock everything');
-    await page.locator('#pay-later').tap();
-    await page.waitForSelector('#paywall', { state: 'hidden' });
-    // Someone who already wants it can pay straight away.
-    await page.locator('#unlock-now').tap();
     await page.waitForSelector('#paywall:not([hidden])');
     assert.equal(await page.textContent('#pay-title'), 'Unlock everything');
     await page.locator('#pay-later').tap();
@@ -152,7 +149,6 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     assert.ok(await page.evaluate(() => localStorage.getItem('trace.unlock')));
     await page.locator('#welcome-go').tap();
     assert.match(await page.textContent('#note'), /Unlocked/);
-    assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button once unlocked');
     assert.equal(await page.isVisible('#buy-top'), false, 'no Buy in the bar once unlocked');
     await page.locator('.tile[data-id="fish"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
@@ -171,6 +167,7 @@ test('a photo from the phone becomes see-through lines, with the photo one tap a
   const { browser, page, errors } = await phone();
   try {
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.setInputFiles('#own', PHOTO);
     await page.waitForSelector('#tracer:not([hidden])');
     const src = await page.getAttribute('#overlay', 'src');
@@ -202,6 +199,7 @@ test("inside Facebook's browser a camera they said no to asks again, with Safari
   const { browser, page, errors } = await phone({ userAgent: FACEBOOK, camera: 'denied' });
   try {
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.locator('.tile[data-id="heart"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.match(await page.textContent('#help-title'), /Allow your camera/);
@@ -227,6 +225,7 @@ test('in Safari a denied camera explains where to allow it', async () => {
   const { browser, page } = await phone({ camera: 'denied' });
   try {
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.locator('.tile[data-id="flower"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.match(await page.textContent('#help-title'), /Allow your camera/);
@@ -250,6 +249,7 @@ test('the owner opening ?notrack=1 records nothing', async () => {
   const { browser, page } = await phone();
   try {
     await page.goto(`${w.base}/trace?notrack=1`);
+    await toPicker(page);
     await page.locator('.tile[data-id="cat"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
@@ -272,7 +272,9 @@ test('inside the Marketel app: the glass bar stands down, US buyers pay in Safar
       window.fetch = (url, options) => realFetch(String(url).replace('https://bookmarketel.com', base), options);
     }, w.base);
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.waitForSelector('.tile');
+    assert.equal(await page.isVisible('#step-intro'), false, 'the app skips the web pitch');
     const shell = () => page.evaluate(() => window.__shell);
     assert.deepEqual((await shell()).find(m => m.type === 'visibility'), { type: 'visibility', visible: false });
     assert.match(await page.textContent('#note'), /\$14\.99 once/);
@@ -308,6 +310,7 @@ test('inside the app outside the US there is no price and no buy button, only th
       } } } };
     });
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.waitForSelector('.tile');
     await page.waitForTimeout(100);
     assert.doesNotMatch(await page.textContent('#note'), /\$/);
@@ -318,7 +321,6 @@ test('inside the app outside the US there is no price and no buy button, only th
     assert.equal(await page.isVisible('#pay-price'), false);
     assert.doesNotMatch(await page.innerText('#paywall'), /\$/);
     assert.equal(await page.isVisible('#pay-elsewhere'), true);
-    assert.equal(await page.isVisible('#unlock-now'), false, 'no buy button where the app may not sell');
     assert.equal(await page.isVisible('#buy-top'), false, 'no Buy in the bar where the app may not sell');
   } finally { await browser.close(); w.close(); }
 });
@@ -337,9 +339,10 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
   const { browser, page, errors } = await phone();
   try {
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.waitForSelector('#describe');
     const box = await page.locator('#describe-form').boundingBox();
-    assert.ok(box.y + box.height <= 664 + 100, `the describe box is within a short scroll (bottom at ${box.y + box.height})`);
+    assert.ok(box.y + box.height <= 664, `the describe box is on the first screen (bottom at ${box.y + box.height})`);
     await page.fill('#describe', 'a cat wearing a crown');
     // As the iPhone keyboard does: the field focused and the page scrolled up.
     await page.focus('#describe');
@@ -387,6 +390,7 @@ test('while iOS asks for the camera, the page says why; the note goes once the c
       navigator.mediaDevices.getUserMedia = constraints => new Promise(resolve => { window.__allow = () => resolve(real(constraints)); });
     });
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.locator('.tile[data-id="house"]').tap();
     await page.waitForSelector('#camera-note:not([hidden])');
     assert.match(await page.textContent('#camera-note'), /Nothing is recorded/);
@@ -421,6 +425,7 @@ test('the native opaque origin starts without constructing a web attribution URL
       body: fs.readFileSync(path.resolve(__dirname, '../../trace-web/trace.js'), 'utf8').replace(/\blocation\b/g, 'window.__nativeLocation'),
     }));
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.waitForSelector('.tile');
     assert.equal(await page.locator('.tile').count(), 6);
     assert.equal(await page.evaluate(() => localStorage.getItem('trace.metaAttribution.v1')), null);
@@ -440,6 +445,7 @@ test('Back while camera permission is pending stops a late stream and preserves 
       });
     });
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.locator('.tile[data-id="cat"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await page.locator('#back').tap();
@@ -462,6 +468,7 @@ test('a camera playback failure offers help without spending the free drawing', 
       HTMLMediaElement.prototype.play = () => Promise.reject(new Error('Playback failed'));
     });
     await page.goto(`${w.base}/trace`);
+    await toPicker(page);
     await page.locator('.tile[data-id="cat"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
@@ -511,4 +518,100 @@ test('closing the paywall while checkout loads never redirects when the late res
     assert.ok(!names(w.events).includes('TraceCheckoutOpened'));
     assert.deepEqual(errors, []);
   } finally { release(); await browser.close(); w.close(); }
+});
+
+test('three steps: the idea, the choice, the pictures; Back walks them in reverse and a return visit skips ahead', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?fbclid=adclick123`);
+    // Page 1: the idea, one button, no pictures yet.
+    assert.equal(await page.isVisible('#step-intro'), true);
+    assert.equal(await page.isVisible('.tile'), false);
+    assert.match(await page.textContent('#intro-title'), /Pay once\.\s*No subscription\./);
+    const gotIt = await page.locator('#intro-go').boundingBox();
+    assert.ok(gotIt.y + gotIt.height <= 664, `Get started is on the first screen (bottom at ${gotIt.y + gotIt.height})`);
+    await page.locator('#intro-go').tap();
+    // Page 2: the comparison and the two ways in.
+    await page.waitForSelector('#step-choose:not([hidden])');
+    assert.equal(await page.isVisible('#step-intro'), false);
+    assert.match(await page.innerText('#choose-compare'), /\$24\.99\/week[\s\S]*\$14\.99 once/);
+    assert.equal(await page.isVisible('#choose-try'), true);
+    assert.equal(await page.isVisible('#choose-pay'), true);
+    const chooseBottom = await page.locator('#choose-pay').boundingBox();
+    assert.ok(chooseBottom.y + chooseBottom.height <= 664, 'both buttons are on the first screen');
+    // Back goes to the idea, forward to the choice again.
+    await page.goBack();
+    await page.waitForSelector('#step-intro:not([hidden])');
+    await page.goForward();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    await page.locator('#choose-try').tap();
+    // Page 3: the pictures.
+    await page.waitForSelector('#step-pick:not([hidden])');
+    assert.equal(await page.locator('.tile').count(), 6);
+    await page.goBack();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    await page.goBack();
+    await page.waitForSelector('#step-intro:not([hidden])');
+    await settle();
+    const seen = names(w.events);
+    assert.ok(seen.includes('TraceIntroDone'), seen.join());
+    assert.ok(seen.includes('TraceChose:try'), seen.join());
+    assert.equal(seen.includes('TraceChose:pay'), false);
+    // Someone who has seen the pitch goes straight to the pictures next time.
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-pick:not([hidden])');
+    assert.equal(await page.isVisible('#step-intro'), false);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('Pay $14.99 once on the choice step goes straight to Stripe, with no second price page', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?fbclid=adclick123`);
+    await page.locator('#intro-go').tap();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    await page.locator('#choose-pay').tap();
+    await page.waitForURL(/checkout\.stripe\.com/);
+    assert.equal(w.creates.length, 1);
+    await settle();
+    const seen = names(w.events);
+    for (const name of ['TraceIntroDone', 'TraceChose:pay', 'TraceCheckoutTapped', 'TraceCheckoutOpened']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
+    assert.equal(seen.some(name => name.startsWith('TracePaywallShown')), false, 'no second price page');
+    assert.deepEqual(errors.filter(error => !/stripe/i.test(error)), []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('when checkout will not open, the choice step says so, keeps the button usable and stays put', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.route('**/api/trace/checkout', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Checkout is not available right now.' }) }));
+    await page.goto(`${w.base}/trace`);
+    await page.locator('#intro-go').tap();
+    await page.locator('#choose-pay').tap();
+    await page.waitForSelector('#choose-error:not([hidden])');
+    assert.match(await page.textContent('#choose-error'), /not available/);
+    assert.equal(await page.isDisabled('#choose-pay'), false);
+    assert.equal(await page.textContent('#choose-pay'), 'Pay $14.99 once');
+    assert.equal(await page.isVisible('#step-choose'), true);
+    await settle();
+    assert.ok(names(w.events).includes('TraceCheckoutFailed:error'), names(w.events).join());
+  } finally { await browser.close(); w.close(); }
+});
+
+test('a buyer never sees the pitch: unlocked, the page opens on the pictures', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?paid=cs_test_paidSession1234`);
+    await page.waitForSelector('#welcome:not([hidden])');
+    await page.locator('#welcome-go').tap();
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-pick:not([hidden])');
+    assert.equal(await page.isVisible('#step-intro'), false);
+    assert.equal(await page.isVisible('#step-choose'), false);
+  } finally { await browser.close(); w.close(); }
 });

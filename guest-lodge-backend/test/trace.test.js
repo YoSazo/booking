@@ -89,7 +89,7 @@ test('the page is served with the camera allowed and nothing else', async () => 
     for (const path of ['/trace', '/trace/']) {
       const res = await fetch(base + path);
       assert.equal(res.status, 200);
-      assert.match(await res.text(), /Trace any picture onto paper/);
+      assert.match(await res.text(), /Pay once\.[\s\S]*No subscription\./);
       assert.match(res.headers.get('permissions-policy'), /camera=\(self\)/);
       assert.match(res.headers.get('permissions-policy'), /microphone=\(\)/);
       assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);

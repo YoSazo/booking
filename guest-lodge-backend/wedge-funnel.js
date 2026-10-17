@@ -104,6 +104,8 @@ const LABELS = Object.freeze(Object.fromEntries([
 // own ladder: landing, picking something, tracing, the price, paying.
 const TRACE_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
+  { key: 'intro', label: 'Tapped Get started (page 1 of 3)', names: ['TraceIntroDone'], aside: true },
+  { key: 'chose', label: 'Chose Try it free or Pay once (page 2 of 3)', names: ['TraceChose'], aside: true },
   { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent)', names: ['TracePicked'] },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
   { key: 'started', label: 'Started tracing (Meta: AddToCart)', names: ['TraceStarted'] },
@@ -117,6 +119,7 @@ const TRACE_STEPS = Object.freeze([
   { key: 'unlocked', label: 'Came back unlocked', names: ['TraceUnlocked'], aside: true },
 ]);
 const TRACE_BRANCHES = Object.freeze([
+  { key: 'chose', label: 'The choice (page 2 of 3)', steps: [['Tapped "Try it free"', ['TraceChose:try']], ['Tapped "Pay $14.99 once" (straight to Stripe)', ['TraceChose:pay']]] },
   { key: 'picked', label: 'What they picked', steps: [['A starter picture', ['TracePicked:starter']], ['Their own photo', ['TracePicked:photo']], ['Describe it (AI)', ['TracePicked:ai']]] },
   { key: 'ai', hideWhenEmpty: true, label: 'Describe it (AI)', steps: [['Typed a description', ['TraceAIAsked']], ['Picture drawn (costs money)', ['TraceAIGenerated']], ['Shown to trace', ['TraceAIShown']], ['Refused by the safety filter', ['TraceAIRefused']], ['Failed', ['TraceAIFailed']]] },
   { key: 'camera', label: 'The camera', steps: [['Camera on, tracing', ['TraceStarted']], ['Blocked by the person', ['TraceCameraDenied:denied']], ['No camera found', ['TraceCameraDenied:nocamera']], ["Browser can't use it", ['TraceCameraDenied:unsupported']], ['Other camera error', ['TraceCameraDenied:error']], ['Told to open in Safari (in-app browser)', ['TraceCameraHelpShown:inapp']]] },
@@ -128,7 +131,7 @@ const TRACE_BRANCHES = Object.freeze([
   { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['TraceBrowser:instagram']], ['Facebook app', ['TraceBrowser:facebook']], ['Safari', ['TraceBrowser:safari']], ['Chrome', ['TraceBrowser:chrome']], ['Other', ['TraceBrowser:other']]] },
   { key: 'where', label: 'Web or iPhone app', steps: [['On the web', ['TraceLanded:web']], ['In the iPhone app', ['TraceLanded:app']]] },
 ]);
-const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
+const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
   'TraceStarted', 'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone', 'TracePaywallShown', 'TracePaywallClosed',
   'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed', 'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown']);
 // Branch labels first, so a ladder step's own label wins for the same event.
@@ -143,7 +146,7 @@ const DEFINITIONS = Object.freeze({
     // Events whose detail says which one (source, browser, what was picked) are
     // named for the card; the detail column shows the value.
     labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
-      TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
+      TraceChose: 'Chose try or pay', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
       TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
     tiles: [['Landed', 'landed'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
 });
