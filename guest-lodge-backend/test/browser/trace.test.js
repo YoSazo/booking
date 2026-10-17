@@ -70,12 +70,9 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.waitForSelector('.tile');
     assert.equal(await page.locator('.tile').count(), 6);
     assert.match(await page.textContent('#note'), /First drawing free/);
-    // Kid-simple: the pictures are on the first screen, under the review tape.
-    // The photo button follows within a short scroll.
-    const gridBox = await page.locator('#grid').boundingBox();
-    assert.ok(gridBox.y + gridBox.height <= 664, `the pictures are below the fold at ${gridBox.y + gridBox.height}`);
+    // Kid-simple: the pictures and the photo button are on the first screen.
     const ownBox = await page.locator('#own-label').boundingBox();
-    assert.ok(ownBox.y + ownBox.height <= 664 + 160, `own-photo button is far below the fold at ${ownBox.y}`);
+    assert.ok(ownBox.y + ownBox.height <= 664, `own-photo button is below the fold at ${ownBox.y}`);
 
     // How it works, in three steps, before anything is tapped.
     assert.deepEqual(await page.$$eval('.steps li', items => items.map(li => li.textContent.replace(/^\d/, '').trim())),
@@ -339,7 +336,7 @@ test('Describe it: type a picture, it is drawn as see-through lines to trace; th
     await page.goto(`${w.base}/trace`);
     await page.waitForSelector('#describe');
     const box = await page.locator('#describe-form').boundingBox();
-    assert.ok(box.y + box.height <= 664 + 100, `the describe box is within a short scroll (bottom at ${box.y + box.height})`);
+    assert.ok(box.y + box.height <= 664, `the describe box is on the first screen (bottom at ${box.y + box.height})`);
     await page.fill('#describe', 'a cat wearing a crown');
     // As the iPhone keyboard does: the field focused and the page scrolled up.
     await page.focus('#describe');

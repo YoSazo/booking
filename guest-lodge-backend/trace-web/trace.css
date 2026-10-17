@@ -43,7 +43,7 @@ a { color: inherit; }
 .home { max-width: 520px; margin: 0 auto; padding: 6px 16px calc(28px + var(--safe-bottom)); }
 h1 { font-size: 34px; line-height: 1.08; letter-spacing: -1.2px; margin: 14px 0 10px; }
 .lede { color: var(--muted); margin: 0 0 22px; font-size: 18px; }
-.steps { list-style: none; padding: 0; margin: 2px 0 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.steps { list-style: none; padding: 0; margin: 2px 0 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .steps li { display: flex; align-items: center; gap: 6px; background: #ffffffb3; border: 1px solid var(--line); border-radius: 12px; padding: 7px 8px; font-size: 13px; font-weight: 600; line-height: 1.2; }
 .steps .n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
 .ghost.unlock-now { margin-top: 10px; border-color: var(--green); color: var(--green); }
@@ -164,15 +164,14 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .compare .us strong { color: var(--green-dark); font-size: 22px; }
 @media (prefers-reduced-motion: reduce) { .sheet:not([hidden]) { animation: none; } }
 
-/* Social proof at the top, under the header: the star line, then a slow tape of real
+/* Social proof: a one-line rating under the headline, and a slow tape of real
    reviews that never stops by itself. The mask, own layer and will-change keep
    WebKit from skipping the first paint of the moving track. */
-.proof { min-height: 138px; margin: 12px 0 0; }
-.trust { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 2px 8px; flex-wrap: wrap; }
+.trust { display: flex; align-items: center; gap: 8px; min-height: 16px; margin: -2px 0 6px; line-height: 1.1; }
 .review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
 .review-stars-off { color: var(--line); }
 .trust-text { color: var(--muted); font-size: 14px; font-weight: 600; }
-.tape { width: 100%; min-width: 0; max-width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); isolation: isolate; transform: translateZ(0); }
+.tape { margin-top: 22px; min-height: 104px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); isolation: isolate; transform: translateZ(0); }
 .tape-track { display: flex; width: max-content; animation: tape 77s linear infinite; will-change: transform; backface-visibility: hidden; }
 .tape-run { display: flex; gap: 10px; padding-right: 10px; }
 .tape-card { flex: 0 0 220px; width: 220px; margin: 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }

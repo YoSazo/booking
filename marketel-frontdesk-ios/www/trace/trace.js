@@ -44,7 +44,7 @@
   const tapeCard = review => `<figure class="tape-card">${reviewStars(review.stars)}<blockquote>${esc(review.quote)}</blockquote><figcaption><span class="review-name">${esc(review.name)}</span></figcaption></figure>`;
   (() => {
     const average = REVIEWS.reduce((sum, review) => sum + review.stars, 0) / REVIEWS.length;
-    $('trust').innerHTML = `${reviewStars(average)}<span class="trust-text">${average.toFixed(1)} from ${REVIEWS.length} reviews</span>`;
+    $('trust').innerHTML = `${reviewStars(average)}<span class="trust-text">${average.toFixed(1)} · ${REVIEWS.length} reviews</span>`;
     const run = REVIEWS.map(tapeCard).join('');
     $('tape-track').innerHTML = `<div class="tape-run">${run}</div><div class="tape-run" aria-hidden="true">${run}</div>`;
   })();
@@ -164,7 +164,7 @@
     // the camera opens) or buy straight away from the bar.
     $('buy-top').hidden = unlocked() || !canBuy();
     // The reviews talk about the price and about buying on the web: only where a price may be shown.
-    $('proof').hidden = !canBuy();
+    $('trust').hidden = $('tape').hidden = !canBuy();
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
