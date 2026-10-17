@@ -87,16 +87,18 @@
     if (!response.ok) throw Object.assign(new Error(data.error || 'Something went wrong. Please try again.'), { status: response.status });
     return data;
   }
-  const SIGNALS = new Set(['TracePicked', 'TraceStarted', 'TraceCheckoutOpened']);
+  const SIGNALS = new Set(['TraceAnswered', 'TracePicked', 'TraceStarted', 'TraceCheckoutOpened']);
 
   // Meta's pixel, on the website only (never the app, never the owner, never a
   // test page over http). It gives Ads Manager landing page views and Meta's own
   // browser match. Each signal goes with the same event id the server sends, so
-  // Meta counts it once. Mirrors TRACE_SIGNALS in trace.js.
+  // Meta counts it once. Mirrors TRACE_SIGNALS in trace.js. ViewContent is the
+  // first meaningful tap: the answer to "What brought you here?", or a pick.
   const PIXEL_ID = '1545780930244672';
   const pixelOn = !ownerBrowser && !inApp && location.protocol === 'https:' && !navigator.webdriver;
   const PIXEL_SIGNALS = {
-    TracePicked: { event: 'ViewContent', id: 'trace-picked' },
+    TraceAnswered: { event: 'ViewContent', id: 'trace-view', when: /^why-/ },
+    TracePicked: { event: 'ViewContent', id: 'trace-view' },
     TraceStarted: { event: 'AddToCart', id: 'trace-started', value: 14.99 },
     TraceCheckoutOpened: { event: 'InitiateCheckout', id: 'trace-checkout', value: 14.99 },
   };
@@ -117,7 +119,10 @@
     if (once && sent.has(key)) return;
     sent.add(key);
     const signal = PIXEL_SIGNALS[name];
-    if (signal && !pixelSent.has(name)) { pixelSent.add(name); pixel(signal.event, signal.value ? { value: signal.value } : {}, `${signal.id}.${visitorId}`); }
+    if (signal && (!signal.when || signal.when.test(detail)) && !pixelSent.has(signal.event)) {
+      pixelSent.add(signal.event);
+      pixel(signal.event, signal.value ? { value: signal.value } : {}, `${signal.id}.${visitorId}`);
+    }
     api('/event', { name, visitorId, ...(detail ? { detail } : {}), ...(SIGNALS.has(name) && !inApp ? { attribution } : {}) }, { keepalive }).catch(() => {});
   }
 
@@ -188,29 +193,53 @@
   }
 
 
-  // ----- The web's guided path, built like the booking engine -----
-  // The first screen is the name, the ad's promise and the drawings as cards,
-  // each with one button. A choice is read back (step 1 of 3), the phone is set
-  // up (step 2), the camera is explained right before it asks, then tracing
-  // (step 3). Money appears after the first drawing. The app and buyers go
-  // straight from the picture grid to the camera.
-  const STEPS = ['cards', 'review', 'setup', 'pick'];
-  // Each ad can open with its own promise under the name (?hook=).
+  // ----- The web's guided path -----
+  // "About you" (behind ?journey=1 until it is the default): three questions in
+  // their own words, their answers read back beside the real recording, then
+  // their choice: try it first, pay now, or look around. Trying shows drawings
+  // that match their answer. The cards (built like the booking engine: the
+  // name, the ad's promise, one button per card) are for looking around and
+  // returning visitors. A pick is read back, the camera is explained right
+  // before it asks, then tracing. The app and buyers go straight from the
+  // picture grid to the camera.
+  const STEPS = ['q1', 'q2', 'q3', 'forward', 'mine', 'cards', 'review', 'pick'];
+  const QUESTIONS = ['q1', 'q2', 'q3', 'forward', 'mine'];
+  // Each ad can open with its own call-out and promise (?hook=).
   const HOOKS = {
-    tracing: 'No Subscription. No Weekly Fees. No Account. Just Simple Tracing.',
-    cantdraw: "Can't Draw? You Can Now. No Lessons. No Subscription. Just Trace.",
+    tracing: { callout: 'Tracing app users: stop paying weekly.', promise: 'No Subscription. No Weekly Fees. No Account. Just Simple Tracing.' },
+    cantdraw: { callout: "Can't draw? You can now.", promise: "Can't Draw? You Can Now. No Lessons. No Subscription. Just Trace." },
   };
-  $('promise').textContent = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
-  const homeStep = () => (inApp || unlocked() ? 'pick' : 'cards');
+  const hook = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
+  $('promise').textContent = hook.promise;
+  $('q-hook').textContent = hook.callout;
+  const JOURNEY_DEFAULT = false;
+  const journeyOn = (() => {
+    const asked = params.get('journey');
+    if (asked === '1') store.set('trace.journeyPreview', '1');
+    if (asked === '0') store.del('trace.journeyPreview');
+    return JOURNEY_DEFAULT || store.get('trace.journeyPreview') === '1';
+  })();
+  let answers = {};
+  try { answers = JSON.parse(store.get('trace.journey.v1') || '{}') || {}; } catch { answers = {}; }
+  const saveAnswers = () => store.set('trace.journey.v1', JSON.stringify(answers));
+  const homeStep = () => (inApp || unlocked() ? 'pick' : journeyOn && !answers.done ? 'q1' : 'cards');
   let currentStep = 'pick';
   let chosen = null;
   function showStep(name, { push = false } = {}) {
     if (name !== 'pick' && (inApp || unlocked())) name = 'pick';
-    // Steps 1 and 2 need a drawing; Back or Forward into them after a reload has none.
-    if ((name === 'review' || name === 'setup') && !chosen) name = homeStep();
+    // A drawing's read-back needs a drawing, and later questions need the first
+    // answer; Back or Forward into them after a reload has neither.
+    if (name === 'review' && !chosen) name = homeStep();
+    if (QUESTIONS.includes(name) && name !== 'q1' && !answers.why) name = homeStep();
     currentStep = name;
     resetCheckout();
     for (const step of STEPS) $(`step-${step}`).hidden = step !== name;
+    if (name === 'q3') renderQ3();
+    if (name === 'forward') renderForward();
+    if (name === 'mine') renderMine();
+    const video = $('forward-video');
+    if (name === 'forward') video.play().catch(() => {}); else video.pause();
+    if (QUESTIONS.includes(name)) track('TraceAsked', name);
     $('buy-top').hidden = name !== 'pick' || unlocked() || !canBuy();
     const state = { traceStep: name };
     if (push) history.pushState(state, ''); else history.replaceState(state, '');
@@ -224,30 +253,130 @@
     closeSheets();
     showStep(name);
   });
-  // A picked drawing: on the guided path it is read back first; elsewhere the camera opens.
+  for (const back of document.querySelectorAll('[data-back]')) back.addEventListener('click', () => history.back());
+
+  // ----- About you -----
+  // An answer shows it was tapped (the framework's 140ms press), is kept on the
+  // phone, and moves on. Their words come back on every screen after.
+  const WEEKLY = { 499: 4.99, 999: 9.99, 2499: 24.99 };
+  const money = n => `$${n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  const weeklyPrice = () => WEEKLY[answers.weekly] || 0;
+  const yearly = () => Math.round(weeklyPrice() * 52);
+  const NEXT = { why: 'q2', want: 'q3', pay: 'forward', weekly: 'forward' };
+  for (const group of document.querySelectorAll('.answers')) {
+    for (const button of group.querySelectorAll('.answer')) {
+      button.addEventListener('click', () => {
+        if (group.dataset.busy) return;
+        group.dataset.busy = '1';
+        button.classList.add('chosen');
+        const q = group.dataset.q, value = button.dataset.value;
+        answers[q] = value;
+        // A different first answer asks the third question afresh.
+        if (q === 'why') { delete answers.pay; delete answers.weekly; }
+        saveAnswers();
+        track('TraceAnswered', `${q}-${value}`, { once: false });
+        setTimeout(() => { delete group.dataset.busy; button.classList.remove('chosen'); showStep(NEXT[q], { push: true }); }, 160);
+      });
+    }
+  }
+  // Question 3 is about money either way: what they pay now, or how they feel about subscriptions.
+  function renderQ3() {
+    const paying = answers.why === 'paying';
+    $('q3-title').textContent = paying ? 'What do you pay now?' : 'How do you feel about app subscriptions?';
+    $('q3-paying').hidden = !paying; $('q3-pref').hidden = paying;
+  }
+  const WANT = {
+    anime: { title: 'You want to draw anime.', point: 'Pick an anime drawing, or type your own.', pick: 'Pick your anime drawing', tiles: ['girl', 'ninja', 'bald', 'profile'], type: 'Or type your own', ideas: ['An anime girl with a sword', 'A chibi fox', 'An anime boy with headphones'] },
+    animals: { title: 'You want to draw animals.', point: 'Type any animal and we draw it in about 10 seconds.', pick: 'Pick your animal', tiles: ['dragon'], type: 'Or type any animal', ideas: ['A cute puppy', 'A kitten', 'A horse', 'A butterfly'] },
+    people: { title: 'You want to draw people.', point: 'Use a photo of them and we turn it into lines.', pick: 'Draw someone', tiles: ['profile'], photo: 'Use a photo of them' },
+    type: { title: 'You want to draw anything you think of.', point: 'Type it and we draw it in about 10 seconds.', pick: 'What do you want to draw?', tiles: [], type: 'Type anything', ideas: ['A cute puppy', 'A sports car', 'A rose', 'A butterfly'] },
+    photo: { title: 'You want to draw your own photos.', point: 'Your photo turns into lines on your phone. It never leaves it.', pick: 'Pick your photo', tiles: [], photo: 'Choose a photo' },
+  };
+  const want = () => WANT[answers.want] || WANT.type;
+  const WHY = {
+    cantdraw: "Can't draw yet? You don't need to. You follow the lines.",
+    gift: 'Make it for someone: trace it, then color it in.',
+    looking: 'Have a look: your first drawing is free.',
+  };
+  // The money line answers question 3 in their own terms.
+  function priceLine() {
+    if (weeklyPrice()) return `You pay ${money(weeklyPrice())} a week: ${money(yearly())} a year. Trace is $14.99 once.`;
+    return {
+      monthly: 'You pay every month. Trace is $14.99 once, and nothing renews.',
+      once: "You'd rather pay once. Trace is $14.99 once.",
+      adds: 'Weekly fees add up. Trace is $14.99 once, and nothing renews.',
+      fine: 'No subscription to keep track of: $14.99 once.',
+    }[answers.weekly || answers.pay] || 'Trace is $14.99 once. Nothing renews.';
+  }
+  const shortPriceLine = () => (weeklyPrice() ? `Instead of ${money(yearly())} a year.`
+    : { once: 'Pay once, like you prefer.', adds: 'No weekly fees.' }[answers.pay] || 'No subscription.');
+  function renderForward() {
+    $('forward-title').textContent = want().title;
+    const points = [WHY[answers.why], priceLine(), want().point].filter(Boolean);
+    $('forward-points').replaceChildren(...points.map(text => Object.assign(document.createElement('li'), { textContent: text })));
+    $('forward-price').textContent = shortPriceLine();
+  }
+  // How they move forward is their call, and it ends "About you" either way.
+  const moveForward = how => { answers.done = true; saveAnswers(); track('TraceForward', how, { once: false }); };
+  $('forward-try').addEventListener('click', () => { moveForward('try'); showStep('mine', { push: true }); });
+  $('forward-pay').addEventListener('click', () => {
+    moveForward('pay');
+    checkout({ button: $('forward-pay'), idleText: 'This is for me: $14.99 once', error: $('forward-error') });
+  });
+  $('forward-look').addEventListener('click', () => { moveForward('look'); showStep('cards', { push: true }); });
+
+  // ----- Your drawing: what matches their answer -----
+  function renderMine() {
+    const w = want();
+    $('mine-title').textContent = w.pick;
+    $('mine-grid').replaceChildren(...w.tiles.map(id => {
+      const tile = tileFor(PICTURES.find(p => p.id === id));
+      tile.addEventListener('click', () => { track('TraceSelected', 'mine', { once: false }); pickStarter(id); });
+      return tile;
+    }));
+    $('mine-grid').hidden = !w.tiles.length;
+    $('mine-photo').hidden = !w.photo; $('mine-photo-note').hidden = !w.photo;
+    if (w.photo) $('mine-photo-label').textContent = w.photo;
+    $('mine-type').hidden = !w.type;
+    if (w.type) {
+      $('mine-type-label').textContent = w.type;
+      $('mine-ideas').replaceChildren(...w.ideas.map(text => {
+        const idea = Object.assign(document.createElement('button'), { type: 'button', className: 'idea', textContent: text });
+        idea.addEventListener('click', () => { $('mine-input').value = text; describe($('mine-input'), true); });
+        return idea;
+      }));
+    }
+  }
+  $('mine-type').addEventListener('submit', event => { event.preventDefault(); describe($('mine-input'), true); });
+  $('mine-photo').addEventListener('click', () => track('TraceSelected', 'mine-photo', { once: false }));
+  $('mine-all').addEventListener('click', () => showStep('cards', { push: true }));
+
+  // ----- A pick, read back -----
+  // On the guided path a pick is read back first; elsewhere the camera opens.
   function choose(picture, guided) {
     if (!guided) return startTracing(picture);
     settleViewport();
     chosen = picture;
     $('review-img').src = picture.lines;
     $('review-name').textContent = picture.label;
+    // After "About you" this is step 2 of 3; from the cards it's step 1 of 2.
+    const about = !!answers.why;
+    $('review-title').textContent = about ? 'Step 2 of 3 — Your drawing' : 'Step 1 of 2 — Your drawing';
+    $('review-bar').style.width = about ? '92%' : '50%';
     showStep('review', { push: true });
   }
-  $('review-go').addEventListener('click', () => { track('TraceReviewed', '', { once: false }); showStep('setup', { push: true }); });
-  for (const id of ['review-back', 'review-change', 'setup-back']) $(id).addEventListener('click', () => history.back());
-  // "Why we need your camera", right before iOS asks, like the booking
-  // engine's "Why we need your card".
-  $('setup-go').addEventListener('click', () => {
-    track('TraceSetupDone', '', { once: false });
+  // "Why we need your camera", with the set-up, right before iOS asks: like the
+  // booking engine's "Why we need your card".
+  $('review-go').addEventListener('click', () => {
+    track('TraceReviewed', '', { once: false });
     $('why-free').textContent = unlocked() ? 'Yours for good. Trace anything.' : 'Free today. No card needed.';
     openSheet('camera-why');
   });
+  for (const id of ['review-back', 'review-change']) $(id).addEventListener('click', () => history.back());
   $('why-go').addEventListener('click', () => { track('TraceCameraOk', '', { once: false }); closeSheets(); if (chosen) startTracing(chosen); });
   $('why-later').addEventListener('click', closeSheets);
-  // Skip, under the big button: straight to the camera from step 1 or 2. iOS still asks, with the note.
-  for (const [id, step] of [['review-skip', 'review'], ['setup-skip', 'setup']]) {
-    $(id).addEventListener('click', () => { track('TraceSkipped', step, { once: false }); if (chosen) startTracing(chosen); });
-  }
+  // Skip, under the big button: straight to the camera. iOS still asks, with the note.
+  $('review-skip').addEventListener('click', () => { track('TraceSkipped', 'review', { once: false }); if (chosen) startTracing(chosen); });
 
   // ----- Picking a picture -----
   const grid = $('grid'), more = $('more-grid');
@@ -270,8 +399,9 @@
     more.append(card);
   }
   $('select-dragon').addEventListener('click', () => { track('TraceSelected', 'dragon', { once: false }); pickStarter('dragon'); });
+  const guidedStep = () => currentStep === 'cards' || currentStep === 'mine';
   function pickStarter(id) {
-    const guided = currentStep === 'cards';
+    const guided = guidedStep();
     track('TracePicked', 'starter', { once: false });
     const key = `starter:${id}`;
     if (!mayOpen(key)) return showPaywall('second');
@@ -337,7 +467,7 @@
   $('describe-form').addEventListener('submit', event => { event.preventDefault(); describe($('describe'), false); });
 
   async function ownPhoto(event) {
-    const guided = event.target.id === 'own-cards';
+    const guided = event.target.id !== 'own';
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
     if (!file) return;
@@ -356,6 +486,7 @@
   }
   $('own').addEventListener('change', ownPhoto);
   $('own-cards').addEventListener('change', ownPhoto);
+  $('own-mine').addEventListener('change', ownPhoto);
 
   // ----- Photo to pencil lines, on the phone -----
   // A pencil sketch: the photo in grey, divided by a blurred negative of itself
@@ -654,6 +785,10 @@
     $('pay-elsewhere').hidden = buy;
     $('pay-title').textContent = !buy ? 'That was your free drawing' : ['home', 'top', 'now'].includes(paywallReason) ? 'Unlock everything'
       : paywallReason === 'done' ? 'Keep drawing. Forever.' : paywallReason === 'quick' ? 'Trace anything. Forever.' : 'Keep tracing anything';
+    // What they said about paying comes back here, in their own terms.
+    $('pay-sub').textContent = weeklyPrice() ? `You pay ${money(weeklyPrice())} a week now (${money(yearly())} a year). Keep this forever for $14.99.`
+      : { once: 'Pay once, like you prefer. Nothing renews.', adds: "Weekly fees add up. This doesn't: pay once, it's yours." }[answers.pay]
+      || "No subscription. Nothing renews. Pay once, it's yours.";
   }
   function showPaywall(reason, note = '') {
     paywallReason = reason;
@@ -673,6 +808,8 @@
   function resetCheckout() {
     checkoutGeneration++;
     $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99';
+    $('forward-pay').disabled = false; $('forward-pay').textContent = 'This is for me: $14.99 once';
+    $('forward-error').hidden = true;
   }
   // `error` is the element that says what went wrong, next to the button tapped.
   async function checkout({ button, idleText, error }) {

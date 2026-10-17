@@ -7,11 +7,96 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=29">
+<link rel="stylesheet" href="/trace/trace.css?v=30">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
 <main id="home" class="home">
+  <!-- About you: three questions in their own words, their answers read back
+       beside the real recording, then their choice of how to move forward. -->
+  <section class="step flow ask" id="step-q1" hidden aria-labelledby="q1-title">
+    <div class="bar" aria-hidden="true"><i style="width:15%"></i></div>
+    <p class="step-count">Step 1 of 3 — About you</p>
+    <p class="eyebrow" id="q-hook">Tracing app users: stop paying weekly.</p>
+    <h2 class="q-title" id="q1-title" tabindex="-1">What brought you here?</h2>
+    <div class="answers" data-q="why">
+      <button type="button" class="answer" data-value="cantdraw">I want to draw, but I can't</button>
+      <button type="button" class="answer" data-value="paying">I pay for a tracing app and want out</button>
+      <button type="button" class="answer" data-value="gift">I want to draw something for someone</button>
+      <button type="button" class="answer" data-value="looking">Just looking</button>
+    </div>
+  </section>
+
+  <section class="step flow ask" id="step-q2" hidden aria-labelledby="q2-title">
+    <div class="bar" aria-hidden="true"><i style="width:35%"></i></div>
+    <p class="step-count">Step 1 of 3 — About you</p>
+    <h2 class="q-title" id="q2-title" tabindex="-1">What do you want to draw?</h2>
+    <div class="answers" data-q="want">
+      <button type="button" class="answer" data-value="anime">Anime characters</button>
+      <button type="button" class="answer" data-value="animals">Animals and pets</button>
+      <button type="button" class="answer" data-value="people">People</button>
+      <button type="button" class="answer" data-value="type">Anything I type</button>
+      <button type="button" class="answer" data-value="photo">My own photo</button>
+    </div>
+    <button type="button" class="linklike back-link" data-back>‹ Back</button>
+  </section>
+
+  <section class="step flow ask" id="step-q3" hidden aria-labelledby="q3-title">
+    <div class="bar" aria-hidden="true"><i style="width:55%"></i></div>
+    <p class="step-count">Step 1 of 3 — About you</p>
+    <h2 class="q-title" id="q3-title" tabindex="-1">How do you feel about app subscriptions?</h2>
+    <div class="answers" data-q="pay" id="q3-pref">
+      <button type="button" class="answer" data-value="once">I'd rather pay once</button>
+      <button type="button" class="answer" data-value="adds">Weekly fees add up</button>
+      <button type="button" class="answer" data-value="fine">They're fine</button>
+    </div>
+    <div class="answers" data-q="weekly" id="q3-paying" hidden>
+      <button type="button" class="answer" data-value="499">$4.99 a week</button>
+      <button type="button" class="answer" data-value="999">$9.99 a week</button>
+      <button type="button" class="answer" data-value="2499">$24.99 a week</button>
+      <button type="button" class="answer" data-value="monthly">I pay monthly</button>
+      <button type="button" class="answer" data-value="unsure">Not sure</button>
+    </div>
+    <button type="button" class="linklike back-link" data-back>‹ Back</button>
+  </section>
+
+  <section class="step flow ask forward" id="step-forward" hidden aria-labelledby="forward-title">
+    <div class="bar" aria-hidden="true"><i style="width:75%"></i></div>
+    <p class="step-count">Step 1 of 3 — About you</p>
+    <h2 class="q-title" id="forward-title" tabindex="-1">You want to draw anime.</h2>
+    <div class="start-row">
+      <video class="demo" id="forward-video" poster="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_9,c_crop,w_1080,h_1960,y_110/w_480,q_auto/v1792256225/1016_1_iu6pq7.jpg" muted loop playsinline preload="none" aria-label="A real recording: typing a dragon, then tracing it onto paper with a pencil"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_h264/v1792256225/1016_1_iu6pq7.mp4" type="video/mp4"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_vp9/v1792256225/1016_1_iu6pq7.webm" type="video/webm"></video>
+      <ul class="start-points" id="forward-points"></ul>
+    </div>
+    <p class="demo-caption">A real recording: type it, then trace it on paper.</p>
+    <h3 class="forward-ask">How would you like to move forward?</h3>
+    <button type="button" class="big" id="forward-try">I want to try it first</button>
+    <p class="under">Your first drawing is free. No card needed.</p>
+    <button type="button" class="ghost" id="forward-pay">This is for me: $14.99 once</button>
+    <p class="under" id="forward-price">No subscription.</p>
+    <p class="under" id="pay-under">One time. If it doesn't work on your phone, full refund within 7 days.</p>
+    <p class="error" id="forward-error" hidden></p>
+    <button type="button" class="linklike look" id="forward-look">Just let me look around</button>
+  </section>
+
+  <!-- Step 2 of 3: drawings that match what they said they want. -->
+  <section class="step flow ask" id="step-mine" hidden aria-labelledby="mine-title">
+    <div class="bar" aria-hidden="true"><i style="width:85%"></i></div>
+    <p class="step-count">Step 2 of 3 — Your drawing</p>
+    <h2 class="q-title" id="mine-title" tabindex="-1">Pick your anime drawing</h2>
+    <div class="grid" id="mine-grid"></div>
+    <label class="big select-photo mine-photo" id="mine-photo" hidden><span id="mine-photo-label">Choose a photo</span><input type="file" id="own-mine" accept="image/*"></label>
+    <p class="under" id="mine-photo-note" hidden>We turn it into lines on your phone. It never leaves your phone.</p>
+    <form class="type-form" id="mine-type" novalidate hidden>
+      <label for="mine-input" id="mine-type-label">Or type your own</label>
+      <input type="text" id="mine-input" maxlength="200" autocomplete="off" enterkeyhint="go" placeholder="Type anything…">
+      <div class="ideas" id="mine-ideas"></div>
+      <button type="submit" class="big" id="mine-go">Draw It</button>
+    </form>
+    <p class="under">Your first drawing is free. No card needed.</p>
+    <div class="mine-links"><button type="button" class="linklike back-link" data-back>‹ Back</button><button type="button" class="linklike" id="mine-all">See every drawing</button></div>
+  </section>
+
   <!-- The first screen, built like the booking engine's: the name, the ad's
        promise, then the drawings as cards. Each card has one button. -->
   <section class="step cards" id="step-cards" aria-labelledby="cards-title">
@@ -68,12 +153,11 @@
     <p class="buy-now"><button type="button" class="linklike" id="buy-now">Already sure? Unlock everything: $14.99 once</button></p>
   </section>
 
-  <!-- Step 1 of 3: their drawing, read back, like the booking engine's
-       "Review your stay". -->
+  <!-- Their drawing, read back, like the booking engine's "Review your stay". -->
   <section class="step flow" id="step-review" hidden aria-labelledby="review-title">
     <div class="flow-top"><button type="button" class="back-pill" id="review-back">‹ Back to drawings</button></div>
-    <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li><i></i>Set up</li><li><i></i>Trace</li></ol>
-    <h2 class="step-count" id="review-title" tabindex="-1">Step 1 of 3 — Your drawing</h2>
+    <div class="bar" aria-hidden="true"><i id="review-bar" style="width:50%"></i></div>
+    <h2 class="step-count" id="review-title" tabindex="-1">Step 1 of 2 — Your drawing</h2>
     <div class="card details">
       <div class="details-head"><h3>Your Drawing</h3><button type="button" class="edit" id="review-change">Change</button></div>
       <div class="preview paper"><img id="review-img" alt=""></div>
@@ -89,24 +173,7 @@
       <p class="free-sub">No card needed. No account.</p>
       <p class="free-after">Want more drawings after this one? <strong>$14.99 once</strong>, yours forever. No subscription.</p>
     </div>
-    <div class="sticky-cta"><button type="button" class="big" id="review-go">Continue to Set Up</button><button type="button" class="ghost skip" id="review-skip">Skip to Tracing</button></div>
-  </section>
-
-  <!-- Step 2 of 3: how to set the phone up, before the camera asks. -->
-  <section class="step flow" id="step-setup" hidden aria-labelledby="setup-title">
-    <div class="flow-top"><button type="button" class="back-pill" id="setup-back">‹ Back to your drawing</button></div>
-    <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li class="on"><i></i>Set up</li><li><i></i>Trace</li></ol>
-    <h2 class="step-count" id="setup-title" tabindex="-1">Step 2 of 3 — Set up</h2>
-    <div class="card setup">
-      <h3>Set up in 10 seconds</h3>
-      <ol class="how">
-        <li><b>1</b><span><strong>Paper on the table.</strong> Any plain paper.</span></li>
-        <li><b>2</b><span><strong>Phone on a glass above it.</strong> A cup, a can or a stack of books works too.</span></li>
-        <li><b>3</b><span><strong>Follow the lines with a pencil.</strong> You see the drawing on your paper.</span></li>
-      </ol>
-      <figure class="setup-photo"><img src="/trace/pictures/setup-photo.webp" width="720" height="540" alt="Through the phone: a drawing's lines on lined paper, and a pencil tracing them"><figcaption>What you'll see: the lines on your paper.</figcaption></figure>
-    </div>
-    <div class="sticky-cta"><button type="button" class="big" id="setup-go">Continue to Trace</button><button type="button" class="ghost skip" id="setup-skip">Skip to Tracing</button></div>
+    <div class="sticky-cta"><button type="button" class="big" id="review-go">Continue to Trace</button><button type="button" class="ghost skip" id="review-skip">Skip to Tracing</button></div>
   </section>
 
   <section class="step" id="step-pick" hidden aria-labelledby="pick-title">
@@ -195,8 +262,13 @@
 <section class="modal" id="camera-why" hidden role="dialog" aria-modal="true" aria-labelledby="why-title">
   <span class="why-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
   <h2 id="why-title">Why we need your camera</h2>
-  <p class="why-body">Your camera shows <strong>your paper under the drawing</strong>, so you can follow the lines with a pencil. <strong>Nothing is recorded</strong> or sent anywhere.</p>
-  <ul class="why-checks"><li id="why-free">Free today. No card needed.</li><li>Your camera stays on your phone</li></ul>
+  <p class="why-body">It shows <strong>your paper under the drawing</strong>. <strong>Nothing is recorded</strong> or sent anywhere.</p>
+  <ol class="how why-how">
+    <li><b>1</b><span><strong>Paper on the table.</strong> Any plain paper.</span></li>
+    <li><b>2</b><span><strong>Phone on a glass above it.</strong> A cup or a stack of books works too.</span></li>
+    <li><b>3</b><span><strong>Follow the lines</strong> with a pencil.</span></li>
+  </ol>
+  <ul class="why-checks"><li id="why-free">Free today. No card needed.</li></ul>
   <button type="button" class="big" id="why-go">Got It — Open My Camera</button>
   <button type="button" class="linklike why-later" id="why-later">Not now</button>
 </section>
@@ -226,6 +298,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=29" defer></script>
+<script src="/trace/trace.js?v=30" defer></script>
 </body>
 </html>

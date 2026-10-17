@@ -32,6 +32,7 @@ const TRACE_EVENTS = Object.freeze([
   'TracePaywallShown', 'TracePaywallClosed', 'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed',
   'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown',
   'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceSkipped',
+  'TraceAsked', 'TraceAnswered', 'TraceForward',
 ]);
 
 // "Describe it": OpenAI draws simple line art to trace. Every picture costs
@@ -55,7 +56,10 @@ const promptOf = value => String(value || '').replace(/[\u0000-\u001f\u007f]/g, 
 // frequent. A Checkout ready to pay is InitiateCheckout; the purchase itself is
 // sent when the payment is confirmed.
 const TRACE_SIGNALS = Object.freeze({
-  TracePicked: { event: 'ViewContent', id: 'trace-picked' },
+  // The first meaningful tap: the answer to "What brought you here?", or a pick.
+  // Both carry the same event id, so a visitor is one ViewContent either way.
+  TraceAnswered: { event: 'ViewContent', id: 'trace-view', when: /^why-/ },
+  TracePicked: { event: 'ViewContent', id: 'trace-view' },
   TraceStarted: { event: 'AddToCart', id: 'trace-started', value: TRACE.priceCents / 100 },
   TraceCheckoutOpened: { event: 'InitiateCheckout', id: 'trace-checkout', value: TRACE.priceCents / 100 },
 });
@@ -186,9 +190,10 @@ function registerTrace(app, {
     rate(`trace-event:${req.ip}`, 300, 3600000);
     const visitorId = visitorOf(req.body?.visitorId);
     const app = fromApp(req);
-    await record(name, { visitorId, detail: name === 'TraceLanded' ? (app ? 'app' : 'web') : detailOf(req.body?.detail) });
+    const detail = name === 'TraceLanded' ? (app ? 'app' : 'web') : detailOf(req.body?.detail);
+    await record(name, { visitorId, detail });
     const signal = TRACE_SIGNALS[name];
-    if (signal && visitorId && !app) {
+    if (signal && (!signal.when || signal.when.test(detail || '')) && visitorId && !app) {
       const attribution = meta(req.body?.attribution, req);
       await sendCapi(signal.event, {
         eventId: `${signal.id}.${visitorId}`,

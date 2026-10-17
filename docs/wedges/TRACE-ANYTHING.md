@@ -12,23 +12,40 @@ money line: one paying customer must cost about $8–12 or less in ads.
 
 Built like the booking engine (`hotel-booking-app/src/BookingPage.jsx` and
 `GuestInfoPage.jsx`), the only funnel that has had cold Meta traffic finish a
-card form. Its order: the name and the ad's promise, the thing from the ad as
-cards with **$0 today** and one button each, the choice read back as step 1
-of 3, a short step 2, and the scary ask explained right before it happens.
+card form, then given an "About you" opening so visitors put themselves into
+it, the way a viewer reads themselves into a video.
 
-1. **Cards:** "Trace Anything", the promise (`?hook=` picks it), then
-   Dragon, Anything You Type (Select opens a box with ideas, like the
-   calendar), Your Own Photo, and "More drawings". No price pitch; a quiet
-   "Already sure?" link opens the price.
-2. **Step 1 of 3, Your drawing:** the drawing on ruled paper, its name, and
-   "Trace it for $0 today".
-3. **Step 2 of 3, Set up:** paper, phone on a glass, follow the lines.
-4. **"Why we need your camera":** then iOS asks, then tracing (step 3).
-5. After Done: confetti and the price, for the first time.
+**About you** (behind `?journey=1` until `JOURNEY_DEFAULT` in
+`trace-web/trace.js` is true; the choice is remembered per browser,
+`?journey=0` clears it):
+
+1. "What brought you here?" (the ad's call-out from `?hook=` sits above it).
+2. "What do you want to draw?" (anime, animals, people, anything I type, my
+   own photo).
+3. Money as a preference: "How do you feel about app subscriptions?", or, for
+   someone who pays for a tracing app, "What do you pay now?".
+4. Their answers read back beside the real recording, then "How would you
+   like to move forward?": try it first (free), "This is for me: $14.99
+   once" (straight to Stripe), or "Just let me look around" (the cards).
+5. Trying shows drawings that match their answer (step 2 of 3), then the
+   read-back.
+
+**Everyone else** (the default, looking around, returning visitors) gets the
+cards: "Trace Anything", the promise, Dragon, Anything You Type (Select opens
+a box with ideas), Your Own Photo, "More drawings", and a quiet "Already
+sure?" link to the price.
+
+Then, for both: the drawing read back on ruled paper with "Trace it for $0
+today" (and Skip to Tracing), "Why we need your camera" with the three
+set-up lines, iOS asks, tracing. After 30 seconds of tracing, Done gives the
+cheer and the price; the price line uses what they said about paying.
 
 The app and buyers skip all of this: the picture grid opens the camera.
-Events: `TraceSelected:<card>`, `TracePicked` (Meta ViewContent),
-`TraceReviewed`, `TraceSetupDone`, `TraceCameraOk`, then `TraceStarted`.
+Events: `TraceAsked:<step>`, `TraceAnswered:<question>-<answer>` (the first
+answer is Meta's ViewContent), `TraceForward:<try|pay|look>`,
+`TraceSelected:<card>`, `TracePicked` (ViewContent with the same event id
+when they didn't answer first), `TraceReviewed`, `TraceCameraOk`,
+`TraceSkipped`, then `TraceStarted`.
 
 ## Where it lives
 

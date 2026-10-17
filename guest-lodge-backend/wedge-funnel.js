@@ -102,17 +102,30 @@ const LABELS = Object.freeze(Object.fromEntries([
 
 // Marketel Trace is its own page (trace.js), not a report wedge, so it has its
 // own ladder: landing, picking something, tracing, the price, paying.
+// "About you": each answer is TraceAnswered with "<question>-<answer>".
+const TRACE_WHY = [["I want to draw, but I can't", 'TraceAnswered:why-cantdraw'], ['I pay for a tracing app and want out', 'TraceAnswered:why-paying'],
+  ['I want to draw something for someone', 'TraceAnswered:why-gift'], ['Just looking', 'TraceAnswered:why-looking']];
+const TRACE_WANT = [['Anime characters', 'TraceAnswered:want-anime'], ['Animals and pets', 'TraceAnswered:want-animals'], ['People', 'TraceAnswered:want-people'],
+  ['Anything I type', 'TraceAnswered:want-type'], ['My own photo', 'TraceAnswered:want-photo']];
+const TRACE_PAY = [["I'd rather pay once", 'TraceAnswered:pay-once'], ['Weekly fees add up', 'TraceAnswered:pay-adds'], ["They're fine", 'TraceAnswered:pay-fine'],
+  ['Pays $4.99 a week', 'TraceAnswered:weekly-499'], ['Pays $9.99 a week', 'TraceAnswered:weekly-999'], ['Pays $24.99 a week', 'TraceAnswered:weekly-2499'],
+  ['Pays monthly', 'TraceAnswered:weekly-monthly'], ['Pays, not sure how much', 'TraceAnswered:weekly-unsure']];
 const TRACE_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
   // Before 2026-10-17 the web had a 'Get started' page first; kept for old ranges.
   { key: 'intro', label: 'Tapped Get started (old 3-page version)', names: ['TraceIntroDone'], aside: true, hideWhenEmpty: true },
   // Oct 17, 2026 (morning): one screen with "try it first" or "pay now".
   { key: 'chose', label: 'Chose try or pay (old one-screen version)', names: ['TraceChose'], aside: true, hideWhenEmpty: true },
-  // From Oct 17, 2026: cards like the booking engine, then steps 1 to 3.
-  { key: 'selected', label: 'Tapped Select on a card', names: ['TraceSelected'], aside: true, hideWhenEmpty: true },
-  { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent)', names: ['TracePicked'] },
-  { key: 'reviewed', label: 'Step 1 done: tapped Continue to Set Up', names: ['TraceReviewed'], aside: true, hideWhenEmpty: true },
-  { key: 'setup', label: 'Step 2 done: tapped Continue to Trace (camera pop-up)', names: ['TraceSetupDone'], aside: true, hideWhenEmpty: true },
+  // From Oct 17, 2026 (behind ?journey=1 first): "About you", three questions, then their choice.
+  { key: 'answered1', label: 'Answered "What brought you here?" (Meta: ViewContent)', names: TRACE_WHY.map(([, name]) => name), aside: true, hideWhenEmpty: true },
+  { key: 'answered2', label: 'Answered "What do you want to draw?"', names: TRACE_WANT.map(([, name]) => name), aside: true, hideWhenEmpty: true },
+  { key: 'answered3', label: 'Answered the subscription question', names: TRACE_PAY.map(([, name]) => name), aside: true, hideWhenEmpty: true },
+  { key: 'forward', label: 'Chose how to move forward (try, pay or look around)', names: ['TraceForward'], aside: true, hideWhenEmpty: true },
+  // From Oct 17, 2026: cards like the booking engine, then the read-back.
+  { key: 'selected', label: 'Tapped Select on a card or a matching drawing', names: ['TraceSelected'], aside: true, hideWhenEmpty: true },
+  { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent, unless they answered first)', names: ['TracePicked'] },
+  { key: 'reviewed', label: 'Read back their drawing and tapped Continue (camera pop-up)', names: ['TraceReviewed'], aside: true, hideWhenEmpty: true },
+  { key: 'setup', label: 'Step 2 done: tapped Continue to Trace (the set-up step, Oct 17)', names: ['TraceSetupDone'], aside: true, hideWhenEmpty: true },
   { key: 'cameraok', label: 'Tapped Got It — Open My Camera', names: ['TraceCameraOk'], aside: true, hideWhenEmpty: true },
   { key: 'skipped', label: 'Tapped Skip to tracing (step 1 or 2)', names: ['TraceSkipped'], aside: true, hideWhenEmpty: true },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
@@ -127,7 +140,11 @@ const TRACE_STEPS = Object.freeze([
   { key: 'unlocked', label: 'Came back unlocked', names: ['TraceUnlocked'], aside: true },
 ]);
 const TRACE_BRANCHES = Object.freeze([
-  { key: 'cards', hideWhenEmpty: true, label: 'The first screen: which card', steps: [['Dragon', ['TraceSelected:dragon']], ['Anything You Type', ['TraceSelected:type']], ['Your Own Photo', ['TraceSelected:photo']], ['More drawings', ['TraceSelected:more']]] },
+  { key: 'why', hideWhenEmpty: true, label: 'Why they came', steps: TRACE_WHY.map(([label, name]) => [label, [name]]) },
+  { key: 'want', hideWhenEmpty: true, label: 'What they want to draw', steps: TRACE_WANT.map(([label, name]) => [label, [name]]) },
+  { key: 'subs', hideWhenEmpty: true, label: 'Subscriptions: how they feel, or what they pay now', steps: TRACE_PAY.map(([label, name]) => [label, [name]]) },
+  { key: 'forward', hideWhenEmpty: true, label: 'How they moved forward', steps: [['I want to try it first', ['TraceForward:try']], ['This is for me: $14.99 once (straight to Stripe)', ['TraceForward:pay']], ['Just let me look around', ['TraceForward:look']]] },
+  { key: 'cards', hideWhenEmpty: true, label: 'The first screen: which card', steps: [['Dragon', ['TraceSelected:dragon']], ['Anything You Type', ['TraceSelected:type']], ['Your Own Photo', ['TraceSelected:photo']], ['More drawings', ['TraceSelected:more']], ['A drawing that matched their answer', ['TraceSelected:mine']], ['A photo, after saying what they want', ['TraceSelected:mine-photo']]] },
   { key: 'skipped', hideWhenEmpty: true, label: 'Skipped to tracing', steps: [['From step 1 (your drawing)', ['TraceSkipped:review']], ['From step 2 (set up)', ['TraceSkipped:setup']]] },
   { key: 'chose', hideWhenEmpty: true, label: 'The old one-screen version (Oct 17 morning)', steps: [['Tapped "I want to try it first"', ['TraceChose:try']], ['Tapped "I\'m ready: pay $14.99" (straight to Stripe)', ['TraceChose:pay']]] },
   { key: 'picked', label: 'What they picked', steps: [['A starter picture', ['TracePicked:starter']], ['Their own photo', ['TracePicked:photo']], ['Describe it (AI)', ['TracePicked:ai']]] },
@@ -141,7 +158,7 @@ const TRACE_BRANCHES = Object.freeze([
   { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['TraceBrowser:instagram']], ['Facebook app', ['TraceBrowser:facebook']], ['Safari', ['TraceBrowser:safari']], ['Chrome', ['TraceBrowser:chrome']], ['Other', ['TraceBrowser:other']]] },
   { key: 'where', label: 'Web or iPhone app', steps: [['On the web', ['TraceLanded:web']], ['In the iPhone app', ['TraceLanded:app']]] },
 ]);
-const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose', 'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceSkipped', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
+const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose', 'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceSkipped', 'TraceAsked', 'TraceAnswered', 'TraceForward', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
   'TraceStarted', 'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone', 'TracePaywallShown', 'TracePaywallClosed',
   'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed', 'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown']);
 // Branch labels first, so a ladder step's own label wins for the same event.
@@ -156,9 +173,9 @@ const DEFINITIONS = Object.freeze({
     // Events whose detail says which one (source, browser, what was picked) are
     // named for the card; the detail column shows the value.
     labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
-      TraceChose: 'Chose try or pay', TraceSelected: 'Tapped Select on a card', TraceSkipped: 'Skipped to tracing', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
+      TraceChose: 'Chose try or pay', TraceSelected: 'Tapped Select on a card', TraceSkipped: 'Skipped to tracing', TraceAsked: 'Saw a question', TraceAnswered: 'Answered', TraceForward: 'Chose how to move forward', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
       TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
-    tiles: [['Landed', 'landed'], ['Picked something', 'picked'], ['Step 1 done', 'reviewed'], ['Step 2 done', 'setup'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
+    tiles: [['Landed', 'landed'], ['Answered question 1', 'answered1'], ['Moved forward', 'forward'], ['Picked something', 'picked'], ['Read back', 'reviewed'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
 });
 const definitionFor = tool => DEFINITIONS[tool] || DEFINITIONS.report;
 

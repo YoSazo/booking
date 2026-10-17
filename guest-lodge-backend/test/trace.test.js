@@ -145,12 +145,30 @@ test('picking, tracing and opening checkout are the Meta signals, once per visit
     await post('/api/trace/event', { name: 'TraceStarted', visitorId: 'v_abcdefghijk', detail: 'photo', attribution }, { 'x-marketel-no-track': '1' });
     await post('/api/trace/event', { name: 'TraceLanded', visitorId: 'v_abcdefghijk', attribution });
     assert.deepEqual(calls.capi.map(c => [c.event, c.eventId, c.value]), [
-      ['ViewContent', 'trace-picked.v_abcdefghijk', undefined],
+      ['ViewContent', 'trace-view.v_abcdefghijk', undefined],
       ['AddToCart', 'trace-started.v_abcdefghijk', 14.99],
       ['InitiateCheckout', 'trace-checkout.v_abcdefghijk', 14.99],
     ], 'landing alone is never sent');
     assert.equal(calls.capi[0].fbc, 'fb.1.1700000000.click');
     assert.equal(calls.capi[0].product, 'trace-anything');
+  });
+});
+
+test('the first answer is the ViewContent; the other answers stay off Meta, and a pick shares its event id', async () => {
+  const { app, calls, rows } = fakeWorld();
+  await serve(app, async ({ post }) => {
+    const attribution = { fbp: 'fb.1.1700000000.123', fbc: 'fb.1.1700000000.click', sourceUrl: 'https://bookmarketel.com/trace?fbclid=click' };
+    for (const detail of ['why-cantdraw', 'want-anime', 'pay-once', 'weekly-2499']) {
+      assert.equal((await post('/api/trace/event', { name: 'TraceAnswered', visitorId: 'v_abcdefghijk', detail, attribution })).status, 200);
+    }
+    await post('/api/trace/event', { name: 'TraceForward', visitorId: 'v_abcdefghijk', detail: 'try' });
+    await post('/api/trace/event', { name: 'TraceAsked', visitorId: 'v_abcdefghijk', detail: 'q1' });
+    await post('/api/trace/event', { name: 'TracePicked', visitorId: 'v_abcdefghijk', detail: 'starter', attribution });
+    assert.deepEqual(rows.filter(r => r.name === 'TraceAnswered').map(r => r.detail), ['why-cantdraw', 'want-anime', 'pay-once', 'weekly-2499']);
+    assert.deepEqual(calls.capi.map(c => [c.event, c.eventId]), [
+      ['ViewContent', 'trace-view.v_abcdefghijk'],
+      ['ViewContent', 'trace-view.v_abcdefghijk'],
+    ], 'only the first answer and the pick, with one event id, so Meta counts one ViewContent');
   });
 });
 
@@ -458,14 +476,16 @@ test('every event name the page sends is one the server accepts', () => {
   assert.ok(sent.size >= 15);
 });
 
-test('the refund promise reads the same on the paywall and the terms', () => {
+test('the refund promise reads the same on "How would you like to move forward?", the paywall and the terms', () => {
   const fs = require('fs');
   const path = require('path');
   const page = fs.readFileSync(path.join(__dirname, '../trace-web/index.html'), 'utf8');
   const terms = fs.readFileSync(path.join(__dirname, '../trace-web/terms.html'), 'utf8');
+  const forward = page.match(/id="pay-under">([^<]*7 days[^<]*)<\/p>/);
+  assert.ok(forward, 'the move-forward screen states the refund under its pay button');
   const fine = page.match(/id="pay-fine">([\s\S]*?)<\/p>/)[1];
   const refunds = terms.match(/<h2>Refunds<\/h2>\s*<p>([\s\S]*?)<\/p>/)[1];
-  for (const [where, text] of [['paywall', fine], ['terms', refunds]]) {
+  for (const [where, text] of [['move forward', forward[1]], ['paywall', fine], ['terms', refunds]]) {
     assert.match(text, /7 days/, `${where} says 7 days`);
     assert.match(text, /(doesn't work|Not working) on your phone/i, `${where} says when it applies`);
   }

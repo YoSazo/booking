@@ -66,14 +66,12 @@ async function toPicker(page) {
 }
 // The one visible tile for a picture: the cards' "More drawings" or the grid.
 const tile = (page, id) => page.locator(`.tile[data-id="${id}"]:visible`);
-// The web's guided steps: step 1 (the drawing read back), step 2 (set up), then
-// "Why we need your camera". The app and buyers skip straight to the camera.
+// The web's guided steps: the drawing read back, then "Why we need your camera"
+// (with the set-up). The app and buyers skip straight to the camera.
 async function throughSteps(page) {
   await page.waitForSelector('#step-review:not([hidden]), #tracer:not([hidden]), #paywall:not([hidden])');
   if (!(await page.isVisible('#step-review'))) return;
   await page.locator('#review-go').tap();
-  await page.waitForSelector('#step-setup:not([hidden])');
-  await page.locator('#setup-go').tap();
   await page.waitForSelector('#camera-why:not([hidden])');
   await page.locator('#why-go').tap();
 }
@@ -174,7 +172,7 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await settle();
 
     const seen = names(w.events);
-    for (const step of ['TraceLanded:web', 'TraceFrom:ad', 'TraceBrowser:safari', 'TraceSelected:more', 'TracePicked:starter', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk',
+    for (const step of ['TraceLanded:web', 'TraceFrom:ad', 'TraceBrowser:safari', 'TraceSelected:more', 'TracePicked:starter', 'TraceReviewed', 'TraceCameraOk',
       'TraceCameraAsked', 'TraceStarted:starter', 'TracePaywallShown:now',
       'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceDone', 'TracePaywallShown:done', 'TracePaywallClosed', 'TracePaywallShown:second',
       'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TracePaid', 'TraceUnlocked']) assert.ok(seen.includes(step), `${step} missing from ${seen.join(', ')}`);
@@ -464,7 +462,7 @@ test("Meta's pixel: PageView on arrival, then the same events and event ids the 
     await settle();
     calls = (await pixelCalls(page)).filter(args => args[0] === 'track' && args[1] !== 'PageView');
     assert.deepEqual(calls.map(args => [args[1], args[3]?.eventID]), [
-      ['ViewContent', `trace-picked.${visitor}`],
+      ['ViewContent', `trace-view.${visitor}`],
       ['AddToCart', `trace-started.${visitor}`],
     ], 'each signal once, with the server event id');
     assert.equal(calls[1][2].value, 14.99);
@@ -631,7 +629,7 @@ test('the first screen is built like the booking engine: the name, the promise, 
     assert.equal(await page.locator('#more-grid .tile').count(), 6);
     // No pitch, no made-up reviews, no Buy in the bar: only a quiet link at the bottom.
     assert.doesNotMatch(await page.innerText('#step-cards'), /24\.99|a week/);
-    assert.equal(await page.locator('#trust, .tape, .tape-card, .demo').count(), 0);
+    assert.equal(await page.locator('#trust, .tape, .tape-card, #step-cards .demo').count(), 0);
     assert.equal(await page.isVisible('#buy-top'), false);
     assert.equal(await page.isVisible('#buy-now'), true);
     assert.deepEqual(errors, []);
@@ -649,7 +647,7 @@ test('each ad can open with its own promise (?hook=), defaulting to no weekly fe
   } finally { await browser.close(); w.close(); }
 });
 
-test('Select Drawing reads it back as step 1 of 3, then set up, then the camera is explained right before it asks', async () => {
+test('Select Drawing reads it back as step 1 of 2, then the camera and the set-up are explained right before it asks', async () => {
   const w = await world();
   const { browser, page, errors } = await phone();
   try {
@@ -657,7 +655,7 @@ test('Select Drawing reads it back as step 1 of 3, then set up, then the camera 
     await page.locator('#select-dragon').tap();
     await page.waitForSelector('#step-review:not([hidden])');
     assert.equal(await page.isVisible('#step-cards'), false);
-    assert.match(await page.textContent('#review-title'), /Step 1 of 3/);
+    assert.equal(await page.textContent('#review-title'), 'Step 1 of 2 — Your drawing');
     assert.equal(await page.textContent('#review-name'), 'Dragon');
     assert.match(await page.getAttribute('#review-img', 'src'), /dragon\.webp$/);
     assert.match(await page.innerText('#review-free'), /Trace it for \$0 today[\s\S]*No card needed[\s\S]*\$14\.99 once/);
@@ -667,37 +665,32 @@ test('Select Drawing reads it back as step 1 of 3, then set up, then the camera 
     await page.waitForSelector('#step-cards:not([hidden])');
     await page.goForward();
     await page.waitForSelector('#step-review:not([hidden])');
+    assert.equal(await page.textContent('#review-go'), 'Continue to Trace');
+    // "Why we need your camera", with the set-up: Not now stays put; Got it opens the camera.
     await page.locator('#review-go').tap();
-    await page.waitForSelector('#step-setup:not([hidden])');
-    assert.match(await page.textContent('#setup-title'), /Step 2 of 3/);
-    assert.match(await page.innerText('#step-setup'), /Phone on a glass above it/);
-    await page.goBack();
-    await page.waitForSelector('#step-review:not([hidden])');
-    await page.locator('#review-go').tap();
-    await page.waitForSelector('#step-setup:not([hidden])');
-    // "Why we need your camera": Not now stays put; Got it opens the camera.
-    await page.locator('#setup-go').tap();
     await page.waitForSelector('#camera-why:not([hidden])');
-    assert.match(await page.innerText('#camera-why'), /Why we need your camera[\s\S]*Nothing is recorded[\s\S]*Free today\. No card needed\./);
+    assert.match(await page.innerText('#camera-why'), /Why we need your camera[\s\S]*Nothing is recorded[\s\S]*Phone on a glass above it[\s\S]*Free today\. No card needed\./);
+    const modal = await page.locator('#camera-why').boundingBox();
+    assert.ok(modal.y >= 0 && modal.y + modal.height <= 664, `the pop-up fits the screen (${modal.y}-${modal.y + modal.height})`);
     assert.equal(await page.isVisible('#tracer'), false, 'the camera waits for the answer');
     await page.locator('#why-later').tap();
     await page.waitForSelector('#camera-why', { state: 'hidden' });
-    assert.equal(await page.isVisible('#step-setup'), true);
-    await page.locator('#setup-go').tap();
+    assert.equal(await page.isVisible('#step-review'), true);
+    await page.locator('#review-go').tap();
     await page.locator('#why-go').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
     assert.match(await page.getAttribute('#overlay', 'src'), /dragon\.webp$/);
     await settle();
     const seen = names(w.events);
-    for (const name of ['TraceSelected:dragon', 'TracePicked:starter', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceCameraAsked', 'TraceStarted:starter']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
+    for (const name of ['TraceSelected:dragon', 'TracePicked:starter', 'TraceReviewed', 'TraceCameraOk', 'TraceCameraAsked', 'TraceStarted:starter']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
     assert.ok(seen.indexOf('TraceCameraOk') < seen.indexOf('TraceCameraAsked'), 'the camera is asked for only after Got it');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); w.close(); }
 });
 
-test('Skip to tracing opens the camera straight from step 1 or step 2', async () => {
-  for (const step of ['review', 'setup']) {
+test('Skip to tracing opens the camera straight from the read-back', async () => {
+  for (const step of ['review']) {
     const w = await world();
     const { browser, page, errors } = await phone();
     try {
@@ -711,7 +704,6 @@ test('Skip to tracing opens the camera straight from step 1 or step 2', async ()
       const go = await page.locator('#review-go').boundingBox(), skip = await page.locator('#review-skip').boundingBox();
       assert.ok(skip.y > go.y + go.height && skip.y - (go.y + go.height) <= 16, `skip sits just under the big button (${go.y + go.height} → ${skip.y})`);
       assert.ok(skip.y + skip.height <= 664, 'and on screen');
-      if (step === 'setup') { await page.locator('#review-go').tap(); await page.waitForSelector('#step-setup:not([hidden])'); }
       await page.locator(`#${step}-skip`).tap();
       await page.waitForSelector('#tracer:not([hidden])');
       assert.equal(await page.isVisible('#camera-why'), false, 'no pop-up on the skip');
@@ -836,5 +828,203 @@ test('a buyer never sees the cards: unlocked, the page opens on the pictures and
     assert.equal(await page.locator('#grid .tile').count(), 7);
     await tile(page, 'dragon').tap();
     await page.waitForSelector('#tracer:not([hidden])');
+  } finally { await browser.close(); w.close(); }
+});
+
+// "About you" (behind ?journey=1 until it is the default).
+const answer = async (page, step, value) => {
+  await page.waitForSelector(`#step-${step}:not([hidden])`);
+  await page.locator(`#step-${step} .answer[data-value="${value}"]:visible`).tap();
+};
+
+test('About you: three questions, their answers read back beside the recording, then try it first leads to drawings that match', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?journey=1&fbclid=adclick123`);
+    await page.waitForSelector('#step-q1:not([hidden])');
+    assert.equal(await page.isVisible('#step-cards'), false);
+    assert.equal(await page.textContent('#q-hook'), 'Tracing app users: stop paying weekly.');
+    assert.equal(await page.textContent('#q1-title'), 'What brought you here?');
+    const last = await page.locator('#step-q1 .answer').last().boundingBox();
+    assert.ok(last.y + last.height <= 664, 'every answer is on the first screen');
+    await answer(page, 'q1', 'cantdraw');
+    await answer(page, 'q2', 'anime');
+    await page.waitForSelector('#step-q3:not([hidden])');
+    assert.equal(await page.textContent('#q3-title'), 'How do you feel about app subscriptions?');
+    assert.equal(await page.isVisible('#q3-paying'), false);
+    await answer(page, 'q3', 'once');
+    await page.waitForSelector('#step-forward:not([hidden])');
+    assert.equal(await page.textContent('#forward-title'), 'You want to draw anime.');
+    assert.deepEqual(await page.$$eval('#forward-points li', list => list.map(li => li.textContent)), [
+      "Can't draw yet? You don't need to. You follow the lines.",
+      "You'd rather pay once. Trace is $14.99 once.",
+      'Pick an anime drawing, or type your own.',
+    ]);
+    assert.equal(await page.textContent('#forward-price'), 'Pay once, like you prefer.');
+    const sources = await page.$$eval('#forward-video source', list => list.map(source => [source.type, source.src]));
+    assert.deepEqual(sources.map(([type]) => type), ['video/mp4', 'video/webm']);
+    assert.ok(sources.every(([, src]) => src.startsWith('https://res.cloudinary.com/')));
+    const look = await page.locator('#forward-look').boundingBox();
+    assert.ok(look.y + look.height <= 844 * 1.2, 'the choices sit right under the recording');
+    await page.locator('#forward-try').tap();
+    await page.waitForSelector('#step-mine:not([hidden])');
+    assert.equal(await page.textContent('#mine-title'), 'Pick your anime drawing');
+    assert.deepEqual(await page.$$eval('#mine-grid .tile', list => list.map(tile => tile.dataset.id)), ['girl', 'ninja', 'bald', 'profile']);
+    assert.equal(await page.isVisible('#mine-type'), true);
+    assert.equal(await page.isVisible('#mine-photo'), false);
+    await page.locator('#mine-grid .tile[data-id="girl"]').tap();
+    await page.waitForSelector('#step-review:not([hidden])');
+    assert.equal(await page.textContent('#review-title'), 'Step 2 of 3 — Your drawing');
+    assert.equal(await page.textContent('#review-name'), 'Anime girl');
+    await throughSteps(page);
+    await page.waitForSelector('#tracer:not([hidden])');
+    await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
+    await settle();
+    const seen = names(w.events);
+    for (const name of ['TraceAsked:q1', 'TraceAnswered:why-cantdraw', 'TraceAnswered:want-anime', 'TraceAnswered:pay-once', 'TraceAsked:forward', 'TraceForward:try',
+      'TraceSelected:mine', 'TracePicked:starter', 'TraceReviewed', 'TraceCameraOk', 'TraceStarted:starter']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('a tracing-app payer is asked what they pay, and sees their own yearly cost on the choice and the price', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?journey=1`);
+    await answer(page, 'q1', 'paying');
+    await answer(page, 'q2', 'type');
+    await page.waitForSelector('#step-q3:not([hidden])');
+    assert.equal(await page.textContent('#q3-title'), 'What do you pay now?');
+    assert.equal(await page.isVisible('#q3-pref'), false);
+    await answer(page, 'q3', '999');
+    await page.waitForSelector('#step-forward:not([hidden])');
+    assert.equal(await page.textContent('#forward-title'), 'You want to draw anything you think of.');
+    assert.match(await page.innerText('#forward-points'), /You pay \$9\.99 a week: \$519 a year\. Trace is \$14\.99 once\./);
+    assert.equal(await page.textContent('#forward-price'), 'Instead of $519 a year.');
+    await page.locator('#forward-try').tap();
+    await page.waitForSelector('#step-mine:not([hidden])');
+    assert.equal(await page.textContent('#mine-title'), 'What do you want to draw?');
+    assert.equal(await page.isVisible('#mine-grid'), false);
+    assert.equal(await page.textContent('#mine-type-label'), 'Type anything');
+    await page.locator('#mine-all').tap();
+    await page.waitForSelector('#step-cards:not([hidden])');
+    await page.locator('#buy-now').tap();
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.textContent('#pay-sub'), 'You pay $9.99 a week now ($519 a year). Keep this forever for $14.99.');
+    await settle();
+    assert.ok(names(w.events).includes('TraceAnswered:weekly-999'));
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('"This is for me" goes straight to Stripe; "Just let me look around" opens the cards, and a return visit is not asked again', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?journey=1&fbclid=adclick123`);
+    await answer(page, 'q1', 'gift');
+    await answer(page, 'q2', 'photo');
+    await answer(page, 'q3', 'adds');
+    await page.waitForSelector('#step-forward:not([hidden])');
+    assert.equal(await page.textContent('#forward-price'), 'No weekly fees.');
+    await Promise.all([page.waitForURL(/checkout\.stripe\.com/), page.locator('#forward-pay').tap()]);
+    assert.equal(w.creates.length, 1);
+    await settle();
+    let seen = names(w.events);
+    for (const name of ['TraceForward:pay', 'TraceCheckoutTapped', 'TraceCheckoutOpened']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
+    // Back from Stripe unpaid: they chose already, so the cards and the price, not the questions.
+    await page.goto(`${w.base}/trace?cancelled=1`);
+    await page.waitForSelector('#paywall:not([hidden])');
+    assert.equal(await page.isVisible('#step-cards'), true);
+    assert.equal(await page.textContent('#pay-sub'), "Weekly fees add up. This doesn't: pay once, it's yours.");
+    // A new visitor who looks around.
+    await page.evaluate(() => { const keep = localStorage.getItem('trace.journeyPreview'); localStorage.clear(); localStorage.setItem('trace.journeyPreview', keep); });
+    await page.goto(`${w.base}/trace`);
+    await answer(page, 'q1', 'looking');
+    await answer(page, 'q2', 'people');
+    await answer(page, 'q3', 'fine');
+    await page.locator('#forward-look').tap();
+    await page.waitForSelector('#step-cards:not([hidden])');
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-cards:not([hidden])');
+    assert.equal(await page.isVisible('#step-q1'), false, 'answered once, never asked again');
+    await settle();
+    seen = names(w.events);
+    assert.ok(seen.includes('TraceForward:look'), seen.join());
+    assert.deepEqual(errors.filter(error => !/stripe/i.test(error)), []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('people and photo answers lead to a photo first; Back walks back through the questions', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?journey=1`);
+    await answer(page, 'q1', 'cantdraw');
+    await answer(page, 'q2', 'people');
+    await page.waitForSelector('#step-q3:not([hidden])');
+    await page.goBack();
+    await page.waitForSelector('#step-q2:not([hidden])');
+    await page.locator('#step-q2 [data-back]').tap();
+    await page.waitForSelector('#step-q1:not([hidden])');
+    await answer(page, 'q1', 'cantdraw');
+    await answer(page, 'q2', 'photo');
+    await answer(page, 'q3', 'once');
+    await page.locator('#forward-try').tap();
+    await page.waitForSelector('#step-mine:not([hidden])');
+    assert.equal(await page.textContent('#mine-title'), 'Pick your photo');
+    assert.equal(await page.isVisible('#mine-photo'), true);
+    assert.equal(await page.textContent('#mine-photo-label'), 'Choose a photo');
+    assert.equal(await page.isVisible('#mine-type'), false);
+    await page.setInputFiles('#own-mine', PHOTO);
+    await page.waitForSelector('#step-review:not([hidden])');
+    assert.equal(await page.textContent('#review-name'), 'Your photo');
+    await page.goBack();
+    await page.waitForSelector('#step-mine:not([hidden])');
+    await page.locator('#step-mine [data-back]').tap();
+    await page.waitForSelector('#step-forward:not([hidden])');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); w.close(); }
+});
+
+test('the journey is a preview until it is the default: ?journey=1 turns it on, ?journey=0 off', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-cards:not([hidden])');
+    assert.equal(await page.isVisible('#step-q1'), false, 'the cards stay the default');
+    await page.goto(`${w.base}/trace?journey=1`);
+    await page.waitForSelector('#step-q1:not([hidden])');
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-q1:not([hidden])', { timeout: 3000 });
+    await page.goto(`${w.base}/trace?journey=0`);
+    await page.waitForSelector('#step-cards:not([hidden])');
+    // The app and buyers never see it.
+    await page.goto(`${w.base}/trace?journey=1&paid=cs_test_paidSession1234`);
+    await page.waitForSelector('#welcome:not([hidden])');
+    assert.equal(await page.isVisible('#step-q1'), false);
+  } finally { await browser.close(); w.close(); }
+});
+
+test("Meta's pixel: the first answer is the ViewContent, once, with the server's event id", async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  try {
+    await overHttps(page, w.base);
+    await page.goto('https://trace.test/trace?journey=1&fbclid=adclick123');
+    const visitor = await page.evaluate(() => localStorage.getItem('trace.visitor'));
+    await answer(page, 'q1', 'cantdraw');
+    await answer(page, 'q2', 'anime');
+    await answer(page, 'q3', 'once');
+    await page.locator('#forward-try').tap();
+    await page.locator('#mine-grid .tile[data-id="ninja"]').tap();
+    await page.waitForSelector('#step-review:not([hidden])');
+    await settle();
+    const calls = (await pixelCalls(page)).filter(args => args[0] === 'track' && args[1] !== 'PageView');
+    assert.deepEqual(calls.map(args => [args[1], args[3]?.eventID]), [['ViewContent', `trace-view.${visitor}`]], 'one ViewContent for the answers and the pick together');
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); w.close(); }
 });

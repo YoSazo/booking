@@ -207,8 +207,8 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .more-title { font-size: 20px; letter-spacing: -0.4px; margin: 24px 0 10px; }
 .buy-now { text-align: center; color: var(--muted); font-size: 15px; margin: 20px 0 0; }
 
-/* Steps 1 and 2: a back pill, three pills for progress, "Step N of 3", the
-   card, and one button that stays at the bottom of the screen. */
+/* The read-back: a back pill, the progress bar, "Step N of M", the card, and
+   one button (with Skip under it) that stays at the bottom of the screen. */
 .flow { padding-bottom: 170px; }
 /* A transform would make the fixed bottom button ride along with the step and
    jump into place when it ends; these steps only fade in. */
@@ -218,16 +218,14 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .back-pill { border: 0; border-radius: 999px; background: var(--green); color: #fff; font-weight: 700; font-size: 16px; min-height: 42px; padding: 0 16px; box-shadow: 0 6px 16px #2e7d5b33; }
 /* Anyone who wants the camera now can have it: right under the big button. */
 .sticky-cta .skip { display: block; max-width: 488px; margin: 10px auto 0; border-color: var(--green); color: var(--green); font-size: 17px; }
-.progress { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
-.progress::before { content: ""; position: absolute; top: 13px; left: 17%; right: 17%; height: 3px; background: #d6dfd9; }
-.progress li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
-.progress i { width: 66px; height: 28px; border-radius: 999px; border: 2.5px solid #d6dfd9; background: #fff; }
-.progress li.on { color: var(--ink); }
-.progress li.on i { background: var(--green); border-color: var(--green); }
-.step-count { text-align: center; font-size: 17px; font-weight: 700; color: var(--muted); letter-spacing: -0.2px; margin: 18px 0 14px; }
-.details, .setup, .free-box { padding: 16px; }
+/* One bar for the whole journey. It starts with some progress already made,
+   and fills as they go: the closer the end, the less they leave. */
+.bar { height: 8px; border-radius: 999px; background: #d6dfd9; overflow: hidden; margin: 6px 0 0; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width 300ms ease; }
+.step-count { text-align: center; font-size: 17px; font-weight: 700; color: var(--muted); letter-spacing: -0.2px; margin: 14px 0 14px; }
+.details, .free-box { padding: 16px; }
 .details-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.details h3, .setup h3 { font-size: 22px; letter-spacing: -0.5px; margin: 0; }
+.details h3 { font-size: 22px; letter-spacing: -0.5px; margin: 0; }
 .edit { border: 1.5px solid var(--green); background: #fff; color: var(--green); border-radius: 10px; min-height: 38px; padding: 0 14px; font-weight: 700; font-size: 15px; }
 .preview { position: relative; aspect-ratio: 16 / 10; border-radius: 16px; border: 1px solid var(--line); overflow: hidden; }
 .preview img { position: absolute; inset: 4%; width: 92%; height: 92%; object-fit: contain; }
@@ -243,24 +241,60 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .how li { display: flex; gap: 12px; align-items: flex-start; color: #3b4a41; }
 .how b { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: 15px; }
 .how strong { color: var(--ink); }
-.setup-photo { margin: 0; }
-.setup-photo img { display: block; width: 100%; height: auto; border-radius: 16px; }
-.setup-photo figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 6px; }
 .sticky-cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 14px 16px calc(14px + var(--safe-bottom)); background: linear-gradient(to top, var(--paper) 72%, #eff4f000); }
 .sticky-cta .big { max-width: 488px; margin: 0 auto; }
 
 /* "Why we need your camera": in the middle of the screen, over the backdrop. */
-.modal { position: fixed; z-index: 31; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 440px; margin: 0 auto; background: #fff; border-radius: 26px; padding: 26px 22px 18px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+.modal { position: fixed; z-index: 31; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 440px; max-height: calc(100vh - 24px); overflow: auto; margin: 0 auto; background: #fff; border-radius: 26px; padding: 22px 20px 16px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+.why-how { text-align: left; font-size: 15px; gap: 8px; margin: 0 0 14px; }
+.why-how b { width: 26px; height: 26px; font-size: 14px; }
 .modal:not([hidden]) { animation: modal-in 260ms cubic-bezier(.32, .72, 0, 1); }
 @keyframes modal-in { from { opacity: 0; transform: translateY(-46%) scale(0.97); } }
-.why-icon { width: 66px; height: 66px; margin: 0 auto 14px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 22px #2e7d5b44; }
+.why-icon { width: 58px; height: 58px; margin: 0 auto 10px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 22px #2e7d5b44; }
 .why-icon svg { width: 32px; height: 32px; }
 .modal h2 { font-size: 26px; line-height: 1.15; letter-spacing: -0.6px; margin: 0 0 8px; }
-.why-body { color: var(--muted); margin: 0 0 14px; }
+.why-body { color: var(--muted); margin: 0 0 12px; }
 .why-body strong { color: var(--ink); }
-.why-checks { list-style: none; padding: 0; margin: 0 auto 18px; display: inline-grid; gap: 8px; text-align: left; font-weight: 700; }
+.why-checks { list-style: none; padding: 0; margin: 0 auto 14px; display: inline-grid; gap: 8px; text-align: left; font-weight: 700; }
 .why-checks li { position: relative; padding-left: 32px; }
 .why-checks li::before { content: ""; position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--green); }
 .why-checks li::after { content: ""; position: absolute; left: 7px; top: 6px; width: 8px; height: 5px; border-left: 2.5px solid var(--green); border-bottom: 2.5px solid var(--green); transform: rotate(-45deg); }
 .why-later { display: block; margin: 12px auto 0; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .modal:not([hidden]), .mock-input::after { animation: none; } }
+
+/* About you: one question a screen, big answers that show the tap. */
+.ask .step-count { margin: 12px 0 6px; }
+.eyebrow { text-align: center; color: var(--green); font-weight: 800; font-size: 14px; letter-spacing: 0.02em; text-transform: uppercase; margin: 0 0 4px; }
+.q-title { font-size: 30px; line-height: 1.1; letter-spacing: -1px; text-align: center; margin: 4px 0 18px; }
+.answers { display: grid; gap: 10px; }
+.answer { width: 100%; min-height: 60px; padding: 12px 18px; border: 2px solid var(--line); border-radius: 16px; background: #fff; color: var(--ink); font-size: 18px; font-weight: 700; text-align: left; box-shadow: 0 4px 14px #2e7d5b0f; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+.answer:active, .answer.chosen { border-color: var(--green); background: var(--green-pale); transform: scale(0.98); }
+.back-link { display: block; margin: 18px auto 0; color: var(--muted); font-size: 16px; }
+.ask.flow { padding-bottom: 24px; }
+
+/* Their answers beside the real recording, then how they move forward. */
+.start-row { display: grid; grid-template-columns: 38% 1fr; gap: 14px; align-items: center; margin-bottom: 6px; }
+.demo { width: 100%; aspect-ratio: 480 / 870; object-fit: cover; border-radius: 18px; background: #dfe8e2; box-shadow: 0 10px 26px #1a2b2226; }
+.start-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.start-points li { font-size: 16px; line-height: 1.3; color: var(--ink); padding-left: 22px; position: relative; }
+.start-points li::before { content: ""; position: absolute; left: 2px; top: 5px; width: 10px; height: 6px; border-left: 3px solid var(--green); border-bottom: 3px solid var(--green); transform: rotate(-45deg); }
+.demo-caption { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.forward .q-title { margin-bottom: 12px; }
+.forward-ask { font-size: 20px; letter-spacing: -0.4px; text-align: center; margin: 4px 0 12px; }
+.under { text-align: center; color: var(--muted); font-size: 14px; margin: 6px 0 10px; }
+#forward-pay { min-height: 56px; font-size: 18px; border-color: var(--green); color: var(--green); margin-top: 4px; }
+#forward-pay[disabled] { opacity: 0.7; }
+.look { display: block; margin: 8px auto 0; color: var(--muted); }
+
+/* Drawings that match what they said. */
+#mine-grid { margin-bottom: 14px; }
+.mine-photo { display: grid; place-items: center; margin-bottom: 4px; }
+#mine-type { margin-top: 4px; }
+.mine-links { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.mine-links .back-link { margin: 0; }
+.mine-links .linklike { color: var(--green); font-weight: 700; }
+@media (max-height: 600px) {
+  .q-title { font-size: 25px; margin-bottom: 12px; }
+  .answer { min-height: 52px; font-size: 17px; }
+  .start-row { grid-template-columns: 32% 1fr; }
+}
