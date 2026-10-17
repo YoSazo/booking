@@ -85,8 +85,10 @@
 
   // Meta's browser ids, sent with the two signals Meta optimises on.
   const cookieValue = name => { try { const m = String(document.cookie || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`)); return m ? decodeURIComponent(m[1]) : ''; } catch { return ''; } };
-  const validMetaId = value => (/^fb\.1\.[A-Za-z0-9._-]+$/.test(String(value || '')) ? String(value).slice(0, 220) : '');
-  const validClickId = value => (/^[A-Za-z0-9._-]{1,180}$/.test(String(value || '')) ? String(value) : '');
+  // Meta's click ids (fbclid) are often well over 180 characters; cutting or
+  // refusing them sent events to Meta that it could not tie to the ad click.
+  const validMetaId = value => (/^fb\.1\.[A-Za-z0-9._-]+$/.test(String(value || '')) && String(value).length <= 500 ? String(value) : '');
+  const validClickId = value => (/^[A-Za-z0-9._-]{1,470}$/.test(String(value || '')) ? String(value) : '');
   const writeCookie = (name, value) => { if (value) document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=7776000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`; };
   const attribution = (() => {
     // Custom-scheme pages have an opaque ("null") origin. They must not

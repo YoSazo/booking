@@ -224,7 +224,7 @@ function registerTrace(app, {
       success_url: `${origin}/trace?paid={CHECKOUT_SESSION_ID}${back}`,
       cancel_url: `${origin}/trace?cancelled=1${back}`,
       payment_intent_data: { statement_descriptor_suffix: TRACE.descriptorSuffix, metadata: { product: TRACE.product } },
-      metadata: { product: TRACE.product, visitorId, fbp: (attribution.fbp || '').slice(0, 200), fbc: (attribution.fbc || '').slice(0, 200),
+      metadata: { product: TRACE.product, visitorId, fbp: (attribution.fbp || '').slice(0, 500), fbc: (attribution.fbc || '').slice(0, 500),
         sourceUrl: (attribution.sourceUrl || '').slice(0, 450), owner: ownerBrowser(req) || automatedBrowser(req) ? '1' : '', app: app ? '1' : '' },
     };
     let session;

@@ -151,6 +151,21 @@ test('picking, tracing and opening checkout are the Meta signals, once per visit
   });
 });
 
+test("a long Meta click id reaches Meta whole, on the signal and in the checkout's metadata", async () => {
+  const { app, calls } = fakeWorld();
+  const longClick = 'IwZXh0bgNhZW0BMABhZGlkAasd' + 'Qw3rTy_aem_'.repeat(22);
+  const fbc = `fb.1.1760000000000.${longClick}`;
+  assert.ok(fbc.length > 250);
+  await serve(app, async ({ post }) => {
+    await post('/api/trace/event', { name: 'TracePicked', visitorId: 'v_longclick01', detail: 'starter', attribution: { fbp: 'fb.1.1.2', fbc } });
+    assert.equal(calls.capi[0].fbc, fbc);
+    await post('/api/trace/checkout', { visitorId: 'v_longclick01', attribution: { fbp: 'fb.1.1.2', fbc } });
+    assert.equal(calls.creates[0].metadata.fbc, fbc);
+  });
+  const { buildMarketelCapiEvent } = require('../marketel-meta-capi');
+  assert.equal(buildMarketelCapiEvent('ViewContent', { eventId: 'x', fbc, fbp: 'fb.1.1.2' }).user_data.fbc, fbc);
+});
+
 test('checkout sells one $14.99 unlock and returns to the page with the session id', async () => {
   const { app, calls } = fakeWorld();
   await serve(app, async ({ post }) => {

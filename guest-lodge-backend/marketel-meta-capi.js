@@ -21,7 +21,8 @@ function hashMetaValue(value) {
 }
 
 function cleanMetaBrowserId(value, kind) {
-    const text = cleanText(value, 220);
+    // Click ids can be long; a cut one is worse than none, so allow 500.
+    const text = cleanText(value, 500);
     if (!text) return '';
     const prefix = kind === 'fbc' ? /^fb\.1\./ : /^fb\.1\./;
     return prefix.test(text) && /^[A-Za-z0-9._-]+$/.test(text) ? text : '';
