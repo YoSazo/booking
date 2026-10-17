@@ -104,15 +104,15 @@ const LABELS = Object.freeze(Object.fromEntries([
 // own ladder: landing, picking something, tracing, the price, paying.
 const TRACE_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
-  { key: 'intro', label: 'Tapped Get started (page 1 of 3)', names: ['TraceIntroDone'], aside: true },
-  { key: 'chose', label: 'Chose Try it free or Pay once (page 2 of 3)', names: ['TraceChose'], aside: true },
+  { key: 'intro', label: 'Tapped Get started (page 1 of 3, new visitors only)', names: ['TraceIntroDone'], aside: true },
+  { key: 'chose', label: 'Chose Try it free or Pay once (page 2 of 3, new visitors only)', names: ['TraceChose'], aside: true },
   { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent)', names: ['TracePicked'] },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
   { key: 'started', label: 'Started tracing (Meta: AddToCart)', names: ['TraceStarted'] },
   { key: 'traced30', label: 'Traced for 30 seconds', names: ['TraceTraced30'], aside: true },
   { key: 'traced120', label: 'Traced for 2 minutes', names: ['TraceTraced120'], aside: true },
   { key: 'done', label: 'Tapped Done', names: ['TraceDone'], aside: true },
-  { key: 'paywall', label: 'Saw the price', names: ['TracePaywallShown'] },
+  { key: 'paywall', label: 'Saw the price (the offer sheet, or Pay once on page 2)', names: ['TracePaywallShown', 'TraceChose:pay'] },
   { key: 'tapped', label: 'Tapped Unlock', names: ['TraceCheckoutTapped'] },
   { key: 'checkout', label: 'Stripe checkout opened (what Meta hears)', names: ['TraceCheckoutOpened'] },
   { key: 'paid', label: 'Paid $14.99', names: ['TracePaid'] },
@@ -124,7 +124,7 @@ const TRACE_BRANCHES = Object.freeze([
   { key: 'ai', hideWhenEmpty: true, label: 'Describe it (AI)', steps: [['Typed a description', ['TraceAIAsked']], ['Picture drawn (costs money)', ['TraceAIGenerated']], ['Shown to trace', ['TraceAIShown']], ['Refused by the safety filter', ['TraceAIRefused']], ['Failed', ['TraceAIFailed']]] },
   { key: 'camera', label: 'The camera', steps: [['Camera on, tracing', ['TraceStarted']], ['Blocked by the person', ['TraceCameraDenied:denied']], ['No camera found', ['TraceCameraDenied:nocamera']], ["Browser can't use it", ['TraceCameraDenied:unsupported']], ['Other camera error', ['TraceCameraDenied:error']], ['Told to open in Safari (in-app browser)', ['TraceCameraHelpShown:inapp']]] },
   { key: 'using', label: 'While tracing', steps: [['Changed the fade', ['TraceFaded']], ['Moved or resized the picture', ['TraceMoved']], ['Locked the picture', ['TraceLocked']], ['Tapped Done', ['TraceDone']]] },
-  { key: 'price', label: 'When they saw the price', steps: [['Tapped "Buy $14.99" in the top bar', ['TracePaywallShown:top']], ['Tapped "Unlock everything" on the home screen', ['TracePaywallShown:home']], ['After tapping Done', ['TracePaywallShown:done']], ['Picked a second picture', ['TracePaywallShown:second']], ['Asked for a second AI picture', ['TracePaywallShown:ai']], ['Came back from Stripe unpaid', ['TracePaywallShown:cancelled']], ['Closed it ("Not now")', ['TracePaywallClosed']]] },
+  { key: 'price', label: 'When they saw the price', steps: [['Tapped "Buy $14.99" in the top bar', ['TracePaywallShown:top']], ['Tapped "Unlock everything" on the old home page (before Oct 16)', ['TracePaywallShown:home']], ['After tapping Done', ['TracePaywallShown:done']], ['Picked a second picture', ['TracePaywallShown:second']], ['Asked for a second AI picture', ['TracePaywallShown:ai']], ['Came back from Stripe unpaid', ['TracePaywallShown:cancelled']], ['Closed it ("Not now")', ['TracePaywallClosed']]] },
   { key: 'checkout', label: 'Checkout', steps: [['Tapped Unlock', ['TraceCheckoutTapped']], ["Checkout didn't open", ['TraceCheckoutFailed']], ['Came back without paying', ['TraceCheckoutCancelled']], ['Paid', ['TracePaid']]] },
   { key: 'restore', hideWhenEmpty: true, label: 'Already paid?', steps: [['Asked to restore', ['TraceRestoreAsked']], ['Unlocked with the code', ['TraceUnlocked:code']], ['Unlocked with the email link', ['TraceUnlocked:link']]] },
   { key: 'from', label: 'Where they came from', steps: [['Clicked the ad (Meta click id)', ['TraceFrom:ad']], ['From Facebook or Instagram, no click id', ['TraceFrom:social']], ['No referrer: typed, QR, or you', ['TraceFrom:direct']], ['From another site', ['TraceFrom:other']]] },
@@ -148,7 +148,7 @@ const DEFINITIONS = Object.freeze({
     labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
       TraceChose: 'Chose try or pay', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
       TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
-    tiles: [['Landed', 'landed'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
+    tiles: [['Landed', 'landed'], ['Get started', 'intro'], ['Chose', 'chose'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
 });
 const definitionFor = tool => DEFINITIONS[tool] || DEFINITIONS.report;
 
