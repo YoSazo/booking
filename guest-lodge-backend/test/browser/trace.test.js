@@ -630,3 +630,63 @@ test('a buyer never sees the pitch: unlocked, the page opens on the pictures', a
     assert.equal(await page.isVisible('#step-choose'), false);
   } finally { await browser.close(); w.close(); }
 });
+
+test('Back from the choice step cancels a checkout that is still loading: no redirect, button reset', async () => {
+  const w = await world();
+  const { browser, page, errors } = await phone();
+  let release;
+  try {
+    const waiting = new Promise(resolve => { release = resolve; });
+    let requested = false;
+    await page.route('**/api/trace/checkout', async route => {
+      requested = true;
+      await waiting;
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'cs_test_lateSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_lateSession123' }) });
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.locator('#intro-go').tap();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    await page.locator('#choose-pay').tap();
+    await until(page, () => document.getElementById('choose-pay').disabled);
+    assert.equal(requested, true);
+    await page.goBack();
+    await page.waitForSelector('#step-intro:not([hidden])');
+    release();
+    await settle();
+    assert.equal(new URL(page.url()).origin, w.base, 'still on our page');
+    assert.equal(await page.isVisible('#step-intro'), true);
+    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null);
+    assert.ok(!names(w.events).includes('TraceCheckoutOpened'), names(w.events).join());
+    // The button is usable again when they come back to the choice.
+    await page.locator('#intro-go').tap();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    assert.equal(await page.isDisabled('#choose-pay'), false);
+    assert.equal(await page.textContent('#choose-pay'), 'Pay $14.99 once');
+    assert.deepEqual(errors, []);
+  } finally { release(); await browser.close(); w.close(); }
+});
+
+test('a checkout that fails after they left the choice step shows no error on the next page', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  let release;
+  try {
+    const waiting = new Promise(resolve => { release = resolve; });
+    await page.route('**/api/trace/checkout', async route => {
+      await waiting;
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Checkout is not available right now.' }) });
+    });
+    await page.goto(`${w.base}/trace`);
+    await page.locator('#intro-go').tap();
+    await page.locator('#choose-pay').tap();
+    await until(page, () => document.getElementById('choose-pay').disabled);
+    await page.goBack();
+    await page.waitForSelector('#step-intro:not([hidden])');
+    release();
+    await settle();
+    await page.locator('#intro-go').tap();
+    await page.waitForSelector('#step-choose:not([hidden])');
+    assert.equal(await page.isVisible('#choose-error'), false);
+    assert.ok(!names(w.events).includes('TraceCheckoutFailed:error'), 'a checkout they walked away from is not a failure');
+  } finally { release(); await browser.close(); w.close(); }
+});

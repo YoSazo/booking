@@ -454,3 +454,18 @@ test('every event name the page sends is one the server accepts', () => {
   for (const name of sent) assert.ok(TRACE_EVENTS.includes(name), name);
   assert.ok(sent.size >= 15);
 });
+
+test('the refund promise reads the same on the choice step, the paywall and the terms', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const page = fs.readFileSync(path.join(__dirname, '../trace-web/index.html'), 'utf8');
+  const terms = fs.readFileSync(path.join(__dirname, '../trace-web/terms.html'), 'utf8');
+  const choose = page.match(/<p class="note">([^<]*7 days[^<]*)<\/p>/);
+  assert.ok(choose, 'the choice step states the refund');
+  const fine = page.match(/id="pay-fine">([\s\S]*?)<\/p>/)[1];
+  const refunds = terms.match(/<h2>Refunds<\/h2>\s*<p>([\s\S]*?)<\/p>/)[1];
+  for (const [where, text] of [['choice step', choose[1]], ['paywall', fine], ['terms', refunds]]) {
+    assert.match(text, /7 days/, `${where} says 7 days`);
+    assert.match(text, /(doesn't work|Not working) on your phone/i, `${where} says when it applies`);
+  }
+});

@@ -199,6 +199,7 @@
   function showStep(name, { push = false } = {}) {
     if (name !== 'pick' && (inApp || unlocked())) name = 'pick';
     currentStep = name;
+    resetCheckout();
     for (const step of STEPS) $(`step-${step}`).hidden = step !== name;
     if (name !== 'intro') store.set('trace.seen', '1');
     const state = { traceStep: name };
@@ -603,6 +604,14 @@
   $('buy-top').addEventListener('click', () => showPaywall('top'));
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('backdrop').addEventListener('click', () => { if (!$('paywall').hidden) track('TracePaywallClosed', '', { once: false }); closeSheets(); });
+  // Forget any checkout still loading and put both Pay buttons back. A response
+  // that arrives later sees a new generation and does nothing: no redirect, no event.
+  function resetCheckout() {
+    checkoutGeneration++;
+    $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99';
+    $('choose-pay').disabled = false; $('choose-pay').textContent = 'Pay $14.99 once';
+    $('choose-error').hidden = true;
+  }
   // One checkout for every Pay button: the sheet's, and the choice step's.
   // `error` is the element that says what went wrong, next to the button tapped.
   async function checkout({ button, idleText, error }) {
@@ -640,7 +649,7 @@
   });
   // Coming back from Stripe with the browser's back button restores this page
   // from memory with the button still saying "Opening…".
-  window.addEventListener('pageshow', event => { if (event.persisted) { $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99'; $('choose-pay').disabled = false; $('choose-pay').textContent = 'Pay $14.99 once'; busy(''); } });
+  window.addEventListener('pageshow', event => { if (event.persisted) { resetCheckout(); busy(''); } });
 
   async function confirmPayment(sessionId) {
     store.set('trace.pending', sessionId);
