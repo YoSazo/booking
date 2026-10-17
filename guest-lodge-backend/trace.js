@@ -104,7 +104,7 @@ function tracePageHeaders(res) {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   // Meta's pixel loads from connect.facebook.net and reports to www.facebook.com.
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.clarity.ms https://scripts.clarity.ms https://connect.facebook.net; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.clarity.ms https://c.bing.com https://www.facebook.com; media-src 'self' blob: mediastream:; connect-src 'self' https://*.clarity.ms https://c.bing.com https://www.facebook.com https://connect.facebook.net; worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://www.clarity.ms https://scripts.clarity.ms https://connect.facebook.net; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.clarity.ms https://c.bing.com https://www.facebook.com https://res.cloudinary.com; media-src 'self' blob: mediastream: https://res.cloudinary.com; connect-src 'self' https://*.clarity.ms https://c.bing.com https://www.facebook.com https://connect.facebook.net; worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
 }
 

@@ -7,30 +7,26 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=24">
+<link rel="stylesheet" href="/trace/trace.css?v=25">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
 <main id="home" class="home">
-  <section class="step" id="step-intro" aria-labelledby="intro-title">
-    <img class="hero" src="/trace/pictures/hero.webp" width="520" height="605" alt="A phone resting on a glass above a sheet of paper, showing the lines to trace while a hand draws them">
-    <h1 id="intro-title" tabindex="-1">Trace anything.<br>Pay once.<br><span class="green">No subscription.</span></h1>
-    <div class="trust" id="trust"></div>
-    <p class="lede">Other tracing apps charge up to $24.99 a week. Marketel Trace is $14.99, once.</p>
-    <button type="button" class="big" id="intro-go">Get started</button>
-  </section>
-
-  <section class="step" id="step-choose" hidden aria-labelledby="choose-title">
-    <h2 class="step-title" id="choose-title" tabindex="-1">Try it first, or get it now.</h2>
-    <div class="compare" id="choose-compare">
-      <div class="them"><span>Other tracing apps</span><strong>up to $24.99/week</strong><small>that's up to $1,299 a year</small></div>
-      <div class="us"><span>Marketel Trace</span><strong>$14.99 once</strong><small>yours forever</small></div>
+  <section class="step start" id="step-intro" aria-labelledby="intro-title">
+    <h1 id="intro-title" tabindex="-1"><span id="hook-1">Tracing app users:</span> <span class="green" id="hook-2">Stop paying weekly.</span></h1>
+    <div class="start-row">
+      <video class="demo" poster="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_9,c_crop,w_1080,h_1960,y_110/w_480,q_auto/v1792256225/1016_1_iu6pq7.jpg" autoplay muted loop playsinline preload="auto" aria-label="A real recording: typing a dragon, then tracing it onto paper with a pencil"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_h264/v1792256225/1016_1_iu6pq7.mp4" type="video/mp4"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_vp9/v1792256225/1016_1_iu6pq7.webm" type="video/webm"></video>
+      <ul class="start-points">
+        <li>Other apps charge up to <strong>$24.99 a week</strong>.</li>
+        <li>This is <strong>$14.99 once</strong>. Yours forever.</li>
+        <li>Type what you want, or use your own photo. Trace it on paper.</li>
+      </ul>
     </div>
-    <button type="button" class="big" id="choose-try">Try it free</button>
-    <button type="button" class="ghost" id="choose-pay">Pay $14.99 once</button>
+    <button type="button" class="big" id="choose-try">I want to try it first</button>
+    <p class="under">Your first drawing is free. No card needed.</p>
+    <button type="button" class="ghost" id="choose-pay">I'm ready: pay $14.99</button>
+    <p class="under" id="pay-under">One time. No subscription. If it doesn't work on your phone, full refund within 7 days.</p>
     <p class="error" id="choose-error" hidden></p>
-    <p class="note">No subscription. Nothing renews. If it doesn't work on your phone, full refund within 7 days.</p>
-    <section class="tape" id="tape" aria-label="Customer reviews"><div class="tape-track" id="tape-track"></div></section>
   </section>
 
   <section class="step" id="step-pick" hidden aria-labelledby="pick-title">
@@ -141,6 +137,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=24" defer></script>
+<script src="/trace/trace.js?v=25" defer></script>
 </body>
 </html>

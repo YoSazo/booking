@@ -10,44 +10,6 @@
     { id: 'girl', label: 'Anime girl' }, { id: 'ninja', label: 'Ninja boy' }, { id: 'bald', label: 'Bald hero' },
     { id: 'profile', label: 'Boy in profile' }, { id: 'doll', label: 'Stitched doll' }, { id: 'creature', label: 'Grinning creature' },
   ];
-  const REVIEWS = [
-    { name: "Emily Carter", stars: 5, quote: "I was paying every week for another tracing app so finding this for $14.99 ONCE was honestly a relief. Does exactly what I need and I don't have to download anything." },
-    { name: "Marcus J", stars: 5, quote: "Wait so I can literally type what I wanna draw and it makes it for me?? 😭 this is actually so cool" },
-    { name: "Sarah Mitchell", stars: 5, quote: "My daughter loves drawing but struggles copying pictures by hand. We tried the butterfly first and she was so proud of herself. The free drawing was a nice touch too." },
-    { name: "Alex P.", stars: 4, quote: "Works pretty good. Took me a few minutes to get my phone positioned properly over the paper but once I figured it out the tracing was easy." },
-    { name: "Jasmine 💕", stars: 5, quote: "NO SUBSCRIPTION!!! finally somebody gets it. I don't mind paying for an app but I hate seeing $6.99 a week for something I only use sometimes." },
-    { name: "Daniel Reyes", stars: 5, quote: "I use it on my iPad and my phone. No app store, no installing anything, just open the website and start. Really convenient." },
-    { name: "Mia Thompson", stars: 5, quote: "The AI drawing thing is my favorite part. I asked for a cute dragon sitting on a mushroom and it actually gave me something I could trace lol. Love it." },
-    { name: "Robert K", stars: 4, quote: "Good alternative to the expensive AR drawing apps. You do need to keep your phone steady though. A stand makes a big difference." },
-    { name: "Ashley Nicole", stars: 5, quote: "I genuinely cannot draw 😂 but I traced a picture of my dog and it came out SO MUCH better than anything I've drawn before." },
-    { name: "Kevin Brooks", stars: 5, quote: "$14.99 forever versus paying monthly? Easy choice. I don't use tracing apps enough to justify another subscription." },
-    { name: "Brianna", stars: 5, quote: "I love that you can upload your own pictures instead of being stuck with whatever drawings the app gives you. I mostly use it for flowers and little tattoo ideas." },
-    { name: "Chris M.", stars: 3, quote: "The actual tracing part is nice but holding the phone above the paper gets annoying after a while. Wish there was an easier way to set it up without buying a stand." },
-    { name: "Olivia Grace", stars: 5, quote: "My kids have been drawing cats, butterflies and flowers all afternoon. I was expecting it to ask for my card just to try it but the first one was free." },
-    { name: "Nathan", stars: 4, quote: "Simple and does what it says. I like that it's a website because I already have way too many apps installed. Would be nice to have more examples to choose from." },
-    { name: "Kayla R", stars: 5, quote: "The fact that I can just DESCRIBE a picture and have it turned into something to trace is crazy to me. I spent like an hour making random cute drawings 😂" },
-    { name: "Jennifer L", stars: 5, quote: "I've tried three different drawing apps and they all wanted subscriptions. This is the first one I've found with a straightforward one-time price. Much prefer this." },
-    { name: "David Wilson", stars: 4, quote: "Used it to trace a photo onto paper for a birthday card. Had to adjust the size a couple times but the end result was great. Pretty useful little tool." },
-    { name: "Bella 🦋", stars: 5, quote: "omggg the butterfly came out so cute!! I literally have zero drawing skills and my first attempt looked decent 😭❤️" },
-    { name: "Thomas Avery", stars: 5, quote: "What sold me was not needing to install another app. Opened it in Safari, picked a picture and started tracing. That's really all I wanted." },
-    { name: "Amanda S", stars: 5, quote: "I got tired of forgetting to cancel free trials and getting charged. Paid once for this and I don't have to think about another recurring payment. Thank you." },
-    { name: "Jordan", stars: 3, quote: "Cool idea and the AI pictures are fun. The camera positioning takes some patience though, especially with smaller drawings. Still usable once you get the hang of it." },
-    { name: "Hannah Marie", stars: 5, quote: "I'm using this to practice drawing faces and hands because those are the hardest for me. Being able to use my own reference photos instead of preset images helps a lot." },
-    { name: "Luis Fernandez", stars: 4, quote: "Pretty straightforward. I tried it on my Android and then on my laptop to pick out pictures. The browser approach is nice, just make sure your camera permissions are enabled." },
-    { name: "Chloe ✨", stars: 5, quote: "This is what I thought those other AR drawing apps were going to be. Pick a photo, see the lines, trace it. No weekly charges, no complicated setup. Love it!!" },
-  ];
-  const esc = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-  const reviewStars = value => {
-    const full = Math.round(Math.max(0, Math.min(5, Number(value) || 0)));
-    return `<span class="review-stars" role="img" aria-label="${full} out of 5 stars">${'★'.repeat(full)}<span class="review-stars-off" aria-hidden="true">${'★'.repeat(5 - full)}</span></span>`;
-  };
-  const tapeCard = review => `<figure class="tape-card">${reviewStars(review.stars)}<blockquote>${esc(review.quote)}</blockquote><figcaption><span class="review-name">${esc(review.name)}</span></figcaption></figure>`;
-  (() => {
-    const average = REVIEWS.reduce((sum, review) => sum + review.stars, 0) / REVIEWS.length;
-    $('trust').innerHTML = `${reviewStars(average)}<span class="trust-text">${average.toFixed(1)} · ${REVIEWS.length} reviews</span>`;
-    const run = REVIEWS.map(tapeCard).join('');
-    $('tape-track').innerHTML = `<div class="tape-run">${run}</div><div class="tape-run" aria-hidden="true">${run}</div>`;
-  })();
   const store = {
     get: key => { try { return localStorage.getItem(key); } catch { return null; } },
     set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } },
@@ -186,7 +148,7 @@
       : canBuy() ? 'First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.'
       : 'Your first drawing is free.';
     // Buying straight away is always one tap, from the bar.
-    $('buy-top').hidden = unlocked() || !canBuy();
+    $('buy-top').hidden = unlocked() || !canBuy() || currentStep === 'intro';
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
@@ -217,10 +179,17 @@
   }
 
 
-  // ----- Three steps on the web: the idea, the choice, the pictures -----
-  // One page, three states, so Back works and a Stripe return never breaks.
-  // The app, a buyer, and anyone who has seen the pitch start at the pictures.
-  const STEPS = ['intro', 'choose', 'pick'];
+  // ----- Two steps on the web: the ad's call-out with a plain choice, then the pictures -----
+  // The first screen continues the ad: the same call-out (per ad with ?hook=),
+  // a real recording, then "try it first" or "pay now". Back works, and the app,
+  // a buyer and anyone who has made the choice start at the pictures.
+  const STEPS = ['intro', 'pick'];
+  const HOOKS = {
+    tracing: ['Tracing app users:', 'Stop paying weekly.'],
+    cantdraw: ["Can't draw?", 'You can now.'],
+  };
+  const hook = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
+  $('hook-1').textContent = hook[0]; $('hook-2').textContent = hook[1];
   const startStep = () => (inApp || unlocked() || store.get('trace.seen') === '1' || params.get('paid') || params.get('unlock') || params.get('cancelled') ? 'pick' : 'intro');
   let currentStep = 'pick';
   function showStep(name, { push = false } = {}) {
@@ -228,6 +197,10 @@
     currentStep = name;
     resetCheckout();
     for (const step of STEPS) $(`step-${step}`).hidden = step !== name;
+    // The first screen has its own pay button; the bar's is for the pictures.
+    $('buy-top').hidden = name === 'intro' || unlocked() || !canBuy();
+    const demo = document.querySelector('.demo');
+    if (demo) { if (name === 'intro') demo.play().catch(() => {}); else demo.pause(); }
     if (name !== 'intro') store.set('trace.seen', '1');
     const state = { traceStep: name };
     if (push) history.pushState(state, ''); else history.replaceState(state, '');
@@ -240,7 +213,6 @@
     if (!$('tracer').hidden) return;
     showStep(name);
   });
-  $('intro-go').addEventListener('click', () => { track('TraceIntroDone'); showStep('choose', { push: true }); });
   $('choose-try').addEventListener('click', () => { track('TraceChose', 'try', { once: false }); showStep('pick', { push: true }); });
 
   // ----- Picking a picture -----
@@ -636,7 +608,7 @@
   function resetCheckout() {
     checkoutGeneration++;
     $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99';
-    $('choose-pay').disabled = false; $('choose-pay').textContent = 'Pay $14.99 once';
+    $('choose-pay').disabled = false; $('choose-pay').textContent = "I'm ready: pay $14.99";
     $('choose-error').hidden = true;
   }
   // One checkout for every Pay button: the sheet's, and the choice step's.
@@ -672,7 +644,7 @@
   // "Pay $14.99 once" on the choice step goes straight to Stripe: no second price page.
   $('choose-pay').addEventListener('click', () => {
     track('TraceChose', 'pay', { once: false });
-    checkout({ button: $('choose-pay'), idleText: 'Pay $14.99 once', error: $('choose-error') });
+    checkout({ button: $('choose-pay'), idleText: "I'm ready: pay $14.99", error: $('choose-error') });
   });
   // Coming back from Stripe with the browser's back button restores this page
   // from memory with the button still saying "Opening…".

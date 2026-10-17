@@ -230,7 +230,7 @@ test('Marketel Trace has its own ladder, side cards and ad-click filter', () => 
   assert.equal(row('paid').people, 1);
   assert.equal(row('traced30').aside, true);
   assert.equal(f.split, null, 'no phone/computer split for Trace');
-  assert.deepEqual(f.tiles.map(([, key]) => key), ['landed', 'intro', 'chose', 'picked', 'started', 'traced30', 'paywall', 'tapped', 'checkout', 'paid']);
+  assert.deepEqual(f.tiles.map(([, key]) => key), ['landed', 'chose', 'picked', 'started', 'traced30', 'paywall', 'tapped', 'checkout', 'paid']);
   const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
   assert.equal(card('picked')['Describe it (AI)'], 1);
   assert.equal(card('picked')['A starter picture'], 1);
@@ -264,13 +264,13 @@ test('Marketel Trace: the three pages are counted, and paying on page 2 cannot m
   const f = buildWedgeFunnel(events, definitionFor('trace'));
   const row = key => f.steps.find(step => step.key === key);
   assert.equal(row('landed').people, 4);
-  assert.equal(row('intro').people, 2);
+  assert.equal(row('intro').people, 2, 'the old Get started page still counts in old ranges');
   assert.equal(row('intro').aside, true);
   assert.equal(row('chose').people, 2);
   assert.equal(row('paywall').people, 2, 'the offer sheet and Pay once on page 2 both count as seeing the price');
   assert.equal(row('tapped').people, 2);
   assert.ok(row('tapped').ofPrevious <= 1, `taps are never more than price views (${row('tapped').ofPrevious})`);
   const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
-  assert.equal(card('chose')['Tapped "Try it free"'], 1);
-  assert.equal(card('chose')['Tapped "Pay $14.99 once" (straight to Stripe)'], 1);
+  assert.equal(card('chose')['Tapped "I want to try it first"'], 1);
+  assert.equal(card('chose')['Tapped "I\'m ready: pay $14.99" (straight to Stripe)'], 1);
 });

@@ -89,7 +89,7 @@ test('the page is served with the camera allowed and nothing else', async () => 
     for (const path of ['/trace', '/trace/']) {
       const res = await fetch(base + path);
       assert.equal(res.status, 200);
-      assert.match(await res.text(), /Pay once\.[\s\S]*No subscription\./);
+      assert.match(await res.text(), /Tracing app users:[\s\S]*Stop paying weekly\./);
       assert.match(res.headers.get('permissions-policy'), /camera=\(self\)/);
       assert.match(res.headers.get('permissions-policy'), /microphone=\(\)/);
       assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'none'/);
@@ -463,8 +463,8 @@ test('the refund promise reads the same on the choice step, the paywall and the 
   const path = require('path');
   const page = fs.readFileSync(path.join(__dirname, '../trace-web/index.html'), 'utf8');
   const terms = fs.readFileSync(path.join(__dirname, '../trace-web/terms.html'), 'utf8');
-  const choose = page.match(/<p class="note">([^<]*7 days[^<]*)<\/p>/);
-  assert.ok(choose, 'the choice step states the refund');
+  const choose = page.match(/id="pay-under">([^<]*7 days[^<]*)<\/p>/);
+  assert.ok(choose, 'the first screen states the refund under its pay button');
   const fine = page.match(/id="pay-fine">([\s\S]*?)<\/p>/)[1];
   const refunds = terms.match(/<h2>Refunds<\/h2>\s*<p>([\s\S]*?)<\/p>/)[1];
   for (const [where, text] of [['choice step', choose[1]], ['paywall', fine], ['terms', refunds]]) {

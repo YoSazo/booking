@@ -165,32 +165,27 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 @keyframes step-in { from { opacity: 0; transform: translateY(10px); } }
 .step-title { font-size: 28px; line-height: 1.1; letter-spacing: -0.9px; margin: 14px 0 14px; }
 .step :focus { outline: none; }
-.hero { display: block; height: clamp(190px, 36vh, 330px); width: auto; max-width: 100%; margin: 6px auto 0; object-fit: contain; }
 #intro-title { font-size: 32px; margin: 12px 0 8px; }
 .green { color: var(--green); }
-#intro-title + .lede { margin: 0 0 18px; font-size: 17px; }
-#step-choose .compare { margin: 4px 0 16px; }
 #choose-pay { min-height: 56px; font-size: 18px; border-color: var(--green); color: var(--green); margin-top: 10px; }
 #choose-pay[disabled] { opacity: 0.7; }
 @media (prefers-reduced-motion: reduce) { .step:not([hidden]) { animation: none; } }
 
-/* Rating line and moving tape. */
-.trust { display: flex; align-items: center; gap: 8px; min-height: 16px; margin: -2px 0 6px; line-height: 1.1; }
-.review-stars { color: var(--green); letter-spacing: 1px; font-size: 15px; line-height: 1; white-space: nowrap; }
-.review-stars-off { color: var(--line); }
-.trust-text { color: var(--muted); font-size: 14px; font-weight: 600; }
-.tape { margin-top: 20px; min-height: 104px; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); isolation: isolate; transform: translateZ(0); }
-.tape-track { display: flex; width: max-content; animation: tape 77s linear infinite; will-change: transform; backface-visibility: hidden; }
-.tape-run { display: flex; gap: 10px; padding-right: 10px; }
-.tape-card { flex: 0 0 220px; width: 220px; margin: 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
-.tape-card .review-stars { display: block; margin-bottom: 4px; font-size: 13px; }
-.tape-card blockquote { margin: 0; padding: 0; white-space: normal; font-size: 13px; line-height: 1.35; letter-spacing: -.15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.tape-card figcaption { margin-top: 6px; }
-.review-name { font-weight: 700; font-size: 12px; }
-@keyframes tape { to { transform: translateX(-50%); } }
-@media (hover: hover) and (pointer: fine) { .tape:hover .tape-track { animation-play-state: paused; } }
-@media (prefers-reduced-motion: reduce) {
-  .tape-track { animation: none; }
-  .tape { overflow-x: auto; }
-  .tape-run + .tape-run { display: none; }
+
+/* The first screen: the ad's call-out, a real recording, two plain choices. */
+.start h1 { font-size: 30px; line-height: 1.05; letter-spacing: -1px; text-transform: uppercase; margin: 12px 0 12px; }
+.start h1 span { display: block; }
+.start-row { display: grid; grid-template-columns: 38% 1fr; gap: 14px; align-items: center; margin-bottom: 16px; }
+.demo { width: 100%; aspect-ratio: 480 / 870; object-fit: cover; border-radius: 18px; background: #dfe8e2; box-shadow: 0 10px 26px #1a2b2226; }
+.start-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.start-points li { font-size: 16px; line-height: 1.3; color: var(--ink); padding-left: 22px; position: relative; }
+.start-points li::before { content: ""; position: absolute; left: 2px; top: 5px; width: 10px; height: 6px; border-left: 3px solid var(--green); border-bottom: 3px solid var(--green); transform: rotate(-45deg); }
+.start .under { text-align: center; color: var(--muted); font-size: 14px; margin: 6px 0 12px; }
+.start #choose-pay { margin-top: 0; }
+@media (max-height: 600px) {
+  .start h1 { font-size: 25px; margin: 8px 0 8px; }
+  .start-row { grid-template-columns: 32% 1fr; gap: 12px; margin-bottom: 10px; }
+  .start-points { gap: 8px; }
+  .start-points li { font-size: 15px; }
+  .start .under { margin: 4px 0 8px; font-size: 13px; }
 }

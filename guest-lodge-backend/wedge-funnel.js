@@ -104,8 +104,9 @@ const LABELS = Object.freeze(Object.fromEntries([
 // own ladder: landing, picking something, tracing, the price, paying.
 const TRACE_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on the page', names: ['TraceLanded'] },
-  { key: 'intro', label: 'Tapped Get started (page 1 of 3, new visitors only)', names: ['TraceIntroDone'], aside: true },
-  { key: 'chose', label: 'Chose Try it free or Pay once (page 2 of 3, new visitors only)', names: ['TraceChose'], aside: true },
+  // Before 2026-10-17 the web had a 'Get started' page first; kept for old ranges.
+  { key: 'intro', label: 'Tapped Get started (old 3-page version)', names: ['TraceIntroDone'], aside: true, hideWhenEmpty: true },
+  { key: 'chose', label: 'Chose on the first screen: try it first, or pay now', names: ['TraceChose'], aside: true },
   { key: 'picked', label: 'Picked a picture, a photo or a description (Meta: ViewContent)', names: ['TracePicked'] },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
   { key: 'started', label: 'Started tracing (Meta: AddToCart)', names: ['TraceStarted'] },
@@ -119,7 +120,7 @@ const TRACE_STEPS = Object.freeze([
   { key: 'unlocked', label: 'Came back unlocked', names: ['TraceUnlocked'], aside: true },
 ]);
 const TRACE_BRANCHES = Object.freeze([
-  { key: 'chose', label: 'The choice (page 2 of 3)', steps: [['Tapped "Try it free"', ['TraceChose:try']], ['Tapped "Pay $14.99 once" (straight to Stripe)', ['TraceChose:pay']]] },
+  { key: 'chose', label: 'The first screen', steps: [['Tapped "I want to try it first"', ['TraceChose:try']], ['Tapped "I\'m ready: pay $14.99" (straight to Stripe)', ['TraceChose:pay']]] },
   { key: 'picked', label: 'What they picked', steps: [['A starter picture', ['TracePicked:starter']], ['Their own photo', ['TracePicked:photo']], ['Describe it (AI)', ['TracePicked:ai']]] },
   { key: 'ai', hideWhenEmpty: true, label: 'Describe it (AI)', steps: [['Typed a description', ['TraceAIAsked']], ['Picture drawn (costs money)', ['TraceAIGenerated']], ['Shown to trace', ['TraceAIShown']], ['Refused by the safety filter', ['TraceAIRefused']], ['Failed', ['TraceAIFailed']]] },
   { key: 'camera', label: 'The camera', steps: [['Camera on, tracing', ['TraceStarted']], ['Blocked by the person', ['TraceCameraDenied:denied']], ['No camera found', ['TraceCameraDenied:nocamera']], ["Browser can't use it", ['TraceCameraDenied:unsupported']], ['Other camera error', ['TraceCameraDenied:error']], ['Told to open in Safari (in-app browser)', ['TraceCameraHelpShown:inapp']]] },
@@ -148,7 +149,7 @@ const DEFINITIONS = Object.freeze({
     labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
       TraceChose: 'Chose try or pay', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
       TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
-    tiles: [['Landed', 'landed'], ['Get started', 'intro'], ['Chose', 'chose'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
+    tiles: [['Landed', 'landed'], ['Chose', 'chose'], ['Picked something', 'picked'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
 });
 const definitionFor = tool => DEFINITIONS[tool] || DEFINITIONS.report;
 

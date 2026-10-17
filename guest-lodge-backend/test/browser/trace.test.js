@@ -59,10 +59,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 300));
 // The web starts on the idea, then the choice, then the pictures. The app, a
 // buyer and anyone who has seen the pitch land on the pictures.
 async function toPicker(page) {
-  if (await page.isVisible('#step-intro')) {
-    await page.locator('#intro-go').tap();
-    await page.locator('#choose-try').tap();
-  }
+  if (await page.isVisible('#step-intro')) await page.locator('#choose-try').tap();
   await page.waitForSelector('.tile', { state: 'visible' });
 }
 async function until(page, predicate, ms = 8000) {
@@ -580,104 +577,92 @@ test('closing the paywall while checkout loads never redirects when the late res
   } finally { release(); await browser.close(); w.close(); }
 });
 
-test('three steps: the idea, the choice, the pictures; Back walks them in reverse and a return visit skips ahead', async () => {
+test('the first screen continues the ad: its call-out, a real recording, and try first or pay now', async () => {
   const w = await world();
   const { browser, page, errors } = await phone();
   try {
     await page.goto(`${w.base}/trace?fbclid=adclick123`);
-    // Page 1: the idea, one button, no pictures yet.
     assert.equal(await page.isVisible('#step-intro'), true);
     assert.equal(await page.isVisible('.tile'), false);
-    assert.match(await page.textContent('#intro-title'), /Pay once\.\s*No subscription\./);
-    // The star line sits under the headline and the page still fits one screen.
-    assert.match(await page.textContent('#trust'), /4\.6 · 24 reviews/);
-    assert.equal(await page.locator('#trust .review-stars').count(), 1);
-    const gotIt = await page.locator('#intro-go').boundingBox();
-    assert.ok(gotIt.y + gotIt.height <= 664, `Get started is on the first screen (bottom at ${gotIt.y + gotIt.height})`);
-    await page.locator('#intro-go').tap();
-    // Page 2: the comparison and the two ways in.
-    await page.waitForSelector('#step-choose:not([hidden])');
-    assert.equal(await page.isVisible('#step-intro'), false);
-    assert.match(await page.innerText('#choose-compare'), /\$24\.99\/week[\s\S]*\$14\.99 once/);
-    assert.equal(await page.isVisible('#choose-try'), true);
-    assert.equal(await page.isVisible('#choose-pay'), true);
-    const chooseBottom = await page.locator('#choose-pay').boundingBox();
-    assert.ok(chooseBottom.y + chooseBottom.height <= 664, 'both buttons are on the first screen');
-    // The moving tape of reviews sits under the choice. Its track is sized by its cards,
-    // not by their unclamped text, so half of it is exactly one run and the loop has no gap.
-    assert.equal(await page.locator('.tape-card').count(), 48);
-    const tape = await page.evaluate(() => {
-      const track = document.getElementById('tape-track');
-      const [first] = track.querySelectorAll('.tape-run');
-      return { track: track.getBoundingClientRect().width, run: first.getBoundingClientRect().width, page: document.documentElement.scrollWidth, view: innerWidth };
-    });
-    assert.ok(Math.abs(tape.track - tape.run * 2) < 2, `the loop has no gap (track ${tape.track}, run ${tape.run})`);
-    assert.ok(tape.page <= tape.view, 'no sideways scroll');
-    const tapeBox = await page.locator('#tape').boundingBox();
-    assert.ok(tapeBox.y + tapeBox.height <= 664, `the tape is on the first screen of the choice (bottom at ${tapeBox.y + tapeBox.height})`);
-    // Back goes to the idea, forward to the choice again.
-    await page.goBack();
-    await page.waitForSelector('#step-intro:not([hidden])');
-    await page.goForward();
-    await page.waitForSelector('#step-choose:not([hidden])');
+    assert.match(await page.textContent('#intro-title'), /Tracing app users:\s*Stop paying weekly\./i);
+    const sources = await page.$$eval('.demo source', list => list.map(source => [source.type, source.src]));
+    assert.deepEqual(sources.map(([type]) => type), ['video/mp4', 'video/webm']);
+    assert.ok(sources.every(([, src]) => src.startsWith('https://res.cloudinary.com/')), JSON.stringify(sources));
+    assert.equal(await page.$eval('.demo', v => v.muted && v.loop && v.hasAttribute('playsinline')), true);
+    assert.match(await page.innerText('#step-intro'), /up to \$24\.99 a week[\s\S]*\$14\.99 once/);
+    assert.equal(await page.textContent('#choose-try'), 'I want to try it first');
+    assert.equal(await page.textContent('#choose-pay'), "I'm ready: pay $14.99");
+    assert.match(await page.innerText('#step-intro'), /Your first drawing is free\. No card needed\./);
+    // Nothing made up: no rating line, no review tape.
+    assert.equal(await page.locator('#trust, .tape, .tape-card').count(), 0);
+    // Both choices fit the first screen, and the bar's Buy stands down here.
+    const pay = await page.locator('#choose-pay').boundingBox();
+    assert.ok(pay.y + pay.height <= 664, `both choices are on the first screen (pay ends at ${pay.y + pay.height})`);
+    assert.equal(await page.isVisible('#buy-top'), false);
+    // Try it first: the pictures, with Buy back in the bar. Back returns to the first screen.
     await page.locator('#choose-try').tap();
-    // Page 3: the pictures.
     await page.waitForSelector('#step-pick:not([hidden])');
     assert.equal(await page.locator('.tile').count(), 6);
-    await page.goBack();
-    await page.waitForSelector('#step-choose:not([hidden])');
+    assert.equal(await page.isVisible('#buy-top'), true);
     await page.goBack();
     await page.waitForSelector('#step-intro:not([hidden])');
     await settle();
     const seen = names(w.events);
-    assert.ok(seen.includes('TraceIntroDone'), seen.join());
     assert.ok(seen.includes('TraceChose:try'), seen.join());
     assert.equal(seen.includes('TraceChose:pay'), false);
-    // Someone who has seen the pitch goes straight to the pictures next time.
+    // Someone who has made the choice goes straight to the pictures next time.
     await page.goto(`${w.base}/trace`);
     await page.waitForSelector('#step-pick:not([hidden])');
-    assert.equal(await page.isVisible('#step-intro'), false);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); w.close(); }
 });
 
-test('Pay $14.99 once on the choice step goes straight to Stripe, with no second price page', async () => {
+test('each ad can open with its own call-out (?hook=), defaulting to tracing app users', async () => {
+  const w = await world();
+  const { browser, page } = await phone();
+  try {
+    await page.goto(`${w.base}/trace?hook=cantdraw`);
+    assert.match(await page.textContent('#intro-title'), /Can't draw\?\s*You can now\./i);
+    await page.evaluate(() => localStorage.clear());
+    await page.goto(`${w.base}/trace?hook=nonsense`);
+    assert.match(await page.textContent('#intro-title'), /Tracing app users:/i);
+  } finally { await browser.close(); w.close(); }
+});
+
+test("I'm ready: pay $14.99 goes straight to Stripe, with no second price page", async () => {
   const w = await world();
   const { browser, page, errors } = await phone();
   try {
     await page.goto(`${w.base}/trace?fbclid=adclick123`);
-    await page.locator('#intro-go').tap();
-    await page.waitForSelector('#step-choose:not([hidden])');
     await page.locator('#choose-pay').tap();
     await page.waitForURL(/checkout\.stripe\.com/);
     assert.equal(w.creates.length, 1);
     await settle();
     const seen = names(w.events);
-    for (const name of ['TraceIntroDone', 'TraceChose:pay', 'TraceCheckoutTapped', 'TraceCheckoutOpened']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
+    for (const name of ['TraceChose:pay', 'TraceCheckoutTapped', 'TraceCheckoutOpened']) assert.ok(seen.includes(name), `${name} in ${seen.join()}`);
     assert.equal(seen.some(name => name.startsWith('TracePaywallShown')), false, 'no second price page');
     assert.deepEqual(errors.filter(error => !/stripe/i.test(error)), []);
   } finally { await browser.close(); w.close(); }
 });
 
-test('when checkout will not open, the choice step says so, keeps the button usable and stays put', async () => {
+test('when checkout will not open, the first screen says so, keeps the button usable and stays put', async () => {
   const w = await world();
   const { browser, page } = await phone();
   try {
     await page.route('**/api/trace/checkout', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Checkout is not available right now.' }) }));
     await page.goto(`${w.base}/trace`);
-    await page.locator('#intro-go').tap();
     await page.locator('#choose-pay').tap();
     await page.waitForSelector('#choose-error:not([hidden])');
     assert.match(await page.textContent('#choose-error'), /not available/);
     assert.equal(await page.isDisabled('#choose-pay'), false);
-    assert.equal(await page.textContent('#choose-pay'), 'Pay $14.99 once');
-    assert.equal(await page.isVisible('#step-choose'), true);
+    assert.equal(await page.textContent('#choose-pay'), "I'm ready: pay $14.99");
+    assert.equal(await page.isVisible('#step-intro'), true);
     await settle();
     assert.ok(names(w.events).includes('TraceCheckoutFailed:error'), names(w.events).join());
   } finally { await browser.close(); w.close(); }
 });
 
-test('a buyer never sees the pitch: unlocked, the page opens on the pictures', async () => {
+test('a buyer never sees the first screen: unlocked, the page opens on the pictures', async () => {
   const w = await world();
   const { browser, page } = await phone();
   try {
@@ -687,66 +672,38 @@ test('a buyer never sees the pitch: unlocked, the page opens on the pictures', a
     await page.goto(`${w.base}/trace`);
     await page.waitForSelector('#step-pick:not([hidden])');
     assert.equal(await page.isVisible('#step-intro'), false);
-    assert.equal(await page.isVisible('#step-choose'), false);
   } finally { await browser.close(); w.close(); }
 });
 
-test('Back from the choice step cancels a checkout that is still loading: no redirect, button reset', async () => {
-  const w = await world();
-  const { browser, page, errors } = await phone();
-  let release;
-  try {
-    const waiting = new Promise(resolve => { release = resolve; });
-    let requested = false;
-    await page.route('**/api/trace/checkout', async route => {
-      requested = true;
-      await waiting;
-      await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'cs_test_lateSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_lateSession123' }) });
-    });
-    await page.goto(`${w.base}/trace`);
-    await page.locator('#intro-go').tap();
-    await page.waitForSelector('#step-choose:not([hidden])');
-    await page.locator('#choose-pay').tap();
-    await until(page, () => document.getElementById('choose-pay').disabled);
-    assert.equal(requested, true);
-    await page.goBack();
-    await page.waitForSelector('#step-intro:not([hidden])');
-    release();
-    await settle();
-    assert.equal(new URL(page.url()).origin, w.base, 'still on our page');
-    assert.equal(await page.isVisible('#step-intro'), true);
-    assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null);
-    assert.ok(!names(w.events).includes('TraceCheckoutOpened'), names(w.events).join());
-    // The button is usable again when they come back to the choice.
-    await page.locator('#intro-go').tap();
-    await page.waitForSelector('#step-choose:not([hidden])');
-    assert.equal(await page.isDisabled('#choose-pay'), false);
-    assert.equal(await page.textContent('#choose-pay'), 'Pay $14.99 once');
-    assert.deepEqual(errors, []);
-  } finally { release(); await browser.close(); w.close(); }
-});
-
-test('a checkout that fails after they left the choice step shows no error on the next page', async () => {
-  const w = await world();
-  const { browser, page } = await phone();
-  let release;
-  try {
-    const waiting = new Promise(resolve => { release = resolve; });
-    await page.route('**/api/trace/checkout', async route => {
-      await waiting;
-      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Checkout is not available right now.' }) });
-    });
-    await page.goto(`${w.base}/trace`);
-    await page.locator('#intro-go').tap();
-    await page.locator('#choose-pay').tap();
-    await until(page, () => document.getElementById('choose-pay').disabled);
-    await page.goBack();
-    await page.waitForSelector('#step-intro:not([hidden])');
-    release();
-    await settle();
-    await page.locator('#intro-go').tap();
-    await page.waitForSelector('#step-choose:not([hidden])');
-    assert.equal(await page.isVisible('#choose-error'), false);
-    assert.ok(!names(w.events).includes('TraceCheckoutFailed:error'), 'a checkout they walked away from is not a failure');
-  } finally { release(); await browser.close(); w.close(); }
+test('switching to "try it first" while checkout loads cancels it: no redirect, no error, button reset', async () => {
+  for (const outcome of ['opens', 'fails']) {
+    const w = await world();
+    const { browser, page, errors } = await phone();
+    let release;
+    try {
+      const waiting = new Promise(resolve => { release = resolve; });
+      await page.route('**/api/trace/checkout', async route => {
+        await waiting;
+        if (outcome === 'opens') await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'cs_test_lateSession123', url: 'https://checkout.stripe.com/c/pay/cs_test_lateSession123' }) });
+        else await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Checkout is not available right now.' }) });
+      });
+      await page.goto(`${w.base}/trace`);
+      await page.locator('#choose-pay').tap();
+      await until(page, () => document.getElementById('choose-pay').disabled);
+      await page.evaluate(() => document.getElementById('choose-try').click());
+      await page.waitForSelector('#step-pick:not([hidden])');
+      release();
+      await settle();
+      assert.equal(new URL(page.url()).origin, w.base, `${outcome}: still on our page`);
+      assert.equal(await page.evaluate(() => localStorage.getItem('trace.pending')), null, outcome);
+      const seen = names(w.events);
+      assert.ok(!seen.includes('TraceCheckoutOpened') && !seen.includes('TraceCheckoutFailed:error'), `${outcome}: ${seen.join()}`);
+      await page.goBack();
+      await page.waitForSelector('#step-intro:not([hidden])');
+      assert.equal(await page.isVisible('#choose-error'), false, outcome);
+      assert.equal(await page.isDisabled('#choose-pay'), false, outcome);
+      assert.equal(await page.textContent('#choose-pay'), "I'm ready: pay $14.99", outcome);
+      assert.deepEqual(errors, [], outcome);
+    } finally { release(); await browser.close(); w.close(); }
+  }
 });
