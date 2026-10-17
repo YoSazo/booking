@@ -114,6 +114,7 @@ const TRACE_STEPS = Object.freeze([
   { key: 'reviewed', label: 'Step 1 done: tapped Continue to Set Up', names: ['TraceReviewed'], aside: true, hideWhenEmpty: true },
   { key: 'setup', label: 'Step 2 done: tapped Continue to Trace (camera pop-up)', names: ['TraceSetupDone'], aside: true, hideWhenEmpty: true },
   { key: 'cameraok', label: 'Tapped Got It — Open My Camera', names: ['TraceCameraOk'], aside: true, hideWhenEmpty: true },
+  { key: 'skipped', label: 'Tapped Skip to tracing (step 1 or 2)', names: ['TraceSkipped'], aside: true, hideWhenEmpty: true },
   { key: 'camera', label: 'Asked for the camera', names: ['TraceCameraAsked'], aside: true },
   { key: 'started', label: 'Started tracing (Meta: AddToCart)', names: ['TraceStarted'] },
   { key: 'traced30', label: 'Traced for 30 seconds', names: ['TraceTraced30'], aside: true },
@@ -127,6 +128,7 @@ const TRACE_STEPS = Object.freeze([
 ]);
 const TRACE_BRANCHES = Object.freeze([
   { key: 'cards', hideWhenEmpty: true, label: 'The first screen: which card', steps: [['Dragon', ['TraceSelected:dragon']], ['Anything You Type', ['TraceSelected:type']], ['Your Own Photo', ['TraceSelected:photo']], ['More drawings', ['TraceSelected:more']]] },
+  { key: 'skipped', hideWhenEmpty: true, label: 'Skipped to tracing', steps: [['From step 1 (your drawing)', ['TraceSkipped:review']], ['From step 2 (set up)', ['TraceSkipped:setup']]] },
   { key: 'chose', hideWhenEmpty: true, label: 'The old one-screen version (Oct 17 morning)', steps: [['Tapped "I want to try it first"', ['TraceChose:try']], ['Tapped "I\'m ready: pay $14.99" (straight to Stripe)', ['TraceChose:pay']]] },
   { key: 'picked', label: 'What they picked', steps: [['A starter picture', ['TracePicked:starter']], ['Their own photo', ['TracePicked:photo']], ['Describe it (AI)', ['TracePicked:ai']]] },
   { key: 'ai', hideWhenEmpty: true, label: 'Describe it (AI)', steps: [['Typed a description', ['TraceAIAsked']], ['Picture drawn (costs money)', ['TraceAIGenerated']], ['Shown to trace', ['TraceAIShown']], ['Refused by the safety filter', ['TraceAIRefused']], ['Failed', ['TraceAIFailed']]] },
@@ -139,7 +141,7 @@ const TRACE_BRANCHES = Object.freeze([
   { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['TraceBrowser:instagram']], ['Facebook app', ['TraceBrowser:facebook']], ['Safari', ['TraceBrowser:safari']], ['Chrome', ['TraceBrowser:chrome']], ['Other', ['TraceBrowser:other']]] },
   { key: 'where', label: 'Web or iPhone app', steps: [['On the web', ['TraceLanded:web']], ['In the iPhone app', ['TraceLanded:app']]] },
 ]);
-const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose', 'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
+const TRACE_VISITOR_EVENTS = Object.freeze(['TraceLanded', 'TraceFrom', 'TraceBrowser', 'TraceIntroDone', 'TraceChose', 'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceSkipped', 'TracePicked', 'TraceCameraAsked', 'TraceCameraDenied', 'TraceCameraHelpShown',
   'TraceStarted', 'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone', 'TracePaywallShown', 'TracePaywallClosed',
   'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed', 'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown']);
 // Branch labels first, so a ladder step's own label wins for the same event.
@@ -154,7 +156,7 @@ const DEFINITIONS = Object.freeze({
     // Events whose detail says which one (source, browser, what was picked) are
     // named for the card; the detail column shows the value.
     labels: Object.freeze({ ...labelsOf(TRACE_STEPS, TRACE_BRANCHES), TraceFrom: 'Where they came from', TraceBrowser: 'Which browser',
-      TraceChose: 'Chose try or pay', TraceSelected: 'Tapped Select on a card', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
+      TraceChose: 'Chose try or pay', TraceSelected: 'Tapped Select on a card', TraceSkipped: 'Skipped to tracing', TracePicked: 'Picked something', TraceCameraDenied: 'Camera problem', TraceCameraHelpShown: 'Shown camera help', TracePaywallShown: 'Saw the price',
       TraceUnlocked: 'Unlocked', TraceAIGenerated: 'AI picture drawn', TraceAIRefused: 'AI picture refused', TraceAIFailed: 'AI picture failed', TraceUnlockEmailed: 'Unlock email sent' }),
     tiles: [['Landed', 'landed'], ['Picked something', 'picked'], ['Step 1 done', 'reviewed'], ['Step 2 done', 'setup'], ['Started tracing', 'started'], ['Traced 30s', 'traced30'], ['Saw the price', 'paywall'], ['Tapped Unlock', 'tapped'], ['Checkout opened', 'checkout'], ['Paid', 'paid']] },
 });

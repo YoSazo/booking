@@ -691,6 +691,31 @@ test('Select Drawing reads it back as step 1 of 3, then set up, then the camera 
   } finally { await browser.close(); w.close(); }
 });
 
+test('Skip to tracing opens the camera straight from step 1 or step 2', async () => {
+  for (const step of ['review', 'setup']) {
+    const w = await world();
+    const { browser, page, errors } = await phone();
+    try {
+      await page.goto(`${w.base}/trace`);
+      await page.locator('#select-dragon').tap();
+      await page.waitForSelector('#step-review:not([hidden])');
+      assert.equal(await page.textContent('#review-skip'), 'Skip to tracing ›');
+      if (step === 'setup') { await page.locator('#review-go').tap(); await page.waitForSelector('#step-setup:not([hidden])'); }
+      await page.locator(`#${step}-skip`).tap();
+      await page.waitForSelector('#tracer:not([hidden])');
+      assert.equal(await page.isVisible('#camera-why'), false, 'no pop-up on the skip');
+      await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
+      assert.match(await page.getAttribute('#overlay', 'src'), /dragon\.webp$/);
+      await settle();
+      const seen = names(w.events);
+      assert.ok(seen.includes(`TraceSkipped:${step}`), seen.join());
+      assert.ok(seen.includes('TraceStarted:starter'), seen.join());
+      assert.equal(seen.includes('TraceCameraOk'), false);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); w.close(); }
+  }
+});
+
 test('an idea under "What do you want to draw?" draws straight away', async () => {
   const maker = await chromium.launch();
   const drawing = await (await maker.newPage()).evaluate(() => {

@@ -285,25 +285,29 @@ test('Marketel Trace: the cards and the three steps are counted, and stay off th
     ev('TraceSetupDone', 'v_all'), ev('TraceCameraOk', 'v_all'), ev('TraceCameraAsked', 'v_all'), ev('TraceStarted', 'v_all', 'starter'),
     // one opens the type box and leaves at step 1
     ev('TraceLanded', 'v_typed', 'web'), ev('TraceSelected', 'v_typed', 'type'), ev('TracePicked', 'v_typed', 'ai'),
+    // one skips from step 1 straight to the camera
+    ev('TraceLanded', 'v_skip', 'web'), ev('TraceSelected', 'v_skip', 'more'), ev('TracePicked', 'v_skip', 'starter'), ev('TraceSkipped', 'v_skip', 'review'),
     // one only looks
     ev('TraceLanded', 'v_look', 'web'),
   ];
   const trace = definitionFor('trace');
   const f = buildWedgeFunnel(events, trace);
   const row = key => f.steps.find(step => step.key === key);
-  assert.equal(row('selected').people, 2);
-  assert.equal(row('picked').people, 2);
+  assert.equal(row('selected').people, 3);
+  assert.equal(row('picked').people, 3);
+  assert.equal(row('skipped').people, 1);
   assert.equal(row('reviewed').people, 1);
   assert.equal(row('setup').people, 1);
   assert.equal(row('cameraok').people, 1);
-  assert.equal(row('started').ofPrevious, 0.5, 'the steps are asides: started is measured against picked');
+  assert.equal(row('started').ofPrevious, 1 / 3, 'the steps are asides: started is measured against picked');
   assert.equal(row('chose'), undefined, 'the old one-screen row hides when nobody used it');
   const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
   assert.equal(card('cards').Dragon, 1);
   assert.equal(card('cards')['Anything You Type'], 1);
+  assert.equal(card('skipped')['From step 1 (your drawing)'], 1);
   assert.equal(f.branches.some(b => b.key === 'chose'), false);
-  for (const name of ['TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk']) assert.ok(trace.visitorEvents.includes(name), name);
+  for (const name of ['TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk', 'TraceSkipped']) assert.ok(trace.visitorEvents.includes(name), name);
   // A range from before the cards shows none of their rows.
   const old = buildWedgeFunnel([ev('TraceLanded', 'v_old', 'web'), ev('TracePicked', 'v_old', 'starter')], trace);
-  for (const key of ['selected', 'reviewed', 'setup', 'cameraok']) assert.equal(old.steps.some(s => s.key === key), false, key);
+  for (const key of ['selected', 'reviewed', 'setup', 'cameraok', 'skipped']) assert.equal(old.steps.some(s => s.key === key), false, key);
 });

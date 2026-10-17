@@ -244,6 +244,10 @@
   });
   $('why-go').addEventListener('click', () => { track('TraceCameraOk', '', { once: false }); closeSheets(); if (chosen) startTracing(chosen); });
   $('why-later').addEventListener('click', closeSheets);
+  // Skip: straight to the camera from step 1 or 2. iOS still asks, with the note.
+  for (const [id, step] of [['review-skip', 'review'], ['setup-skip', 'setup']]) {
+    $(id).addEventListener('click', () => { track('TraceSkipped', step, { once: false }); if (chosen) startTracing(chosen); });
+  }
 
   // ----- Picking a picture -----
   const grid = $('grid'), more = $('more-grid');

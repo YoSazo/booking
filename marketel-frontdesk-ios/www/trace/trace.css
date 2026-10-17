@@ -210,7 +210,10 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 /* Steps 1 and 2: a back pill, three pills for progress, "Step N of 3", the
    card, and one button that stays at the bottom of the screen. */
 .flow { padding-bottom: 100px; }
-.back-pill { border: 0; border-radius: 999px; background: var(--green); color: #fff; font-weight: 700; font-size: 16px; min-height: 42px; padding: 0 16px; margin: 10px 0 14px; box-shadow: 0 6px 16px #2e7d5b33; }
+.flow-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0 14px; }
+.back-pill { border: 0; border-radius: 999px; background: var(--green); color: #fff; font-weight: 700; font-size: 16px; min-height: 42px; padding: 0 16px; box-shadow: 0 6px 16px #2e7d5b33; }
+/* Anyone who wants the camera now can have it. */
+.skip { flex: none; border: 0; background: none; color: var(--green); font-weight: 700; font-size: 16px; min-height: 42px; padding: 0 2px; }
 .progress { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
 .progress::before { content: ""; position: absolute; top: 13px; left: 17%; right: 17%; height: 3px; background: #d6dfd9; }
 .progress li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
