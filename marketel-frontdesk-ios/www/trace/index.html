@@ -7,7 +7,7 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=30">
+<link rel="stylesheet" href="/trace/trace.css?v=31">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
@@ -60,23 +60,27 @@
     <button type="button" class="linklike back-link" data-back>‹ Back</button>
   </section>
 
-  <section class="step flow ask forward" id="step-forward" hidden aria-labelledby="forward-title">
-    <div class="bar" aria-hidden="true"><i style="width:75%"></i></div>
-    <p class="step-count">Step 1 of 3 — About you</p>
-    <h2 class="q-title" id="forward-title" tabindex="-1">You want to draw anime.</h2>
-    <div class="start-row">
-      <video class="demo" id="forward-video" poster="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_9,c_crop,w_1080,h_1960,y_110/w_480,q_auto/v1792256225/1016_1_iu6pq7.jpg" muted loop playsinline preload="none" aria-label="A real recording: typing a dragon, then tracing it onto paper with a pencil"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_h264/v1792256225/1016_1_iu6pq7.mp4" type="video/mp4"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_vp9/v1792256225/1016_1_iu6pq7.webm" type="video/webm"></video>
-      <ul class="start-points" id="forward-points"></ul>
+  <!-- Their answers over the real recording, full screen like the ad they came
+       from, with the choice of how to move forward at the bottom. -->
+  <section class="step forward" id="step-forward" hidden aria-labelledby="forward-title">
+    <div class="reel">
+      <video class="reel-video" id="forward-video" poster="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_9,c_crop,w_1080,h_1960,y_290/w_720,q_auto/v1792256225/1016_1_iu6pq7.jpg" muted loop playsinline preload="none" aria-label="A real recording: typing a dragon, then tracing it onto paper with a pencil"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_6.6/c_crop,w_1080,h_1960,y_290/w_720,q_auto,ac_none,vc_h264/v1792256225/1016_1_iu6pq7.mp4" type="video/mp4"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_6.6/c_crop,w_1080,h_1960,y_290/w_720,q_auto,ac_none,vc_vp9/v1792256225/1016_1_iu6pq7.webm" type="video/webm"></video>
+      <div class="reel-top">
+        <div class="reel-row"><button type="button" class="pill reel-back" data-back>‹ Back</button><span class="reel-tag">Real recording</span></div>
+        <div class="bar" aria-hidden="true"><i style="width:75%"></i></div>
+        <h2 class="reel-title" id="forward-title" tabindex="-1">You want to draw anime.</h2>
+        <p class="reel-line" id="forward-line">Trace is $14.99 once. Nothing renews.</p>
+      </div>
+      <div class="reel-bottom">
+        <p class="reel-ask">How would you like to move forward?</p>
+        <button type="button" class="big" id="forward-try">I want to try it first</button>
+        <p class="reel-under">Your first drawing is free. No card needed.</p>
+        <button type="button" class="reel-pay" id="forward-pay">This is for me: $14.99 once</button>
+        <p class="reel-under" id="pay-under"><span id="forward-price">No subscription.</span> If it doesn't work on your phone, full refund within 7 days.</p>
+        <p class="error" id="forward-error" hidden></p>
+        <button type="button" class="linklike reel-look" id="forward-look">Just let me look around</button>
+      </div>
     </div>
-    <p class="demo-caption">A real recording: type it, then trace it on paper.</p>
-    <h3 class="forward-ask">How would you like to move forward?</h3>
-    <button type="button" class="big" id="forward-try">I want to try it first</button>
-    <p class="under">Your first drawing is free. No card needed.</p>
-    <button type="button" class="ghost" id="forward-pay">This is for me: $14.99 once</button>
-    <p class="under" id="forward-price">No subscription.</p>
-    <p class="under" id="pay-under">One time. If it doesn't work on your phone, full refund within 7 days.</p>
-    <p class="error" id="forward-error" hidden></p>
-    <button type="button" class="linklike look" id="forward-look">Just let me look around</button>
   </section>
 
   <!-- Step 2 of 3: drawings that match what they said they want. -->
@@ -298,6 +302,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=30" defer></script>
+<script src="/trace/trace.js?v=31" defer></script>
 </body>
 </html>

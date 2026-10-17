@@ -481,8 +481,9 @@ test('the refund promise reads the same on "How would you like to move forward?"
   const path = require('path');
   const page = fs.readFileSync(path.join(__dirname, '../trace-web/index.html'), 'utf8');
   const terms = fs.readFileSync(path.join(__dirname, '../trace-web/terms.html'), 'utf8');
-  const forward = page.match(/id="pay-under">([^<]*7 days[^<]*)<\/p>/);
-  assert.ok(forward, 'the move-forward screen states the refund under its pay button');
+  const forward = page.match(/id="pay-under">([\s\S]*?)<\/p>/);
+  assert.ok(forward && /7 days/.test(forward[1]), 'the move-forward screen states the refund under its pay button');
+  forward[1] = forward[1].replace(/<[^>]+>/g, '');
   const fine = page.match(/id="pay-fine">([\s\S]*?)<\/p>/)[1];
   const refunds = terms.match(/<h2>Refunds<\/h2>\s*<p>([\s\S]*?)<\/p>/)[1];
   for (const [where, text] of [['move forward', forward[1]], ['paywall', fine], ['terms', refunds]]) {

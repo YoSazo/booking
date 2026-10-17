@@ -237,7 +237,9 @@
     if (name === 'q3') renderQ3();
     if (name === 'forward') renderForward();
     if (name === 'mine') renderMine();
+    // The recording fills the screen; the page behind it stays put.
     const video = $('forward-video');
+    document.documentElement.classList.toggle('reel-open', name === 'forward');
     if (name === 'forward') video.play().catch(() => {}); else video.pause();
     if (QUESTIONS.includes(name)) track('TraceAsked', name);
     $('buy-top').hidden = name !== 'pick' || unlocked() || !canBuy();
@@ -286,18 +288,13 @@
     $('q3-paying').hidden = !paying; $('q3-pref').hidden = paying;
   }
   const WANT = {
-    anime: { title: 'You want to draw anime.', point: 'Pick an anime drawing, or type your own.', pick: 'Pick your anime drawing', tiles: ['girl', 'ninja', 'bald', 'profile'], type: 'Or type your own', ideas: ['An anime girl with a sword', 'A chibi fox', 'An anime boy with headphones'] },
-    animals: { title: 'You want to draw animals.', point: 'Type any animal and we draw it in about 10 seconds.', pick: 'Pick your animal', tiles: ['dragon'], type: 'Or type any animal', ideas: ['A cute puppy', 'A kitten', 'A horse', 'A butterfly'] },
-    people: { title: 'You want to draw people.', point: 'Use a photo of them and we turn it into lines.', pick: 'Draw someone', tiles: ['profile'], photo: 'Use a photo of them' },
-    type: { title: 'You want to draw anything you think of.', point: 'Type it and we draw it in about 10 seconds.', pick: 'What do you want to draw?', tiles: [], type: 'Type anything', ideas: ['A cute puppy', 'A sports car', 'A rose', 'A butterfly'] },
-    photo: { title: 'You want to draw your own photos.', point: 'Your photo turns into lines on your phone. It never leaves it.', pick: 'Pick your photo', tiles: [], photo: 'Choose a photo' },
+    anime: { title: 'You want to draw anime.', pick: 'Pick your anime drawing', tiles: ['girl', 'ninja', 'bald', 'profile'], type: 'Or type your own', ideas: ['An anime girl with a sword', 'A chibi fox', 'An anime boy with headphones'] },
+    animals: { title: 'You want to draw animals.', pick: 'Pick your animal', tiles: ['dragon'], type: 'Or type any animal', ideas: ['A cute puppy', 'A kitten', 'A horse', 'A butterfly'] },
+    people: { title: 'You want to draw people.', pick: 'Draw someone', tiles: ['profile'], photo: 'Use a photo of them' },
+    type: { title: 'You want to draw anything you think of.', pick: 'What do you want to draw?', tiles: [], type: 'Type anything', ideas: ['A cute puppy', 'A sports car', 'A rose', 'A butterfly'] },
+    photo: { title: 'You want to draw your own photos.', pick: 'Pick your photo', tiles: [], photo: 'Choose a photo' },
   };
   const want = () => WANT[answers.want] || WANT.type;
-  const WHY = {
-    cantdraw: "Can't draw yet? You don't need to. You follow the lines.",
-    gift: 'Make it for someone: trace it, then color it in.',
-    looking: 'Have a look: your first drawing is free.',
-  };
   // The money line answers question 3 in their own terms.
   function priceLine() {
     if (weeklyPrice()) return `You pay ${money(weeklyPrice())} a week: ${money(yearly())} a year. Trace is $14.99 once.`;
@@ -312,8 +309,7 @@
     : { once: 'Pay once, like you prefer.', adds: 'No weekly fees.' }[answers.pay] || 'No subscription.');
   function renderForward() {
     $('forward-title').textContent = want().title;
-    const points = [WHY[answers.why], priceLine(), want().point].filter(Boolean);
-    $('forward-points').replaceChildren(...points.map(text => Object.assign(document.createElement('li'), { textContent: text })));
+    $('forward-line').textContent = priceLine();
     $('forward-price').textContent = shortPriceLine();
   }
   // How they move forward is their call, and it ends "About you" either way.

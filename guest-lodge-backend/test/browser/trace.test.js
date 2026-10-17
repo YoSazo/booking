@@ -856,19 +856,22 @@ test('About you: three questions, their answers read back beside the recording, 
     await answer(page, 'q3', 'once');
     await page.waitForSelector('#step-forward:not([hidden])');
     assert.equal(await page.textContent('#forward-title'), 'You want to draw anime.');
-    assert.deepEqual(await page.$$eval('#forward-points li', list => list.map(li => li.textContent)), [
-      "Can't draw yet? You don't need to. You follow the lines.",
-      "You'd rather pay once. Trace is $14.99 once.",
-      'Pick an anime drawing, or type your own.',
-    ]);
+    assert.equal(await page.textContent('#forward-line'), "You'd rather pay once. Trace is $14.99 once.");
     assert.equal(await page.textContent('#forward-price'), 'Pay once, like you prefer.');
     const sources = await page.$$eval('#forward-video source', list => list.map(source => [source.type, source.src]));
     assert.deepEqual(sources.map(([type]) => type), ['video/mp4', 'video/webm']);
-    assert.ok(sources.every(([, src]) => src.startsWith('https://res.cloudinary.com/')));
-    const look = await page.locator('#forward-look').boundingBox();
-    assert.ok(look.y + look.height <= 844 * 1.2, 'the choices sit right under the recording');
+    assert.ok(sources.every(([, src]) => src.startsWith('https://res.cloudinary.com/') && src.includes('so_6.6')), 'the recording starts where the tracing does');
+    // Full screen, like the ad: the recording fills the phone and every choice sits on it.
+    const video = await page.locator('#forward-video').boundingBox();
+    assert.deepEqual([video.x, video.y, video.width, video.height].map(Math.round), [0, 0, 390, 664]);
+    for (const id of ['#forward-title', '#forward-try', '#forward-pay', '#forward-look']) {
+      const box = await page.locator(id).boundingBox();
+      assert.ok(box.y >= 0 && box.y + box.height <= 664, `${id} is on the screen (${box.y}-${box.y + box.height})`);
+    }
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('reel-open')), true, 'the page behind stays put');
     await page.locator('#forward-try').tap();
     await page.waitForSelector('#step-mine:not([hidden])');
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('reel-open')), false);
     assert.equal(await page.textContent('#mine-title'), 'Pick your anime drawing');
     assert.deepEqual(await page.$$eval('#mine-grid .tile', list => list.map(tile => tile.dataset.id)), ['girl', 'ninja', 'bald', 'profile']);
     assert.equal(await page.isVisible('#mine-type'), true);
@@ -901,7 +904,7 @@ test('a tracing-app payer is asked what they pay, and sees their own yearly cost
     await answer(page, 'q3', '999');
     await page.waitForSelector('#step-forward:not([hidden])');
     assert.equal(await page.textContent('#forward-title'), 'You want to draw anything you think of.');
-    assert.match(await page.innerText('#forward-points'), /You pay \$9\.99 a week: \$519 a year\. Trace is \$14\.99 once\./);
+    assert.equal(await page.textContent('#forward-line'), 'You pay $9.99 a week: $519 a year. Trace is $14.99 once.');
     assert.equal(await page.textContent('#forward-price'), 'Instead of $519 a year.');
     await page.locator('#forward-try').tap();
     await page.waitForSelector('#step-mine:not([hidden])');
