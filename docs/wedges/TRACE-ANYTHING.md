@@ -8,12 +8,34 @@ free. After that it's **$14.99 once**: no subscription, nothing renews.
 This is the first consumer test after Claims. It's judged by the consumer
 money line: one paying customer must cost about $8–12 or less in ads.
 
+## The web flow (since Oct 17, 2026)
+
+Built like the booking engine (`hotel-booking-app/src/BookingPage.jsx` and
+`GuestInfoPage.jsx`), the only funnel that has had cold Meta traffic finish a
+card form. Its order: the name and the ad's promise, the thing from the ad as
+cards with **$0 today** and one button each, the choice read back as step 1
+of 3, a short step 2, and the scary ask explained right before it happens.
+
+1. **Cards:** "Trace Anything", the promise (`?hook=` picks it), then
+   Dragon, Anything You Type (Select opens a box with ideas, like the
+   calendar), Your Own Photo, and "More drawings". No price pitch; a quiet
+   "Already sure?" link opens the price.
+2. **Step 1 of 3, Your drawing:** the drawing on ruled paper, its name, and
+   "Trace it for $0 today".
+3. **Step 2 of 3, Set up:** paper, phone on a glass, follow the lines.
+4. **"Why we need your camera":** then iOS asks, then tracing (step 3).
+5. After Done: confetti and the price, for the first time.
+
+The app and buyers skip all of this: the picture grid opens the camera.
+Events: `TraceSelected:<card>`, `TracePicked` (Meta ViewContent),
+`TraceReviewed`, `TraceSetupDone`, `TraceCameraOk`, then `TraceStarted`.
+
 ## Where it lives
 
 - `guest-lodge-backend/trace.js`: page routes, `/api/trace/*`, unlock tokens.
   It's registered in `server.js` next to Inspect.
 - `guest-lodge-backend/trace-web/`: `index.html`, `trace.js`, `trace.css`,
-  `terms.html`, `pictures/*.svg` (original drawings). These files
+  `terms.html`, `pictures/*.webp` (line drawings, the cards' art and the setup photo). These files
   are served only through `trace.js`. They aren't under `public/`; the build
   script mirrors them into the iOS app's `www/trace` directory.
 - Tests: `test/trace.test.js` and `test/browser/trace.test.js` (Chromium with

@@ -7,26 +7,106 @@
 <title>Marketel Trace: trace any picture onto paper</title>
 <meta name="description" content="Point your phone at paper and trace any picture. $14.99 once. No subscription.">
 <link rel="icon" href="/marketel-frontdesk-icon.png" type="image/png">
-<link rel="stylesheet" href="/trace/trace.css?v=25">
+<link rel="stylesheet" href="/trace/trace.css?v=27">
 </head>
 <body>
 <header class="site-bar" id="site-bar"><div class="bar-row"><a class="brand" href="/trace"><img class="brand-icon" src="/marketel-frontdesk-icon.png" alt=""><img class="brand-wordmark" src="/marketel.svg" alt="Marketel"><span>Trace</span></a><button type="button" class="buy-top" id="buy-top">Buy $14.99</button></div></header>
 <main id="home" class="home">
-  <section class="step start" id="step-intro" aria-labelledby="intro-title">
-    <h1 id="intro-title" tabindex="-1"><span id="hook-1">Tracing app users:</span> <span class="green" id="hook-2">Stop paying weekly.</span></h1>
-    <div class="start-row">
-      <video class="demo" poster="https://res.cloudinary.com/dkmr3h5jb/video/upload/so_9,c_crop,w_1080,h_1960,y_110/w_480,q_auto/v1792256225/1016_1_iu6pq7.jpg" autoplay muted loop playsinline preload="auto" aria-label="A real recording: typing a dragon, then tracing it onto paper with a pencil"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_h264/v1792256225/1016_1_iu6pq7.mp4" type="video/mp4"><source src="https://res.cloudinary.com/dkmr3h5jb/video/upload/c_crop,w_1080,h_1960,y_110/w_480,q_auto:eco,ac_none,vc_vp9/v1792256225/1016_1_iu6pq7.webm" type="video/webm"></video>
-      <ul class="start-points">
-        <li>Other apps charge up to <strong>$24.99 a week</strong>.</li>
-        <li>This is <strong>$14.99 once</strong>. Yours forever.</li>
-        <li>Type what you want, or use your own photo. Trace it on paper.</li>
-      </ul>
+  <!-- The first screen, built like the booking engine's: the name, the ad's
+       promise, then the drawings as cards. Each card has one button. -->
+  <section class="step cards" id="step-cards" aria-labelledby="cards-title">
+    <header class="cards-head">
+      <h1 id="cards-title" tabindex="-1">Trace Anything</h1>
+      <p class="promise" id="promise">No Subscription. No Weekly Fees. No Account. Just Simple Tracing.</p>
+      <p class="where">Works in your phone's browser. Nothing to install.</p>
+    </header>
+
+    <article class="card pick-card" id="card-dragon">
+      <div class="card-art paper"><img src="/trace/pictures/dragon.webp" width="560" height="560" alt="A line drawing of a cute dragon spitting flames"></div>
+      <div class="card-body">
+        <h2>Dragon</h2>
+        <p class="card-desc">Bold, easy lines. Made for tracing.</p>
+        <div class="today"><p class="today-big"><strong>$0</strong> today</p><p class="today-sub">Your first drawing is free. No card needed.</p></div>
+        <button type="button" class="big select" id="select-dragon">Select Drawing</button>
+      </div>
+    </article>
+
+    <article class="card pick-card" id="card-type">
+      <div class="card-art paper type-art" aria-hidden="true">
+        <span class="mock-input">A cute cat wearing a crown</span>
+        <img src="/trace/pictures/cat-card.webp" width="400" height="400" alt="">
+      </div>
+      <div class="card-body">
+        <h2>Anything You Type</h2>
+        <p class="card-desc">Your pet, a car, a flower, a name. Type it and we draw it in about 10 seconds.</p>
+        <div class="today"><p class="today-big"><strong>$0</strong> today</p><p class="today-sub">Your first drawing is free. No card needed.</p></div>
+        <button type="button" class="big select" id="select-type" aria-expanded="false" aria-controls="type-form">Select</button>
+        <form class="type-form" id="type-form" novalidate hidden>
+          <label for="type-input">What do you want to draw?</label>
+          <input type="text" id="type-input" maxlength="200" autocomplete="off" enterkeyhint="go" placeholder="Type anything…">
+          <div class="ideas" id="ideas">
+            <button type="button" class="idea">A cute puppy</button>
+            <button type="button" class="idea">A sports car</button>
+            <button type="button" class="idea">A rose</button>
+            <button type="button" class="idea">A butterfly</button>
+          </div>
+          <button type="submit" class="big" id="type-go">Draw It</button>
+        </form>
+      </div>
+    </article>
+
+    <article class="card photo-card" id="card-photo">
+      <div class="photo-row">
+        <span class="photo-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+        <div><h2>Your Own Photo</h2><p class="card-desc">Any photo on your phone, turned into lines. It never leaves your phone.</p></div>
+      </div>
+      <label class="ghost select-photo" id="select-photo">Select Photo<input type="file" id="own-cards" accept="image/*"></label>
+    </article>
+
+    <h2 class="more-title">More drawings</h2>
+    <div class="grid" id="more-grid"></div>
+    <p class="buy-now"><button type="button" class="linklike" id="buy-now">Already sure? Unlock everything: $14.99 once</button></p>
+  </section>
+
+  <!-- Step 1 of 3: their drawing, read back, like the booking engine's
+       "Review your stay". -->
+  <section class="step flow" id="step-review" hidden aria-labelledby="review-title">
+    <button type="button" class="back-pill" id="review-back">‹ Back to drawings</button>
+    <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li><i></i>Set up</li><li><i></i>Trace</li></ol>
+    <h2 class="step-count" id="review-title" tabindex="-1">Step 1 of 3 — Your drawing</h2>
+    <div class="card details">
+      <div class="details-head"><h3>Your Drawing</h3><button type="button" class="edit" id="review-change">Change</button></div>
+      <div class="preview paper"><img id="review-img" alt=""></div>
+      <dl class="facts">
+        <div><dt>Drawing</dt><dd id="review-name">Dragon</dd></div>
+        <div><dt>Lines</dt><dd>Ready to trace</dd></div>
+        <div><dt>Paper</dt><dd>Any plain paper</dd></div>
+        <div><dt>Today</dt><dd id="review-today">$0</dd></div>
+      </dl>
     </div>
-    <button type="button" class="big" id="choose-try">I want to try it first</button>
-    <p class="under">Your first drawing is free. No card needed.</p>
-    <button type="button" class="ghost" id="choose-pay">I'm ready: pay $14.99</button>
-    <p class="under" id="pay-under">One time. No subscription. If it doesn't work on your phone, full refund within 7 days.</p>
-    <p class="error" id="choose-error" hidden></p>
+    <div class="card free-box" id="review-free">
+      <p class="free-title">Trace it for $0 today</p>
+      <p class="free-sub">No card needed. No account.</p>
+      <p class="free-after">Want more drawings after this one? <strong>$14.99 once</strong>, yours forever. No subscription.</p>
+    </div>
+    <div class="sticky-cta"><button type="button" class="big" id="review-go">Continue to Set Up</button></div>
+  </section>
+
+  <!-- Step 2 of 3: how to set the phone up, before the camera asks. -->
+  <section class="step flow" id="step-setup" hidden aria-labelledby="setup-title">
+    <button type="button" class="back-pill" id="setup-back">‹ Back to your drawing</button>
+    <ol class="progress" aria-hidden="true"><li class="on"><i></i>Your drawing</li><li class="on"><i></i>Set up</li><li><i></i>Trace</li></ol>
+    <h2 class="step-count" id="setup-title" tabindex="-1">Step 2 of 3 — Set up</h2>
+    <div class="card setup">
+      <h3>Set up in 10 seconds</h3>
+      <ol class="how">
+        <li><b>1</b><span><strong>Paper on the table.</strong> Any plain paper.</span></li>
+        <li><b>2</b><span><strong>Phone on a glass above it.</strong> A cup, a can or a stack of books works too.</span></li>
+        <li><b>3</b><span><strong>Follow the lines with a pencil.</strong> You see the drawing on your paper.</span></li>
+      </ol>
+      <figure class="setup-photo"><img src="/trace/pictures/setup-photo.webp" width="720" height="540" alt="Through the phone: a drawing's lines on lined paper, and a pencil tracing them"><figcaption>What you'll see: the lines on your paper.</figcaption></figure>
+    </div>
+    <div class="sticky-cta"><button type="button" class="big" id="setup-go">Continue to Trace</button></div>
   </section>
 
   <section class="step" id="step-pick" hidden aria-labelledby="pick-title">
@@ -112,6 +192,15 @@
   </div>
 </section>
 
+<section class="modal" id="camera-why" hidden role="dialog" aria-modal="true" aria-labelledby="why-title">
+  <span class="why-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>
+  <h2 id="why-title">Why we need your camera</h2>
+  <p class="why-body">Your camera shows <strong>your paper under the drawing</strong>, so you can follow the lines with a pencil. <strong>Nothing is recorded</strong> or sent anywhere.</p>
+  <ul class="why-checks"><li id="why-free">Free today. No card needed.</li><li>Your camera stays on your phone</li></ul>
+  <button type="button" class="big" id="why-go">Got It — Open My Camera</button>
+  <button type="button" class="linklike why-later" id="why-later">Not now</button>
+</section>
+
 <section class="sheet" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcome-title">
   <h2 id="welcome-title">You're in.</h2>
   <p class="sub" id="welcome-body">Trace anything, for good.</p>
@@ -137,6 +226,6 @@
 
 <div class="busy" id="busy" hidden><div class="spinner"></div><p id="busy-text">One moment…</p></div>
 
-<script src="/trace/trace.js?v=25" defer></script>
+<script src="/trace/trace.js?v=27" defer></script>
 </body>
 </html>

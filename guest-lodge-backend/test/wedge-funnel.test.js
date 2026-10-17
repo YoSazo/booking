@@ -230,7 +230,7 @@ test('Marketel Trace has its own ladder, side cards and ad-click filter', () => 
   assert.equal(row('paid').people, 1);
   assert.equal(row('traced30').aside, true);
   assert.equal(f.split, null, 'no phone/computer split for Trace');
-  assert.deepEqual(f.tiles.map(([, key]) => key), ['landed', 'chose', 'picked', 'started', 'traced30', 'paywall', 'tapped', 'checkout', 'paid']);
+  assert.deepEqual(f.tiles.map(([, key]) => key), ['landed', 'picked', 'reviewed', 'setup', 'started', 'traced30', 'paywall', 'tapped', 'checkout', 'paid']);
   const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
   assert.equal(card('picked')['Describe it (AI)'], 1);
   assert.equal(card('picked')['A starter picture'], 1);
@@ -273,4 +273,37 @@ test('Marketel Trace: the three pages are counted, and paying on page 2 cannot m
   const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
   assert.equal(card('chose')['Tapped "I want to try it first"'], 1);
   assert.equal(card('chose')['Tapped "I\'m ready: pay $14.99" (straight to Stripe)'], 1);
+});
+
+test('Marketel Trace: the cards and the three steps are counted, and stay off the page for ranges without them', () => {
+  const { buildWedgeFunnel, definitionFor } = require('../wedge-funnel');
+  const at = '2026-10-17T22:00:00Z';
+  const ev = (name, visitorId, detail = null) => ({ id: `${name}-${visitorId}-${detail}`, name, visitorId, detail, accountId: null, createdAt: at });
+  const events = [
+    // one taps the dragon, reads it back, sets up, allows the camera and traces
+    ev('TraceLanded', 'v_all', 'web'), ev('TraceSelected', 'v_all', 'dragon'), ev('TracePicked', 'v_all', 'starter'), ev('TraceReviewed', 'v_all'),
+    ev('TraceSetupDone', 'v_all'), ev('TraceCameraOk', 'v_all'), ev('TraceCameraAsked', 'v_all'), ev('TraceStarted', 'v_all', 'starter'),
+    // one opens the type box and leaves at step 1
+    ev('TraceLanded', 'v_typed', 'web'), ev('TraceSelected', 'v_typed', 'type'), ev('TracePicked', 'v_typed', 'ai'),
+    // one only looks
+    ev('TraceLanded', 'v_look', 'web'),
+  ];
+  const trace = definitionFor('trace');
+  const f = buildWedgeFunnel(events, trace);
+  const row = key => f.steps.find(step => step.key === key);
+  assert.equal(row('selected').people, 2);
+  assert.equal(row('picked').people, 2);
+  assert.equal(row('reviewed').people, 1);
+  assert.equal(row('setup').people, 1);
+  assert.equal(row('cameraok').people, 1);
+  assert.equal(row('started').ofPrevious, 0.5, 'the steps are asides: started is measured against picked');
+  assert.equal(row('chose'), undefined, 'the old one-screen row hides when nobody used it');
+  const card = key => Object.fromEntries(f.branches.find(b => b.key === key).steps.map(s => [s.label, s.people]));
+  assert.equal(card('cards').Dragon, 1);
+  assert.equal(card('cards')['Anything You Type'], 1);
+  assert.equal(f.branches.some(b => b.key === 'chose'), false);
+  for (const name of ['TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk']) assert.ok(trace.visitorEvents.includes(name), name);
+  // A range from before the cards shows none of their rows.
+  const old = buildWedgeFunnel([ev('TraceLanded', 'v_old', 'web'), ev('TracePicked', 'v_old', 'starter')], trace);
+  for (const key of ['selected', 'reviewed', 'setup', 'cameraok']) assert.equal(old.steps.some(s => s.key === key), false, key);
 });

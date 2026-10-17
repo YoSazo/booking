@@ -7,6 +7,7 @@
   // The starters, line drawings that look like what the page promises. Each has a
   // small thumbnail for the grid and a larger see-through picture to trace.
   const PICTURES = [
+    { id: 'dragon', label: 'Dragon' },
     { id: 'girl', label: 'Anime girl' }, { id: 'ninja', label: 'Ninja boy' }, { id: 'bald', label: 'Bald hero' },
     { id: 'profile', label: 'Boy in profile' }, { id: 'doll', label: 'Stitched doll' }, { id: 'creature', label: 'Grinning creature' },
   ];
@@ -128,7 +129,7 @@
   const mayOpen = key => unlocked() || !freeKey() || freeKey() === key;
 
   // ----- Screens and sheets -----
-  const sheets = ['paywall', 'welcome', 'restore'];
+  const sheets = ['paywall', 'welcome', 'restore', 'camera-why'];
   let checkoutGeneration = 0;
   function openSheet(id) {
     checkoutGeneration++;
@@ -147,8 +148,16 @@
       ? '<strong>Unlocked.</strong> Trace anything, for good.'
       : canBuy() ? 'First drawing free. Then <strong>$14.99 once</strong> to trace anything, for good. No subscription.'
       : 'Your first drawing is free.';
-    // Buying straight away is always one tap, from the bar.
-    $('buy-top').hidden = unlocked() || !canBuy() || currentStep === 'intro';
+    // The bar's Buy belongs to the picture grid; the first screen has its own
+    // quiet link, and the guided steps ask for nothing.
+    $('buy-top').hidden = unlocked() || !canBuy() || currentStep !== 'pick';
+    $('buy-now').hidden = unlocked() || !canBuy();
+    // The cards say $0 today while the free drawing is unused, and the price once it is.
+    const spent = !unlocked() && !!freeKey();
+    for (const box of document.querySelectorAll('.today')) {
+      box.querySelector('.today-big').innerHTML = spent ? '<strong>$14.99</strong> once' : '<strong>$0</strong> today';
+      box.querySelector('.today-sub').textContent = spent ? 'Your free drawing is used. Pay once and trace anything, for good.' : 'Your first drawing is free. No card needed.';
+    }
     $('restore-open').hidden = unlocked();
     document.querySelector('.restore-dot').hidden = unlocked();
     for (const tile of document.querySelectorAll('.tile')) tile.classList.toggle('is-free', !unlocked() && freeKey() === `starter:${tile.dataset.id}`);
@@ -162,7 +171,7 @@
     if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur();
     window.scrollTo(0, 0);
   }
-  function showHome() { stopTracing(); document.documentElement.classList.remove('tracing'); $('tracer').hidden = true; $('camera-help').hidden = true; $('home').hidden = false; showStep('pick'); renderHome(); }
+  function showHome() { stopTracing(); document.documentElement.classList.remove('tracing'); $('tracer').hidden = true; $('camera-help').hidden = true; $('home').hidden = false; showStep(homeStep()); renderHome(); }
   if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (!$('tracer').hidden) window.scrollTo(0, 0); });
   if (inApp) {
     // The page draws its own Marketel bar, so the app's glass bar stands down.
@@ -179,29 +188,30 @@
   }
 
 
-  // ----- Two steps on the web: the ad's call-out with a plain choice, then the pictures -----
-  // The first screen continues the ad: the same call-out (per ad with ?hook=),
-  // a real recording, then "try it first" or "pay now". Back works, and the app,
-  // a buyer and anyone who has made the choice start at the pictures.
-  const STEPS = ['intro', 'pick'];
+  // ----- The web's guided path, built like the booking engine -----
+  // The first screen is the name, the ad's promise and the drawings as cards,
+  // each with one button. A choice is read back (step 1 of 3), the phone is set
+  // up (step 2), the camera is explained right before it asks, then tracing
+  // (step 3). Money appears after the first drawing. The app and buyers go
+  // straight from the picture grid to the camera.
+  const STEPS = ['cards', 'review', 'setup', 'pick'];
+  // Each ad can open with its own promise under the name (?hook=).
   const HOOKS = {
-    tracing: ['Tracing app users:', 'Stop paying weekly.'],
-    cantdraw: ["Can't draw?", 'You can now.'],
+    tracing: 'No Subscription. No Weekly Fees. No Account. Just Simple Tracing.',
+    cantdraw: "Can't Draw? You Can Now. No Lessons. No Subscription. Just Trace.",
   };
-  const hook = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
-  $('hook-1').textContent = hook[0]; $('hook-2').textContent = hook[1];
-  const startStep = () => (inApp || unlocked() || store.get('trace.seen') === '1' || params.get('paid') || params.get('unlock') || params.get('cancelled') ? 'pick' : 'intro');
+  $('promise').textContent = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
+  const homeStep = () => (inApp || unlocked() ? 'pick' : 'cards');
   let currentStep = 'pick';
+  let chosen = null;
   function showStep(name, { push = false } = {}) {
     if (name !== 'pick' && (inApp || unlocked())) name = 'pick';
+    // Steps 1 and 2 need a drawing; Back or Forward into them after a reload has none.
+    if ((name === 'review' || name === 'setup') && !chosen) name = homeStep();
     currentStep = name;
     resetCheckout();
     for (const step of STEPS) $(`step-${step}`).hidden = step !== name;
-    // The first screen has its own pay button; the bar's is for the pictures.
-    $('buy-top').hidden = name === 'intro' || unlocked() || !canBuy();
-    const demo = document.querySelector('.demo');
-    if (demo) { if (name === 'intro') demo.play().catch(() => {}); else demo.pause(); }
-    if (name !== 'intro') store.set('trace.seen', '1');
+    $('buy-top').hidden = name !== 'pick' || unlocked() || !canBuy();
     const state = { traceStep: name };
     if (push) history.pushState(state, ''); else history.replaceState(state, '');
     window.scrollTo(0, 0);
@@ -209,29 +219,72 @@
     if (title) title.focus({ preventScroll: true });
   }
   window.addEventListener('popstate', event => {
-    const name = event.state && STEPS.includes(event.state.traceStep) ? event.state.traceStep : startStep();
+    const name = event.state && STEPS.includes(event.state.traceStep) ? event.state.traceStep : homeStep();
     if (!$('tracer').hidden) return;
+    closeSheets();
     showStep(name);
   });
-  $('choose-try').addEventListener('click', () => { track('TraceChose', 'try', { once: false }); showStep('pick', { push: true }); });
+  // A picked drawing: on the guided path it is read back first; elsewhere the camera opens.
+  function choose(picture, guided) {
+    if (!guided) return startTracing(picture);
+    settleViewport();
+    chosen = picture;
+    $('review-img').src = picture.lines;
+    $('review-name').textContent = picture.label;
+    showStep('review', { push: true });
+  }
+  $('review-go').addEventListener('click', () => { track('TraceReviewed', '', { once: false }); showStep('setup', { push: true }); });
+  for (const id of ['review-back', 'review-change', 'setup-back']) $(id).addEventListener('click', () => history.back());
+  // "Why we need your camera", right before iOS asks, like the booking
+  // engine's "Why we need your card".
+  $('setup-go').addEventListener('click', () => {
+    track('TraceSetupDone', '', { once: false });
+    $('why-free').textContent = unlocked() ? 'Yours for good. Trace anything.' : 'Free today. No card needed.';
+    openSheet('camera-why');
+  });
+  $('why-go').addEventListener('click', () => { track('TraceCameraOk', '', { once: false }); closeSheets(); if (chosen) startTracing(chosen); });
+  $('why-later').addEventListener('click', closeSheets);
 
   // ----- Picking a picture -----
-  const grid = $('grid');
-  for (const picture of PICTURES) {
+  const grid = $('grid'), more = $('more-grid');
+  const tileFor = picture => {
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'tile'; button.dataset.id = picture.id;
     button.setAttribute('aria-label', `Trace the ${picture.label.toLowerCase()}`);
     const img = document.createElement('img'); img.src = `/trace/pictures/${picture.id}-t.webp`; img.alt = '';
     button.append(img);
-    button.addEventListener('click', () => pickStarter(picture.id));
-    grid.append(button);
+    return button;
+  };
+  for (const picture of PICTURES) {
+    const tile = tileFor(picture);
+    tile.addEventListener('click', () => pickStarter(picture.id));
+    grid.append(tile);
+    // The first screen shows the dragon as its own card.
+    if (picture.id === 'dragon') continue;
+    const card = tileFor(picture);
+    card.addEventListener('click', () => { track('TraceSelected', 'more', { once: false }); pickStarter(picture.id); });
+    more.append(card);
   }
+  $('select-dragon').addEventListener('click', () => { track('TraceSelected', 'dragon', { once: false }); pickStarter('dragon'); });
   function pickStarter(id) {
+    const guided = currentStep === 'cards';
     track('TracePicked', 'starter', { once: false });
     const key = `starter:${id}`;
     if (!mayOpen(key)) return showPaywall('second');
-    startTracing({ key, lines: `/trace/pictures/${id}.webp`, photo: '', kind: 'starter' });
+    const picture = PICTURES.find(p => p.id === id);
+    choose({ key, lines: `/trace/pictures/${id}.webp`, photo: '', kind: 'starter', label: picture ? picture.label : 'Your drawing' }, guided);
   }
+  // "Anything You Type": Select opens the box on the card, like the booking
+  // engine's calendar; an idea fills it and draws straight away.
+  $('select-type').addEventListener('click', () => {
+    track('TraceSelected', 'type', { once: false });
+    $('select-type').hidden = true; $('select-type').setAttribute('aria-expanded', 'true');
+    $('type-form').hidden = false;
+    $('type-input').focus();
+  });
+  for (const idea of document.querySelectorAll('.idea')) idea.addEventListener('click', () => { $('type-input').value = idea.textContent; describe($('type-input'), true); });
+  $('type-form').addEventListener('submit', event => { event.preventDefault(); describe($('type-input'), true); });
+  $('select-photo').addEventListener('click', () => track('TraceSelected', 'photo', { once: false }));
   // ----- Describe it: AI line art to trace -----
   // The drawing comes back as black lines on white. White becomes see-through
   // so only the lines float over the camera, the same as a photo's sketch.
@@ -253,16 +306,16 @@
     ctx.putImageData(pixels, 0, 0);
     return toBlobUrl(canvas, 'image/png');
   }
-  $('describe-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    const prompt = $('describe').value.replace(/\s+/g, ' ').trim();
-    if (prompt.length < 2) { $('describe').focus(); return; }
+  async function describe(input, guided) {
+    const prompt = input.value.replace(/\s+/g, ' ').trim();
+    if (prompt.length < 2) { input.focus(); return; }
     track('TraceAIAsked', '', { once: false });
     track('TracePicked', 'ai', { once: false });
     const key = `ai:${prompt.toLowerCase()}`;
     if (!mayOpen(key)) return showPaywall('second');
-    $('describe').blur();
-    if (aiCache.has(key)) return startTracing({ key, lines: aiCache.get(key), photo: '', kind: 'ai' });
+    input.blur();
+    const label = prompt.charAt(0).toUpperCase() + prompt.slice(1);
+    if (aiCache.has(key)) return choose({ key, lines: aiCache.get(key), photo: '', kind: 'ai', label }, guided);
     busy('Drawing your picture… about 10 seconds');
     try {
       const { image } = await api('/generate', { prompt, visitorId, ...(token ? { token } : {}) });
@@ -270,15 +323,17 @@
       aiCache.set(key, lines);
       busy('');
       track('TraceAIShown');
-      startTracing({ key, lines, photo: '', kind: 'ai' });
+      choose({ key, lines, photo: '', kind: 'ai', label }, guided);
     } catch (error) {
       busy('');
       if (error.status === 402) return showPaywall('ai');
       alert(error.message || "The drawing didn't come out. Please try again.");
     }
-  });
+  }
+  $('describe-form').addEventListener('submit', event => { event.preventDefault(); describe($('describe'), false); });
 
-  $('own').addEventListener('change', async event => {
+  async function ownPhoto(event) {
+    const guided = event.target.id === 'own-cards';
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
     if (!file) return;
@@ -289,12 +344,14 @@
     try {
       const picture = await photoToLines(file);
       busy('');
-      startTracing({ key, ...picture, kind: 'photo' });
+      choose({ key, ...picture, kind: 'photo', label: 'Your photo' }, guided);
     } catch (error) {
       busy('');
       alert(error.message || 'That photo could not be opened. Try another one.');
     }
-  });
+  }
+  $('own').addEventListener('change', ownPhoto);
+  $('own-cards').addEventListener('change', ownPhoto);
 
   // ----- Photo to pencil lines, on the phone -----
   // A pencil sketch: the photo in grey, divided by a blurred negative of itself
@@ -588,7 +645,7 @@
     // The comparison carries the price; the old big price line stays for no one.
     $('pay-price').hidden = true;
     $('pay-elsewhere').hidden = buy;
-    $('pay-title').textContent = !buy ? 'That was your free drawing' : paywallReason === 'home' || paywallReason === 'top' ? 'Unlock everything'
+    $('pay-title').textContent = !buy ? 'That was your free drawing' : ['home', 'top', 'now'].includes(paywallReason) ? 'Unlock everything'
       : paywallReason === 'done' ? 'Keep drawing. Forever.' : 'Keep tracing anything';
   }
   function showPaywall(reason, note = '') {
@@ -601,17 +658,15 @@
     openSheet('paywall');
   }
   $('buy-top').addEventListener('click', () => showPaywall('top'));
+  $('buy-now').addEventListener('click', () => showPaywall('now'));
   $('pay-later').addEventListener('click', () => { track('TracePaywallClosed', '', { once: false }); closeSheets(); });
   $('backdrop').addEventListener('click', () => { if (!$('paywall').hidden) track('TracePaywallClosed', '', { once: false }); closeSheets(); });
-  // Forget any checkout still loading and put both Pay buttons back. A response
+  // Forget any checkout still loading and put the Pay button back. A response
   // that arrives later sees a new generation and does nothing: no redirect, no event.
   function resetCheckout() {
     checkoutGeneration++;
     $('buy').disabled = false; $('buy').textContent = 'Unlock forever: $14.99';
-    $('choose-pay').disabled = false; $('choose-pay').textContent = "I'm ready: pay $14.99";
-    $('choose-error').hidden = true;
   }
-  // One checkout for every Pay button: the sheet's, and the choice step's.
   // `error` is the element that says what went wrong, next to the button tapped.
   async function checkout({ button, idleText, error }) {
     if (!canBuy()) return;
@@ -641,11 +696,6 @@
     }
   }
   $('buy').addEventListener('click', () => checkout({ button: $('buy'), idleText: 'Unlock forever: $14.99', error: $('pay-error') }));
-  // "Pay $14.99 once" on the choice step goes straight to Stripe: no second price page.
-  $('choose-pay').addEventListener('click', () => {
-    track('TraceChose', 'pay', { once: false });
-    checkout({ button: $('choose-pay'), idleText: "I'm ready: pay $14.99", error: $('choose-error') });
-  });
   // Coming back from Stripe with the browser's back button restores this page
   // from memory with the button still saying "Opening…".
   window.addEventListener('pageshow', event => { if (event.persisted) { resetCheckout(); busy(''); } });
@@ -667,7 +717,7 @@
           : 'Trace anything, for good.';
         // Paid in Safari for the app: the way back in.
         $('welcome-app').hidden = !(params.get('app') === '1' && !inApp);
-        renderHome();
+        showStep('pick'); renderHome();
         openSheet('welcome');
         return;
       } catch (error) {
@@ -695,7 +745,7 @@
       token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
       purchasePixel(pending);
       track('TraceUnlocked', inApp ? 'app' : 'return');
-      renderHome();
+      showStep('pick'); renderHome();
       $('welcome-title').textContent = 'You\'re in.'; $('welcome-go').textContent = 'Pick a picture';
       $('welcome-body').textContent = 'Trace anything, for good. Your receipt is in your email.';
       $('welcome-app').hidden = true;
@@ -719,7 +769,7 @@
       await api('/verify', { token: value });
       token = value; store.set('trace.unlock', token);
       track('TraceUnlocked', 'link');
-      busy(''); renderHome();
+      busy(''); showStep('pick'); renderHome();
       $('welcome-title').textContent = 'Unlocked on this phone';
       $('welcome-body').textContent = 'Trace anything, for good.';
       openSheet('welcome');
@@ -767,7 +817,7 @@
       const result = await api('/restore-code', { email, code });
       token = result.token; store.set('trace.unlock', token); store.del('trace.pending');
       track('TraceUnlocked', 'code');
-      renderHome();
+      showStep('pick'); renderHome();
       $('welcome-title').textContent = 'Unlocked on this phone'; $('welcome-go').textContent = 'Pick a picture';
       $('welcome-body').textContent = 'Trace anything, for good.'; $('welcome-app').hidden = true;
       openSheet('welcome');
@@ -788,8 +838,8 @@
     for (const key of ['paid', 'unlock', 'cancelled', 'app']) clean.searchParams.delete(key);
     history.replaceState(null, '', clean.pathname + clean.search);
   }
+  showStep(homeStep());
   renderHome();
-  showStep(startStep());
   if (paid) confirmPayment(paid);
   else if (unlockLink) unlockFromLink(unlockLink);
   else if (cancelled) { store.del('trace.pending'); track('TraceCheckoutCancelled'); showPaywall('cancelled', 'No payment was taken.'); }

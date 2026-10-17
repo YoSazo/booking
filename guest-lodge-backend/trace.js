@@ -31,6 +31,7 @@ const TRACE_EVENTS = Object.freeze([
   'TraceFaded', 'TraceLocked', 'TraceMoved', 'TraceTraced30', 'TraceTraced120', 'TraceDone',
   'TracePaywallShown', 'TracePaywallClosed', 'TraceCheckoutTapped', 'TraceCheckoutOpened', 'TraceCheckoutFailed',
   'TraceCheckoutCancelled', 'TraceUnlocked', 'TraceRestoreAsked', 'TraceAIAsked', 'TraceAIShown',
+  'TraceSelected', 'TraceReviewed', 'TraceSetupDone', 'TraceCameraOk',
 ]);
 
 // "Describe it": OpenAI draws simple line art to trace. Every picture costs

@@ -159,33 +159,101 @@ html.tracing, html.tracing body { overflow: hidden; height: 100%; overscroll-beh
 .compare .us strong { color: var(--green-dark); font-size: 22px; }
 @media (prefers-reduced-motion: reduce) { .sheet:not([hidden]) { animation: none; } }
 
-/* Three steps on one page: the idea, the choice, the pictures. Only one shows. */
+/* One step shows at a time. */
 .step { padding-top: 4px; }
 .step:not([hidden]) { animation: step-in 260ms cubic-bezier(.32, .72, 0, 1); }
 @keyframes step-in { from { opacity: 0; transform: translateY(10px); } }
 .step-title { font-size: 28px; line-height: 1.1; letter-spacing: -0.9px; margin: 14px 0 14px; }
 .step :focus { outline: none; }
-#intro-title { font-size: 32px; margin: 12px 0 8px; }
-.green { color: var(--green); }
-#choose-pay { min-height: 56px; font-size: 18px; border-color: var(--green); color: var(--green); margin-top: 10px; }
-#choose-pay[disabled] { opacity: 0.7; }
 @media (prefers-reduced-motion: reduce) { .step:not([hidden]) { animation: none; } }
 
+/* The first screen, laid out like the booking engine: the name, the ad's
+   promise, then cards with a picture, a $0 today box and one button. */
+.cards-head { text-align: center; padding: 8px 4px 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+.cards-head h1 { font-size: 42px; line-height: 1.02; letter-spacing: -1.6px; color: var(--green); font-weight: 800; margin: 4px 0 8px; }
+.promise { font-size: 17px; line-height: 1.38; color: #4c5b52; margin: 0 auto 8px; max-width: 360px; }
+.where { font-size: 14px; color: var(--muted); margin: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 10px 28px #2e7d5b12; overflow: hidden; margin-bottom: 16px; }
+/* Ruled paper, so a drawing looks like it will on the table. */
+.paper { background: repeating-linear-gradient(to bottom, #fffef9 0 25px, #d9e6f2 25px 26px); }
+.card-art { position: relative; aspect-ratio: 16 / 10; border-bottom: 1px solid var(--line); }
+.card-art img { position: absolute; inset: 5% 4%; width: 92%; height: 90%; object-fit: contain; }
+.type-art .mock-input { position: absolute; top: 12px; left: 14px; right: 14px; }
+.type-art img { inset: 64px 4% 4%; height: auto; width: 92%; height: calc(96% - 64px); }
+.mock-input { background: #fff; border: 2px solid var(--green); border-radius: 12px; padding: 8px 12px; font-size: 15px; font-weight: 600; color: var(--ink); box-shadow: 0 4px 12px #2e7d5b1f; }
+.mock-input::after { content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: var(--green); animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.card-body { padding: 16px 18px 18px; }
+.card-body h2, .photo-card h2 { font-size: 26px; line-height: 1.1; letter-spacing: -0.7px; margin: 0 0 6px; }
+.card-desc { color: var(--muted); font-size: 16px; margin: 0 0 14px; }
+.today { background: linear-gradient(135deg, #f0fbf5, #dcf5e8); border: 1.5px solid #ade3c7; border-radius: 16px; padding: 10px 16px 12px; margin-bottom: 14px; }
+.today-big { margin: 0; font-size: 18px; color: var(--muted); font-weight: 600; }
+.today-big strong { font-size: 36px; color: var(--green); font-weight: 800; letter-spacing: -1.2px; margin-right: 4px; }
+.today-sub { margin: 0; color: var(--ink); font-size: 15px; }
+.type-form { margin-top: 2px; }
+.type-form label { display: block; font-weight: 700; margin-bottom: 8px; }
+.type-form input { width: 100%; min-height: 54px; border-radius: 14px; border: 2px solid var(--green); background: #fff; padding: 0 14px; font-size: 17px; color: var(--ink); }
+.type-form input:focus { outline: none; box-shadow: 0 0 0 4px #2e7d5b22; }
+.ideas { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+.idea { border: 1.5px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 8px 13px; font-weight: 600; font-size: 15px; }
+.idea:active { background: var(--green-pale); border-color: var(--green); }
+.photo-card { padding: 16px 18px 18px; }
+.photo-row { display: flex; gap: 14px; align-items: flex-start; }
+.photo-icon { flex: none; width: 52px; height: 52px; border-radius: 16px; background: var(--green-pale); color: var(--green); display: grid; place-items: center; }
+.photo-icon svg { width: 28px; height: 28px; }
+.photo-card .card-desc { margin-bottom: 12px; }
+.select-photo { position: relative; overflow: hidden; display: grid; place-items: center; margin-top: 0; border-color: var(--green); color: var(--green); font-size: 18px; }
+.select-photo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.more-title { font-size: 20px; letter-spacing: -0.4px; margin: 24px 0 10px; }
+.buy-now { text-align: center; color: var(--muted); font-size: 15px; margin: 20px 0 0; }
 
-/* The first screen: the ad's call-out, a real recording, two plain choices. */
-.start h1 { font-size: 30px; line-height: 1.05; letter-spacing: -1px; text-transform: uppercase; margin: 12px 0 12px; }
-.start h1 span { display: block; }
-.start-row { display: grid; grid-template-columns: 38% 1fr; gap: 14px; align-items: center; margin-bottom: 16px; }
-.demo { width: 100%; aspect-ratio: 480 / 870; object-fit: cover; border-radius: 18px; background: #dfe8e2; box-shadow: 0 10px 26px #1a2b2226; }
-.start-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.start-points li { font-size: 16px; line-height: 1.3; color: var(--ink); padding-left: 22px; position: relative; }
-.start-points li::before { content: ""; position: absolute; left: 2px; top: 5px; width: 10px; height: 6px; border-left: 3px solid var(--green); border-bottom: 3px solid var(--green); transform: rotate(-45deg); }
-.start .under { text-align: center; color: var(--muted); font-size: 14px; margin: 6px 0 12px; }
-.start #choose-pay { margin-top: 0; }
-@media (max-height: 600px) {
-  .start h1 { font-size: 25px; margin: 8px 0 8px; }
-  .start-row { grid-template-columns: 32% 1fr; gap: 12px; margin-bottom: 10px; }
-  .start-points { gap: 8px; }
-  .start-points li { font-size: 15px; }
-  .start .under { margin: 4px 0 8px; font-size: 13px; }
-}
+/* Steps 1 and 2: a back pill, three pills for progress, "Step N of 3", the
+   card, and one button that stays at the bottom of the screen. */
+.flow { padding-bottom: 100px; }
+.back-pill { border: 0; border-radius: 999px; background: var(--green); color: #fff; font-weight: 700; font-size: 16px; min-height: 42px; padding: 0 16px; margin: 10px 0 14px; box-shadow: 0 6px 16px #2e7d5b33; }
+.progress { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
+.progress::before { content: ""; position: absolute; top: 13px; left: 17%; right: 17%; height: 3px; background: #d6dfd9; }
+.progress li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.progress i { width: 66px; height: 28px; border-radius: 999px; border: 2.5px solid #d6dfd9; background: #fff; }
+.progress li.on { color: var(--ink); }
+.progress li.on i { background: var(--green); border-color: var(--green); }
+.step-count { text-align: center; font-size: 17px; font-weight: 700; color: var(--muted); letter-spacing: -0.2px; margin: 18px 0 14px; }
+.details, .setup, .free-box { padding: 16px; }
+.details-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.details h3, .setup h3 { font-size: 22px; letter-spacing: -0.5px; margin: 0; }
+.edit { border: 1.5px solid var(--green); background: #fff; color: var(--green); border-radius: 10px; min-height: 38px; padding: 0 14px; font-weight: 700; font-size: 15px; }
+.preview { position: relative; aspect-ratio: 16 / 10; border-radius: 16px; border: 1px solid var(--line); overflow: hidden; }
+.preview img { position: absolute; inset: 4%; width: 92%; height: 92%; object-fit: contain; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 0; }
+.facts div { background: #f5f8f6; border-radius: 14px; padding: 10px 12px; }
+.facts dt { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.facts dd { margin: 2px 0 0; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.free-box { background: linear-gradient(135deg, #f0fbf5, #dcf5e8); border-color: #ade3c7; }
+.free-title { margin: 0; font-size: 22px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.4px; }
+.free-sub { margin: 2px 0 10px; font-weight: 600; }
+.free-after { margin: 0; padding-top: 10px; border-top: 1px solid #ade3c7; color: #3b4a41; font-size: 15px; }
+.how { list-style: none; margin: 12px 0 14px; padding: 0; display: grid; gap: 12px; }
+.how li { display: flex; gap: 12px; align-items: flex-start; color: #3b4a41; }
+.how b { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: 15px; }
+.how strong { color: var(--ink); }
+.setup-photo { margin: 0; }
+.setup-photo img { display: block; width: 100%; height: auto; border-radius: 16px; }
+.setup-photo figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 6px; }
+.sticky-cta { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 14px 16px calc(14px + var(--safe-bottom)); background: linear-gradient(to top, var(--paper) 72%, #eff4f000); }
+.sticky-cta .big { max-width: 488px; margin: 0 auto; }
+
+/* "Why we need your camera": in the middle of the screen, over the backdrop. */
+.modal { position: fixed; z-index: 31; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); max-width: 440px; margin: 0 auto; background: #fff; border-radius: 26px; padding: 26px 22px 18px; text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); }
+.modal:not([hidden]) { animation: modal-in 260ms cubic-bezier(.32, .72, 0, 1); }
+@keyframes modal-in { from { opacity: 0; transform: translateY(-46%) scale(0.97); } }
+.why-icon { width: 66px; height: 66px; margin: 0 auto 14px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; box-shadow: 0 8px 22px #2e7d5b44; }
+.why-icon svg { width: 32px; height: 32px; }
+.modal h2 { font-size: 26px; line-height: 1.15; letter-spacing: -0.6px; margin: 0 0 8px; }
+.why-body { color: var(--muted); margin: 0 0 14px; }
+.why-body strong { color: var(--ink); }
+.why-checks { list-style: none; padding: 0; margin: 0 auto 18px; display: inline-grid; gap: 8px; text-align: left; font-weight: 700; }
+.why-checks li { position: relative; padding-left: 32px; }
+.why-checks li::before { content: ""; position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--green); }
+.why-checks li::after { content: ""; position: absolute; left: 7px; top: 6px; width: 8px; height: 5px; border-left: 2.5px solid var(--green); border-bottom: 2.5px solid var(--green); transform: rotate(-45deg); }
+.why-later { display: block; margin: 12px auto 0; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .modal:not([hidden]), .mock-input::after { animation: none; } }
