@@ -91,12 +91,12 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.locator('#pay-later').tap();
     await page.waitForSelector('#paywall', { state: 'hidden' });
 
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     // waitForFunction evaluates a string, which the page's own CSP forbids; poll instead.
     await until(page, () => { const v = document.getElementById('cam'); return !!v.srcObject && v.readyState >= 2; });
     assert.equal(await page.isVisible('#camera-note'), false, 'the camera note goes once the camera shows the paper');
-    assert.match(await page.getAttribute('#overlay', 'src'), /cat\.svg$/);
+    assert.match(await page.getAttribute('#overlay', 'src'), /girl\.webp$/);
     assert.equal(await page.isVisible('#hint'), true);
 
     // The fade slider changes how see-through the picture is.
@@ -129,10 +129,10 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.waitForSelector('#paywall', { state: 'hidden' });
 
     // The free drawing can be reopened; a second picture asks.
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await page.locator('#back').tap();
-    await page.locator('.tile[data-id="fish"]').tap();
+    await page.locator('.tile[data-id="ninja"]').tap();
     await page.waitForSelector('#paywall:not([hidden])');
     assert.equal(await page.isVisible('#tracer'), false);
 
@@ -150,7 +150,7 @@ test('pick a picture, trace it over the camera, then meet the paywall and pay', 
     await page.locator('#welcome-go').tap();
     assert.match(await page.textContent('#note'), /Unlocked/);
     assert.equal(await page.isVisible('#buy-top'), false, 'no Buy in the bar once unlocked');
-    await page.locator('.tile[data-id="fish"]').tap();
+    await page.locator('.tile[data-id="ninja"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
 
@@ -200,7 +200,7 @@ test("inside Facebook's browser a camera they said no to asks again, with Safari
   try {
     await page.goto(`${w.base}/trace`);
     await toPicker(page);
-    await page.locator('.tile[data-id="heart"]').tap();
+    await page.locator('.tile[data-id="bald"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.match(await page.textContent('#help-title'), /Allow your camera/);
     assert.match(await page.textContent('#help-body'), /Tap Try again, then Allow/);
@@ -208,7 +208,7 @@ test("inside Facebook's browser a camera they said no to asks again, with Safari
     assert.equal(await page.isVisible('#help-copy'), true);
     assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
     await page.locator('#help-home').tap();
-    await page.locator('.tile[data-id="fish"]').tap();
+    await page.locator('.tile[data-id="ninja"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.equal(await page.isVisible('#paywall'), false, 'a different picture is still free because nothing was traced');
     await settle();
@@ -226,7 +226,7 @@ test('in Safari a denied camera explains where to allow it', async () => {
   try {
     await page.goto(`${w.base}/trace`);
     await toPicker(page);
-    await page.locator('.tile[data-id="flower"]').tap();
+    await page.locator('.tile[data-id="profile"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.match(await page.textContent('#help-title'), /Allow your camera/);
     assert.match(await page.textContent('#help-body'), /Website Settings/);
@@ -250,7 +250,7 @@ test('the owner opening ?notrack=1 records nothing', async () => {
   try {
     await page.goto(`${w.base}/trace?notrack=1`);
     await toPicker(page);
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await settle();
     assert.deepEqual(w.events, []);
@@ -278,7 +278,7 @@ test('inside the Marketel app: the glass bar stands down, US buyers pay in Safar
     const shell = () => page.evaluate(() => window.__shell);
     assert.deepEqual((await shell()).find(m => m.type === 'visibility'), { type: 'visibility', visible: false });
     assert.match(await page.textContent('#note'), /\$14\.99 once/);
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await page.locator('#done').tap();
     await page.waitForSelector('#buy:visible');
@@ -315,7 +315,7 @@ test('inside the app outside the US there is no price and no buy button, only th
     await page.waitForTimeout(100);
     assert.doesNotMatch(await page.textContent('#note'), /\$/);
     await page.evaluate(() => localStorage.setItem('trace.free', 'starter:cat'));
-    await page.locator('.tile[data-id="fish"]').tap();
+    await page.locator('.tile[data-id="ninja"]').tap();
     await page.waitForSelector('#paywall:not([hidden])');
     assert.equal(await page.isVisible('#buy'), false);
     assert.equal(await page.isVisible('#pay-price'), false);
@@ -391,7 +391,7 @@ test('while iOS asks for the camera, the page says why; the note goes once the c
     });
     await page.goto(`${w.base}/trace`);
     await toPicker(page);
-    await page.locator('.tile[data-id="house"]').tap();
+    await page.locator('.tile[data-id="doll"]').tap();
     await page.waitForSelector('#camera-note:not([hidden])');
     assert.match(await page.textContent('#camera-note'), /Nothing is recorded/);
     await page.evaluate(() => window.__allow());
@@ -446,7 +446,7 @@ test('Back while camera permission is pending stops a late stream and preserves 
     });
     await page.goto(`${w.base}/trace`);
     await toPicker(page);
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#tracer:not([hidden])');
     await page.locator('#back').tap();
     await page.evaluate(() => window.__allowCamera());
@@ -469,7 +469,7 @@ test('a camera playback failure offers help without spending the free drawing', 
     });
     await page.goto(`${w.base}/trace`);
     await toPicker(page);
-    await page.locator('.tile[data-id="cat"]').tap();
+    await page.locator('.tile[data-id="girl"]').tap();
     await page.waitForSelector('#camera-help:not([hidden])');
     assert.equal(await page.evaluate(() => localStorage.getItem('trace.free')), null);
     assert.equal(await page.evaluate(() => !!document.getElementById('cam').srcObject), false);

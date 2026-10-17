@@ -99,8 +99,9 @@ test('the page is served with the camera allowed and nothing else', async () => 
     assert.match(await terms.text(), /never uploaded/);
     const script = await fetch(`${base}/trace/trace.js`);
     assert.equal(script.status, 200);
-    for (const picture of ['butterfly', 'flower', 'cat', 'heart', 'house', 'fish']) {
-      assert.equal((await fetch(`${base}/trace/pictures/${picture}.svg`)).status, 200, picture);
+    for (const picture of ['girl', 'ninja', 'bald', 'profile', 'doll', 'creature']) {
+      assert.equal((await fetch(`${base}/trace/pictures/${picture}.webp`)).status, 200, picture);
+      assert.equal((await fetch(`${base}/trace/pictures/${picture}-t.webp`)).status, 200, `${picture} thumbnail`);
     }
   });
 });

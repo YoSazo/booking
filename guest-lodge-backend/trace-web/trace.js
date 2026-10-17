@@ -4,9 +4,11 @@
 // photos stay on the phone: only anonymous step names are sent to the server.
 (() => {
   const $ = id => document.getElementById(id);
+  // The starters, line drawings that look like what the page promises. Each has a
+  // small thumbnail for the grid and a larger see-through picture to trace.
   const PICTURES = [
-    { id: 'butterfly', label: 'Butterfly' }, { id: 'flower', label: 'Flower' }, { id: 'cat', label: 'Cat' },
-    { id: 'heart', label: 'Heart' }, { id: 'house', label: 'House' }, { id: 'fish', label: 'Fish' },
+    { id: 'girl', label: 'Anime girl' }, { id: 'ninja', label: 'Ninja boy' }, { id: 'bald', label: 'Bald hero' },
+    { id: 'profile', label: 'Boy in profile' }, { id: 'doll', label: 'Stitched doll' }, { id: 'creature', label: 'Grinning creature' },
   ];
   const REVIEWS = [
     { name: "Emily Carter", stars: 5, quote: "I was paying every week for another tracing app so finding this for $14.99 ONCE was honestly a relief. Does exactly what I need and I don't have to download anything." },
@@ -222,7 +224,7 @@
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'tile'; button.dataset.id = picture.id;
     button.setAttribute('aria-label', `Trace the ${picture.label.toLowerCase()}`);
-    const img = document.createElement('img'); img.src = `/trace/pictures/${picture.id}.svg`; img.alt = '';
+    const img = document.createElement('img'); img.src = `/trace/pictures/${picture.id}-t.webp`; img.alt = '';
     button.append(img);
     button.addEventListener('click', () => pickStarter(picture.id));
     grid.append(button);
@@ -231,7 +233,7 @@
     track('TracePicked', 'starter', { once: false });
     const key = `starter:${id}`;
     if (!mayOpen(key)) return showPaywall('second');
-    startTracing({ key, lines: `/trace/pictures/${id}.svg`, photo: '', kind: 'starter' });
+    startTracing({ key, lines: `/trace/pictures/${id}.webp`, photo: '', kind: 'starter' });
   }
   // ----- Describe it: AI line art to trace -----
   // The drawing comes back as black lines on white. White becomes see-through
