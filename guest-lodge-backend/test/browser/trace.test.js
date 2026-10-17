@@ -529,6 +529,9 @@ test('three steps: the idea, the choice, the pictures; Back walks them in revers
     assert.equal(await page.isVisible('#step-intro'), true);
     assert.equal(await page.isVisible('.tile'), false);
     assert.match(await page.textContent('#intro-title'), /Pay once\.\s*No subscription\./);
+    // The star line sits under the headline and the page still fits one screen.
+    assert.match(await page.textContent('#trust'), /4\.6 · 24 reviews/);
+    assert.equal(await page.locator('#trust .review-stars').count(), 1);
     const gotIt = await page.locator('#intro-go').boundingBox();
     assert.ok(gotIt.y + gotIt.height <= 664, `Get started is on the first screen (bottom at ${gotIt.y + gotIt.height})`);
     await page.locator('#intro-go').tap();
@@ -540,6 +543,18 @@ test('three steps: the idea, the choice, the pictures; Back walks them in revers
     assert.equal(await page.isVisible('#choose-pay'), true);
     const chooseBottom = await page.locator('#choose-pay').boundingBox();
     assert.ok(chooseBottom.y + chooseBottom.height <= 664, 'both buttons are on the first screen');
+    // The moving tape of reviews sits under the choice. Its track is sized by its cards,
+    // not by their unclamped text, so half of it is exactly one run and the loop has no gap.
+    assert.equal(await page.locator('.tape-card').count(), 48);
+    const tape = await page.evaluate(() => {
+      const track = document.getElementById('tape-track');
+      const [first] = track.querySelectorAll('.tape-run');
+      return { track: track.getBoundingClientRect().width, run: first.getBoundingClientRect().width, page: document.documentElement.scrollWidth, view: innerWidth };
+    });
+    assert.ok(Math.abs(tape.track - tape.run * 2) < 2, `the loop has no gap (track ${tape.track}, run ${tape.run})`);
+    assert.ok(tape.page <= tape.view, 'no sideways scroll');
+    const tapeBox = await page.locator('#tape').boundingBox();
+    assert.ok(tapeBox.y + tapeBox.height <= 664, `the tape is on the first screen of the choice (bottom at ${tapeBox.y + tapeBox.height})`);
     // Back goes to the idea, forward to the choice again.
     await page.goBack();
     await page.waitForSelector('#step-intro:not([hidden])');
