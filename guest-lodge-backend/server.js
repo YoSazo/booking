@@ -12022,7 +12022,7 @@ const wedgeFunnel = require('./wedge-funnel');
 const wedgeRegistry = require('./wedges/registry');
 // On the dashboard: Marketel Trace (the test running ads, first), then the
 // report wedges that are live and in the approved app.
-const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, ...wedgeRegistry.load().all
+const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, { id: 'payoff', product: 'Payoff preorders' }, ...wedgeRegistry.load().all
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
     .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');
@@ -12072,7 +12072,7 @@ app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
     try {
         if (String(req.body?.confirm || '') !== 'RESET') return res.status(400).json({ success: false, message: 'Send confirm: "RESET".' });
         const tool = String(req.body?.tool || '');
-        if (tool !== 'trace' && !wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
+        if (!['trace', 'payoff'].includes(tool) && !wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
         const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.definitionFor(tool).visitorEvents] } } });
         await prisma.inspectEvent.create({ data: { name: wedgeFunnel.RESET_EVENT, tool } });
         console.log(`wedge funnel reset: removed ${deleted.count} ${tool} visitor steps`);
@@ -18868,6 +18868,12 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
     : marketelStripe;
+const payoffRegistration = require('./payoff').registerPayoff(app, {
+    prisma,
+    mail: emailTransporter,
+    stripe: inspectStripe,
+    isExcludedEmail: email => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(normalizeExcludedEmail(email)),
+});
 // Trace owns its fulfillment; the existing verified webhook dispatches its
 // checkout events without changing Claims' or Inspect's payment handlers.
 const traceRegistration = require('./trace').registerTrace(app, {
@@ -18889,7 +18895,8 @@ require('./inspect').registerInspect(app, {
     isCapiExcludedEmail: (email) => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(
         normalizeExcludedEmail(email)
     ),
-    handleTraceStripeEvent: traceRegistration.handleStripeEvent,
+    handleTraceStripeEvent: async (event, req) => await payoffRegistration.handleStripeEvent(event, req)
+        || await traceRegistration.handleStripeEvent(event, req),
 });
 telemetry.setupRoutes(app);
 
