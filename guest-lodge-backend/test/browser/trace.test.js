@@ -41,7 +41,10 @@ async function world({ drawing = null } = {}) {
 
 // Tracing time comes from Date.now; tests move it forward instead of waiting.
 const skipAhead = (page, ms) => page.evaluate(ms => { window.__skew = (window.__skew || 0) + ms; }, ms);
-async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
+// The questions are every new web visitor's first screen. Tests of the cards
+// and what follows them start a browser that has skipped them (?journey=0);
+// the journey's own tests ask for it (journey: true, or ?journey=1).
+async function phone({ userAgent = IPHONE, camera = 'fake', journey = false } = {}) {
   const args = camera === 'fake' ? ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] : [];
   const browser = await chromium.launch({ args });
   const context = await browser.newContext({ viewport: { width: 390, height: 664 }, isMobile: true, hasTouch: true, userAgent });
@@ -49,6 +52,7 @@ async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
     navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error('Permission denied'), { name: 'NotAllowedError' }));
   });
   await context.addInitScript(() => { const real = Date.now.bind(Date); Date.now = () => real() + (window.__skew || 0); });
+  if (!journey) await context.addInitScript(() => { try { if (!localStorage.getItem('trace.journeyPreview')) localStorage.setItem('trace.journeyPreview', '0'); } catch { /* about:blank */ } });
   const page = await context.newPage();
   page.setDefaultTimeout(8000);
   const errors = [];
@@ -59,8 +63,8 @@ async function phone({ userAgent = IPHONE, camera = 'fake' } = {}) {
 }
 const names = events => events.map(e => e.name + (e.detail ? `:${e.detail}` : ''));
 const settle = () => new Promise(resolve => setTimeout(resolve, 300));
-// The web starts on the cards (like the booking engine's rooms); the app and a
-// buyer start on the picture grid. Either way a visible tile is ready.
+// With the questions skipped the web starts on the cards (like the booking
+// engine's rooms); the app and a buyer start on the picture grid. Either way a visible tile is ready.
 async function toPicker(page) {
   await page.waitForSelector('.tile:visible');
 }
@@ -831,7 +835,7 @@ test('a buyer never sees the cards: unlocked, the page opens on the pictures and
   } finally { await browser.close(); w.close(); }
 });
 
-// "About you" (behind ?journey=1 until it is the default).
+// "About you" (the default for web visitors; ?journey=0 skips it).
 const answer = async (page, step, value) => {
   await page.waitForSelector(`#step-${step}:not([hidden])`);
   await page.locator(`#step-${step} .answer[data-value="${value}"]:visible`).tap();
@@ -992,19 +996,20 @@ test('people and photo answers lead to a photo first; Back walks back through th
   } finally { await browser.close(); w.close(); }
 });
 
-test('the journey is a preview until it is the default: ?journey=1 turns it on, ?journey=0 off', async () => {
+test('the journey is the default: ?journey=0 turns it off on this browser, ?journey=1 back on', async () => {
   const w = await world();
-  const { browser, page } = await phone();
+  const { browser, page } = await phone({ journey: true });
   try {
     await page.goto(`${w.base}/trace`);
-    await page.waitForSelector('#step-cards:not([hidden])');
-    assert.equal(await page.isVisible('#step-q1'), false, 'the cards stay the default');
-    await page.goto(`${w.base}/trace?journey=1`);
     await page.waitForSelector('#step-q1:not([hidden])');
-    await page.goto(`${w.base}/trace`);
-    await page.waitForSelector('#step-q1:not([hidden])', { timeout: 3000 });
+    assert.equal(await page.isVisible('#step-cards'), false, 'a new web visitor starts with the questions');
     await page.goto(`${w.base}/trace?journey=0`);
     await page.waitForSelector('#step-cards:not([hidden])');
+    await page.goto(`${w.base}/trace`);
+    await page.waitForSelector('#step-cards:not([hidden])', { timeout: 3000 });
+    assert.equal(await page.isVisible('#step-q1'), false, 'the opt-out is remembered');
+    await page.goto(`${w.base}/trace?journey=1`);
+    await page.waitForSelector('#step-q1:not([hidden])');
     // The app and buyers never see it.
     await page.goto(`${w.base}/trace?journey=1&paid=cs_test_paidSession1234`);
     await page.waitForSelector('#welcome:not([hidden])');

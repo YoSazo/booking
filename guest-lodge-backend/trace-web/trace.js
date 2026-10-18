@@ -194,7 +194,7 @@
 
 
   // ----- The web's guided path -----
-  // "About you" (behind ?journey=1 until it is the default): three questions in
+  // "About you" (every web visitor's first screen; ?journey=0 skips it): three questions in
   // their own words, their answers read back beside the real recording, then
   // their choice: try it first, pay now, or look around. Trying shows drawings
   // that match their answer. The cards (built like the booking engine: the
@@ -212,12 +212,14 @@
   const hook = HOOKS[String(params.get('hook') || '').toLowerCase()] || HOOKS.tracing;
   $('promise').textContent = hook.promise;
   $('q-hook').textContent = hook.callout;
-  const JOURNEY_DEFAULT = false;
+  // On for every web visitor; ?journey=0 turns it off on this device (and
+  // ?journey=1 back on), so the cards can still be seen first.
+  const JOURNEY_DEFAULT = true;
   const journeyOn = (() => {
     const asked = params.get('journey');
-    if (asked === '1') store.set('trace.journeyPreview', '1');
-    if (asked === '0') store.del('trace.journeyPreview');
-    return JOURNEY_DEFAULT || store.get('trace.journeyPreview') === '1';
+    if (asked === '1' || asked === '0') store.set('trace.journeyPreview', asked);
+    const kept = store.get('trace.journeyPreview');
+    return kept === '1' || kept === '0' ? kept === '1' : JOURNEY_DEFAULT;
   })();
   let answers = {};
   try { answers = JSON.parse(store.get('trace.journey.v1') || '{}') || {}; } catch { answers = {}; }

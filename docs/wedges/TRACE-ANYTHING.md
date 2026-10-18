@@ -15,9 +15,9 @@ Built like the booking engine (`hotel-booking-app/src/BookingPage.jsx` and
 card form, then given an "About you" opening so visitors put themselves into
 it, the way a viewer reads themselves into a video.
 
-**About you** (behind `?journey=1` until `JOURNEY_DEFAULT` in
-`trace-web/trace.js` is true; the choice is remembered per browser,
-`?journey=0` clears it):
+**About you** (every web visitor who has not finished it and has not
+bought; `JOURNEY_DEFAULT` in `trace-web/trace.js`; `?journey=0` skips it on
+that browser and `?journey=1` brings it back):
 
 1. "What brought you here?" (the ad's call-out from `?hook=` sits above it).
 2. "What do you want to draw?" (anime, animals, people, anything I type, my
@@ -30,7 +30,7 @@ it, the way a viewer reads themselves into a video.
 5. Trying shows drawings that match their answer (step 2 of 3), then the
    read-back.
 
-**Everyone else** (the default, looking around, returning visitors) gets the
+**Everyone else** (looking around, returning visitors, `?journey=0`) gets the
 cards: "Trace Anything", the promise, Dragon, Anything You Type (Select opens
 a box with ideas), Your Own Photo, "More drawings", and a quiet "Already
 sure?" link to the price.
