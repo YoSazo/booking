@@ -12020,9 +12020,8 @@ app.get('/api/meta-insights', adminAuth, async (req, res) => {
 // booking and support dashboard lives on at /funnel/legacy.
 const wedgeFunnel = require('./wedge-funnel');
 const wedgeRegistry = require('./wedges/registry');
-// On the dashboard: Marketel Trace (the test running ads, first), then the
-// report wedges that are live and in the approved app.
-const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, { id: 'payoff', product: 'Payoff' }, ...wedgeRegistry.load().all
+// Payoff opens first; the other live products remain available in the selector.
+const dashboardWedges = () => [{ id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }, ...wedgeRegistry.load().all
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
     .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');

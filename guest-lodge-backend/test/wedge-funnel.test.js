@@ -346,3 +346,20 @@ test('Marketel Trace: "About you" shows why they came, what they want, how they 
   for (const key of ['answered1', 'answered2', 'answered3', 'forward']) assert.equal(old.steps.some(s => s.key === key), false, key);
   for (const key of ['why', 'want', 'subs', 'forward']) assert.equal(old.branches.some(b => b.key === key), false, key);
 });
+
+test('Payoff counts checkout, purchases, delivery and sources separately', () => {
+  const definition = require('../wedge-funnel').definitionFor('payoff');
+  const events = [ev('PayoffLanded', 'v_a'), ev('PayoffLanded', 'v_a'), ev('PayoffLanded', 'v_b'),
+    ev('PayoffFrom', 'v_a', { detail: 'ad' }), ev('PayoffFrom', 'v_b', { detail: 'direct' }),
+    ev('PayoffOrderViewed', 'v_a'), ev('PayoffCheckoutTapped', 'v_a'), ev('PayoffCheckoutOpened', 'v_a'),
+    ev('PayoffPaid', 'v_a'), ev('PayoffConfirmationEmailed', 'v_a'), ev('PayoffCheckoutFailed', 'v_b')];
+  const funnel = buildWedgeFunnel(events, definition);
+  assert.equal(funnel.steps.find(s => s.key === 'landed').people, 2);
+  assert.equal(funnel.steps.find(s => s.key === 'paid').people, 1);
+  assert.equal(funnel.steps.find(s => s.key === 'paid').ofLanded, 0.5);
+  assert.equal(funnel.steps.find(s => s.key === 'emailed').people, 1);
+  assert.equal(funnel.steps.find(s => s.key === 'failed').people, 1);
+  assert.deepEqual(funnel.branches[0].steps.map(s => s.people), [1, 0, 1, 0]);
+  assert.equal(onlyAdClicks(events, events, definition.fromEvent).length, 8);
+  for (const name of ['PayoffPaid', 'PayoffConfirmationEmailed']) assert.equal(definition.visitorEvents.has(name), false);
+});
