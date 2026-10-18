@@ -124,3 +124,56 @@ test('bad inputs are cleaned, not trusted', () => {
   assert.equal(debts[0].type, 'card');
   assert.equal(E.plan([]).fastest, null);
 });
+
+test('cash-flow: repeats land on the right days, month ends clamp, and nothing before today counts', () => {
+  const on = (item, from, to) => E.occurrences(item, E.toDay(from), E.toDay(to)).map(E.fromDay);
+  assert.deepEqual(on({ date: '2026-01-31', repeat: 'monthly' }, '2026-02-01', '2026-04-30'), ['2026-02-28', '2026-03-31', '2026-04-30']);
+  assert.deepEqual(on({ date: '2026-10-02', repeat: 'biweekly' }, '2026-10-18', '2026-11-20'), ['2026-10-30', '2026-11-13']);
+  assert.deepEqual(on({ date: '2026-10-16', repeat: 'weekly' }, '2026-10-18', '2026-10-31'), ['2026-10-23', '2026-10-30']);
+  assert.deepEqual(on({ date: '2026-10-10', repeat: 'twice-monthly' }, '2026-10-01', '2026-11-30'), ['2026-10-15', '2026-11-01', '2026-11-15']);
+  assert.deepEqual(on({ date: '2026-10-01', repeat: 'once' }, '2026-10-18', '2026-12-31'), []);
+  assert.deepEqual(on({ date: '2026-12-25', repeat: 'once' }, '2026-10-18', '2026-12-31'), ['2026-12-25']);
+});
+
+test('cash-flow: the balance runs day by day and the first shortfall names the bill that caused it', () => {
+  const result = E.cashflow({ today: '2026-10-18', balance: 50000, months: 2, items: [
+    { id: 'pay', name: 'Paycheck', kind: 'income', amount: 120000, repeat: 'biweekly', date: '2026-10-30' },
+    { id: 'rent', name: 'Rent', kind: 'bill', amount: 140000, repeat: 'monthly', date: '2026-11-01' },
+    { id: 'car', name: 'Car', kind: 'bill', amount: 31000, repeat: 'monthly', date: '2026-10-20' },
+  ] });
+  const day = date => result.daily.find(entry => entry.date === date);
+  assert.equal(result.daily[0].date, '2026-10-18');
+  assert.equal(result.daily.at(-1).date, '2026-12-17');
+  assert.equal(day('2026-10-20').balance, 19000);
+  assert.equal(day('2026-10-30').balance, 139000);
+  assert.equal(day('2026-11-01').balance, -1000);
+  assert.deepEqual(result.shortfalls[0], { date: '2026-11-01', balance: -1000, event: { id: 'rent', name: 'Rent', kind: 'bill', amount: -140000 } });
+  assert.equal(result.lowest.balance, Math.min(...result.daily.map(entry => entry.balance)));
+  assert.equal(result.end, 50000 + result.totalIn - result.totalOut);
+});
+
+test('cash-flow: income lands before bills on the same day, and the horizon stops at 18 months', () => {
+  const same = E.cashflow({ today: '2026-10-18', balance: 0, months: 1, items: [
+    { id: 'b', name: 'Bill', kind: 'bill', amount: 5000, repeat: 'once', date: '2026-10-20' },
+    { id: 'i', name: 'Pay', kind: 'income', amount: 5000, repeat: 'once', date: '2026-10-20' },
+  ] });
+  assert.equal(same.shortfalls.length, 0);
+  const long = E.cashflow({ today: '2026-10-18', months: 40 });
+  assert.equal(long.daily.at(-1).date, '2028-04-17');
+});
+
+test('spending reset: days kept, slips, a streak, and money saved from the paused things', () => {
+  const reset = { start: '2026-10-10', days: 14, paused: [{ name: 'Takeout', weekly: 7000 }, { name: 'Coffee', weekly: 2100 }],
+    log: { '2026-10-10': { kept: true }, '2026-10-11': { kept: true }, '2026-10-12': { kept: false, spent: 1500 }, '2026-10-14': { kept: true }, '2026-10-15': { kept: true } } };
+  const summary = E.resetSummary(reset, '2026-10-16');
+  assert.equal(summary.day, 7);
+  assert.equal(summary.kept, 4);
+  assert.equal(summary.slipped, 1);
+  assert.equal(summary.missed, 1); // the 13th; today isn't missed yet
+  assert.equal(summary.streak, 2);
+  assert.equal(summary.perDay, 1300);
+  assert.equal(summary.saved, 1300 * 5 - 1500);
+  assert.equal(summary.done, false);
+  assert.equal(summary.end, '2026-10-23');
+  assert.equal(E.resetSummary(reset, '2026-10-24').done, true);
+});

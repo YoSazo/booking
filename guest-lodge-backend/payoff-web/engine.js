@@ -130,5 +130,93 @@
     return { debts, plans: results, fastest: fastest && fastest.key, minimums: results.find(result => result.key === 'minimums'), warnings };
   }
 
-  return { plan, simulate, clean, order, addMonths, monthlyInterest, PLANS, MAX_MONTHS, MAX_DEBTS };
+  // Cash-flow calendar. Dates are 'YYYY-MM-DD' and handled as UTC day numbers,
+  // so a time zone never moves a bill to another day.
+  const toDay = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000;
+  const fromDay = day => new Date(day * 86400000).toISOString().slice(0, 10);
+  const daysIn = (year, month) => new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const REPEATS = Object.freeze(['once', 'weekly', 'biweekly', 'twice-monthly', 'monthly']);
+
+  // Every day in [from, to] that an item lands on.
+  function occurrences(item, from, to) {
+    const first = toDay(item.date), days = [];
+    if (item.repeat === 'weekly' || item.repeat === 'biweekly') {
+      const step = item.repeat === 'weekly' ? 7 : 14;
+      for (let day = first + Math.max(0, Math.ceil((from - first) / step)) * step; day <= to; day += step) days.push(day);
+    } else if (item.repeat === 'monthly' || item.repeat === 'twice-monthly') {
+      const date = new Date(first * 86400000);
+      let year = date.getUTCFullYear(), month = date.getUTCMonth();
+      const want = item.repeat === 'monthly' ? [date.getUTCDate()] : [1, 15];
+      for (;;) {
+        const monthStart = Date.UTC(year, month, 1) / 86400000;
+        if (monthStart > to) break;
+        for (const dayOfMonth of want) {
+          const day = monthStart + Math.min(dayOfMonth, daysIn(year, month)) - 1;
+          if (day >= first && day >= from && day <= to) days.push(day);
+        }
+        month += 1;
+        if (month === 12) { month = 0; year += 1; }
+      }
+    } else if (first >= from && first <= to) days.push(first);
+    return days;
+  }
+
+  // Projected balance for every day from today through `months` ahead.
+  // Items: { id, name, kind: 'income' | 'bill', amount (cents), repeat, date }.
+  // On a day with both, income lands first.
+  function cashflow({ today, balance = 0, items = [], months = 3 }) {
+    const from = toDay(today);
+    const start = new Date(from * 86400000);
+    const to = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + Math.min(18, Math.max(1, months)), start.getUTCDate()) / 86400000 - 1;
+    const byDay = new Map();
+    for (const item of items) {
+      if (!(item.amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(item.date || '')) continue;
+      const signed = item.kind === 'income' ? item.amount : -item.amount;
+      for (const day of occurrences(item, from, to)) {
+        if (!byDay.has(day)) byDay.set(day, []);
+        byDay.get(day).push({ id: item.id, name: item.name, kind: item.kind === 'income' ? 'income' : 'bill', amount: signed });
+      }
+    }
+    const daily = [], shortfalls = [];
+    let running = Math.round(balance), lowest = null, short = false, totalIn = 0, totalOut = 0;
+    for (let day = from; day <= to; day += 1) {
+      const events = (byDay.get(day) || []).sort((a, b) => b.amount - a.amount);
+      for (const event of events) {
+        running += event.amount;
+        if (event.amount > 0) totalIn += event.amount; else totalOut -= event.amount;
+      }
+      const date = fromDay(day);
+      daily.push({ date, balance: running, events });
+      if (!lowest || running < lowest.balance) lowest = { date, balance: running };
+      if (running < 0 && !short) shortfalls.push({ date, balance: running, event: events.filter(event => event.amount < 0).at(-1) || null });
+      short = running < 0;
+    }
+    return { daily, lowest, shortfalls, end: running, totalIn, totalOut };
+  }
+
+  // Spending reset: { start, days, paused: [{ name, weekly (cents) }], log: { date: { kept, spent } } }.
+  // Saved is what the paused things usually cost on the logged days, minus
+  // whatever was spent on them anyway.
+  function resetSummary(reset, today) {
+    const length = Math.max(1, Math.round(reset.days) || 7);
+    const first = toDay(reset.start), now = toDay(today);
+    const perDay = (reset.paused || []).reduce((sum, item) => sum + Math.max(0, Math.round(item.weekly) || 0), 0) / 7;
+    let kept = 0, slipped = 0, spent = 0, streak = 0, missed = 0;
+    const days = [];
+    for (let i = 0; i < length; i += 1) {
+      const date = fromDay(first + i), entry = reset.log?.[date];
+      const status = entry ? (entry.kept ? 'kept' : 'slipped') : first + i < now ? 'missed' : first + i === now ? 'today' : 'ahead';
+      days.push({ date, status, spent: entry?.spent || 0 });
+      if (status === 'kept') { kept += 1; streak += 1; }
+      if (status === 'slipped') { slipped += 1; streak = 0; }
+      if (status === 'missed') { missed += 1; streak = 0; }
+      if (entry) spent += Math.max(0, Math.round(entry.spent) || 0);
+    }
+    const day = Math.min(length, Math.max(1, now - first + 1));
+    return { length, day, done: now - first + 1 > length, kept, slipped, missed, streak, spent,
+      saved: Math.max(0, Math.round(perDay * (kept + slipped)) - spent), perDay: Math.round(perDay), days, end: fromDay(first + length - 1) };
+  }
+
+  return { plan, simulate, clean, order, addMonths, monthlyInterest, PLANS, MAX_MONTHS, MAX_DEBTS,
+    cashflow, occurrences, resetSummary, toDay, fromDay, REPEATS };
 });

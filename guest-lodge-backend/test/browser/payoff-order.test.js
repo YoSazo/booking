@@ -6,7 +6,7 @@ const path = require('node:path');
 const { chromium } = require('playwright-core');
 const { registerPayoff, PRODUCT, VERSION } = require('../../payoff');
 
-async function world(fn, { rejectFirst = false, unpaid = false } = {}) {
+async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null } = {}) {
   const app = express(), creates = [], emails = [], rows = new Map();
   const paid = { id: 'cs_test_browserOrder123', mode: 'payment', status: 'complete', payment_status: unpaid ? 'unpaid' : 'paid', currency: 'usd', amount_total: 3300, livemode: false,
     metadata: { product: PRODUCT, offerVersion: VERSION, addons: '[]' }, customer_details: { email: 'buyer@example.test' } };
@@ -30,25 +30,29 @@ async function world(fn, { rejectFirst = false, unpaid = false } = {}) {
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...(userAgent ? { userAgent } : {}) });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://checkout.stripe.com/**', route => route.fulfill({ body: 'Stripe checkout fixture' }));
     await fn({ page, base, creates, emails }); assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 
-test('the order page opens one Stripe checkout for Payoff alone, no preorder steps', async () => world(async ({ page, base, creates }) => {
+test('the order page offers both extras unchecked and opens one Stripe checkout with the ones picked', async () => world(async ({ page, base, creates }) => {
   await page.goto(base + '/payoff/order');
   const button = page.locator('#buy-button'); await page.locator('#buy-button:enabled').waitFor();
-  assert.equal(await page.locator('.preorder-notice, #preorder-consent, .order-bump').count(), 0);
+  assert.equal(await page.locator('.preorder-notice, #preorder-consent').count(), 0);
+  assert.equal(await page.locator('.order-bump').count(), 2);
+  assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   assert.equal(await page.locator('#order-total').innerText(), '$33.00');
+  assert.doesNotMatch(await page.locator('.order-bump').first().innerText(), /preorder|in development/i);
   await button.click(); assert.equal(creates.length, 0);
   await page.locator('#email').fill('buyer@example.test');
+  await page.locator('#cashflow').check(); await page.locator('#reset').check();
+  assert.equal(await page.locator('#order-total').innerText(), '$64.00');
   await button.click();
   await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(creates.length, 1);
-  assert.equal(creates[0].params.line_items.length, 1);
-  assert.equal(creates[0].params.line_items[0].price_data.unit_amount, 3300);
+  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 6400);
   assert.equal(creates[0].params.customer_email, 'buyer@example.test');
   assert.match(creates[0].params.custom_text.submit.message, /opens as soon as you pay/);
 }));
@@ -58,8 +62,12 @@ test('failed checkout is retryable and reuses its idempotency key; cancelling sa
   await page.locator('#buy-button').click();
   await page.locator('#checkout-status:has-text("try again")').waitFor();
   assert.equal(await page.locator('#buy-button').isEnabled(), true);
+  await page.locator('#cashflow').check();
   await page.locator('#buy-button').click(); await page.waitForURL('https://checkout.stripe.com/**');
-  assert.equal(creates.length, 2); assert.equal(creates[0].options.idempotencyKey, creates[1].options.idempotencyKey);
+  assert.equal(creates.length, 2);
+  await page.goto(base + '/payoff/order');
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#cashflow').isChecked(), true, 'the pick survives a return from Stripe');
   await page.goto(base + '/payoff/order?cancelled=1');
   await page.locator('#buy-button:enabled').waitFor();
   assert.match(await page.locator('#checkout-status').innerText(), /not charged/);
@@ -84,3 +92,66 @@ test('unpaid return shows pending confirmation and never invents a purchase', as
   assert.equal(await page.locator('#debts').isHidden(), true);
   assert.equal(await page.evaluate(() => localStorage.getItem('payoff.access')), null);
 }, { unpaid: true }));
+
+// Meta's pixel only loads on the real https site, for a real browser. Serve
+// the page from an https test origin, stub Meta's script, and record every
+// fbq call in Node so they survive page changes.
+const PHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS]';
+async function overHttps(page, base, calls) {
+  await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
+  await page.exposeBinding('__pixel', (_source, args) => calls.push(args));
+  await page.addInitScript(() => { window.fbq = (...args) => window.__pixel(JSON.parse(JSON.stringify(args))); });
+  await page.route('https://connect.facebook.net/**', route => route.fulfill({ status: 200, body: '', headers: { 'content-type': 'application/javascript' } }));
+  await page.route('https://payoff.test/**', async route => {
+    const request = route.request();
+    const response = await page.request.fetch(request.url().replace('https://payoff.test', base), { method: request.method(), headers: request.headers(), data: request.postDataBuffer() || undefined });
+    await route.fulfill({ response });
+  });
+}
+test("Meta's pixel: PageView on each page, AddToCart once on reaching the order page, InitiateCheckout at Stripe, with the server's event ids", async () => world(async ({ page, base, creates }) => {
+  const calls = [], posts = [];
+  page.on('request', request => { if (request.method() === 'POST') posts.push({ url: request.url(), body: request.postData() || '' }); });
+  await overHttps(page, base, calls);
+  await page.goto('https://payoff.test/payoff?fbclid=adclick123&utm_source=facebook');
+  await page.locator('.offer-slot .cta').first().waitFor();
+  assert.deepEqual(calls.slice(0, 2), [['init', '1545780930244672'], ['track', 'PageView']]);
+  const visitor = await page.evaluate(() => sessionStorage.getItem('payoff.visitor'));
+  await page.locator('.offer-slot .cta').first().click();
+  await page.waitForURL('https://payoff.test/payoff/order');
+  await page.locator('#buy-button:enabled').waitFor();
+  await page.reload();
+  await page.locator('#buy-button:enabled').waitFor();
+  await page.locator('#email').fill('buyer@example.test');
+  await page.locator('#reset').check();
+  await page.locator('#buy-button').click();
+  await page.waitForURL('https://checkout.stripe.com/**');
+  const tracked = calls.filter(args => args[0] === 'track');
+  assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again');
+  assert.deepEqual(tracked.filter(args => args[1] !== 'PageView').map(args => [args[1], args[2].value, args[3]?.eventID]), [
+    ['AddToCart', 33, `payoff-cart.${visitor}`],
+    ['InitiateCheckout', 42, `payoff-checkout.${visitor}`],
+  ], 'AddToCart once per visitor, then InitiateCheckout');
+  // The server gets the click ids, so its copies match the same person.
+  const viewed = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('PayoffOrderViewed'));
+  assert.match(JSON.parse(viewed.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);
+  assert.match(JSON.parse(viewed.body).attribution.sourceUrl, /utm_source=facebook/);
+  assert.match(creates[0].params.metadata.fbc, /adclick123$/);
+}, { userAgent: PHONE_UA }));
+test("Meta's pixel never loads for the owner, over http, or in the tool", async () => {
+  for (const setup of ['owner', 'http', 'tool']) await world(async ({ page, base }) => {
+    const facebook = [];
+    page.on('request', request => { if (/facebook\.(net|com)/.test(request.url())) facebook.push(request.url()); });
+    if (setup !== 'http') {
+      await page.addInitScript(() => Object.defineProperty(navigator, 'webdriver', { get: () => false }));
+      await page.route('https://payoff.test/**', async route => {
+        const request = route.request();
+        await route.fulfill({ response: await page.request.fetch(request.url().replace('https://payoff.test', base), { method: request.method(), headers: request.headers(), data: request.postDataBuffer() || undefined }) });
+      });
+    }
+    const url = { owner: 'https://payoff.test/payoff/order?notrack=1', http: base + '/payoff/order', tool: 'https://payoff.test/payoff/app' }[setup];
+    await page.goto(url);
+    await page.waitForTimeout(300);
+    assert.equal(await page.evaluate(() => typeof window.fbq), 'undefined', setup);
+    assert.deepEqual(facebook, [], setup);
+  }, { userAgent: PHONE_UA });
+});

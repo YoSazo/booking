@@ -52,5 +52,8 @@ window.PAYOFF_CONTENT = {
   },
   productImage: { src: '/payoff/assets/tool-result.jpg', alt: 'Marketel Payoff showing a debt-free date and five plans compared', caption: 'The real app, with the example numbers above' },
   refundPolicy: null, // Publish only a policy the owner approves and can honor.
-  addOns: [],
+  addOns: [
+    { id: 'cashflow', name: 'Cash-flow calendar', priceCents: 2200 },
+    { id: 'reset', name: 'Spending reset', priceCents: 900 },
+  ],
 };

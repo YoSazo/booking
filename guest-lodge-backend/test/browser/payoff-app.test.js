@@ -7,10 +7,11 @@ const { chromium } = require('playwright-core');
 const { registerPayoff, PRODUCT, VERSION } = require('../../payoff');
 
 const SHOTS = process.env.PAYOFF_SHOTS || '';
-async function world(fn) {
+async function world(fn, { addons = [] } = {}) {
   const app = express(), emails = [], requests = [];
-  const paid = { id: 'cs_test_appOrder1234567', mode: 'payment', status: 'complete', payment_status: 'paid', currency: 'usd', amount_total: 3300, livemode: false,
-    metadata: { product: PRODUCT, offerVersion: VERSION, addons: '[]' }, customer_details: { email: 'buyer@example.test' } };
+  const paid = { id: 'cs_test_appOrder1234567', mode: 'payment', status: 'complete', payment_status: 'paid', currency: 'usd',
+    amount_total: 3300 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0), livemode: false,
+    metadata: { product: PRODUCT, offerVersion: VERSION, addons: JSON.stringify(addons) }, customer_details: { email: 'buyer@example.test' } };
   const rows = new Map();
   const prisma = { inspectEvent: {
     upsert: async () => ({}),
@@ -191,4 +192,107 @@ test('the order page sells Payoff alone and the sales page shows the real tool',
   await page.waitForFunction(() => document.getElementById('buy-button').textContent === 'Continue to secure payment');
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   assert.ok(width <= 390, 'no sideways scroll');
+}));
+
+test('a buyer without extras sees no tabs', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/payoff/app?session_id=cs_test_appOrder1234567');
+  await page.waitForSelector('#debts:not([hidden])');
+  assert.equal(await page.isVisible('#tabs'), false);
+  assert.doesNotMatch(await text(page, '#toast'), /tabs/);
+}));
+
+test('a buyer with both extras gets tabs, a cash-flow calendar that warns before a shortfall, and a spending reset', async () => world(async ({ page, base, requests, shot }) => {
+  await page.goto(base + '/payoff/app?session_id=cs_test_appOrder1234567');
+  await page.waitForSelector('#debts:not([hidden])');
+  assert.match(await text(page, '#toast'), /cash-flow calendar and spending reset are in the tabs/);
+  assert.equal(await page.isVisible('#tabs'), true);
+  assert.equal(await page.$$eval('#tabs button:not([hidden])', tabs => tabs.length), 3);
+  await addDebt(page, { name: 'Visa', balance: '3000', apr: '24', minimum: '90' });
+  await page.click('#show-result');
+  await page.waitForSelector('#result:not([hidden])');
+
+  // Cash flow: $500 today, paid $1,200 every two weeks from the 30th... the date pickers use real dates.
+  await page.click('#tabs [data-tab="cashflow"]');
+  await page.waitForSelector('#cashflow:not([hidden])');
+  assert.equal(await page.getAttribute('#tabs [data-tab="cashflow"]', 'aria-current'), 'page');
+  const today = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(), d.getMonth(), d.getDate()]; });
+  const iso = (y, m, d) => new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+  await page.fill('#cf-balance', '500');
+  await page.click('#cf-add-bill');
+  await page.fill('#cf-name', 'Rent');
+  await page.fill('#cf-amount', '1400');
+  await page.selectOption('#cf-repeat', 'monthly');
+  await page.fill('#cf-date', iso(today[0], today[1], today[2] + 3));
+  await page.click('#cf-form button[type="submit"]');
+  await page.waitForSelector('#cf-sheet', { state: 'hidden' });
+  assert.match(await text(page, '#cf-alert'), /Short by \$900\.00 on/);
+  assert.match(await text(page, '#cf-alert'), /Rent \(\$1,400\.00\)/);
+  assert.ok(await page.$$eval('.cf-day.is-low', days => days.length) > 0);
+  await page.click('#cf-add-income');
+  await page.fill('#cf-name', 'Paycheck');
+  await page.fill('#cf-amount', '1200');
+  await page.selectOption('#cf-repeat', 'biweekly');
+  await page.fill('#cf-date', iso(today[0], today[1], today[2] + 1));
+  await page.click('#cf-form button[type="submit"]');
+  assert.match(await text(page, '#cf-alert'), /You stay above \$0 for the next 3 months/);
+  await page.check('#cf-debts');
+  assert.match(await page.textContent('#cf-agenda'), /Paycheck/);
+  await shot('6-cashflow');
+  await page.click('#cf-next');
+  assert.match(await page.textContent('#cf-agenda'), /Debt payments/);
+  assert.equal(await page.$$eval('.cf-agenda li', items => items.length) > 0, true);
+  await page.click('.debt-row >> text=Rent');
+  await page.fill('#cf-amount', '1450');
+  await page.click('#cf-form button[type="submit"]');
+  assert.match(await page.textContent('#cf-items'), /1,450\.00/);
+
+  // Spending reset: pick what to pause, start, log two days.
+  await page.click('#tabs [data-tab="reset"]');
+  await page.waitForSelector('#reset:not([hidden])');
+  await page.click('[data-length="7"]');
+  await page.click('#reset-paused-chips >> text=Takeout');
+  await page.fill('#reset-paused-costs input', '70');
+  await page.click('#reset-rule-ideas >> text=Groceries from a list only');
+  await page.fill('#reset-rule', 'No shopping apps');
+  await page.press('#reset-rule', 'Enter');
+  assert.equal(await page.$$eval('#reset-rules li', rules => rules.length), 2);
+  await shot('7-reset-setup');
+  await page.click('#reset-start');
+  await page.waitForSelector('#reset-track:not([hidden])');
+  assert.equal(await text(page, '#reset-title'), 'Day 1 of 7');
+  await page.click('#reset-kept');
+  assert.equal(await text(page, '#reset-saved'), '$10');
+  assert.equal(await text(page, '#reset-streak'), '1 day');
+  assert.match(await text(page, '#reset-logged'), /stuck to it/);
+  await page.click('#reset-slipped');
+  await page.fill('#reset-spent', '4');
+  assert.equal(await text(page, '#reset-saved'), '$6');
+  assert.equal(await text(page, '#reset-streak'), '0 days');
+  await page.click('#reset-kept');
+  await shot('8-reset-track');
+  await page.click('#reset-review .big');
+  await page.waitForSelector('#result:not([hidden])');
+  assert.match(await text(page, '#date-label'), /\$10 once/);
+  assert.equal(await page.inputValue('#one-time'), '10');
+
+  // Everything survives a reload, and the tab comes back.
+  await page.click('#tabs [data-tab="reset"]');
+  await page.reload();
+  await page.waitForSelector('#reset-track:not([hidden])');
+  assert.equal(await page.isVisible('#tabs'), true);
+  await page.click('#tabs [data-tab="cashflow"]');
+  assert.match(await page.textContent('#cf-items'), /Paycheck/);
+  for (const request of requests) for (const secret of ['1400', '1450', '1200', 'Takeout', 'Rent', 'Paycheck']) {
+    assert.ok(!request.url.includes(secret) && !request.body.includes(secret), `${request.url} carried ${secret}`);
+  }
+}, { addons: ['cashflow', 'reset'] }));
+
+test('the order page offers both extras, unchecked, and checkout includes the ones picked', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/payoff/order');
+  assert.equal(await page.isChecked('#cashflow'), false);
+  assert.equal(await page.isChecked('#reset'), false);
+  await page.check('#cashflow');
+  assert.equal(await text(page, '#order-total'), '$55.00');
+  await page.check('#reset');
+  assert.equal(await text(page, '#order-total'), '$64.00');
 }));

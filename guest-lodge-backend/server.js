@@ -18872,6 +18872,8 @@ const payoffRegistration = require('./payoff').registerPayoff(app, {
     prisma,
     mail: emailTransporter,
     stripe: inspectStripe,
+    queueCapi: queueMarketelCAPI,
+    capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
     isExcludedEmail: email => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(normalizeExcludedEmail(email)),
 });
 // Trace owns its fulfillment; the existing verified webhook dispatches its

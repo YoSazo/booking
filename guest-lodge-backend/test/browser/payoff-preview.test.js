@@ -52,10 +52,14 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
-test('the order is Payoff alone at $33; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
+test('the order starts at $33 with both extras unchecked; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
- assert.equal(await page.locator('.order-bump,#preorder-consent').count(),0);
+ assert.equal(await page.locator('#preorder-consent').count(),0);
+ assert.equal(await page.locator('.order-bump').count(),2);
+ assert.equal(await page.locator('#cashflow').isChecked(),false);assert.equal(await page.locator('#reset').isChecked(),false);
  assert.equal(await page.locator('#order-total').innerText(),'$33.00');
+ await page.locator('#cashflow').check();assert.equal(await page.locator('#order-total').innerText(),'$55.00');
+ await page.locator('#cashflow').uncheck();
  await page.locator('#email').fill('preview@example.test');await page.locator('#email').press('Enter');
  await page.waitForTimeout(160);assert.equal(page.url(),base+'/payoff/order');assert.ok(await page.locator('.disabled-payment').isDisabled());
  assert.equal(requests.filter(r=>r.method()!=='GET').length,0);

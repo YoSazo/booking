@@ -6,15 +6,22 @@
 const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { sanitizeInspectAttribution } = require('./inspect');
 
 const PRODUCT = 'marketel-payoff';
 const VERSION = 'payoff-v1';
 // Paid preorders from before the tool existed open it too, with their extras.
 const PREORDER = Object.freeze({ product: 'marketel-payoff-preorder', version: 'payoff-preorder-v1' });
+const EXTRAS = Object.freeze(['cashflow', 'reset']);
+const DESCRIPTIONS = Object.freeze({
+  base: 'Your debt payoff plan on your phone. Opens right after payment. One payment, no subscription.',
+  cashflow: 'Income, bills and debt payments on one calendar, with your projected balance up to 18 months ahead. Opens inside Payoff.',
+  reset: 'A spending reset you set up and track day by day. Opens inside Payoff.',
+});
 const ITEMS = Object.freeze({
   base: { name: 'Marketel Payoff', cents: 3300 },
-  cashflow: { name: 'Cash-flow calendar — preorder', cents: 2200 },
-  reset: { name: 'Spending reset — preorder', cents: 900 },
+  cashflow: { name: 'Cash-flow calendar', cents: 2200 },
+  reset: { name: 'Spending reset', cents: 900 },
 });
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
@@ -47,10 +54,14 @@ function paidOrder(session) {
     || session.currency !== 'usd') return null;
   let ids;
   try { ids = basket(JSON.parse(session.metadata.addons)); } catch { return null; }
-  if (current && ids.length !== 1) return null;
   if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0)) return null;
   return ids;
 }
+// Meta's pixel loads from connect.facebook.net and reports to www.facebook.com,
+// on the sales and order pages only. The tool itself (/payoff/app) never loads
+// it, so nothing a buyer types there can reach Meta.
+const META_CSP = "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; img-src 'self' https://www.facebook.com; font-src 'self'; connect-src 'self' https://www.facebook.com https://connect.facebook.net; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const PRICE = cents => Math.round(cents) / 100;
 function pageHeaders(res) {
   res.set({
     'Cache-Control': 'no-store',
@@ -60,7 +71,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, env = process.env }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -90,7 +101,10 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     next();
   });
   for (const [route, file] of [['/', 'index.html'], ['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
-    pages.get(route, (_req, res) => res.sendFile(path.join(ROOT, file)));
+    pages.get(route, (_req, res) => {
+      if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
+      res.sendFile(path.join(ROOT, file));
+    });
   }
   for (const file of ['content.js', 'page.js', 'checkout.js', 'confirmation.js', 'style.css', 'app.js', 'app.css', 'engine.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
@@ -102,7 +116,20 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   pages.use((_req, res) => res.sendStatus(404));
   app.use('/payoff', pages);
 
-  async function confirm(session, { retryMail = false } = {}) {
+  // Server copies of the pixel's events, with the same event ids, so Meta
+  // counts each once and still hears about the ones a browser blocked.
+  const sendCapi = (eventName, input) => {
+    if (!capiConfigured || typeof queueCapi !== 'function') return Promise.resolve({ queued: false });
+    return queueCapi(eventName, { product: 'marketel-payoff', currency: 'USD', contentName: 'Marketel Payoff', ...input })
+      .catch(error => { console.error('Payoff CAPI queue failed:', eventName, error.message); return { queued: false }; });
+  };
+  const visitorCapi = (visitor, attribution, req) => ({
+    hotelId: `payoff-visitor:${visitor}`, externalId: `payoff-visitor:${visitor}`,
+    ip: attribution.ipAddress || req.ip || '', userAgent: attribution.userAgent || req.headers['user-agent'] || '',
+    sourceUrl: attribution.sourceUrl || `${origin}/payoff`, fbp: attribution.fbp || '', fbc: attribution.fbc || '',
+  });
+
+  async function confirm(session, { retryMail = false, req = null, webhook = false } = {}) {
     const ids = paidOrder(session);
     if (!ids) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
     const visitor = visitorId(session.metadata.visitorId);
@@ -111,6 +138,16 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     // confirmations but do not inflate the customer conversion ladder.
     if (session.livemode !== false && session.metadata.noTrack !== '1' && !isExcludedEmail(email || '')) {
       await record('PayoffPaid', visitor, `payoff-paid:${session.id}`, ids.join(','));
+      await sendCapi('Purchase', {
+        eventId: `payoff-purchase.${session.id}`,
+        hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${session.id}`,
+        externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${session.id}`,
+        email: email || '',
+        // A webhook request is Stripe's, never the buyer's IP or browser.
+        ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
+        sourceUrl: session.metadata.sourceUrl || `${origin}/payoff`, fbp: session.metadata.fbp || '', fbc: session.metadata.fbc || '',
+        value: PRICE(session.amount_total),
+      });
     }
     let emailSent = false;
     if (email && mail) {
@@ -129,7 +166,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
             ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
             `Total paid: $${(session.amount_total / 100).toFixed(2)} USD. One payment, no subscription.`,
             `Order reference: ${session.id}`,
-            ...(ids.length > 1 ? ['', 'The cash-flow calendar and spending reset you preordered are still in development. We will email this address when they are ready.'] : []),
+            ...(ids.length > 1 ? ['', `Your ${ids.slice(1).map(id => ITEMS[id].name.toLowerCase()).join(' and ')} ${ids.length > 2 ? 'are' : 'is'} inside Payoff, in the tabs at the top.`] : []),
           ]));
           emailSent = true;
         } catch (error) {
@@ -140,7 +177,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       }
     }
     return { paid: true, reference: session.id, totalCents: session.amount_total, items: ids.map(id => ITEMS[id].name), emailSent,
-      access: accessToken(secret, session.id) };
+      access: accessToken(secret, session.id), extras: ids.filter(id => id !== 'base') };
   }
   // One email for every way of getting the link: after payment and on request.
   function accessMail(to, id, lines = []) {
@@ -163,7 +200,14 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (noTrack(req)) return res.json({ ignored: true });
     rate(req, 'event', 300);
     const detail = req.body.name === 'PayoffFrom' && ['ad', 'social', 'direct', 'other'].includes(req.body.detail) ? req.body.detail : null;
-    await record(req.body.name, visitorId(req.body.visitorId), null, detail);
+    const visitor = visitorId(req.body.visitorId);
+    await record(req.body.name, visitor, null, detail);
+    // Reaching the order page is Meta's AddToCart (every "Get My Debt-Free
+    // Date" button leads there); the browser pixel sends the same event id.
+    if (req.body.name === 'PayoffOrderViewed' && visitor) {
+      await sendCapi('AddToCart', { eventId: `payoff-cart.${visitor}`, value: PRICE(ITEMS.base.cents),
+        ...visitorCapi(visitor, sanitizeInspectAttribution(req.body.attribution, req) || {}, req) });
+    }
     res.json({ success: true });
   }));
   api.post('/checkout', guarded(async (req, res) => {
@@ -172,25 +216,32 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     // used to construct redirects or set the price.
     if (req.headers.origin && req.headers.origin !== origin && env.NODE_ENV !== 'test') throw fail(403, 'Open checkout on bookmarketel.com.');
     rate(req, 'checkout', 20);
-    const ids = basket([]);
+    const ids = basket(req.body?.addons || []);
     const attempt = req.body?.attempt;
     if (typeof attempt !== 'string' || !/^[a-f0-9-]{16,64}$/.test(attempt)) throw fail(400, 'Please reload the order page and try again.');
     const email = String(req.body?.email || '').trim();
     if (!validEmail(email)) throw fail(400, 'Enter a valid email.');
+    const visitor = visitorId(req.body?.visitorId);
+    const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const metadata = { product: PRODUCT, offerVersion: VERSION, addons: JSON.stringify(ids.filter(id => id !== 'base')),
-      visitorId: visitorId(req.body?.visitorId) || '', noTrack: noTrack(req) ? '1' : '' };
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email])).digest('hex');
+      visitorId: visitor || '', noTrack: noTrack(req) ? '1' : '',
+      fbp: (attribution.fbp || '').slice(0, 500), fbc: (attribution.fbc || '').slice(0, 500), sourceUrl: (attribution.sourceUrl || '').slice(0, 500) };
+    const total = ids.reduce((sum, id) => sum + ITEMS[id].cents, 0);
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc])).digest('hex');
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', submit_type: 'pay', payment_method_types: ['card'], customer_email: email,
       line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
-        product_data: { name: ITEMS[id].name, description: 'Your debt payoff plan on your phone. Opens right after payment. One payment, no subscription.' } } })),
+        product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
       custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. Questions or refund requests: support@bookmarketel.com.' } },
       success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,
       metadata, payment_intent_data: { metadata },
     }, { idempotencyKey: `payoff:${fingerprint}` });
     if (!session.url || !session.url.startsWith('https://checkout.stripe.com/')) throw fail(502, 'Checkout could not open. Please try again.');
-    res.json({ url: session.url });
+    if (visitor && !metadata.noTrack && !isExcludedEmail(email)) {
+      await sendCapi('InitiateCheckout', { eventId: `payoff-checkout.${visitor}`, value: PRICE(total), email, ...visitorCapi(visitor, attribution, req) });
+    }
+    res.json({ url: session.url, value: PRICE(total) });
   }));
   api.post('/confirm', guarded(async (req, res) => {
     if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Order confirmation is temporarily unavailable.');
@@ -200,12 +251,21 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     let session;
     try { session = await stripe.checkout.sessions.retrieve(id); }
     catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
-    res.json(await confirm(session));
+    res.json(await confirm(session, { req }));
   }));
   api.post('/access', guarded(async (req, res) => {
     rate(req, 'access', 120);
-    if (!verifyAccess(secret, req.body?.token)) throw fail(403, 'This link is not valid. Use the link in your Payoff email, or ask for a new one.');
-    res.json({ ok: true });
+    const id = verifyAccess(secret, req.body?.token);
+    if (!id) throw fail(403, 'This link is not valid. Use the link in your Payoff email, or ask for a new one.');
+    // Which extras the order included comes from Stripe each time; if Stripe
+    // can't answer, the app keeps what it last knew (extras: null).
+    if (id.startsWith('own_')) return res.json({ ok: true, extras: [...EXTRAS] });
+    let extras = null;
+    try {
+      const ids = stripe && paidOrder(await stripe.checkout.sessions.retrieve(id));
+      if (ids) extras = ids.filter(item => item !== 'base');
+    } catch (error) { console.error('Payoff access lookup failed:', error.type || error.message); }
+    res.json({ ok: true, extras });
   }));
   // The same answer whether or not the address bought, so it reveals nothing.
   api.post('/resend', guarded(async (req, res) => {
@@ -232,7 +292,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       || !isPayoff(event.data?.object?.metadata)) return false;
     if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
     const session = await stripe.checkout.sessions.retrieve(event.data.object.id);
-    if (session.payment_status === 'paid') await confirm(session, { retryMail: true });
+    if (session.payment_status === 'paid') await confirm(session, { retryMail: true, webhook: true });
     return true;
   } };
 }

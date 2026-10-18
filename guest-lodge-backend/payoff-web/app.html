@@ -7,12 +7,18 @@
   <meta name="theme-color" content="#ffffff">
   <title>Marketel Payoff — your debt-free date</title>
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/app.css?v=1">
-  <script src="/payoff/engine.js?v=1" defer></script>
-  <script src="/payoff/app.js?v=1" defer></script>
+  <link rel="stylesheet" href="/payoff/app.css?v=2">
+  <script src="/payoff/engine.js?v=2" defer></script>
+  <script src="/payoff/app.js?v=2" defer></script>
 </head>
 <body>
-  <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a></header>
+  <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a>
+    <nav class="tabs" id="tabs" aria-label="Your tools" hidden>
+      <button type="button" data-tab="plan">Plan</button>
+      <button type="button" data-tab="cashflow" hidden>Cash flow</button>
+      <button type="button" data-tab="reset" hidden>Reset</button>
+    </nav>
+  </header>
   <main id="main">
     <section class="view" id="opening" hidden>
       <h1 id="opening-title">Opening your plan…</h1>
@@ -93,6 +99,92 @@
       <p class="fine">Your numbers stay on this phone. They are never sent to us.</p>
       <p class="fine">Estimates only, not financial advice. Interest is the yearly rate ÷ 12 each month, with no new charges, fees or rate changes. Your lender’s statement is the source of truth.</p>
     </section>
+
+    <section class="view" id="cashflow" hidden>
+      <h1>Cash-flow calendar</h1>
+      <p class="muted" id="cf-intro">Add your pay and your bills to see your balance every day ahead, and any day it would run short.</p>
+      <label class="field"><span>In your checking account today</span>
+        <span class="money-input"><b>$</b><input id="cf-balance" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+      <div class="cf-alert" id="cf-alert" role="status" aria-live="polite" hidden></div>
+      <div class="chips cf-ahead" role="group" aria-label="Look ahead">
+        <button class="chip" type="button" data-ahead="3" aria-pressed="true">3 months</button>
+        <button class="chip" type="button" data-ahead="6" aria-pressed="false">6 months</button>
+        <button class="chip" type="button" data-ahead="12" aria-pressed="false">12</button>
+        <button class="chip" type="button" data-ahead="18" aria-pressed="false">18</button>
+      </div>
+      <div class="cf-month">
+        <div class="cf-month-head">
+          <button class="cf-step" id="cf-prev" type="button" aria-label="Previous month">‹</button>
+          <h2 id="cf-month-title"></h2>
+          <button class="cf-step" id="cf-next" type="button" aria-label="Next month">›</button>
+        </div>
+        <div class="cf-grid" id="cf-grid" role="grid"></div>
+        <p class="cf-key"><span class="key-low"></span> Short that day <span class="key-event"></span> Money in or out</p>
+        <ol class="cf-agenda" id="cf-agenda"></ol>
+      </div>
+      <h2>Income and bills</h2>
+      <ul class="debt-list" id="cf-items"></ul>
+      <div class="sheet-row">
+        <button class="ghost" id="cf-add-income" type="button">+ Add income</button>
+        <button class="ghost" id="cf-add-bill" type="button">+ Add a bill</button>
+      </div>
+      <label class="check" id="cf-debts-row"><input type="checkbox" id="cf-debts"><span>Include my debt payments from my plan, on day <input id="cf-debt-day" inputmode="numeric" maxlength="2" value="1" aria-label="Day of the month"> of each month</span></label>
+      <button class="ghost danger" id="cf-clear" type="button">Clear cash flow</button>
+      <p class="fine">Projection only. Your bank balance is the source of truth.</p>
+    </section>
+
+    <section class="view" id="reset" hidden>
+      <div id="reset-setup">
+        <h1>Spending reset</h1>
+        <p class="muted">Pick how long, keep your essentials covered, and pause the rest. Then tick off each day.</p>
+        <h2>How long?</h2>
+        <div class="chips" role="group" aria-label="Reset length">
+          <button class="chip" type="button" data-length="7" aria-pressed="false">7 days</button>
+          <button class="chip" type="button" data-length="14" aria-pressed="true">14 days</button>
+          <button class="chip" type="button" data-length="21" aria-pressed="false">21 days</button>
+          <button class="chip" type="button" data-length="30" aria-pressed="false">30 days</button>
+        </div>
+        <h2>Essentials you’ll keep paying for</h2>
+        <div class="chips" id="reset-essentials"></div>
+        <h2>What you’ll pause</h2>
+        <p class="muted small">Add roughly what each usually costs you a week, and we’ll count what you save.</p>
+        <div class="chips" id="reset-paused-chips"></div>
+        <ul class="paused-costs" id="reset-paused-costs"></ul>
+        <h2>Your ground rules</h2>
+        <div class="chips" id="reset-rule-ideas"></div>
+        <ul class="rules" id="reset-rules"></ul>
+        <label class="field"><span>Add your own rule</span><input id="reset-rule" maxlength="80" autocomplete="off" placeholder="e.g. No shopping apps on my phone"></label>
+        <button class="big" id="reset-start" type="button">Start my reset</button>
+      </div>
+      <div id="reset-track" hidden>
+        <p class="date-label" id="reset-dates"></p>
+        <h1 id="reset-title"></h1>
+        <div class="totals">
+          <div><span>Saved so far</span><strong id="reset-saved"></strong></div>
+          <div><span>Streak</span><strong id="reset-streak"></strong></div>
+        </div>
+        <div class="today-card" id="reset-today">
+          <p class="today-q" id="reset-question"></p>
+          <div class="sheet-row">
+            <button class="big" id="reset-kept" type="button">I stuck to it</button>
+            <button class="ghost" id="reset-slipped" type="button">I slipped</button>
+          </div>
+          <label class="field" id="reset-spent-row" hidden><span>Spent on paused things that day <em>(optional)</em></span>
+            <span class="money-input"><b>$</b><input id="reset-spent" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+          <p class="muted small" id="reset-logged"></p>
+        </div>
+        <div class="reset-days" id="reset-days" aria-label="Your days"></div>
+        <div class="review" id="reset-review"></div>
+        <h2>Your ground rules</h2>
+        <ul class="rules" id="reset-rules-view"></ul>
+        <h2>Paused</h2>
+        <p class="muted" id="reset-paused-view"></p>
+        <h2>Still covered</h2>
+        <p class="muted" id="reset-essentials-view"></p>
+        <button class="ghost" id="reset-new" type="button" hidden>Start another reset</button>
+        <button class="ghost danger" id="reset-end" type="button">End this reset</button>
+      </div>
+    </section>
   </main>
 
   <div class="sheet-backdrop" id="sheet" hidden>
@@ -114,6 +206,35 @@
       <div class="sheet-row">
         <button class="ghost" type="button" id="sheet-cancel">Cancel</button>
         <button class="ghost danger" type="button" id="sheet-delete" hidden>Delete</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="sheet-backdrop" id="cf-sheet" hidden>
+    <form class="sheet" id="cf-form" novalidate aria-labelledby="cf-sheet-title">
+      <h2 id="cf-sheet-title">Add income</h2>
+      <div class="field"><span>Type</span>
+        <div class="segmented" role="radiogroup" aria-label="Income or bill">
+          <button type="button" role="radio" data-kind="income" aria-checked="true">Income</button>
+          <button type="button" role="radio" data-kind="bill" aria-checked="false">Bill</button>
+        </div>
+      </div>
+      <label class="field"><span>Name</span><input id="cf-name" maxlength="40" autocomplete="off" placeholder="e.g. Paycheck"></label>
+      <label class="field"><span>Amount</span><span class="money-input"><b>$</b><input id="cf-amount" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+      <label class="field"><span>How often</span>
+        <select id="cf-repeat">
+          <option value="once">Just once</option>
+          <option value="weekly">Every week</option>
+          <option value="biweekly">Every 2 weeks</option>
+          <option value="twice-monthly">Twice a month (1st and 15th)</option>
+          <option value="monthly" selected>Every month</option>
+        </select></label>
+      <label class="field"><span id="cf-date-label">Next date</span><input id="cf-date" type="date"></label>
+      <p class="sheet-warning" id="cf-warning" role="status" aria-live="polite"></p>
+      <button class="big" type="submit">Save</button>
+      <div class="sheet-row">
+        <button class="ghost" type="button" id="cf-cancel">Cancel</button>
+        <button class="ghost danger" type="button" id="cf-delete" hidden>Delete</button>
       </div>
     </form>
   </div>

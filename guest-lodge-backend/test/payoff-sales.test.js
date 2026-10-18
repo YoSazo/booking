@@ -5,7 +5,7 @@ const express = require('express');
 const { registerPayoff, basket, paidOrder, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
 
 function fixture({ failEmail = false, ready = true, production = false } = {}) {
-  const rows = new Map(), creates = [], emails = [], sessions = new Map();
+  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [];
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
     create: async ({ data }) => {
@@ -24,9 +24,10 @@ function fixture({ failEmail = false, ready = true, production = false } = {}) {
   const env = production ? { STRIPE_MARKETEL_SECRET_KEY: 'sk_test_no_live_charges', NODE_ENV: 'production' } : { NODE_ENV: 'test' };
   const app = express();
   const registration = registerPayoff(app, { prisma, stripe: ready ? stripe : null, mail, env,
+    queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
     isExcludedEmail: email => email === 'owner@example.test' });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
-  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail };
+  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi };
 }
 async function serve(world, fn) {
   const server = world.app.listen(0, '127.0.0.1');
@@ -56,33 +57,38 @@ test('Payoff pages and assets are published without exposing source documents or
       assert.doesNotMatch(html, /preorder-notice|not available yet|No release date/i, route);
       if (route !== '/payoff/terms') assert.doesNotMatch(html, /preorder|in development/i, route);
     }
-    assert.match((await fetch(base + '/payoff/app')).headers.get('content-security-policy'), /default-src 'self'/);
+    // Meta's pixel may load on the sales and order pages, never in the tool.
+    for (const route of ['/payoff', '/payoff/order']) assert.match((await fetch(base + route)).headers.get('content-security-policy'), /script-src 'self' https:\/\/connect\.facebook\.net/, route);
+    const toolCsp = (await fetch(base + '/payoff/app')).headers.get('content-security-policy');
+    assert.match(toolCsp, /default-src 'self'/); assert.doesNotMatch(toolCsp, /facebook/);
   });
 });
-test('checkout is Payoff alone at the server price, opens the tool on return, and ignores anything the browser adds', async () => {
+test('checkout charges server prices for Payoff and any extras, opens the tool on return, and keeps idempotency', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
-    for (const body of [order(), order({ addons: ['cashflow', 'reset'] }), order({ preorderAccepted: '' })]) {
-      assert.equal((await post('/api/payoff/checkout', body)).status, 200);
+    for (const [addons, total] of [[[], 3300], [['cashflow'], 5500], [['reset'], 4200], [['cashflow', 'reset'], 6400]]) {
+      const reply = await post('/api/payoff/checkout', order({ addons }));
+      assert.equal(reply.status, 200); assert.equal(reply.body.value, total / 100);
       const { params, options } = w.creates.at(-1);
       assert.equal(params.mode, 'payment'); assert.deepEqual(params.payment_method_types, ['card']);
-      assert.equal(params.line_items.length, 1);
+      assert.equal(params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), total);
       assert.equal(params.line_items[0].price_data.unit_amount, 3300);
       assert.match(params.custom_text.submit.message, /opens as soon as you pay/);
-      assert.doesNotMatch(JSON.stringify(params), /preorder|not yet available/i);
+      assert.doesNotMatch(JSON.stringify(params), /preorder|not yet available|in development/i);
       assert.equal(params.success_url, 'https://bookmarketel.com/payoff/app?session_id={CHECKOUT_SESSION_ID}');
-      assert.equal(params.metadata.product, PRODUCT); assert.equal(params.metadata.offerVersion, VERSION); assert.equal(params.metadata.addons, '[]');
+      assert.equal(params.metadata.product, PRODUCT); assert.equal(params.metadata.offerVersion, VERSION); assert.equal(params.metadata.addons, JSON.stringify(addons));
       assert.match(options.idempotencyKey, /^payoff:/);
     }
-    const first = w.creates[0].options.idempotencyKey;
+    await post('/api/payoff/checkout', order()); const first = w.creates.at(-1).options.idempotencyKey;
     await post('/api/payoff/checkout', order()); assert.equal(w.creates.at(-1).options.idempotencyKey, first);
+    await post('/api/payoff/checkout', order({ addons: ['reset'] })); assert.notEqual(w.creates.at(-1).options.idempotencyKey, first);
     await post('/api/payoff/checkout', order({ email: 'other@example.test' })); assert.notEqual(w.creates.at(-1).options.idempotencyKey, first);
   });
 });
 test('invalid email and invalid attempts cannot create checkout', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
-    for (const body of [order({ email: 'bad' }), order({ attempt: '../bad' }), order({ email: 'a'.repeat(250) + '@x.io' })]) {
+    for (const body of [order({ email: 'bad' }), order({ attempt: '../bad' }), order({ email: 'a'.repeat(250) + '@x.io' }), order({ addons: ['other'] }), order({ addons: ['reset', 'reset'] }), order({ addons: {} })]) {
       assert.equal((await post('/api/payoff/checkout', body)).status, 400);
     }
     assert.equal(w.creates.length, 0);
@@ -99,7 +105,8 @@ test('only correctly paid Payoff orders and earlier preorders count, never anoth
   assert.deepEqual(paidOrder(paid()), ['base']);
   assert.deepEqual(paidOrder(paid(['reset'])), ['base', 'reset']);
   assert.deepEqual(paidOrder(paid([], { preorder: true })), ['base']);
-  assert.equal(paidOrder(paid(['reset'], { preorder: false })), null);
+  assert.deepEqual(paidOrder(paid(['cashflow', 'reset'], { preorder: false })), ['base', 'cashflow', 'reset']);
+  assert.equal(paidOrder({ ...paid(['reset'], { preorder: false }), amount_total: 3300 }), null);
   for (const change of [{ payment_status: 'unpaid' }, { status: 'open' }, { amount_total: 1 }, { currency: 'eur' }, { mode: 'subscription' }, { metadata: { product: 'trace' } }]) assert.equal(paidOrder({ ...paid([]), ...change }), null);
 });
 test('a paid order opens the tool: confirmation returns a signed link and sends one email with it', async () => {
@@ -116,13 +123,30 @@ test('a paid order opens the tool: confirmation returns a signed link and sends 
   assert.doesNotMatch(w.emails[0].text, /preorder|in development/i);
   assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffPaid').length, 1);
 });
-test('an earlier preorder opens the tool too, and is told its extras are still coming', async () => {
-  const w = fixture(); const session = paid(['cashflow', 'reset']); w.sessions.set(session.id, session);
+test('an order with extras, new or preordered, opens them too and the email says where they are', async () => {
+  for (const preorder of [false, true]) {
+    const w = fixture(); const session = paid(['cashflow', 'reset'], { preorder }); w.sessions.set(session.id, session);
+    await serve(w, async ({ post }) => {
+      const r = await post('/api/payoff/confirm', { sessionId: session.id });
+      assert.equal(r.status, 200); assert.equal(r.body.totalCents, 6400); assert.equal(verifyAccess(SECRET, r.body.access), session.id);
+      assert.deepEqual(r.body.extras, ['cashflow', 'reset']);
+      assert.deepEqual((await post('/api/payoff/access', { token: r.body.access })).body, { ok: true, extras: ['cashflow', 'reset'] });
+    });
+    assert.equal(w.emails.length, 1); assert.match(w.emails[0].text, /\$64\.00/);
+    assert.match(w.emails[0].text, /cash-flow calendar and spending reset are inside Payoff/);
+    assert.doesNotMatch(w.emails[0].text, /in development/);
+  }
+});
+test('access tells the tool which extras the order has; owners get both; Stripe trouble keeps what the tool knew', async () => {
+  const w = fixture(); const session = paid(); w.sessions.set(session.id, session);
   await serve(w, async ({ post }) => {
-    const r = await post('/api/payoff/confirm', { sessionId: session.id });
-    assert.equal(r.status, 200); assert.equal(r.body.totalCents, 6400); assert.equal(verifyAccess(SECRET, r.body.access), session.id);
+    const { body } = await post('/api/payoff/confirm', { sessionId: session.id });
+    assert.deepEqual(body.extras, []);
+    assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: [] });
+    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, 'own_0123456789abcdef01234567') })).body, { ok: true, extras: ['cashflow', 'reset'] });
+    w.stripe.checkout.sessions.retrieve = async () => { throw new Error('Stripe down'); };
+    assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: null });
   });
-  assert.equal(w.emails.length, 1); assert.match(w.emails[0].text, /\$64\.00/); assert.match(w.emails[0].text, /still in development/);
 });
 test('access links are checked by signature; tampered or foreign links are refused', async () => {
   const w = fixture(); const session = paid(); w.sessions.set(session.id, session);
@@ -211,4 +235,40 @@ test('anonymous funnel records contain no receipt email, and owner/headless even
   }); assert.equal(w.rows.size, 2); assert.doesNotMatch(JSON.stringify([...w.rows.values()]), /private@/);
   const definition = require('../wedge-funnel').definitionFor('payoff');
   assert.ok(definition.steps.some(step => step.names.includes('PayoffPaid')));
+});
+
+test('Meta hears AddToCart on the order page, InitiateCheckout at Stripe and Purchase on payment, with the pixel\'s event ids', async () => {
+  const w = fixture(); const session = paid(['reset'], { preorder: false }); w.sessions.set(session.id, session);
+  const attribution = { fbp: 'fb.1.1700000000000.123456789', fbc: 'fb.1.1700000000000.AbCdEf', sourceUrl: 'https://bookmarketel.com/payoff?utm_source=facebook', utmSource: 'facebook' };
+  await serve(w, async ({ post }) => {
+    await post('/api/payoff/event', { name: 'PayoffLanded', visitorId: 'v_abcdefghijk', attribution });
+    assert.equal(w.capi.length, 0);
+    await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk', attribution });
+    await post('/api/payoff/checkout', order({ addons: ['reset'], visitorId: 'v_abcdefghijk', attribution }));
+    const { params } = w.creates.at(-1);
+    assert.equal(params.metadata.fbp, attribution.fbp); assert.equal(params.metadata.fbc, attribution.fbc);
+    session.metadata = { ...session.metadata, fbp: params.metadata.fbp, fbc: params.metadata.fbc, sourceUrl: params.metadata.sourceUrl };
+    await post('/api/payoff/confirm', { sessionId: session.id });
+  });
+  assert.deepEqual(w.capi.map(event => [event.name, event.eventId, event.value]), [
+    ['AddToCart', 'payoff-cart.v_abcdefghijk', 33],
+    ['InitiateCheckout', 'payoff-checkout.v_abcdefghijk', 42],
+    ['Purchase', 'payoff-purchase.cs_test_validOrder123456', 42],
+  ]);
+  for (const event of w.capi) { assert.equal(event.fbp, attribution.fbp); assert.equal(event.fbc, attribution.fbc); assert.equal(event.product, 'marketel-payoff'); }
+  assert.equal(w.capi[2].email, 'buyer@example.test');
+});
+test('Meta hears nothing from the owner, no-track browsers, test browsers or sandbox orders', async () => {
+  const w = fixture();
+  await serve(w, async ({ post }) => {
+    await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk' }, { 'x-marketel-no-track': '1' });
+    await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk' }, { 'user-agent': 'HeadlessChrome' });
+    await post('/api/payoff/checkout', order({ email: 'owner@example.test', visitorId: 'v_abcdefghijk' }));
+    await post('/api/payoff/checkout', order({ visitorId: 'v_abcdefghijk' }), { 'x-marketel-no-track': '1' });
+    for (const change of [{ livemode: false }, { customer_details: { email: 'owner@example.test' } }]) {
+      const s = { ...paid(), ...change }; w.sessions.set(s.id, s);
+      await post('/api/payoff/confirm', { sessionId: s.id });
+    }
+  });
+  assert.deepEqual(w.capi, []);
 });

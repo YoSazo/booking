@@ -47,7 +47,7 @@ test('sales content only references files that exist, and the product shot is a 
  const images=[...Object.values(content.proof).flat(),content.productImage,content.founder&&{src:content.founder.image}].filter(Boolean);
  for(const image of images)assert.ok(fs.existsSync(path.join(root,'assets',path.basename(image.src))),image.src);
  assert.ok(fs.statSync(path.join(root,'assets/tool-result.jpg')).size<200000);
- assert.equal(content.addOns.length,0);
+ assert.equal(JSON.stringify(content.addOns.map(addon=>[addon.id,addon.priceCents])),JSON.stringify([['cashflow',2200],['reset',900]]));
 });
 async function withServer(fn){const server=createPreview().listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));try{await fn('http://127.0.0.1:'+server.address().port);}finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}}
 test('Payoff design preview serves only its pages and local assets',async()=>withServer(async base=>{
