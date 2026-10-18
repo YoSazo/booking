@@ -12,11 +12,15 @@
     if (subtitle) box.append(element('p', '', subtitle));
     return box;
   };
-  function proof(entry) {
+  // Width and height reserve the space before the picture arrives, so the
+  // page doesn't jump; the first group loads straight away.
+  function proof(entry, eager) {
     if (!entry || !localImage(entry.src) || typeof entry.alt !== 'string' || !entry.alt.trim()) return null;
     const figure = element('figure', 'proof-image');
     const image = new Image();
-    image.src = entry.src; image.alt = entry.alt; image.loading = 'lazy'; image.decoding = 'async';
+    if (entry.width && entry.height) { image.width = entry.width; image.height = entry.height; }
+    if (eager) image.fetchPriority = 'high';
+    image.src = entry.src; image.alt = entry.alt; image.loading = eager ? 'eager' : 'lazy'; image.decoding = 'async';
     image.addEventListener('error', () => figure.remove(), { once: true });
     figure.append(image);
     if (entry.caption) figure.append(element('figcaption', '', entry.caption));
@@ -40,17 +44,19 @@
       if (content.rating.description) label.append(document.createTextNode(' '+content.rating.description));
       rating.append(stars, label);
       rating.setAttribute('aria-label', content.rating.stars+' out of 5. '+content.rating.label+(content.rating.description ? ' '+content.rating.description : ''));
-    } else rating.append(placeholder('Your rating and customer proof', 'Add your supported rating or customer count.', 'rating-placeholder'));
+    } else rating.remove();
   }
   for (const slot of document.querySelectorAll('[data-proof]')) {
     const group = slot.dataset.proof;
     const entries = group === 'checkout'
       ? [content.proof.early[1], content.proof.early[0], content.proof.main[0], content.proof.example[0]]
       : content.proof[group] || [];
-    entries.forEach(entry => { const item = proof(entry); if (item) slot.append(item); });
+    entries.forEach(entry => { const item = proof(entry, group === 'early'); if (item) slot.append(item); });
+    if (!slot.children.length && group === 'main') slot.closest('section')?.remove();
   }
   const founder = content.founder;
   const founderRoot = document.getElementById('founder-content');
+  if (founderRoot && !founder) founderRoot.closest('section').remove();
   if (founderRoot && founder) {
     if (founder.heading) founderRoot.querySelector('h2').textContent = founder.heading;
     if (Array.isArray(founder.paragraphs) && founder.paragraphs.length) {
@@ -73,7 +79,10 @@
   }
   for (const slot of document.querySelectorAll('[data-product-visual]')) {
     if (content.productImage && localImage(content.productImage.src) && content.productImage.alt) {
-      const image = new Image(); image.src = content.productImage.src; image.alt = content.productImage.alt; image.loading = 'lazy'; slot.append(image); continue;
+      const image = new Image(); image.src = content.productImage.src; image.alt = content.productImage.alt; image.loading = 'lazy'; image.className = 'product-shot';
+      slot.append(image);
+      if (content.productImage.caption) slot.append(element('p', 'interface-caption', content.productImage.caption));
+      continue;
     }
     const demo = element('div', 'interface-demo');
     const top = element('div', 'interface-top');
@@ -83,7 +92,7 @@
     const table = element('table', 'interface-table');
     table.setAttribute('aria-label', 'Illustrative debt balances');
     for (const [index, row] of [['Debt', 'Balance', 'APR'], ['Card', '$5,000', '24%'], ['Other debt', '$1,000', '0%']].entries()) { const tr = element('tr', ''); for (const cell of row) tr.append(element(index ? 'td' : 'th', '', cell)); table.append(tr); }
-    demo.append(top, body, table); slot.append(demo, element('p', 'interface-caption', 'Interface illustration · example data · app not yet built'));
+    demo.append(top, body, table); slot.append(demo, element('p', 'interface-caption', 'Example data'));
   }
   // Real press feedback, not focus-dependent; no tracking or remote requests.
   document.addEventListener('touchstart', () => {}, { passive: true });
@@ -98,7 +107,8 @@
   const order = document.getElementById('order-form');
   if (order) {
     order.addEventListener('submit', event => event.preventDefault());
-    document.querySelector('[data-base-price]').textContent = money(content.priceCents);
+    const basePrice = document.querySelector('[data-base-price]');
+    if (basePrice) basePrice.textContent = money(content.priceCents);
     content.addOns.forEach(addon => { const price = document.querySelector('[data-addon-price="'+addon.id+'"]'); if (price) price.textContent = money(addon.priceCents).replace('.00', '')+' once'; });
     const update = () => {
       const selected = content.addOns.filter(addon => document.getElementById(addon.id)?.checked);

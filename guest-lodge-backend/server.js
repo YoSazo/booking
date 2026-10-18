@@ -12022,7 +12022,7 @@ const wedgeFunnel = require('./wedge-funnel');
 const wedgeRegistry = require('./wedges/registry');
 // On the dashboard: Marketel Trace (the test running ads, first), then the
 // report wedges that are live and in the approved app.
-const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, { id: 'payoff', product: 'Payoff preorders' }, ...wedgeRegistry.load().all
+const dashboardWedges = () => [{ id: 'trace', product: 'Trace' }, { id: 'payoff', product: 'Payoff' }, ...wedgeRegistry.load().all
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
     .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');

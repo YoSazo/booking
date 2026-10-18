@@ -1,15 +1,18 @@
 'use strict';
 
-// Payoff is sold as a preorder until the app is ready. Stripe is the durable
-// order ledger; no financial inputs or payment details are stored here.
+// Payoff is sold once and opens straight after payment. Stripe is the durable
+// order ledger; no financial inputs or payment details are stored here. The
+// buyer's numbers stay in their browser (payoff-web/app.js).
 const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const PRODUCT = 'marketel-payoff-preorder';
-const VERSION = 'payoff-preorder-v1';
+const PRODUCT = 'marketel-payoff';
+const VERSION = 'payoff-v1';
+// Paid preorders from before the tool existed open it too, with their extras.
+const PREORDER = Object.freeze({ product: 'marketel-payoff-preorder', version: 'payoff-preorder-v1' });
 const ITEMS = Object.freeze({
-  base: { name: 'Marketel Payoff — preorder', cents: 3300 },
+  base: { name: 'Marketel Payoff', cents: 3300 },
   cashflow: { name: 'Cash-flow calendar — preorder', cents: 2200 },
   reset: { name: 'Spending reset — preorder', cents: 900 },
 });
@@ -17,6 +20,18 @@ const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
+// Access is the paid session id (or an owner id) signed with the server secret.
+const accessId = value => sessionId(value) || (typeof value === 'string' && /^own_[a-f0-9]{24}$/.test(value) ? value : null);
+const accessSignature = (secret, id) => crypto.createHmac('sha256', secret).update(`payoff-access:${id}`).digest('base64url').slice(0, 32);
+const accessToken = (secret, id) => `${id}.${accessSignature(secret, id)}`;
+function verifyAccess(secret, token) {
+  const [id, signature, extra] = String(token || '').split('.');
+  if (!secret || extra !== undefined || !accessId(id) || !signature) return null;
+  const expected = Buffer.from(accessSignature(secret, id)), given = Buffer.from(signature);
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected) ? id : null;
+}
+const ownerId = email => 'own_' + crypto.createHash('sha256').update(`payoff-owner:${email.toLowerCase()}`).digest('hex').slice(0, 24);
+const validEmail = email => email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const visitorId = value => typeof value === 'string' && /^v_[A-Za-z0-9_-]{8,80}$/.test(value) ? value : null;
 
 function basket(addons) {
@@ -24,12 +39,15 @@ function basket(addons) {
     || addons.some(id => !['cashflow', 'reset'].includes(id))) throw fail(400, 'Choose only the listed optional tools.');
   return ['base', ...['cashflow', 'reset'].filter(id => addons.includes(id))];
 }
+const isPayoff = metadata => metadata?.product === PRODUCT || metadata?.product === PREORDER.product;
 function paidOrder(session) {
-  if (!session || session.metadata?.product !== PRODUCT || session.metadata?.offerVersion !== VERSION
-    || session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid'
+  const current = session?.metadata?.product === PRODUCT && session.metadata.offerVersion === VERSION;
+  const preorder = session?.metadata?.product === PREORDER.product && session.metadata.offerVersion === PREORDER.version;
+  if (!(current || preorder) || session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid'
     || session.currency !== 'usd') return null;
   let ids;
   try { ids = basket(JSON.parse(session.metadata.addons)); } catch { return null; }
+  if (current && ids.length !== 1) return null;
   if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0)) return null;
   return ids;
 }
@@ -45,7 +63,9 @@ function pageHeaders(res) {
 function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, env = process.env }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
-  const available = () => env.PAYOFF_ENABLED !== 'false' && !!stripe && !!mail && !!prisma?.inspectEvent
+  const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
+  const accessUrl = id => `${origin}/payoff/app?access=${encodeURIComponent(accessToken(secret, id))}`;
+  const available = () => env.PAYOFF_ENABLED !== 'false' && !!stripe && !!mail && !!prisma?.inspectEvent && !!secret
     && (env.NODE_ENV === 'test' || (key.startsWith('sk_live_') && String(env.STRIPE_INSPECT_WEBHOOK_SECRET || '').startsWith('whsec_')));
   const automated = req => /HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(req.headers['user-agent'] || '');
   const noTrack = req => req.headers['x-marketel-no-track'] === '1' || automated(req);
@@ -66,17 +86,17 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   pages.use((req, res, next) => {
     pageHeaders(res);
     if (env.PAYOFF_ENABLED === 'false') return res.sendStatus(404);
-    if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).send('Use the secure checkout to preorder.');
+    if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).send('Use the secure checkout to buy.');
     next();
   });
-  for (const [route, file] of [['/', 'index.html'], ['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html']]) {
+  for (const [route, file] of [['/', 'index.html'], ['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
-  for (const file of ['content.js', 'page.js', 'checkout.js', 'confirmation.js', 'style.css']) {
+  for (const file of ['content.js', 'page.js', 'checkout.js', 'confirmation.js', 'style.css', 'app.js', 'app.css', 'engine.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
-    if (!/^[a-z0-9-]+\.png$/.test(req.params.file)) return res.sendStatus(404);
+    if (!/^[a-z0-9-]+\.(?:png|jpg)$/.test(req.params.file)) return res.sendStatus(404);
     res.sendFile(path.join(ROOT, 'assets', req.params.file));
   });
   pages.use((_req, res) => res.sendStatus(404));
@@ -84,7 +104,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
 
   async function confirm(session, { retryMail = false } = {}) {
     const ids = paidOrder(session);
-    if (!ids) throw fail(402, 'This preorder has not been paid. If you were charged, contact support@bookmarketel.com.');
+    if (!ids) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
     const visitor = visitorId(session.metadata.visitorId);
     const email = session.customer_details?.email;
     // Stripe retains every order. Owner, no-track and sandbox orders receive
@@ -94,7 +114,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     }
     let emailSent = false;
     if (email && mail) {
-      const sourceId = `payoff-mail:${session.id}`;
+      const sourceId = `payoff-access-mail:${session.id}`;
       let claimed = false;
       try {
         await prisma.inspectEvent.create({ data: { name: 'PayoffConfirmationEmailed', tool: 'payoff', sourceId, visitorId: visitor } });
@@ -105,26 +125,34 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       }
       if (claimed) {
         try {
-          await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: email,
-            subject: 'Your Marketel Payoff preorder confirmation',
-            text: [
-              'Thank you for preordering Marketel Payoff.', '',
-              'This is a paid preorder. The app and optional tools are in development and are not available yet. No release date has been announced. We will email this address when your purchased tools are ready.', '',
-              ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
-              `Total paid: $${(session.amount_total / 100).toFixed(2)} USD. One payment, no subscription.`,
-              `Order reference: ${session.id}`, '',
-              'For order questions, cancellations or refund requests, reply to this email or contact support@bookmarketel.com.',
-              `${origin}/payoff/terms`,
-            ].join('\n') });
+          await mail.sendMail(accessMail(email, session.id, [
+            ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
+            `Total paid: $${(session.amount_total / 100).toFixed(2)} USD. One payment, no subscription.`,
+            `Order reference: ${session.id}`,
+            ...(ids.length > 1 ? ['', 'The cash-flow calendar and spending reset you preordered are still in development. We will email this address when they are ready.'] : []),
+          ]));
           emailSent = true;
         } catch (error) {
           await prisma.inspectEvent.delete({ where: { sourceId } }).catch(() => {});
-          console.error('Payoff preorder email failed:', error.message);
+          console.error('Payoff access email failed:', error.message);
           if (retryMail) throw error;
         }
       }
     }
-    return { paid: true, reference: session.id, totalCents: session.amount_total, items: ids.map(id => ITEMS[id].name), emailSent };
+    return { paid: true, reference: session.id, totalCents: session.amount_total, items: ids.map(id => ITEMS[id].name), emailSent,
+      access: accessToken(secret, session.id) };
+  }
+  // One email for every way of getting the link: after payment and on request.
+  function accessMail(to, id, lines = []) {
+    return { from: '"Marketel" <support@bookmarketel.com>', to, subject: 'Your Marketel Payoff link',
+      text: [
+        'Here is your Marketel Payoff. Open this link on your phone to see your debt-free date:', '',
+        accessUrl(id), '',
+        'Keep this email. The link opens your plan on any phone or computer. Your numbers stay on the device where you type them.', '',
+        ...(lines.length ? [...lines, ''] : []),
+        'Questions or refund requests: reply to this email or contact support@bookmarketel.com.',
+        `${origin}/payoff/terms`,
+      ].join('\n') };
   }
   const api = express.Router();
   api.use(express.json({ limit: '8kb' }));
@@ -144,21 +172,20 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     // used to construct redirects or set the price.
     if (req.headers.origin && req.headers.origin !== origin && env.NODE_ENV !== 'test') throw fail(403, 'Open checkout on bookmarketel.com.');
     rate(req, 'checkout', 20);
-    const ids = basket(req.body?.addons || []);
-    if (req.body?.preorderAccepted !== VERSION) throw fail(400, 'Please acknowledge that this is a paid preorder.');
+    const ids = basket([]);
     const attempt = req.body?.attempt;
     if (typeof attempt !== 'string' || !/^[a-f0-9-]{16,64}$/.test(attempt)) throw fail(400, 'Please reload the order page and try again.');
     const email = String(req.body?.email || '').trim();
-    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw fail(400, 'Enter a valid receipt email.');
+    if (!validEmail(email)) throw fail(400, 'Enter a valid email.');
     const metadata = { product: PRODUCT, offerVersion: VERSION, addons: JSON.stringify(ids.filter(id => id !== 'base')),
       visitorId: visitorId(req.body?.visitorId) || '', noTrack: noTrack(req) ? '1' : '' };
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email])).digest('hex');
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', submit_type: 'pay', payment_method_types: ['card'], customer_email: email,
       line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
-        product_data: { name: ITEMS[id].name, description: 'PAID PREORDER. In development; not yet available. No release date announced. You pay now; access will be emailed when ready. No subscription.' } } })),
-      custom_text: { submit: { message: 'Paid preorder: charged today. Software is in development, not yet available, and no release date is announced. We will email you when ready. Order questions or refund requests: support@bookmarketel.com.' } },
-      success_url: `${origin}/payoff/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+        product_data: { name: ITEMS[id].name, description: 'Your debt payoff plan on your phone. Opens right after payment. One payment, no subscription.' } } })),
+      custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. Questions or refund requests: support@bookmarketel.com.' } },
+      success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,
       metadata, payment_intent_data: { metadata },
     }, { idempotencyKey: `payoff:${fingerprint}` });
@@ -175,6 +202,26 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
     res.json(await confirm(session));
   }));
+  api.post('/access', guarded(async (req, res) => {
+    rate(req, 'access', 120);
+    if (!verifyAccess(secret, req.body?.token)) throw fail(403, 'This link is not valid. Use the link in your Payoff email, or ask for a new one.');
+    res.json({ ok: true });
+  }));
+  // The same answer whether or not the address bought, so it reveals nothing.
+  api.post('/resend', guarded(async (req, res) => {
+    rate(req, 'resend', 10);
+    const email = String(req.body?.email || '').trim();
+    if (!validEmail(email)) throw fail(400, 'Enter the email you used at checkout.');
+    if (!stripe || !mail || !secret) throw fail(503, 'Sending links is temporarily unavailable. Contact support@bookmarketel.com.');
+    let id = isExcludedEmail(email) ? ownerId(email) : null;
+    for (const address of id ? [] : [...new Set([email, email.toLowerCase()])]) {
+      const found = await stripe.checkout.sessions.list({ customer_details: { email: address }, limit: 50 });
+      const order = (found.data || []).find(session => paidOrder(session));
+      if (order) { id = order.id; break; }
+    }
+    if (id) await mail.sendMail(accessMail(email, id));
+    res.json({ sent: true });
+  }));
   api.use((error, _req, res, _next) => {
     if (!error.forBuyer) console.error('Payoff request failed:', error.type || error.name);
     res.status(error.forBuyer ? error.status : 503).json({ message: error.forBuyer ? error.message : 'We could not complete that request. Please try again.' });
@@ -182,11 +229,11 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   app.use('/api/payoff', api);
   return { handleStripeEvent: async (event, _req) => {
     if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)
-      || event.data?.object?.metadata?.product !== PRODUCT) return false;
+      || !isPayoff(event.data?.object?.metadata)) return false;
     if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
     const session = await stripe.checkout.sessions.retrieve(event.data.object.id);
     if (session.payment_status === 'paid') await confirm(session, { retryMail: true });
     return true;
   } };
 }
-module.exports = { registerPayoff, paidOrder, basket, ITEMS, VERSION, PRODUCT };
+module.exports = { registerPayoff, paidOrder, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER };

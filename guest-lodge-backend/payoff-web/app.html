@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#ffffff">
+  <title>Marketel Payoff — your debt-free date</title>
+  <link rel="icon" href="/marketel-frontdesk-icon.png">
+  <link rel="stylesheet" href="/payoff/app.css?v=1">
+  <script src="/payoff/engine.js?v=1" defer></script>
+  <script src="/payoff/app.js?v=1" defer></script>
+</head>
+<body>
+  <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a></header>
+  <main id="main">
+    <section class="view" id="opening" hidden>
+      <h1 id="opening-title">Opening your plan…</h1>
+      <p class="muted" id="opening-status" role="status" aria-live="polite">Checking your payment with Stripe.</p>
+      <button class="big" id="opening-retry" type="button" hidden>Check again</button>
+      <p class="fine" id="opening-help" hidden>If you were charged, don’t pay again. Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a>.</p>
+    </section>
+
+    <section class="view" id="gate" hidden>
+      <h1>Your debt-free date is one link away</h1>
+      <p class="muted">Open the link in your Marketel Payoff email. Lost it? We’ll send it again.</p>
+      <form id="resend-form" novalidate>
+        <label class="field"><span>Email you used at checkout</span>
+          <input id="resend-email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required placeholder="you@example.com"></label>
+        <button class="big" id="resend-button" type="submit">Email me my link</button>
+        <p class="status" id="resend-status" role="status" aria-live="polite"></p>
+      </form>
+      <p class="fine">Don’t have Payoff yet? <a href="/payoff">See how it works</a>.</p>
+    </section>
+
+    <section class="view" id="debts" hidden>
+      <h1>Your debts</h1>
+      <p class="muted" id="debts-intro">Grab your latest statements. For each debt you need the balance, the interest rate (APR) and the minimum payment.</p>
+      <div class="totals" id="totals" hidden>
+        <div><span>Total owed</span><strong id="total-owed"></strong></div>
+        <div><span>Minimums a month</span><strong id="total-minimums"></strong></div>
+      </div>
+      <ul class="debt-list" id="debt-list"></ul>
+      <button class="big" id="add-first" type="button">Add your first debt</button>
+      <button class="ghost" id="add-more" type="button" hidden>+ Add another debt</button>
+      <div class="monthly" id="monthly" hidden>
+        <label class="field"><span>Extra you can pay each month <em>(optional)</em></span>
+          <span class="money-input"><b>$</b><input id="extra" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+        <p class="muted" id="monthly-total"></p>
+        <button class="big" id="show-result" type="button">Show my debt-free date</button>
+      </div>
+    </section>
+
+    <section class="view" id="result" hidden>
+      <button class="link-back" id="edit-debts" type="button">← Edit my debts</button>
+      <div class="date-card">
+        <p class="date-label" id="date-label">Debt-free</p>
+        <p class="date-big" id="date-big"></p>
+        <p class="date-plan" id="date-plan"></p>
+        <p class="date-was" id="date-was" hidden></p>
+        <p class="date-minimums" id="date-minimums"></p>
+        <p class="date-win" id="date-win" hidden></p>
+      </div>
+
+      <div class="whatif" aria-labelledby="whatif-title">
+        <h2 id="whatif-title">What if I paid more?</h2>
+        <div class="chips" role="group" aria-label="Extra each month">
+          <button class="chip" type="button" data-more="2500" aria-pressed="false">+$25/mo</button>
+          <button class="chip" type="button" data-more="5000" aria-pressed="false">+$50/mo</button>
+          <button class="chip" type="button" data-more="10000" aria-pressed="false">+$100/mo</button>
+        </div>
+        <label class="field"><span>One-time amount, like a tax refund</span>
+          <span class="money-input"><b>$</b><input id="one-time" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+      </div>
+
+      <h2>Compare plans</h2>
+      <p class="muted small">Same money every month. Tap a plan to see its order and schedule.</p>
+      <div class="plans" id="plans"></div>
+
+      <h2 id="order-title">Payoff order</h2>
+      <ol class="payoff-order" id="payoff-order"></ol>
+
+      <h2>Month by month</h2>
+      <p class="muted small" id="schedule-intro"></p>
+      <div class="schedule" id="schedule"></div>
+
+      <div class="warnings" id="warnings"></div>
+
+      <div class="actions">
+        <button class="big" id="save-pdf" type="button">Save as PDF</button>
+        <button class="ghost danger" id="clear" type="button">Clear my numbers</button>
+      </div>
+      <p class="fine">Your numbers stay on this phone. They are never sent to us.</p>
+      <p class="fine">Estimates only, not financial advice. Interest is the yearly rate ÷ 12 each month, with no new charges, fees or rate changes. Your lender’s statement is the source of truth.</p>
+    </section>
+  </main>
+
+  <div class="sheet-backdrop" id="sheet" hidden>
+    <form class="sheet" id="debt-form" novalidate aria-labelledby="sheet-title">
+      <h2 id="sheet-title">Add a debt</h2>
+      <label class="field"><span>Name <em>(optional)</em></span><input id="debt-name" maxlength="40" autocomplete="off" placeholder="e.g. Visa card"></label>
+      <div class="field"><span>Type</span>
+        <div class="segmented" role="radiogroup" aria-label="Type">
+          <button type="button" role="radio" data-type="card" aria-checked="true">Credit card</button>
+          <button type="button" role="radio" data-type="loan" aria-checked="false">Loan</button>
+        </div>
+        <p class="hint" id="type-hint">A card’s minimum shrinks as you pay it down.</p>
+      </div>
+      <label class="field"><span>Balance</span><span class="money-input"><b>$</b><input id="debt-balance" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+      <label class="field"><span>Interest rate (APR)</span><span class="money-input suffix"><input id="debt-apr" inputmode="decimal" autocomplete="off" placeholder="0"><b>%</b></span></label>
+      <label class="field"><span id="minimum-label">Minimum payment a month</span><span class="money-input"><b>$</b><input id="debt-minimum" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
+      <p class="sheet-warning" id="sheet-warning" role="status" aria-live="polite"></p>
+      <button class="big" type="submit" id="sheet-save">Save debt</button>
+      <div class="sheet-row">
+        <button class="ghost" type="button" id="sheet-cancel">Cancel</button>
+        <button class="ghost danger" type="button" id="sheet-delete" hidden>Delete</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <section class="print-only" id="print-head" aria-hidden="true"></section>
+</body>
+</html>

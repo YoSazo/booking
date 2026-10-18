@@ -169,17 +169,17 @@ const labelsOf = (steps, branches) => Object.fromEntries([
 // What each dashboard shows: the report wedges share one definition.
 const PAYOFF_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on Payoff', names: ['PayoffLanded'] },
-  { key: 'order', label: 'Viewed preorder', names: ['PayoffOrderViewed'] },
+  { key: 'order', label: 'Viewed order', names: ['PayoffOrderViewed'] },
   { key: 'tapped', label: 'Started secure checkout', names: ['PayoffCheckoutTapped'] },
   { key: 'checkout', label: 'Opened Stripe', names: ['PayoffCheckoutOpened'] },
-  { key: 'paid', label: 'Paid preorder', names: ['PayoffPaid'] },
+  { key: 'paid', label: 'Paid', names: ['PayoffPaid'] },
   { key: 'failed', label: 'Checkout failed', names: ['PayoffCheckoutFailed'], aside: true },
   { key: 'cancelled', label: 'Returned without payment', names: ['PayoffCheckoutCancelled'], aside: true },
 ]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: [], labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, []), PayoffConfirmationEmailed: 'Preorder confirmation emailed' }),
+  payoff: { steps: PAYOFF_STEPS, branches: [], labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, []), PayoffConfirmationEmailed: 'Payoff link emailed' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => name !== 'PayoffPaid'), 'PayoffFrom']),
-    split: false, tiles: [['Landed', 'landed'], ['Viewed preorder', 'order'], ['Started checkout', 'tapped'], ['Opened Stripe', 'checkout'], ['Paid preorder', 'paid']] },
+    split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Started checkout', 'tapped'], ['Opened Stripe', 'checkout'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
     // Events whose detail says which one (source, browser, what was picked) are
