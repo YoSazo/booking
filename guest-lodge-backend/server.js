@@ -1274,14 +1274,20 @@ function inspectGate(req, res, next) {
     next();
 }
 
+// An ad visitor at /claims gets the long-form offer; anything carrying one of
+// the app's own parameters (back from Stripe, sign-in links, previews) falls
+// through to the Claims app below. Registered first, so it is asked first.
+const { wantsClaimsApp } = require('./claims-offer-route');
+app.get('/claims', inspectGate, (req, res, next) => (wantsClaimsApp(req.query)
+    ? next() : res.sendFile(path.join(__dirname, 'public', 'claims-offer', 'index.html'))));
+
 for (const slug of Object.keys(INSPECT_ARMS)) {
     // Express is non-strict, so each of these also answers the trailing-slash
     // form. The client's arm regex accepts both.
     app.get(`/${slug}`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('index.html', slug)));
     app.get(`/${slug}/terms`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('terms.html', slug)));
 }
-// The long-form Claims offer for ad traffic: one page that sells the $49
-// one-time plan through the same checkout and events as /claims.
+// The same offer at its own address too (the first link shared for it).
 app.get('/claims/offer', inspectGate, (req, res) => res.sendFile(path.join(__dirname, 'public', 'claims-offer', 'index.html')));
 
 const INSPECT_LEGACY_ARMS = new Set(['', '/', ...Object.keys(INSPECT_ARMS).map(slug => `/${slug}`)]);

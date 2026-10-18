@@ -7,6 +7,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
+  // Someone already signed in to Claims came here for the app, not the pitch.
+  try { if (localStorage.getItem('inspect.session')) { location.replace('/claims?app=1'); return; } } catch { /* private mode */ }
   const store = {
     get: key => { try { return localStorage.getItem(key); } catch { return null; } },
     set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } },
