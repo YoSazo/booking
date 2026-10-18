@@ -1,6 +1,5 @@
 // Testimonials and founder content confirmed genuine by the owner.
 window.PAYOFF_CONTENT = {
-  localMockup: false,
   product: 'Marketel Payoff',
   priceCents: 3300,
   currency: 'USD',
@@ -8,37 +7,35 @@ window.PAYOFF_CONTENT = {
     stars: 5,
     label: 'Join 10,000+ people',
     description: 'using Marketel Payoff to turn their balances into a clear plan for paying off debt.',
-    mockup: false,
   },
   proof: {
     early: [
-      { src: '/payoff/assets/testimony-alexis-hannah.png', alt: 'Testimonials from Alexis and Hannah', mockup: false },
-      { src: '/payoff/assets/email-to-lauren.png', alt: 'Email from Jeanne to Lauren', mockup: false },
+      { src: '/payoff/assets/testimony-alexis-hannah.png', alt: 'Testimonials from Alexis and Hannah' },
+      { src: '/payoff/assets/email-to-lauren.png', alt: 'Email from Jeanne to Lauren' },
     ],
     problem: [
-      { src: '/payoff/assets/testimony-heather.png', alt: 'Testimonial from Heather', mockup: false },
-      { src: '/payoff/assets/testimony-brittany.png', alt: 'Testimonial from Brittany', mockup: false },
+      { src: '/payoff/assets/testimony-heather.png', alt: 'Testimonial from Heather' },
+      { src: '/payoff/assets/testimony-brittany.png', alt: 'Testimonial from Brittany' },
     ],
     example: [
-      { src: '/payoff/assets/testimony-barbara.png', alt: 'Testimonial from Barbara', mockup: false },
-      { src: '/payoff/assets/testimony-lindsay.png', alt: 'Testimonial from Lindsay', mockup: false },
-      { src: '/payoff/assets/testimony-amanda.png', alt: 'Testimonial from Amanda', mockup: false },
-      { src: '/payoff/assets/testimony-tara.png', alt: 'Testimonial from Tara', mockup: false },
+      { src: '/payoff/assets/testimony-barbara.png', alt: 'Testimonial from Barbara' },
+      { src: '/payoff/assets/testimony-lindsay.png', alt: 'Testimonial from Lindsay' },
+      { src: '/payoff/assets/testimony-amanda.png', alt: 'Testimonial from Amanda' },
+      { src: '/payoff/assets/testimony-tara.png', alt: 'Testimonial from Tara' },
     ],
     main: [
-      { src: '/payoff/assets/testimony-nicole.png', alt: 'Testimonial from Nicole', mockup: false },
-      { src: '/payoff/assets/testimony-megan.png', alt: 'Testimonial from Megan', mockup: false },
-      { src: '/payoff/assets/testimony-rachel.png', alt: 'Email from Rachel to Lauren', mockup: false },
-      { src: '/payoff/assets/testimony-dana.png', alt: 'Email from Dana to Lauren', mockup: false },
-      { src: '/payoff/assets/testimony-melissa.png', alt: 'Email from Melissa to Lauren', mockup: false },
-      { src: '/payoff/assets/testimony-sandy.png', alt: 'Email from Sandy to Lauren', mockup: false },
+      { src: '/payoff/assets/testimony-nicole.png', alt: 'Testimonial from Nicole' },
+      { src: '/payoff/assets/testimony-megan.png', alt: 'Testimonial from Megan' },
+      { src: '/payoff/assets/testimony-rachel.png', alt: 'Email from Rachel to Lauren' },
+      { src: '/payoff/assets/testimony-dana.png', alt: 'Email from Dana to Lauren' },
+      { src: '/payoff/assets/testimony-melissa.png', alt: 'Email from Melissa to Lauren' },
+      { src: '/payoff/assets/testimony-sandy.png', alt: 'Email from Sandy to Lauren' },
       null,
     ],
   }, // Each non-null entry: { src: '/payoff/assets/review.jpg', alt: 'Description', caption: '' }
   founder: {
     heading: 'Meet Lauren, A Mom Who Gets It',
     // Biography transcribed from the owner’s image.
-    mockup: false,
     paragraphs: [
       'I’m a mom who knows what it feels like to stare at numbers and feel completely overwhelmed.',
       'I wanted a real plan to pay off debt, but I hated spreadsheets. They felt confusing, cold, and way too easy to mess up.',

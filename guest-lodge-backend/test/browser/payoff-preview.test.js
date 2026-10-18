@@ -22,7 +22,7 @@ test('local composition has seven offers, fourteen images and reference-style ra
  assert.equal(await page.locator('a.cta').count(),7);
  for(const [group,count]of Object.entries({early:2,problem:2,example:4,main:6}))assert.equal(await page.locator('[data-proof="'+group+'"] > *').count(),count);
  assert.equal(await page.locator('.proof-image').count(),14);
- assert.equal(await page.locator('.mockup-label,.preview-note,.portrait-caption').count(),0);
+ assert.equal(await page.locator('.proof-image > figcaption,.preview-note,.portrait-caption').count(),0);
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
  assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
  assert.match(await page.locator('.rating-label').innerText(),/using Marketel Payoff to turn their balances into a clear plan for paying off debt\./);
@@ -30,14 +30,14 @@ test('local composition has seven offers, fourteen images and reference-style ra
  assert.equal(await page.locator('.proof-slot,.owner-placeholder,.policy-slot').count(),0);
  assert.doesNotMatch(await page.locator('body').innerText(),/your testimonial|refund-policy slot|customer feedback will appear/i);
  assert.equal(await page.locator('.proof-image img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);
- assert.equal(await page.locator('.media-slot,.media-placeholders,.bio-mockup-label').count(),0);
+ assert.equal(await page.locator('.media-slot,.media-placeholders').count(),0);
  assert.equal(await page.locator('iframe').count(),0);
  assert.deepEqual(errors,[]);
 }));
 test('local composition keeps the full extracted biography and all supplied images',async()=>world(async({page,base,errors})=>{
  assert.equal(await page.locator('#founder-content h2').innerText(),'Meet Lauren, A Mom Who Gets It');
  assert.equal(await page.locator('[data-owner-slot="founder-story"]').count(),0);
- const paragraphs=await page.locator('.founder-story > p:not(.bio-mockup-label)').allTextContents();
+ const paragraphs=await page.locator('.founder-story > p').allTextContents();
  assert.equal(paragraphs.length,8);
  assert.equal(paragraphs[0],'I’m a mom who knows what it feels like to stare at numbers and feel completely overwhelmed.');
  assert.equal(paragraphs[7],'I’d be honored to help you too.');
@@ -48,16 +48,10 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
  assert.equal(await page.locator('[data-proof="checkout"] .proof-image').count(),4);
- assert.equal(await page.locator('[data-proof="checkout"] .mockup-label').count(),0);
+ assert.equal(await page.locator('[data-proof="checkout"] figcaption').count(),0);
  assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
-test('public rendering keeps all testimonials and founder content without supplied/mockup labels',async()=>world(async({page})=>{
- assert.equal(await page.locator('.proof-image').count(),14);
- assert.equal(await page.locator('.mockup-label,.bio-mockup-label,.portrait-caption').count(),0);
- assert.doesNotMatch(await page.locator('body').innerText(),/Supplied testimonial mockup|Supplied founder biography|not independently verified|not verified rating/);
- assert.equal(await page.locator('.proof-slot').count(),0);
-},{config:'window.PAYOFF_CONTENT.localMockup=false;'}));
 test('all four baskets have correct totals; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
  assert.equal(await page.locator('#cashflow').isChecked(),false);assert.equal(await page.locator('#reset').isChecked(),false);
@@ -78,13 +72,13 @@ test('Back restores the sales page; FAQ and repeated offers remain usable',async
  assert.equal(await page.locator('a.cta').count(),7);
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
 }));
-test('owner text is text-only; missing or external proof assets are omitted rather than replaced with mock reviews',async()=>world(async({page,errors})=>{
+test('owner text is text-only; missing or external proof assets are omitted',async()=>world(async({page,errors})=>{
  assert.equal(await page.locator('#injected').count(),0);
  assert.match(await page.locator('#founder-content').innerText(),/<img id="injected"/);
  await page.waitForFunction(()=>document.querySelectorAll('[data-proof="early"] > *').length===0);
  assert.equal(await page.locator('[data-proof="early"] .owner-placeholder').count(),0);
  assert.equal(await page.locator('img[src^="https:"]').count(),0);assert.deepEqual(errors,[]);
-},{config:'window.PAYOFF_CONTENT.founder={heading:"About us",paragraphs:[\'<img id="injected" src=x onerror=alert(1)>\']};window.PAYOFF_CONTENT.proof.early=[{src:"https://example.test/fake.jpg",alt:"external"},{src:"/payoff/assets/missing.jpg",alt:"missing"}];'}));
+},{config:'window.PAYOFF_CONTENT.founder={heading:"About us",paragraphs:[\'<img id="injected" src=x onerror=alert(1)>\']};window.PAYOFF_CONTENT.proof.early=[{src:"https://example.test/external.jpg",alt:"external"},{src:"/payoff/assets/missing.jpg",alt:"missing"}];'}));
 for(const width of [320,390,430,1280])test('no horizontal overflow and accessible first CTA at '+width+'px',async()=>world(async({page,base,errors})=>{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  const first=page.locator('a.cta').first();await first.scrollIntoViewIfNeeded();

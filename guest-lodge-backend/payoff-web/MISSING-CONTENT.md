@@ -11,7 +11,6 @@ for buyers who selected them. Integrate existing paid Stripe preorders
 and email access to each buyer when the purchased tools are ready.
 
 The owner confirmed the testimonials and founder content are genuine.
-The repeated supplied/mockup labels have been removed.
 
 Use product screenshots once real software exists. Current illustrations
 are explicitly labeled example data. Support handles order questions,

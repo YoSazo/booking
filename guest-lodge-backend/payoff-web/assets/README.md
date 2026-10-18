@@ -6,5 +6,4 @@ genuine media/credential images here. Configure their paths and text in
 only material you have permission to publish. No reference-vendor assets ship.
 
 The local preview has 15 testimonial placements in groups of 2 / 2 / 4 / 7.
-Four reuse those entries on the order page. A missing image falls back to an
-editorial placeholder rather than a broken image or invented review.
+Four reuse those entries on the order page. Missing images are omitted.

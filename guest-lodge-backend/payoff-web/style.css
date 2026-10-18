@@ -21,9 +21,7 @@
 [data-proof=main] .proof-slot:nth-child(5){aspect-ratio:348/306}
 [data-proof=main] .proof-slot:nth-child(6){aspect-ratio:348/374}
 [data-proof=main] .proof-slot:nth-child(7){aspect-ratio:348/341}
-.proof-image .mockup-label{opacity:1;font-size:12px;line-height:1.4;font-weight:700;text-align:left;color:#654311;background:#fff3cf;border:1px solid #e8d19a;padding:9px 11px;margin:0 0 8px}
 .portrait-caption{font-size:12px;line-height:1.4;margin:12px auto 0;max-width:280px}
-.bio-mockup-label{font-size:12px;line-height:1.4;font-weight:700;color:#654311;background:#fff3cf;border:1px solid #e8d19a;padding:10px 12px;max-width:540px;margin:0 auto 24px}
 .founder-story{max-width:780px;margin:28px auto 0}
 .rating-slot{max-width:350px;margin:30px auto 20px}
 .rating-stars{font-size:56px;line-height:1;letter-spacing:4px;color:#d64c6e;margin:0 0 22px}

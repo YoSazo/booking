@@ -2,9 +2,7 @@
 
 Transcribed from the user-supplied `Meet Lauren_ A Mom Who Gets It.png`.
 Line wrapping is removed; wording and paragraph order are preserved, including
-the handwritten closing line. This is supplied mockup copy, not independently
-verified biographical history. The loopback-only composition hides the label
-at the owner's request; the source retains its mockup designation.
+the handwritten closing line.
 
 ---
 
