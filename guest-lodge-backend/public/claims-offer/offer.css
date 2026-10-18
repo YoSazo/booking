@@ -1,0 +1,83 @@
+/* A long, talkative offer page: white, centered, big coloured headlines, one
+   bright button repeated. No brand bar. */
+@font-face { font-family: "DM Sans"; font-weight: 400; font-display: swap; src: url("/frontdesk/assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-weight: 500; font-display: swap; src: url("/frontdesk/assets/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-weight: 700; font-display: swap; src: url("/frontdesk/assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
+:root {
+  --ink: #1d1d1f;
+  --soft: #4a4f55;
+  --head: #1f6b4c;
+  --cta: #ff7a3d;
+  --cta-dark: #ec6426;
+  --line: #e7e9ec;
+  --tint: #f5f8f6;
+  --star: #f2a33a;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: #fff; }
+body { color: var(--ink); font: 18px/1.5 "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; }
+button { font: inherit; cursor: pointer; }
+.letter { max-width: 560px; margin: 0 auto; padding: 0 20px calc(40px + var(--safe-bottom)); text-align: center; }
+section { padding: 34px 0 30px; border-bottom: 1px solid var(--line); }
+section:last-of-type { border-bottom: 0; }
+h1 { font-size: 31px; line-height: 1.16; letter-spacing: -0.6px; color: var(--head); font-weight: 700; margin: 6px 0 18px; }
+h2 { font-size: 25px; line-height: 1.2; letter-spacing: -0.4px; margin: 0 0 18px; font-weight: 700; }
+p { margin: 0 0 14px; }
+.hero { padding-top: 26px; }
+.eyebrow { font-weight: 700; font-size: 16px; color: var(--soft); margin: 0; }
+.lede { color: var(--soft); font-size: 19px; }
+.kill { font-weight: 700; font-size: 20px; margin: 18px 0 6px; }
+.turn { font-weight: 700; font-size: 20px; color: var(--head); }
+.story p, .example p, .who p { font-size: 18.5px; }
+
+/* The offer block, repeated. */
+.offer { margin: 22px 0 6px; }
+.anchor { margin: 0; color: var(--soft); font-size: 18px; }
+.was { font-weight: 500; }
+.price { font-weight: 700; font-size: 22px; margin: 2px 0 14px; }
+.cta { display: block; width: 100%; max-width: 420px; margin: 0 auto; min-height: 62px; border: 0; border-radius: 999px; background: var(--cta); color: #fff; font-weight: 700; font-size: 20px; letter-spacing: -0.2px; box-shadow: 0 8px 20px rgba(255, 122, 61, 0.35); transition: transform .12s ease, background .12s ease; }
+.cta:active { transform: scale(0.98); background: var(--cta-dark); }
+.cta[disabled] { opacity: 0.75; }
+.fine { font-size: 14.5px; color: var(--soft); margin: 12px 0 0; line-height: 1.45; }
+.error { color: #b3261e; font-weight: 700; font-size: 15px; margin: 10px 0 0; }
+.rating { margin: 18px 0 0; font-size: 16px; color: var(--soft); }
+.rating .stars { color: var(--star); letter-spacing: 2px; font-size: 22px; display: block; }
+
+/* How it works. */
+.steps { list-style: none; padding: 0; margin: 0 0 18px; text-align: left; display: grid; gap: 14px; }
+.steps li { background: var(--tint); border-radius: 16px; padding: 14px 16px; font-size: 17px; }
+.steps b { display: block; color: var(--head); font-size: 18px; margin-bottom: 2px; }
+.video { margin: 18px 0 0; }
+.video video { display: block; width: 100%; max-width: 360px; margin: 0 auto; border-radius: 18px; background: #eef1ef; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12); }
+.video figcaption { font-size: 15px; color: var(--soft); margin-top: 10px; }
+
+/* Reviews. */
+.reviews { display: grid; gap: 12px; text-align: left; }
+.review { margin: 0; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: #fff; }
+.review .stars { color: var(--star); letter-spacing: 1px; font-size: 16px; }
+.review p { margin: 6px 0 8px; font-size: 16.5px; }
+.review .who { font-weight: 700; font-size: 15px; }
+.review .role { color: var(--soft); font-weight: 500; }
+.more { margin: 14px auto 0; display: block; border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: 16px; color: var(--ink); }
+
+/* What you get. */
+.list { list-style: none; padding: 0; margin: 0 0 16px; text-align: left; display: grid; gap: 12px; }
+.list li { position: relative; padding-left: 32px; font-size: 17px; }
+.list li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 13px; height: 7px; border-left: 3px solid var(--head); border-bottom: 3px solid var(--head); transform: rotate(-45deg); }
+
+/* Questions. */
+.faq details { text-align: left; border-bottom: 1px solid var(--line); padding: 14px 2px; }
+.faq summary { font-weight: 700; font-size: 18px; cursor: pointer; list-style: none; position: relative; padding-right: 28px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; position: absolute; right: 4px; top: -2px; font-size: 24px; color: var(--head); }
+.faq details[open] summary::after { content: "–"; }
+.faq details p { margin: 10px 0 2px; font-size: 16.5px; color: var(--soft); }
+
+.foot { padding: 26px 0 0; font-size: 13.5px; color: var(--soft); }
+.busy { position: fixed; inset: 0; z-index: 40; background: rgba(255, 255, 255, 0.92); display: grid; place-content: center; justify-items: center; gap: 14px; font-weight: 700; }
+.spinner { width: 44px; height: 44px; border-radius: 50%; border: 5px solid var(--line); border-top-color: var(--cta); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } .cta { transition: none; } }

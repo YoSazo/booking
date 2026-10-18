@@ -1280,6 +1280,9 @@ for (const slug of Object.keys(INSPECT_ARMS)) {
     app.get(`/${slug}`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('index.html', slug)));
     app.get(`/${slug}/terms`, inspectGate, (req, res) => res.type('html').send(inspectSkinned('terms.html', slug)));
 }
+// The long-form Claims offer for ad traffic: one page that sells the $49
+// one-time plan through the same checkout and events as /claims.
+app.get('/claims/offer', inspectGate, (req, res) => res.sendFile(path.join(__dirname, 'public', 'claims-offer', 'index.html')));
 
 const INSPECT_LEGACY_ARMS = new Set(['', '/', ...Object.keys(INSPECT_ARMS).map(slug => `/${slug}`)]);
 app.use('/inspect/', inspectGate, (req, res, next) => {
