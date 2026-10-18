@@ -255,3 +255,38 @@ test('/funnel applies custom times, persists them, changes timezone, and reports
     assert.equal(h.seen.length, before, 'inverted ranges never hit the server');
   } finally { await h.browser.close(); }
 });
+
+for (const linked of [false, true]) test(`/funnel opens Payoff ${linked ? 'from a link over a saved Trace selection' : 'by default'} and keeps product switching`, async () => {
+  const { definitionFor } = require('../../wedge-funnel');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const requests = [], errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.addInitScript(saved => {
+      localStorage.setItem('marketelAdminToken', 'test');
+      if (saved) localStorage.setItem('marketelWedgeFunnel', JSON.stringify({ version: 2, tool: 'trace', period: 'today', timezone: 'America/Chicago' }));
+    }, linked);
+    await page.route('http://funnel.test/**', route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/funnel/wedge') {
+        requests.push(url.searchParams.get('tool'));
+        const tool = ['payoff', 'trace'].includes(url.searchParams.get('tool')) ? url.searchParams.get('tool') : 'payoff';
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ wedges: [{ id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }], tool,
+          ...buildWedgeFunnel([], definitionFor(tool)) }) });
+      }
+      if (url.pathname === '/funnel') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')) });
+      return route.fulfill({ status: 404, body: '' });
+    });
+    await page.goto('http://funnel.test/funnel' + (linked ? '?tool=payoff' : ''));
+    await page.locator('#wedge-name:has-text("Payoff")').waitFor();
+    assert.equal(requests[0], 'payoff');
+    assert.match(await page.locator('#ladder').innerText(), /Landed on Payoff/);
+    assert.match(await page.locator('#branches').innerText(), /Where they came from/);
+    assert.equal(await page.locator('#split-card').isHidden(), true);
+    await page.locator('#wedge').selectOption('trace');
+    await page.locator('#wedge-name:has-text("Trace")').waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('tool'), 'trace');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});

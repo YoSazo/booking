@@ -192,15 +192,22 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
 let adminToken = '';
 try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
-let state = { version: 2, tool: '', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false };
+let state = { version: 2, tool: 'payoff', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false };
 let feedAll = false, lastData = null;
 try {
   const saved = JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}');
   // Retain source/wedge preferences, but migrate the old misleading rolling
   // "Today" and seven-day default to a genuine calendar Today.
   if (saved.version === 2) Object.assign(state, saved);
-  else Object.assign(state, { tool: saved.tool || '', adOnly: !!saved.adOnly });
+  else Object.assign(state, { tool: saved.tool || 'payoff', adOnly: !!saved.adOnly });
 } catch (_) {}
+const linkedTool = new URLSearchParams(location.search).get('tool');
+if (linkedTool && /^[a-z][a-z0-9-]{0,49}$/.test(linkedTool)) state.tool = linkedTool;
+const syncToolLink = () => {
+  const url = new URL(location.href);
+  if (state.tool) url.searchParams.set('tool', state.tool);
+  history.replaceState(null, '', url);
+};
 if (!['today','yesterday','24h','7d','30d','all','since-reset','custom'].includes(state.period)) state.period = 'today';
 try { new Intl.DateTimeFormat('en-US', { timeZone: state.timezone }); } catch (_) { state.timezone = 'America/Chicago'; }
 const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
@@ -327,6 +334,7 @@ async function load() {
     const data = await adminFetch(`/api/funnel/wedge?${params}`);
     if (version !== loadVersion) return;
     if (data.tool && data.tool !== state.tool) { state.tool = data.tool; saveState(); }
+    syncToolLink();
     lastData = data;
     render(data);
   } catch (error) {
@@ -352,7 +360,7 @@ function paintTrack() {
   $('track-toggle').setAttribute('aria-pressed', String(off));
   $('track-toggle').textContent = off ? '✓ Not counting this browser' : 'Counting this browser';
   $('track-note').textContent = off
-    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open any page with ?notrack=1 once (bookmarketel.com/trace?notrack=1 or /claims?notrack=1; one covers both).'
+    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open any page with ?notrack=1 once (bookmarketel.com/payoff?notrack=1; this covers every product).'
     : 'This browser counts like a visitor. Switch it off before looking at the site yourself.';
 }
 if (trackState() === null) setTrack('1');

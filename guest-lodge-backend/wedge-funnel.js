@@ -173,12 +173,21 @@ const PAYOFF_STEPS = Object.freeze([
   { key: 'tapped', label: 'Started secure checkout', names: ['PayoffCheckoutTapped'] },
   { key: 'checkout', label: 'Opened Stripe', names: ['PayoffCheckoutOpened'] },
   { key: 'paid', label: 'Paid', names: ['PayoffPaid'] },
+  { key: 'emailed', label: 'Payoff link emailed', names: ['PayoffConfirmationEmailed'], aside: true },
   { key: 'failed', label: 'Checkout failed', names: ['PayoffCheckoutFailed'], aside: true },
   { key: 'cancelled', label: 'Returned without payment', names: ['PayoffCheckoutCancelled'], aside: true },
 ]);
+const PAYOFF_BRANCHES = Object.freeze([
+  { key: 'from', label: 'Where they came from', steps: [
+    ['Clicked the ad (Meta click id)', ['PayoffFrom:ad']],
+    ['From Facebook or Instagram, no click id', ['PayoffFrom:social']],
+    ['No referrer: typed, QR, or bookmark', ['PayoffFrom:direct']],
+    ['From another site', ['PayoffFrom:other']],
+  ] },
+]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: [], labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, []), PayoffConfirmationEmailed: 'Payoff link emailed' }),
-    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => name !== 'PayoffPaid'), 'PayoffFrom']),
+  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze(labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES)),
+    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom']),
     split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Started checkout', 'tapped'], ['Opened Stripe', 'checkout'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
