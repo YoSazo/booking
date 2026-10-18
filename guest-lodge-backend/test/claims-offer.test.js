@@ -20,6 +20,7 @@ test('every event the offer page sends is on the anonymous Claims allowlist', ()
 test('it sells the one-time plan through the existing checkout and keeps long Meta click ids', () => {
   assert.match(page, /\/api\/inspect\/checkout\/sim/);
   assert.match(page, /plan: 'lifetime'/);
+  assert.match(page, /from: 'offer'/, 'Stripe back link returns to the offer');
   assert.doesNotMatch(page, /lifetime_trial/);
   assert.match(page, /\{1,470\}/, 'fbclid values up to 470 characters are kept');
 });

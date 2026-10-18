@@ -3094,6 +3094,25 @@ test('a headless or crawler browser opening Checkout is not counted as someone w
   } finally { h.registration.close(); }
 }));
 
+test('backing out of Stripe from the long-form offer returns to the offer, not the app', () => atTime(DURING_LAUNCH, async () => {
+  const { wantsClaimsApp } = require('../claims-offer-route');
+  const buy = (h, extra) => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plan: 'lifetime', tool: 'claims', visitorId: `v_${'d'.repeat(12)}`, ...extra }) });
+  let h = moneyHarness();
+  try {
+    assert.equal((await buy(h, { from: 'offer', embedded: false })).status, 200);
+    const { params } = h.calls.sessions[0];
+    assert.equal(params.cancel_url, 'https://bookmarketel.com/claims?back=checkout');
+    assert.equal(wantsClaimsApp(Object.fromEntries(new URL(params.cancel_url).searchParams)), false, 'the cancel link serves the offer');
+    assert.equal(params.success_url, 'https://bookmarketel.com/claims?sim=1&checkout=success&session={CHECKOUT_SESSION_ID}', 'a buyer still lands in the app');
+  } finally { h.registration.close(); }
+  h = moneyHarness();
+  try {
+    assert.equal((await buy(h, { embedded: false })).status, 200);
+    assert.equal(h.calls.sessions[0].params.cancel_url, 'https://bookmarketel.com/claims?sim=1&checkout=cancelled', 'the app keeps its own return');
+  } finally { h.registration.close(); }
+}));
+
 test('Claims embeds Checkout on-page and safely falls back when its public key is unavailable', () => atTime(DURING_LAUNCH, async () => {
   const buy = h => request(h.app, '/api/inspect/checkout/sim', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plan: 'lifetime', embedded: true, tool: 'claims', visitorId: `v_${'c'.repeat(12)}` }) });

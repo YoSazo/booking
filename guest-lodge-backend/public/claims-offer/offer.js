@@ -7,6 +7,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
+  // Back from Stripe without paying: the same page, without the marker in the address.
+  if (params.get('back') === 'checkout') { try { history.replaceState(null, '', location.pathname); } catch { /* old browser */ } }
   // Someone already signed in to Claims came here for the app, not the pitch.
   try { if (localStorage.getItem('inspect.session')) { location.replace('/claims?app=1'); return; } } catch { /* private mode */ }
   const store = {
@@ -90,7 +92,7 @@
     $('busy').hidden = false;
     try {
       const response = await fetch('/api/inspect/checkout/sim', { method: 'POST', headers,
-        body: JSON.stringify({ tool: 'claims', plan: 'lifetime', visitorId, attribution, embedded: false }) });
+        body: JSON.stringify({ tool: 'claims', plan: 'lifetime', from: 'offer', visitorId, attribution, embedded: false }) });
       const data = await response.json().catch(() => ({}));
       if (mine !== generation) return;
       if (!response.ok || !/^https:\/\/checkout\.stripe\.com\//.test(String(data.url || ''))) throw new Error(data.error || data.message || 'Checkout could not be opened. Please try again.');

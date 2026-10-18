@@ -1107,7 +1107,9 @@ const signaturesHtml = document => (document.signatures || []).map(signature => 
       metadata, payment_intent_data: { metadata, ...(paidTrial ? { setup_future_usage: 'off_session', description: `Marketel Claims paid trial. ${CLAIMS_TRIAL.disclosure}` } : {}) },
       ...(!embedded ? {
         success_url: toolReturn(tool, 'sim=1&checkout=success&session={CHECKOUT_SESSION_ID}'),
-        cancel_url: toolReturn(tool, 'sim=1&checkout=cancelled'),
+        // Backing out of Stripe returns to the page they came from: the
+        // long-form offer has no app parameter, so it stays the offer.
+        cancel_url: tool === 'claims' && req.body?.from === 'offer' ? toolReturn(tool, 'back=checkout') : toolReturn(tool, 'sim=1&checkout=cancelled'),
       } : {}),
     });
     if (!ownerBrowser(req) && !automatedBrowser(req)) await recordBestEffort(null, 'SimCheckoutStarted', `inspect-sim-checkout:${session.id}`, { tool, visitorId: visitor, detail: paidTrial ? 'lifetime_trial' : 'lifetime' });
