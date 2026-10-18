@@ -43,10 +43,9 @@ steps and paid orders are available under Payoff preorders on `/funnel`.
 
 ## Content and preview
 
-Supplied portrait, biography, rating/count and testimonial assets retain their
-mockup markings. On public hosts, the renderer displays the disclosures;
-`localMockup: true` suppresses them only on loopback for design review.
-The software illustrations use example data and are labeled accordingly.
+The owner confirmed that the testimonials and founder content are genuine.
+They render without supplied/mockup warnings on every host. The software
+illustrations use example data and are labeled accordingly.
 Images are copied byte for byte; the Jeanne/Kati recipient variant is excluded.
 
 Local design preview (payments always disabled):

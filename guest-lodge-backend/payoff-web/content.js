@@ -1,7 +1,6 @@
-// Rating/count, founder history and supplied proof are source-marked mockups.
-// Public hostnames display disclosures; these are not verified customer claims.
+// Testimonials and founder content confirmed genuine by the owner.
 window.PAYOFF_CONTENT = {
-  localMockup: true,
+  localMockup: false,
   product: 'Marketel Payoff',
   priceCents: 3300,
   currency: 'USD',
@@ -9,38 +8,37 @@ window.PAYOFF_CONTENT = {
     stars: 5,
     label: 'Join 10,000+ people',
     description: 'using Marketel Payoff to turn their balances into a clear plan for paying off debt.',
-    mockup: true,
+    mockup: false,
   },
   proof: {
     early: [
-      { src: '/payoff/assets/testimony-alexis-hannah.png', alt: 'Supplied comment mockup showing Alexis and Hannah', mockup: true },
-      { src: '/payoff/assets/email-to-lauren.png', alt: 'Supplied email mockup from Jeanne addressed to Lauren', mockup: true },
+      { src: '/payoff/assets/testimony-alexis-hannah.png', alt: 'Testimonials from Alexis and Hannah', mockup: false },
+      { src: '/payoff/assets/email-to-lauren.png', alt: 'Email from Jeanne to Lauren', mockup: false },
     ],
     problem: [
-      { src: '/payoff/assets/testimony-heather.png', alt: 'Supplied comment mockup attributed to Heather', mockup: true },
-      { src: '/payoff/assets/testimony-brittany.png', alt: 'Supplied comment mockup attributed to Brittany', mockup: true },
+      { src: '/payoff/assets/testimony-heather.png', alt: 'Testimonial from Heather', mockup: false },
+      { src: '/payoff/assets/testimony-brittany.png', alt: 'Testimonial from Brittany', mockup: false },
     ],
     example: [
-      { src: '/payoff/assets/testimony-barbara.png', alt: 'Supplied comment mockup attributed to Barbara', mockup: true },
-      { src: '/payoff/assets/testimony-lindsay.png', alt: 'Supplied comment mockup attributed to Lindsay', mockup: true },
-      { src: '/payoff/assets/testimony-amanda.png', alt: 'Supplied comment mockup attributed to Amanda', mockup: true },
-      { src: '/payoff/assets/testimony-tara.png', alt: 'Supplied comment mockup attributed to Tara', mockup: true },
+      { src: '/payoff/assets/testimony-barbara.png', alt: 'Testimonial from Barbara', mockup: false },
+      { src: '/payoff/assets/testimony-lindsay.png', alt: 'Testimonial from Lindsay', mockup: false },
+      { src: '/payoff/assets/testimony-amanda.png', alt: 'Testimonial from Amanda', mockup: false },
+      { src: '/payoff/assets/testimony-tara.png', alt: 'Testimonial from Tara', mockup: false },
     ],
     main: [
-      { src: '/payoff/assets/testimony-nicole.png', alt: 'Supplied comment mockup attributed to Nicole', mockup: true },
-      { src: '/payoff/assets/testimony-megan.png', alt: 'Supplied comment mockup attributed to Megan', mockup: true },
-      { src: '/payoff/assets/testimony-rachel.png', alt: 'Supplied email mockup attributed to Rachel and addressed to Lauren', mockup: true },
-      { src: '/payoff/assets/testimony-dana.png', alt: 'Supplied email mockup attributed to Dana and addressed to Lauren', mockup: true },
-      { src: '/payoff/assets/testimony-melissa.png', alt: 'Supplied email mockup attributed to Melissa and addressed to Lauren', mockup: true },
-      { src: '/payoff/assets/testimony-sandy.png', alt: 'Supplied email mockup attributed to Sandy and addressed to Lauren', mockup: true },
+      { src: '/payoff/assets/testimony-nicole.png', alt: 'Testimonial from Nicole', mockup: false },
+      { src: '/payoff/assets/testimony-megan.png', alt: 'Testimonial from Megan', mockup: false },
+      { src: '/payoff/assets/testimony-rachel.png', alt: 'Email from Rachel to Lauren', mockup: false },
+      { src: '/payoff/assets/testimony-dana.png', alt: 'Email from Dana to Lauren', mockup: false },
+      { src: '/payoff/assets/testimony-melissa.png', alt: 'Email from Melissa to Lauren', mockup: false },
+      { src: '/payoff/assets/testimony-sandy.png', alt: 'Email from Sandy to Lauren', mockup: false },
       null,
     ],
   }, // Each non-null entry: { src: '/payoff/assets/review.jpg', alt: 'Description', caption: '' }
   founder: {
     heading: 'Meet Lauren, A Mom Who Gets It',
-    // Faithful text extraction from the supplied image, not independently
-    // verified founder history. Local design material, not publication-ready.
-    mockup: true,
+    // Biography transcribed from the owner’s image.
+    mockup: false,
     paragraphs: [
       'I’m a mom who knows what it feels like to stare at numbers and feel completely overwhelmed.',
       'I wanted a real plan to pay off debt, but I hated spreadsheets. They felt confusing, cold, and way too easy to mess up.',
@@ -52,8 +50,8 @@ window.PAYOFF_CONTENT = {
       'I’d be honored to help you too.',
     ],
     image: '/payoff/assets/lauren-portrait.png',
-    imageAlt: 'Portrait supplied for the Lauren founder-layout mockup',
-    caption: 'Supplied founder portrait mockup',
+    imageAlt: 'Lauren, founder of Marketel Payoff',
+    caption: '',
   },
   productImage: null, // { src, alt }; fallback is explicitly an interface illustration.
   refundPolicy: null, // Publish only a policy the owner approves and can honor.

@@ -21,7 +21,7 @@ test('local composition has seven offers, fourteen images and reference-style ra
  assert.deepEqual(await page.locator('[data-section]').evaluateAll(els=>els.map(el=>el.dataset.section)),['hero','problem','example','mechanism','proof','founder','included','faq']);
  assert.equal(await page.locator('a.cta').count(),7);
  for(const [group,count]of Object.entries({early:2,problem:2,example:4,main:6}))assert.equal(await page.locator('[data-proof="'+group+'"] > *').count(),count);
- assert.equal(await page.locator('.proof-mockup').count(),14);
+ assert.equal(await page.locator('.proof-image').count(),14);
  assert.equal(await page.locator('.mockup-label,.preview-note,.portrait-caption').count(),0);
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
  assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
@@ -29,7 +29,7 @@ test('local composition has seven offers, fourteen images and reference-style ra
  assert.equal(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize),'56px');
  assert.equal(await page.locator('.proof-slot,.owner-placeholder,.policy-slot').count(),0);
  assert.doesNotMatch(await page.locator('body').innerText(),/your testimonial|refund-policy slot|customer feedback will appear/i);
- assert.equal(await page.locator('.proof-mockup img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);
+ assert.equal(await page.locator('.proof-image img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);
  assert.equal(await page.locator('.media-slot,.media-placeholders,.bio-mockup-label').count(),0);
  assert.equal(await page.locator('iframe').count(),0);
  assert.deepEqual(errors,[]);
@@ -47,16 +47,15 @@ test('local composition keeps the full extracted biography and all supplied imag
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
- assert.equal(await page.locator('[data-proof="checkout"] .proof-mockup').count(),4);
+ assert.equal(await page.locator('[data-proof="checkout"] .proof-image').count(),4);
  assert.equal(await page.locator('[data-proof="checkout"] .mockup-label').count(),0);
  assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
-test('disabling local mockup mode restores proof, biography and rating disclosures',async()=>world(async({page})=>{
- assert.equal(await page.locator('.proof-mockup .mockup-label').count(),14);
- assert.equal(await page.locator('.bio-mockup-label').count(),1);
- assert.equal(await page.locator('.portrait-caption').count(),1);
- assert.match(await page.locator('.rating-slot .mockup-label').innerText(),/not verified rating or customer count/);
+test('public rendering keeps all testimonials and founder content without supplied/mockup labels',async()=>world(async({page})=>{
+ assert.equal(await page.locator('.proof-image').count(),14);
+ assert.equal(await page.locator('.mockup-label,.bio-mockup-label,.portrait-caption').count(),0);
+ assert.doesNotMatch(await page.locator('body').innerText(),/Supplied testimonial mockup|Supplied founder biography|not independently verified|not verified rating/);
  assert.equal(await page.locator('.proof-slot').count(),0);
 },{config:'window.PAYOFF_CONTENT.localMockup=false;'}));
 test('all four baskets have correct totals; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{

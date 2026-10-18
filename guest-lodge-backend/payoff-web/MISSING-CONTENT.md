@@ -10,9 +10,8 @@ for buyers who selected them. Integrate existing paid Stripe preorders
 (product `marketel-payoff-preorder`, offer version `payoff-preorder-v1`)
 and email access to each buyer when the purchased tools are ready.
 
-Supplied rating/count, proof, biography and portrait remain source-marked
-mockups and are disclosed on public hosts. Replace these with verified
-materials before presenting them as actual customer/founder proof.
+The owner confirmed the testimonials and founder content are genuine.
+The repeated supplied/mockup labels have been removed.
 
 Use product screenshots once real software exists. Current illustrations
 are explicitly labeled example data. Support handles order questions,

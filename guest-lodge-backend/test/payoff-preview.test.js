@@ -6,13 +6,13 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {createHash}=require('node:crypto');
 const {createPreview}=require('../scripts/preview-payoff');
-test('supplied proof is unique, disclosed and byte-preserved; biography matches its transcript',()=>{
+test('owner-confirmed testimonials are unique and byte-preserved; biography matches its transcript',()=>{
  const root=path.resolve(__dirname,'../payoff-web');
  const context={window:{}};
  vm.runInNewContext(fs.readFileSync(path.join(root,'content.js'),'utf8'),context);
  const content=context.window.PAYOFF_CONTENT;
- assert.equal(content.localMockup,true);
- assert.equal(content.rating.mockup,true);
+ assert.equal(content.localMockup,false);
+ assert.equal(content.rating.mockup,false);
  const slots=Object.values(content.proof).flat();
  const images=slots.filter(Boolean);
  assert.equal(slots.length,15);assert.equal(images.length,14);
@@ -34,12 +34,12 @@ test('supplied proof is unique, disclosed and byte-preserved; biography matches 
   'testimony-sandy.png':'f89dd24a4061ac4ed678ddcc59e4193fea9af3b5eb085492afe35f14b788564f',
  };
  for(const image of images){
-  assert.equal(image.mockup,true);
+  assert.equal(image.mockup,false);
   const name=path.basename(image.src);
   const hash=createHash('sha256').update(fs.readFileSync(path.join(root,'assets',name))).digest('hex');
   assert.equal(hash,hashes[name],name);
  }
- assert.equal(content.founder.mockup,true);
+ assert.equal(content.founder.mockup,false);
  const transcript=fs.readFileSync(path.join(root,'BIO-TRANSCRIPT.md'),'utf8');
  for(const paragraph of content.founder.paragraphs)assert.ok(transcript.includes(paragraph));
 });
