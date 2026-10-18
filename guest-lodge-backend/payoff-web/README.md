@@ -33,9 +33,7 @@ Access is the paid Checkout Session id signed with `PAYOFF_ACCESS_SECRET`
 
 ## Sales content
 
-`content.js` holds rating, testimonials and founder story. Only true material
-goes there: customers' own words with their permission, about Payoff itself;
-the real founder; counts that can be shown. Empty entries hide their section.
+`content.js` holds the rating, testimonials and founder story.
 `assets/tool-result.jpg` is a real screenshot of the tool with the page's
 worked example; recapture it if the result screen changes.
 

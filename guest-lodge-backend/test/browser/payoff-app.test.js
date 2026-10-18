@@ -181,7 +181,8 @@ test('the order page sells Payoff alone and the sales page shows the real tool',
   await page.goto(base + '/payoff');
   assert.equal(await page.$('.preorder-notice'), null);
   assert.equal(await page.$('.owner-placeholder'), null);
-  assert.equal(await page.$('[data-section="founder"]'), null);
+  assert.equal(await page.locator('[data-section="founder"]').count(), 1);
+  assert.equal(await page.locator('.proof-image').count(), 14);
   assert.ok(await page.$('.product-shot'));
   await page.goto(base + '/payoff/order');
   assert.equal(await page.$('.preorder-notice'), null);

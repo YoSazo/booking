@@ -17,16 +17,39 @@ async function world(fn,{width=390,reducedMotion='no-preference',config=null}={}
   await fn({page,base,errors,requests});
  }finally{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 }
-test('composition shows the real tool and no empty slots, rating or borrowed proof',async()=>world(async({page,errors})=>{
- assert.deepEqual(await page.locator('[data-section]').evaluateAll(els=>els.map(el=>el.dataset.section)),['hero','problem','example','mechanism','included','faq']);
- assert.equal(await page.locator('a.cta').count(),6);
- assert.equal(await page.locator('.proof-image,.rating-stars,.rating-slot,.preorder-notice,.owner-placeholder,.proof-slot,.policy-slot,.preview-note').count(),0);
- assert.doesNotMatch(await page.locator('body').innerText(),/preorder|10,000|Lauren|Kati|not yet available|in development/i);
- const shots=page.locator('img.product-shot');
- assert.equal(await shots.count(),3);
- await shots.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
- assert.ok(await shots.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
+test('local composition has seven offers, fourteen images and reference-style rating without empty slots',async()=>world(async({page,errors})=>{
+ assert.deepEqual(await page.locator('[data-section]').evaluateAll(els=>els.map(el=>el.dataset.section)),['hero','problem','example','mechanism','proof','founder','included','faq']);
+ assert.equal(await page.locator('a.cta').count(),7);
+ for(const [group,count]of Object.entries({early:2,problem:2,example:4,main:6}))assert.equal(await page.locator('[data-proof="'+group+'"] > *').count(),count);
+ assert.equal(await page.locator('.proof-image').count(),14);
+ assert.equal(await page.locator('.proof-image > figcaption,.preview-note,.portrait-caption').count(),0);
+ assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
+ assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
+ assert.match(await page.locator('.rating-label').innerText(),/using Marketel Payoff to turn their balances into a clear plan for paying off debt\./);
+ assert.equal(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize),'56px');
+ assert.equal(await page.locator('.proof-slot,.owner-placeholder,.policy-slot').count(),0);
+ assert.doesNotMatch(await page.locator('body').innerText(),/your testimonial|refund-policy slot|customer feedback will appear/i);
+ assert.equal(await page.locator('.proof-image img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);
+ assert.equal(await page.locator('.media-slot,.media-placeholders').count(),0);
  assert.equal(await page.locator('iframe').count(),0);
+ assert.deepEqual(errors,[]);
+}));
+test('local composition keeps the full extracted biography and all supplied images',async()=>world(async({page,base,errors})=>{
+ assert.equal(await page.locator('#founder-content h2').innerText(),'Meet Lauren, A Mom Who Gets It');
+ assert.equal(await page.locator('[data-owner-slot="founder-story"]').count(),0);
+ const paragraphs=await page.locator('.founder-story > p').allTextContents();
+ assert.equal(paragraphs.length,8);
+ assert.equal(paragraphs[0],'I’m a mom who knows what it feels like to stare at numbers and feel completely overwhelmed.');
+ assert.equal(paragraphs[7],'I’d be honored to help you too.');
+ assert.deepEqual(paragraphs,await page.evaluate(()=>window.PAYOFF_CONTENT.founder.paragraphs));
+ const assets=page.locator('img[src^="/payoff/assets/"]');
+ assert.equal(await assets.count(),18);
+ await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
+ assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
+ await page.goto(base+'/payoff/order');
+ assert.equal(await page.locator('[data-proof="checkout"] .proof-image').count(),4);
+ assert.equal(await page.locator('[data-proof="checkout"] figcaption').count(),0);
+ assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
 test('the order is Payoff alone at $33; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
@@ -43,7 +66,7 @@ test('Back restores the sales page; FAQ and repeated offers remain usable',async
  const faq=page.locator('.faq details').first();await faq.locator('summary').click();assert.ok(await faq.getAttribute('open')!==null);
  await page.locator('[data-placement="faq"] a.cta').click();await page.waitForURL(base+'/payoff/order');
  await page.goBack();await page.waitForURL(base+'/payoff');await page.locator('a.cta').first().waitFor();
- assert.equal(await page.locator('a.cta').count(),6);
+ assert.equal(await page.locator('a.cta').count(),7);
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
 }));
 test('owner text is text-only; missing or external proof assets are omitted',async()=>world(async({page,errors})=>{
