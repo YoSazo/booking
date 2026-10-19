@@ -65,5 +65,5 @@ test('preview cannot submit information, execute payment or frame a remote check
  const response=await fetch(base+'/payoff');
  const csp=response.headers.get('content-security-policy');
  for(const directive of ["connect-src 'self'","frame-src 'none'","form-action 'none'","frame-ancestors 'none'"])assert.ok(csp.includes(directive));
- const html=await response.text();assert.doesNotMatch(html,/preorder/i);assert.doesNotMatch(html,/truemoneysaver|70,000|Kati|Reg\. price|% off|media-slot|preview-note/);
+ const html=await response.text();assert.doesNotMatch(html,/preorder/i);assert.doesNotMatch(html,/truemoneysaver|70,000|Kati|media-slot|preview-note/);
 }));

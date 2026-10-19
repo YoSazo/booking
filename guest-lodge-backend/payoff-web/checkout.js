@@ -74,7 +74,38 @@
   }
   if (!form) event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
-  if (!form || !button) return;
+  if (!form || !button) {
+    // Preview eligibility without starting or resetting the checkout deadline.
+    let salesTimer, salesDeadline = null;
+    const paintSalesOffer = (active, started = false) => document.querySelectorAll('.sales-offer').forEach(box => {
+      box.querySelector('[data-offer-anchor]').hidden = false;
+      box.querySelector('[data-offer-saving]').hidden = false;
+      box.querySelector('[data-offer-saving]').textContent = active ? 'Save $347 · Over 92% off' : 'Save $342 · Over 91% off';
+      box.querySelector('[data-offer-window]').hidden = !active;
+      box.querySelector('[data-offer-label]').textContent = active ? 'Sale price $33 · Extra $5 off at checkout' : 'Sale price';
+      box.querySelector('[data-price]').textContent = active ? '$28 once' : '$33 once';
+      box.querySelector('[data-offer-window]').textContent = started ? 'Continue to checkout before your current offer ends.' : 'Your 30-minute offer starts when you open checkout.';
+    });
+    const refreshSalesOffer = () => {
+      if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
+      return fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
+        if (!response.ok) throw new Error('Unavailable');
+        return response.json();
+      }).then(config => {
+        const offer = config.checkoutOffer;
+        if (!offer) return;
+        clearTimeout(salesTimer);
+        const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
+        salesDeadline = remaining === null ? null : Date.now() + remaining;
+        paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0), !!offer.expiresAt);
+        if (remaining > 0) salesTimer = setTimeout(() => paintSalesOffer(false), remaining);
+      }).catch(() => { /* The sale price and checkout link remain usable. */ });
+    };
+    refreshSalesOffer();
+    window.addEventListener('pageshow', event => { if (event.persisted) refreshSalesOffer(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSalesOffer(); });
+    return;
+  }
   let ready = false, busy = false, currentOffer = null, basePriceCents = 3300, quotedBaseCents = null, serverOffset = 0;
   const offerBox = document.getElementById('checkout-offer');
   const stickyOffer = document.getElementById('offer-sticky');
@@ -163,7 +194,7 @@
     serverOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
     paintOffer();
     button.disabled = !ready || busy;
-    button.textContent = busy ? 'Opening secure checkout…' : ready ? 'Continue to secure payment' : 'Purchases are temporarily unavailable';
+    button.textContent = busy ? 'Opening secure checkout…' : ready ? 'Complete order' : 'Purchases are temporarily unavailable';
     button.classList.toggle('disabled-payment', !ready);
     if (!ready) status.textContent = config.preview ? 'Payments are disabled in the local preview.' : 'Please try again later or contact support@bookmarketel.com.';
   }).catch(() => {
@@ -180,7 +211,7 @@
     paintOffer();
     if (basePriceCents !== displayedBasePrice) {
       status.textContent = 'The checkout offer has ended. Review the updated total and continue when you’re ready.';
-      busy = false; button.disabled = !ready; button.textContent = 'Continue to secure payment';
+      busy = false; button.disabled = !ready; button.textContent = 'Complete order';
       return;
     }
     const addons = saveExtras();
@@ -202,7 +233,7 @@
     } catch (error) {
       event('PayoffCheckoutFailed');
       status.textContent = error.message || 'Checkout could not open. Please try again.';
-      busy = false; button.disabled = !ready; button.textContent = ready ? 'Continue to secure payment' : 'Purchases are temporarily unavailable';
+      busy = false; button.disabled = !ready; button.textContent = ready ? 'Complete order' : 'Purchases are temporarily unavailable';
     }
   });
   window.addEventListener('pageshow', () => {

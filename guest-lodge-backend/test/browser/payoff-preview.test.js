@@ -17,9 +17,9 @@ async function world(fn,{width=390,reducedMotion='no-preference',config=null}={}
   await fn({page,base,errors,requests});
  }finally{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 }
-test('local composition has seven offers, fourteen images and reference-style rating without empty slots',async()=>world(async({page,errors})=>{
+test('local composition has eight offers, fourteen images and reference-style rating without empty slots',async()=>world(async({page,errors})=>{
  assert.deepEqual(await page.locator('[data-section]').evaluateAll(els=>els.map(el=>el.dataset.section)),['hero','problem','example','mechanism','proof','founder','included','faq']);
- assert.equal(await page.locator('a.cta').count(),7);
+ assert.equal(await page.locator('a.cta').count(),8);
  for(const [group,count]of Object.entries({early:2,problem:2,example:4,main:6}))assert.equal(await page.locator('[data-proof="'+group+'"] > *').count(),count);
  assert.equal(await page.locator('.proof-image').count(),14);
  assert.ok(await page.locator('.proof-image img').evaluateAll(imgs=>imgs.every(img=>img.src.endsWith('.webp')&&img.width>0&&img.height>0)));
@@ -44,7 +44,7 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.equal(paragraphs[7],'I’d be honored to help you too.');
  assert.deepEqual(paragraphs,await page.evaluate(()=>window.PAYOFF_CONTENT.founder.paragraphs));
  const assets=page.locator('img[src^="/payoff/assets/"]');
- assert.equal(await assets.count(),18);
+ assert.equal(await assets.count(),19);
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
@@ -71,7 +71,7 @@ test('Back restores the sales page; FAQ and repeated offers remain usable',async
  const faq=page.locator('.faq details').first();await faq.locator('summary').click();assert.ok(await faq.getAttribute('open')!==null);
  await page.locator('[data-placement="faq"] a.cta').click();await page.waitForURL(base+'/payoff/order');
  await page.goBack();await page.waitForURL(base+'/payoff');await page.locator('a.cta').first().waitFor();
- assert.equal(await page.locator('a.cta').count(),7);
+ assert.equal(await page.locator('a.cta').count(),8);
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
 }));
 test('owner text is text-only; missing or external proof assets are omitted',async()=>world(async({page,errors})=>{

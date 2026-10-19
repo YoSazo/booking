@@ -15,7 +15,7 @@ const VERSION = 'payoff-v1';
 const PREORDER = Object.freeze({ product: 'marketel-payoff-preorder', version: 'payoff-preorder-v1' });
 const EXTRAS = Object.freeze(['cashflow', 'reset']);
 const DESCRIPTIONS = Object.freeze({
-  base: 'Your debt payoff plan on your phone. Opens right after payment. One payment, no subscription.',
+  base: 'Regular price was $375. Sale price $33. Your debt payoff plan opens right after payment. 30-day money-back guarantee.',
   cashflow: 'Income, bills and debt payments on one calendar, with your projected balance up to 18 months ahead. Opens inside Payoff.',
   reset: 'A spending reset you set up and track day by day. Opens inside Payoff.',
 });
@@ -130,7 +130,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
-    if (!/^[a-z0-9-]+\.(?:png|jpg|webp)$/.test(req.params.file)) return res.sendStatus(404);
+    if (!/^[a-z0-9-]+\.(?:png|jpg|webp)$/.test(req.params.file) && !/^payment-(?:visa|mastercard|americanexpress|discover|cashapp|klarna)\.svg$/.test(req.params.file)) return res.sendStatus(404);
     if (/-[a-f0-9]{10}\.webp$/.test(req.params.file)) {
       res.set('Cache-Control', 'public, max-age=31536000, immutable');
     }
@@ -211,7 +211,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         accessUrl(id), '',
         'Keep this email. The link opens your plan on any phone or computer. Your numbers stay on the device where you type them.', '',
         ...(lines.length ? [...lines, ''] : []),
-        'Questions or refund requests: reply to this email or contact support@bookmarketel.com.',
+        '30-day money-back guarantee: reply to this email or contact support@bookmarketel.com with your order reference within 30 days of purchase for a full refund, including any extras.',
         `${origin}/payoff/terms`,
       ].join('\n') };
   }
@@ -229,6 +229,12 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       }
       const offer = readOffer(secret, token, now());
       if (offer) config.offer = { ...offer, basePriceCents: ITEMS.base.cents - offer.discountCents };
+      config.serverNow = now();
+    }
+    if (req.query.offer === 'preview') {
+      const token = offerCookie(req), existing = token ? readOffer(secret, token, now()) : null;
+      config.checkoutOffer = { discountCents: config.available ? (token ? existing?.discountCents || 0 : OFFER.discountCents) : 0,
+        durationMs: OFFER.durationMs, expiresAt: existing?.expiresAt || null };
       config.serverNow = now();
     }
     res.json(config);
@@ -272,13 +278,13 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     }
     if (discount) Object.assign(metadata, { checkoutDiscountVersion: OFFER.version, checkoutDiscountCents: String(discount) });
     const coupon = discount ? await checkoutCoupon() : null;
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon])).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon, 'dashboard-methods-v1'])).digest('hex');
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment', submit_type: 'pay', payment_method_types: ['card'], customer_email: email,
+      mode: 'payment', submit_type: 'pay', customer_email: email,
       line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
         product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
       ...(coupon ? { discounts: [{ coupon }] } : {}),
-      custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. Questions or refund requests: support@bookmarketel.com.' } },
+      custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. 30-day money-back guarantee: request a full refund at support@bookmarketel.com.' } },
       success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,
       metadata, payment_intent_data: { metadata },

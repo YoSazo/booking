@@ -41,8 +41,11 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
 test('the order page offers both extras unchecked and opens one Stripe checkout with the ones picked', async () => world(async ({ page, base, creates }) => {
   await page.goto(base + '/payoff/order');
   const button = page.locator('#buy-button'); await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await button.innerText(), 'Complete order');
+  assert.equal(await page.locator('.payment-brands img').count(), 6);
   assert.equal(await page.locator('.preorder-notice, #preorder-consent').count(), 0);
   assert.equal(await page.locator('.order-bump').count(), 2);
+  assert.match(await page.locator('#guarantee-heading').innerText(), /30-day money-back guarantee/);
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   assert.doesNotMatch(await page.locator('.order-bump').first().innerText(), /preorder|in development/i);
@@ -210,10 +213,10 @@ test('the sticky offer follows scrolling, shows the same red clock, and reviews 
   if (process.env.PAYOFF_STICKY_SHOT) await page.screenshot({ path: process.env.PAYOFF_STICKY_SHOT });
   await page.locator('#offer-sticky-review').click();
   await page.locator('#offer-sticky').waitFor({ state: 'hidden' });
-  assert.match(await page.locator('#summary-lines').innerText(), /Regular Payoff price.*\$33.00.*Checkout offer.*−\$5.00.*Payoff after offer.*\$28.00/s);
+  assert.match(await page.locator('#summary-lines').innerText(), /Regular Payoff price.*\$375.00.*Sale saving.*−\$342.00.*Sale price.*\$33.00.*Checkout offer.*−\$5.00.*Payoff after offer.*\$28.00/s);
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
-  assert.equal(await page.locator('#selected-regular-price').innerText(), '$64.00');
+  assert.equal(await page.locator('#selected-regular-price').innerText(), '$406.00');
   assert.equal(await page.locator('#selected-offer-total').innerText(), '$59.00');
   for (const width of [320, 390, 1024]) {
     await page.setViewportSize({ width, height: 844 });
@@ -222,6 +225,34 @@ test('the sticky offer follows scrolling, shows the same red clock, and reviews 
   advanceTime(31 * 60000); await page.reload(); await page.locator('#buy-button:enabled').waitFor();
   await page.locator('.order-bump').first().evaluate(el => el.scrollIntoView({ behavior: 'instant' }));
   assert.equal(await page.locator('#offer-sticky').isHidden(), true);
-  assert.equal(await page.locator('.summary-discount').count(), 0);
+  assert.equal(await page.locator('.summary-discount:has-text("Checkout offer")').count(), 0);
   assert.equal(await page.locator('#order-total').innerText(), '$64.00');
+}));
+
+test('sales offer blocks show the eligible price without starting the deadline; an expired offer returns to regular price', async () => world(async ({ page, base, advanceTime }) => {
+  await page.goto(base + '/payoff');
+  await page.locator('.sales-offer [data-price]:has-text("$28 once")').first().waitFor();
+  assert.equal(await page.locator('.sales-offer').count(), 8);
+  assert.equal((await page.context().cookies()).filter(c => c.name === 'payoff_checkout_offer').length, 0);
+  await page.locator('.sales-offer .cta').first().click();
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  await page.goto(base + '/payoff');
+  await page.locator('.sales-offer [data-price]:has-text("$28 once")').first().waitFor();
+  advanceTime(31 * 60000);
+  const previewDone = page.waitForResponse(r => r.url().includes('offer=preview'));
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await previewDone;
+  await page.locator('.sales-offer [data-price]:has-text("$33 once")').first().waitFor();
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), '$33 once');
+  assert.equal(await page.locator('.sales-offer [data-offer-anchor]').first().isHidden(), false);
+}));
+test('sales offers retain the regular price and usable checkout when the offer lookup fails', async () => world(async ({ page, base }) => {
+  await page.route('**/api/payoff/config?offer=preview', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  await page.goto(base + '/payoff');
+  await page.locator('.sales-offer .cta').first().waitFor();
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), '$33 once');
+  await page.locator('.sales-offer .cta').first().click();
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
 }));

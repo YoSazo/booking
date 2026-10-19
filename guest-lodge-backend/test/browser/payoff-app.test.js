@@ -189,7 +189,7 @@ test('the order page sells Payoff alone and the sales page shows the real tool',
   assert.equal(await page.$('.preorder-notice'), null);
   assert.equal(await page.$('#preorder-consent'), null);
   assert.equal(await page.$$eval('.summary-line', lines => lines.length), 1);
-  await page.waitForFunction(() => document.getElementById('buy-button').textContent === 'Continue to secure payment');
+  await page.waitForFunction(() => document.getElementById('buy-button').textContent === 'Complete order');
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   assert.ok(width <= 390, 'no sideways scroll');
 }));

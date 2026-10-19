@@ -2,7 +2,7 @@
 
 Public page: https://bookmarketel.com/payoff. The tool: https://bookmarketel.com/payoff/app.
 
-$33 USD once, no subscription. The tool opens straight after payment and the
+$33 USD once at the current sale price (previous regular price $375), no subscription. The tool opens straight after payment and the
 buyer gets an email with their link.
 
 ## The tool
@@ -31,8 +31,18 @@ and created idempotently by the server when first needed. Receipts and
 fulfillment validate the resulting total. The sticky reminder shares the
 same clock and hides around typing and the payment button.
 
-Add-on previews are compressed screenshots from the real app using example
-numbers. The selected-software recap uses the actual listed prices.
+Product device visuals were generated from real app screenshots, then saved
+as small WebP files. The original screenshots are preserved. Asset paths and
+prompts are in `assets/checkout-visuals.md`. The selected-software recap uses
+the previous base price and actual extra prices, and shows the sale total.
+
+The sales page previews offer eligibility without starting the timer. Returning
+visitors keep their existing deadline. Stripe uses payment methods enabled in
+the Dashboard, rather than a card-only list; Cash App Pay and Klarna appear
+when the buyer is eligible. An unpaid delayed payment does not unlock access.
+
+The owner offers a full refund within 30 days of purchase, including extras.
+The guarantee appears beside offers, in checkout, in terms and in access emails.
 
 ## Access
 

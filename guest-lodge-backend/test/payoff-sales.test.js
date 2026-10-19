@@ -52,6 +52,11 @@ test('Payoff pages and assets are published without exposing source documents or
     for (const route of ['/payoff', '/payoff/', '/payoff/order', '/payoff/confirmation', '/payoff/terms', '/payoff/checkout.js', '/payoff/app', '/payoff/app.js', '/payoff/app.css', '/payoff/engine.js', '/payoff/assets/tool-result.jpg']) {
       const r = await fetch(base + route); assert.equal(r.status, 200, route); assert.equal(r.headers.get('cache-control'), 'no-store');
     }
+    for (const brand of ['visa', 'mastercard', 'americanexpress', 'discover', 'cashapp', 'klarna']) {
+      const response = await fetch(base + '/payoff/assets/payment-' + brand + '.svg');
+      assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /image\/svg\+xml/);
+    }
+    assert.equal((await fetch(base + '/payoff/assets/unlisted.svg')).status, 404);
     const optimized = fs.readdirSync(path.join(__dirname, '../payoff-web/assets')).find(name => name.endsWith('.webp'));
     const imageUrl = base + '/payoff/assets/' + optimized;
     const image = await fetch(imageUrl);
@@ -79,7 +84,7 @@ test('checkout charges server prices for Payoff and any extras, opens the tool o
       const reply = await post('/api/payoff/checkout', order({ addons }));
       assert.equal(reply.status, 200); assert.equal(reply.body.value, total / 100);
       const { params, options } = w.creates.at(-1);
-      assert.equal(params.mode, 'payment'); assert.deepEqual(params.payment_method_types, ['card']);
+      assert.equal(params.mode, 'payment'); assert.equal(params.payment_method_types, undefined, 'Stripe Dashboard controls the eligible payment methods');
       assert.equal(params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), total);
       assert.equal(params.line_items[0].price_data.unit_amount, 3300);
       assert.match(params.custom_text.submit.message, /opens as soon as you pay/);
@@ -358,5 +363,39 @@ for (const missing of [false, true]) test('checkout coupon is validated before o
     assert.equal(result.status, missing ? 200 : 503);
     assert.equal(w.creates.length, missing ? 1 : 0);
     assert.equal(created, missing ? 1 : 0);
+  });
+});
+
+test('a delayed payment unlocks only after Stripe confirms success, and repeated success emails once', async () => {
+  const w = fixture(), session = paid([]);
+  session.payment_status = 'unpaid'; w.sessions.set(session.id, session);
+  assert.equal(await w.registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: session } }, {}), true);
+  assert.equal(w.emails.length, 0);
+  assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffPaid').length, 0);
+  session.payment_status = 'paid';
+  const success = { type: 'checkout.session.async_payment_succeeded', data: { object: session } };
+  assert.equal(await w.registration.handleStripeEvent(success, {}), true);
+  assert.equal(await w.registration.handleStripeEvent(success, {}), true);
+  assert.equal(w.emails.length, 1);
+  assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffPaid').length, 1);
+});
+
+test('the landing previews the actual offer without issuing or restarting its deadline', async () => {
+  let time = Date.now(); const w = fixture({ clock: () => time });
+  await serve(w, async ({ base }) => {
+    const preview = await fetch(base + '/api/payoff/config?offer=preview');
+    assert.equal(preview.headers.get('set-cookie'), null);
+    assert.equal((await preview.json()).checkoutOffer.discountCents, 500);
+    const started = await fetch(base + '/api/payoff/config?offer=1');
+    const cookie = started.headers.get('set-cookie').split(';')[0];
+    const expiresAt = (await started.json()).offer.expiresAt;
+    time += 10 * 60000;
+    const ongoing = await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } });
+    assert.equal(ongoing.headers.get('set-cookie'), null);
+    assert.equal((await ongoing.json()).checkoutOffer.expiresAt, expiresAt);
+    time += 21 * 60000;
+    const ended = await (await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } })).json();
+    assert.equal(ended.checkoutOffer.discountCents, 0);
+    assert.equal(ended.checkoutOffer.expiresAt, expiresAt);
   });
 });

@@ -116,27 +116,35 @@
       const discount = content.priceCents - baseCents;
       const original = document.getElementById('base-original-price');
       const label = document.getElementById('base-offer-label');
-      if (original) { original.hidden = discount <= 0; original.textContent = money(content.priceCents); }
-      if (label) { label.hidden = discount <= 0; label.textContent = 'Checkout offer −' + money(discount); }
+      if (original) { original.hidden = false; original.textContent = money(content.regularPriceCents || content.priceCents); }
+      if (label) { label.hidden = false; label.textContent = discount > 0 ? 'Sale $33 · Checkout offer −' + money(discount) : 'Sale price'; }
       const selected = content.addOns.filter(addon => document.getElementById(addon.id)?.checked);
       const lines = document.getElementById('summary-lines');
       lines.replaceChildren();
+      const historicalPrice = content.regularPriceCents || content.priceCents;
+      if (historicalPrice > content.priceCents) {
+        const historicalRow = element('div', 'summary-adjustment summary-original');
+        historicalRow.append(element('span', '', 'Regular Payoff price'), element('s', '', money(historicalPrice)));
+        const saleRow = element('div', 'summary-adjustment summary-discount');
+        saleRow.append(element('span', '', 'Sale saving'), element('strong', '', '−' + money(historicalPrice - content.priceCents)));
+        lines.append(historicalRow, saleRow);
+      }
       if (discount > 0) {
         const originalRow = element('div', 'summary-adjustment summary-original');
-        originalRow.append(element('span', '', 'Regular Payoff price'), element('s', '', money(content.priceCents)));
+        originalRow.append(element('span', '', 'Sale price'), element('span', '', money(content.priceCents)));
         const discountRow = element('div', 'summary-adjustment summary-discount');
         discountRow.append(element('span', '', 'Checkout offer — 15% off'), element('strong', '', '−' + money(discount)));
         lines.append(originalRow, discountRow);
       }
       for (const item of [{ name: discount > 0 ? 'Payoff after offer' : 'Payoff plan', priceCents: baseCents }, ...selected]) { const row = element('div', 'summary-line'); row.append(element('span', '', item.name), element('span', '', money(item.priceCents))); lines.append(row); }
       document.getElementById('order-total').textContent = money(selected.reduce((sum, addon) => sum+addon.priceCents, baseCents));
-      const regularTotal = selected.reduce((sum, addon) => sum + addon.priceCents, content.priceCents);
+      const regularTotal = selected.reduce((sum, addon) => sum + addon.priceCents, historicalPrice);
       const regularValue = document.getElementById('selected-regular-price');
       const offerTotal = document.getElementById('selected-offer-total');
       const saving = document.getElementById('selected-saving');
-      if (regularValue) { regularValue.textContent = money(regularTotal); regularValue.classList.toggle('has-saving', discount > 0); }
-      if (offerTotal) offerTotal.textContent = money(regularTotal - discount);
-      if (saving) { saving.hidden = discount <= 0; saving.textContent = 'Your checkout offer saves you ' + money(discount); }
+      if (regularValue) { regularValue.textContent = money(regularTotal); regularValue.classList.toggle('has-saving', historicalPrice > baseCents); }
+      if (offerTotal) offerTotal.textContent = money(regularTotal - historicalPrice + baseCents);
+      if (saving) { saving.hidden = historicalPrice <= baseCents; saving.textContent = 'You save ' + money(historicalPrice - baseCents) + ' on Payoff'; }
 
     };
     window.addEventListener('payoff:quote', event => {
