@@ -599,7 +599,7 @@
     history.replaceState(null, '', '/payoff/app');
   }
   const post = (route, body) => fetch(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    .then(async response => ({ ok: response.ok, body: await response.json().catch(() => ({})) }));
+    .then(async response => ({ ok: response.ok, status: response.status, body: await response.json().catch(() => ({})) }));
 
   async function openFromLink(token) {
     show('opening');
@@ -615,24 +615,36 @@
       $('resend-status').textContent = error.refused ? error.message : 'We couldn’t check your link. Check your connection and open it again.';
     }
   }
-  async function openAfterPayment(sessionId, tries = 0) {
+  // `order` is { sessionId } after Stripe's hosted page, or { paymentIntent }
+  // after the order page's own form (or a wallet or bank that redirected).
+  async function openAfterPayment(order, tries = 0) {
     show('opening');
     $('opening-title').textContent = 'Opening your plan…';
     $('opening-status').textContent = 'Checking your payment with Stripe.';
-    $('opening-retry').hidden = true; $('opening-help').hidden = true;
+    $('opening-retry').hidden = true; $('opening-help').hidden = true; $('opening-back').hidden = true;
     try {
-      const reply = await post('/api/payoff/confirm', { sessionId });
-      if (!reply.ok || !reply.body.access) throw new Error(reply.body.message || 'We couldn’t confirm your payment yet.');
+      const reply = await post('/api/payoff/confirm', order);
+      if (reply.status === 402 && order.paymentIntent) {
+        $('opening-title').textContent = 'Your payment didn’t go through';
+        $('opening-status').textContent = reply.body.message || 'You weren’t charged. Go back to checkout to try again.';
+        $('opening-back').hidden = false;
+        return;
+      }
+      if (!reply.ok || !reply.body.access) throw Object.assign(new Error(reply.body.message || 'We couldn’t confirm your payment yet.'), { processing: reply.body.processing });
       try { sessionStorage.removeItem('payoff.attempt'); } catch { /* Optional. */ }
       grant(reply.body.access); setExtras(reply.body.extras || []); enter();
       toast(paidToast(reply.body.emailSent, extras));
     } catch (error) {
-      if (tries < 2) return setTimeout(() => openAfterPayment(sessionId, tries + 1), 1500);
+      if (tries < 2 && !error.processing) return setTimeout(() => openAfterPayment(order, tries + 1), 1500);
       $('opening-title').textContent = 'Your payment is still confirming';
       $('opening-status').textContent = error.message;
       $('opening-retry').hidden = false; $('opening-help').hidden = false;
     }
   }
+  const paymentReference = () => {
+    const params = new URLSearchParams(location.search);
+    return params.get('payment_intent') ? { paymentIntent: params.get('payment_intent') } : { sessionId: params.get('session_id') };
+  };
 
   // Wiring
   document.addEventListener('touchstart', () => {}, { passive: true });
@@ -689,7 +701,7 @@
     save(); renderDebts(); show('debts');
     toast('Cleared. Your numbers are gone from this phone.');
   });
-  $('opening-retry').addEventListener('click', () => openAfterPayment(new URLSearchParams(location.search).get('session_id')));
+  $('opening-retry').addEventListener('click', () => openAfterPayment(paymentReference()));
   $('resend-form').addEventListener('submit', async submit => {
     submit.preventDefault();
     const email = $('resend-email').value.trim(), button = $('resend-button');
@@ -759,7 +771,7 @@
 
   const params = new URLSearchParams(location.search);
   if (params.get('access')) openFromLink(params.get('access'));
-  else if (params.get('session_id')) openAfterPayment(params.get('session_id'));
+  else if (params.get('session_id') || params.get('payment_intent')) openAfterPayment(paymentReference());
   else if (canUse()) { enter(); refreshExtras(); }
   else show('gate');
 })();

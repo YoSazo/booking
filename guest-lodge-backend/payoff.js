@@ -6,7 +6,7 @@
 const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { sanitizeInspectAttribution } = require('./inspect');
+const { sanitizeInspectAttribution, inspectPublishableKey } = require('./inspect');
 const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount } = require('./payoff-offer');
 
 const PRODUCT = 'marketel-payoff';
@@ -28,8 +28,10 @@ const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
-// Access is the paid session id (or an owner id) signed with the server secret.
-const accessId = value => sessionId(value) || (typeof value === 'string' && /^own_[a-f0-9]{24}$/.test(value) ? value : null);
+const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
+// Access is the paid order's id (a hosted Checkout Session, a PaymentIntent
+// from the order page, or an owner id) signed with the server secret.
+const accessId = value => sessionId(value) || intentId(value) || (typeof value === 'string' && /^own_[a-f0-9]{24}$/.test(value) ? value : null);
 const accessSignature = (secret, id) => crypto.createHmac('sha256', secret).update(`payoff-access:${id}`).digest('base64url').slice(0, 32);
 const accessToken = (secret, id) => `${id}.${accessSignature(secret, id)}`;
 function verifyAccess(secret, token) {
@@ -60,10 +62,35 @@ function paidOrder(session) {
   if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount) return null;
   return ids;
 }
+// A payment made in the order page's own form. A hosted session's
+// PaymentIntent carries the same product but not `checkout: embedded`, so it
+// is only ever counted through its session.
+function paidIntent(intent) {
+  const metadata = intent?.metadata || {};
+  if (intent?.object !== 'payment_intent' || metadata.product !== PRODUCT || metadata.offerVersion !== VERSION || metadata.checkout !== 'embedded'
+    || intent.status !== 'succeeded' || intent.currency !== 'usd') return null;
+  let ids;
+  try { ids = basket(JSON.parse(metadata.addons)); } catch { return null; }
+  const discount = orderDiscount(intent);
+  if (discount === null || intent.amount_received !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount) return null;
+  return ids;
+}
+// One shape for either kind of paid order.
+function paidPurchase(object) {
+  const intent = object?.object === 'payment_intent';
+  const ids = intent ? paidIntent(object) : paidOrder(object);
+  return ids && { id: object.id, ids, livemode: object.livemode, metadata: object.metadata,
+    email: intent ? object.receipt_email || object.metadata.email : object.customer_details?.email,
+    totalCents: intent ? object.amount_received : object.amount_total };
+}
 // Meta's pixel loads from connect.facebook.net and reports to www.facebook.com,
 // on the sales and order pages only. The tool itself (/payoff/app) never loads
 // it, so nothing a buyer types there can reach Meta.
 const META_CSP = "default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self'; img-src 'self' https://www.facebook.com; font-src 'self'; connect-src 'self' https://www.facebook.com https://connect.facebook.net; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+// The order page also holds Stripe's payment fields: Stripe.js, its frames, and
+// the inline styles it adds for its overlays (3D Secure, Link).
+const ORDER_CSP = "default-src 'self'; script-src 'self' https://connect.facebook.net https://js.stripe.com https://*.js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.facebook.com https://*.stripe.com; font-src 'self'; connect-src 'self' https://www.facebook.com https://connect.facebook.net https://api.stripe.com https://r.stripe.com https://*.link.com; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://*.link.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+const ORDER_PERMISSIONS = 'payment=(self "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")';
 const PRICE = cents => Math.round(cents) / 100;
 function pageHeaders(res) {
   res.set({
@@ -122,16 +149,18 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   });
   for (const [route, file] of [['/', 'index.html'], ['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
-      if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
+      if (file === 'order.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
+      else if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'confirmation.js', 'style.css', 'app.js', 'app.css', 'engine.js']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'confirmation.js', 'style.css', 'order.css', 'app.js', 'app.css', 'engine.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
-    if (!/^[a-z0-9-]+\.(?:png|jpg|webp)$/.test(req.params.file) && !/^payment-(?:visa|mastercard|americanexpress|discover|cashapp|klarna)\.svg$/.test(req.params.file)) return res.sendStatus(404);
-    if (/-[a-f0-9]{10}\.webp$/.test(req.params.file)) {
+    if (!/^[a-z0-9-]+\.(?:png|jpg|webp)$/.test(req.params.file) && !/^font-[a-z]+-[a-f0-9]{10}\.woff2$/.test(req.params.file)
+      && !/^payment-(?:visa|mastercard|americanexpress|discover|cashapp|klarna)\.svg$/.test(req.params.file)) return res.sendStatus(404);
+    if (/-[a-f0-9]{10}\.(?:webp|woff2)$/.test(req.params.file)) {
       res.set('Cache-Control', 'public, max-age=31536000, immutable');
     }
     res.sendFile(path.join(ROOT, 'assets', req.params.file));
@@ -152,29 +181,29 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     sourceUrl: attribution.sourceUrl || `${origin}/payoff`, fbp: attribution.fbp || '', fbc: attribution.fbc || '',
   });
 
-  async function confirm(session, { retryMail = false, req = null, webhook = false } = {}) {
-    const ids = paidOrder(session);
-    if (!ids) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
-    const visitor = visitorId(session.metadata.visitorId);
-    const email = session.customer_details?.email;
+  async function confirm(object, { retryMail = false, req = null, webhook = false } = {}) {
+    const order = paidPurchase(object);
+    if (!order) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
+    const { ids, email, metadata } = order;
+    const visitor = visitorId(metadata.visitorId);
     // Stripe retains every order. Owner, no-track and sandbox orders receive
     // confirmations but do not inflate the customer conversion ladder.
-    if (session.livemode !== false && session.metadata.noTrack !== '1' && !isExcludedEmail(email || '')) {
-      await record('PayoffPaid', visitor, `payoff-paid:${session.id}`, ids.join(','));
+    if (order.livemode !== false && metadata.noTrack !== '1' && !isExcludedEmail(email || '')) {
+      await record('PayoffPaid', visitor, `payoff-paid:${order.id}`, ids.join(','));
       await sendCapi('Purchase', {
-        eventId: `payoff-purchase.${session.id}`,
-        hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${session.id}`,
-        externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${session.id}`,
+        eventId: `payoff-purchase.${order.id}`,
+        hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
+        externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
         email: email || '',
         // A webhook request is Stripe's, never the buyer's IP or browser.
         ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
-        sourceUrl: session.metadata.sourceUrl || `${origin}/payoff`, fbp: session.metadata.fbp || '', fbc: session.metadata.fbc || '',
-        value: PRICE(session.amount_total),
+        sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
+        value: PRICE(order.totalCents),
       });
     }
     let emailSent = false;
     if (email && mail) {
-      const sourceId = `payoff-access-mail:${session.id}`;
+      const sourceId = `payoff-access-mail:${order.id}`;
       let claimed = false;
       try {
         await prisma.inspectEvent.create({ data: { name: 'PayoffConfirmationEmailed', tool: 'payoff', sourceId, visitorId: visitor } });
@@ -185,11 +214,11 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       }
       if (claimed) {
         try {
-          await mail.sendMail(accessMail(email, session.id, [
+          await mail.sendMail(accessMail(email, order.id, [
             ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
-            ...(orderDiscount(session) ? ['Checkout offer: −$5.00'] : []),
-            `Total paid: $${(session.amount_total / 100).toFixed(2)} USD. One payment, no subscription.`,
-            `Order reference: ${session.id}`,
+            ...(orderDiscount(order) ? ['Checkout offer: −$5.00'] : []),
+            `Total paid: $${(order.totalCents / 100).toFixed(2)} USD. One payment, no subscription.`,
+            `Order reference: ${order.id}`,
             ...(ids.length > 1 ? ['', `Your ${ids.slice(1).map(id => ITEMS[id].name.toLowerCase()).join(' and ')} ${ids.length > 2 ? 'are' : 'is'} inside Payoff, in the tabs at the top.`] : []),
           ]));
           emailSent = true;
@@ -200,9 +229,10 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         }
       }
     }
-    return { paid: true, reference: session.id, totalCents: session.amount_total, items: ids.map(id => ITEMS[id].name), emailSent,
-      access: accessToken(secret, session.id), extras: ids.filter(id => id !== 'base') };
+    return { paid: true, reference: order.id, totalCents: order.totalCents, items: ids.map(id => ITEMS[id].name), emailSent,
+      access: accessToken(secret, order.id), extras: ids.filter(id => id !== 'base') };
   }
+  const retrieve = id => id.startsWith('pi_') ? stripe.paymentIntents.retrieve(id) : stripe.checkout.sessions.retrieve(id);
   // One email for every way of getting the link: after payment and on request.
   function accessMail(to, id, lines = []) {
     return { from: '"Marketel" <support@bookmarketel.com>', to, subject: 'Your Marketel Payoff link',
@@ -220,6 +250,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   api.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   api.get('/config', (req, res) => {
     const config = { available: available(), priceCents: ITEMS.base.cents, addOns: { cashflow: 2200, reset: 900 } };
+    // Without a matching publishable key the order page falls back to hosted Checkout.
+    if (config.available) config.stripeKey = inspectPublishableKey(env) || null;
     if (req.query.offer === '1' && config.available) {
       let token = offerCookie(req);
       if (!token) {
@@ -254,7 +286,9 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     }
     res.json({ success: true });
   }));
-  api.post('/checkout', guarded(async (req, res) => {
+  // What either checkout charges: the items, the buyer's email, the ad click
+  // and the checkout offer if it is still running. The total is the server's.
+  function quote(req) {
     if (!available()) throw fail(503, 'Purchases are temporarily unavailable. Please try again later.');
     // Browser requests must come from our own page. A supplied Origin is never
     // used to construct redirects or set the price.
@@ -277,6 +311,29 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       throw fail(409, 'The checkout offer has ended or your order changed. Review the updated total and continue when you’re ready.');
     }
     if (discount) Object.assign(metadata, { checkoutDiscountVersion: OFFER.version, checkoutDiscountCents: String(discount) });
+    return { ids, attempt, email, visitor, attribution, metadata, discount, total };
+  }
+  const initiated = (order, req) => order.visitor && !order.metadata.noTrack && !isExcludedEmail(order.email)
+    ? sendCapi('InitiateCheckout', { eventId: `payoff-checkout.${order.visitor}`, value: PRICE(order.total), email: order.email, ...visitorCapi(order.visitor, order.attribution, req) })
+    : null;
+  // The order page's own payment form: Stripe's fields on our page, charged
+  // only when the buyer taps Complete Order. Retrying the same order (after a
+  // declined card, say) returns the same payment.
+  api.post('/pay', guarded(async (req, res) => {
+    const order = quote(req);
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, 'embedded-v1'])).digest('hex');
+    const intent = await stripe.paymentIntents.create({
+      amount: order.total, currency: 'usd', automatic_payment_methods: { enabled: true },
+      receipt_email: order.email, description: order.ids.map(id => ITEMS[id].name).join(' + '),
+      metadata: { ...order.metadata, checkout: 'embedded', email: order.email.toLowerCase() },
+    }, { idempotencyKey: `payoff-pay:${fingerprint}` });
+    if (!intent.client_secret) throw fail(502, 'Payment could not start. Please try again.');
+    await initiated(order, req);
+    res.json({ id: intent.id, clientSecret: intent.client_secret, value: PRICE(order.total) });
+  }));
+  // Stripe's hosted page: what the order page uses when its own form can't load.
+  api.post('/checkout', guarded(async (req, res) => {
+    const { ids, attempt, email, metadata, discount, total, ...order } = quote(req);
     const coupon = discount ? await checkoutCoupon() : null;
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon, 'dashboard-methods-v1'])).digest('hex');
     const session = await stripe.checkout.sessions.create({
@@ -290,20 +347,24 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       metadata, payment_intent_data: { metadata },
     }, { idempotencyKey: `payoff:${fingerprint}` });
     if (!session.url || !session.url.startsWith('https://checkout.stripe.com/')) throw fail(502, 'Checkout could not open. Please try again.');
-    if (visitor && !metadata.noTrack && !isExcludedEmail(email)) {
-      await sendCapi('InitiateCheckout', { eventId: `payoff-checkout.${visitor}`, value: PRICE(total), email, ...visitorCapi(visitor, attribution, req) });
-    }
+    await initiated({ ...order, email, metadata, total }, req);
     res.json({ url: session.url, value: PRICE(total) });
   }));
   api.post('/confirm', guarded(async (req, res) => {
     if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Order confirmation is temporarily unavailable.');
     rate(req, 'confirm', 60);
-    const id = sessionId(req.body?.sessionId);
+    const id = sessionId(req.body?.sessionId) || intentId(req.body?.paymentIntent);
     if (!id) throw fail(400, 'The order reference is invalid.');
-    let session;
-    try { session = await stripe.checkout.sessions.retrieve(id); }
+    let object;
+    try { object = await retrieve(id); }
     catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
-    res.json(await confirm(session, { req }));
+    if (object.object === 'payment_intent' && object.status === 'processing') {
+      return res.status(202).json({ processing: true, message: 'Your bank is still confirming the payment. We’ll email your Payoff link as soon as it clears.' });
+    }
+    if (object.object === 'payment_intent' && object.status !== 'succeeded') {
+      throw fail(402, 'Your payment didn’t go through and you weren’t charged. Go back to checkout to try again.');
+    }
+    res.json(await confirm(object, { req }));
   }));
   api.post('/access', guarded(async (req, res) => {
     rate(req, 'access', 120);
@@ -314,8 +375,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (id.startsWith('own_')) return res.json({ ok: true, extras: [...EXTRAS] });
     let extras = null;
     try {
-      const ids = stripe && paidOrder(await stripe.checkout.sessions.retrieve(id));
-      if (ids) extras = ids.filter(item => item !== 'base');
+      const order = stripe && paidPurchase(await retrieve(id));
+      if (order) extras = order.ids.filter(item => item !== 'base');
     } catch (error) { console.error('Payoff access lookup failed:', error.type || error.message); }
     res.json({ ok: true, extras });
   }));
@@ -331,6 +392,12 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       const order = (found.data || []).find(session => paidOrder(session));
       if (order) { id = order.id; break; }
     }
+    if (!id) {
+      // Payments made in the order page's form carry the email in metadata.
+      const found = await stripe.paymentIntents.search({ limit: 20,
+        query: `status:'succeeded' AND metadata['email']:'${email.toLowerCase().replace(/['\\]/g, '\\$&')}'` });
+      id = (found.data || []).find(intent => paidIntent(intent))?.id || null;
+    }
     if (id) await mail.sendMail(accessMail(email, id));
     res.json({ sent: true });
   }));
@@ -340,6 +407,13 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   });
   app.use('/api/payoff', api);
   return { handleStripeEvent: async (event, _req) => {
+    if (event.type === 'payment_intent.succeeded') {
+      const object = event.data?.object;
+      if (object?.metadata?.product !== PRODUCT || object.metadata.checkout !== 'embedded') return false;
+      if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
+      await confirm(await stripe.paymentIntents.retrieve(object.id), { retryMail: true, webhook: true });
+      return true;
+    }
     if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)
       || !isPayoff(event.data?.object?.metadata)) return false;
     if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
@@ -348,4 +422,4 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return true;
   } };
 }
-module.exports = { registerPayoff, paidOrder, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER };
+module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER };

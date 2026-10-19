@@ -1,9 +1,7 @@
 'use strict';
 (() => {
   const form = document.getElementById('order-form');
-  const button = document.getElementById('buy-button');
-  const status = document.getElementById('checkout-status');
-  let visitor = null, excluded = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent), attempt;
+  let visitor = null, excluded = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent);
   try {
     const tracking = new URLSearchParams(location.search).get('notrack');
     if (tracking === '1') localStorage.setItem('marketel.noTrack', '1');
@@ -71,174 +69,39 @@
     let first = true;
     try { first = sessionStorage.getItem('payoff.cartSent') !== visitor; sessionStorage.setItem('payoff.cartSent', visitor || ''); } catch { /* Send it. */ }
     if (first) pixel('AddToCart', { value: 33 }, visitor ? `payoff-cart.${visitor}` : undefined);
-  }
-  if (!form) event('PayoffFrom', query.has('fbclid') ? 'ad'
-    : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
-  if (!form || !button) {
-    // Preview eligibility without starting or resetting the checkout deadline.
-    let salesTimer, salesDeadline = null;
-    const paintSalesOffer = (active, started = false) => document.querySelectorAll('.sales-offer').forEach(box => {
-      box.querySelector('[data-offer-anchor]').hidden = false;
-      box.querySelector('[data-offer-saving]').hidden = false;
-      box.querySelector('[data-offer-saving]').textContent = active ? 'Save $347 · Over 92% off' : 'Save $342 · Over 91% off';
-      box.querySelector('[data-offer-window]').hidden = !active;
-      box.querySelector('[data-offer-label]').textContent = active ? 'Sale price $33 · Extra $5 off at checkout' : 'Sale price';
-      box.querySelector('[data-price]').textContent = active ? '$28 once' : '$33 once';
-      box.querySelector('[data-offer-window]').textContent = started ? 'Continue to checkout before your current offer ends.' : 'Your 30-minute offer starts when you open checkout.';
-    });
-    const refreshSalesOffer = () => {
-      if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
-      return fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
-        if (!response.ok) throw new Error('Unavailable');
-        return response.json();
-      }).then(config => {
-        const offer = config.checkoutOffer;
-        if (!offer) return;
-        clearTimeout(salesTimer);
-        const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
-        salesDeadline = remaining === null ? null : Date.now() + remaining;
-        paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0), !!offer.expiresAt);
-        if (remaining > 0) salesTimer = setTimeout(() => paintSalesOffer(false), remaining);
-      }).catch(() => { /* The sale price and checkout link remain usable. */ });
-    };
-    refreshSalesOffer();
-    window.addEventListener('pageshow', event => { if (event.persisted) refreshSalesOffer(); });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSalesOffer(); });
+    // The order page's own form (order.js) reports through the same helpers.
+    window.PayoffTrack = { event, pixel, attribution, visitor, headers };
     return;
   }
-  let ready = false, busy = false, currentOffer = null, basePriceCents = 3300, quotedBaseCents = null, serverOffset = 0;
-  const offerBox = document.getElementById('checkout-offer');
-  const stickyOffer = document.getElementById('offer-sticky');
-  let stickyFrame = null;
-  const updateSticky = () => {
-    if (!stickyOffer || !offerBox) return;
-    const active = currentOffer && currentOffer.discountCents > 0 && Date.now() + serverOffset < currentOffer.expiresAt;
-    document.body.classList.toggle('has-checkout-offer', !!active);
-    const height = window.visualViewport?.height || innerHeight;
-    const payment = button.getBoundingClientRect();
-    const paymentVisible = payment.top < height && payment.bottom > 0;
-    const typing = document.activeElement?.matches('input:not([type="checkbox"]), textarea, select');
-    stickyOffer.hidden = !active || offerBox.getBoundingClientRect().bottom > 0 || paymentVisible || typing;
-  };
-  const scheduleSticky = () => {
-    if (stickyFrame !== null) return;
-    stickyFrame = requestAnimationFrame(() => { stickyFrame = null; updateSticky(); });
-  };
-  window.addEventListener('scroll', scheduleSticky, { passive: true });
-  window.addEventListener('resize', scheduleSticky, { passive: true });
-  window.visualViewport?.addEventListener('resize', scheduleSticky);
-  document.addEventListener('focusin', scheduleSticky);
-  document.addEventListener('focusout', scheduleSticky);
-  document.getElementById('offer-sticky-review')?.addEventListener('click', () => {
-    const summary = document.getElementById('order-summary');
-    summary?.scrollIntoView({ block: 'start', behavior: 'instant' });
-    summary?.focus({ preventScroll: true });
-    scheduleSticky();
+  event('PayoffFrom', query.has('fbclid') ? 'ad'
+    : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
+  // Preview eligibility without starting or resetting the checkout deadline.
+  let salesTimer, salesDeadline = null;
+  const paintSalesOffer = (active, started = false) => document.querySelectorAll('.sales-offer').forEach(box => {
+    box.querySelector('[data-offer-anchor]').hidden = false;
+    box.querySelector('[data-offer-saving]').hidden = false;
+    box.querySelector('[data-offer-saving]').textContent = active ? 'Save $347 · Over 92% off' : 'Save $342 · Over 91% off';
+    box.querySelector('[data-offer-window]').hidden = !active;
+    box.querySelector('[data-offer-label]').textContent = active ? 'Sale price $33 · Extra $5 off at checkout' : 'Sale price';
+    box.querySelector('[data-price]').textContent = active ? '$28 once' : '$33 once';
+    box.querySelector('[data-offer-window]').textContent = started ? 'Continue to checkout before your current offer ends.' : 'Your 30-minute offer starts when you open checkout.';
   });
-  const paintOffer = () => {
-    const active = currentOffer && currentOffer.discountCents > 0 && Date.now() + serverOffset < currentOffer.expiresAt;
-    basePriceCents = active ? currentOffer.basePriceCents : 3300;
-    if (quotedBaseCents !== basePriceCents) {
-      quotedBaseCents = basePriceCents;
-      window.dispatchEvent(new CustomEvent('payoff:quote', { detail: { basePriceCents } }));
-    }
-    if (!offerBox) return;
-    offerBox.hidden = !currentOffer;
-    if (!currentOffer) { updateSticky(); return; }
-    offerBox.classList.toggle('is-expired', !active);
-    document.getElementById('checkout-offer-heading').textContent = active ? 'Save 15% — $5 off' : 'Your checkout offer has ended';
-    document.getElementById('offer-original').hidden = !active;
-    document.getElementById('offer-price').textContent = active ? '$28' : '$33';
-    document.getElementById('offer-clock-row').hidden = !active;
-    const reminder = document.getElementById('summary-offer-reminder');
-    if (reminder) reminder.hidden = !active;
-    document.getElementById('offer-note').textContent = active ? '$5 off your Payoff plan. Optional extras are priced separately.' : 'Payoff is still available for $33 once. Optional extras are priced separately.';
-    if (active) {
-      const left = Math.max(0, Math.ceil((currentOffer.expiresAt - Date.now() - serverOffset) / 1000));
-      const clock = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
-      document.querySelectorAll('#offer-clock, [data-offer-clock]').forEach(timer => { if (timer.textContent !== clock) timer.textContent = clock; });
-    }
-    updateSticky();
+  const refreshSalesOffer = () => {
+    if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
+    return fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
+      if (!response.ok) throw new Error('Unavailable');
+      return response.json();
+    }).then(config => {
+      const offer = config.checkoutOffer;
+      if (!offer) return;
+      clearTimeout(salesTimer);
+      const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
+      salesDeadline = remaining === null ? null : Date.now() + remaining;
+      paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0), !!offer.expiresAt);
+      if (remaining > 0) salesTimer = setTimeout(() => paintSalesOffer(false), remaining);
+    }).catch(() => { /* The sale price and checkout link remain usable. */ });
   };
-  setInterval(() => {
-    if (currentOffer && currentOffer.discountCents > 0) {
-      if (Date.now() + serverOffset >= currentOffer.expiresAt) {
-        currentOffer.discountCents = 0; paintOffer(); refresh();
-      } else paintOffer();
-    }
-  }, 1000);
-  const randomAttempt = () => crypto.randomUUID();
-  try {
-    attempt = sessionStorage.getItem('payoff.attempt') || randomAttempt();
-    sessionStorage.setItem('payoff.attempt', attempt);
-    const selected = JSON.parse(sessionStorage.getItem('payoff.addons') || '[]');
-    for (const id of ['cashflow', 'reset']) document.getElementById(id).checked = selected.includes(id);
-    form.dispatchEvent(new Event('change'));
-  } catch { attempt = randomAttempt(); }
-  if (new URLSearchParams(location.search).has('cancelled')) {
-    status.textContent = 'Checkout was canceled and you were not charged. You can try again any time.';
-    event('PayoffCheckoutCancelled');
-  }
-  const saveExtras = () => {
-    const addons = ['cashflow', 'reset'].filter(id => document.getElementById(id).checked);
-    try { sessionStorage.setItem('payoff.addons', JSON.stringify(addons)); } catch { /* Optional. */ }
-    return addons;
-  };
-  form.addEventListener('change', saveExtras);
-  const refresh = () => fetch('/api/payoff/config?offer=1', { headers }).then(response => {
-    if (!response.ok) throw new Error('Unavailable');
-    return response.json();
-  }).then(config => {
-    ready = config.available === true;
-    currentOffer = config.offer || null;
-    serverOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
-    paintOffer();
-    button.disabled = !ready || busy;
-    button.textContent = busy ? 'Opening secure checkout…' : ready ? 'Complete order' : 'Purchases are temporarily unavailable';
-    button.classList.toggle('disabled-payment', !ready);
-    if (!ready) status.textContent = config.preview ? 'Payments are disabled in the local preview.' : 'Please try again later or contact support@bookmarketel.com.';
-  }).catch(() => {
-    ready = false; button.disabled = true;
-    button.textContent = 'Purchases are temporarily unavailable';
-    status.textContent = 'Please reload to try again or contact support@bookmarketel.com.';
-  });
-  form.addEventListener('submit', async submit => {
-    submit.preventDefault();
-    if (!ready || busy || !form.reportValidity()) return;
-    busy = true; button.disabled = true; button.textContent = 'Opening secure checkout…';
-    status.textContent = ''; event('PayoffCheckoutTapped');
-    const displayedBasePrice = basePriceCents;
-    paintOffer();
-    if (basePriceCents !== displayedBasePrice) {
-      status.textContent = 'The checkout offer has ended. Review the updated total and continue when you’re ready.';
-      busy = false; button.disabled = !ready; button.textContent = 'Complete order';
-      return;
-    }
-    const addons = saveExtras();
-    const expectedTotalCents = basePriceCents + window.PAYOFF_CONTENT.addOns.filter(addon => addons.includes(addon.id)).reduce((sum, addon) => sum + addon.priceCents, 0);
-    try {
-      const response = await fetch('/api/payoff/checkout', { method: 'POST', headers,
-        body: JSON.stringify({ email: document.getElementById('email').value.trim(), addons, attempt, visitorId: visitor, attribution,
-          useCheckoutOffer: basePriceCents === 2800, expectedTotalCents }) });
-      const result = await response.json();
-      if (!response.ok) {
-        if (response.status === 409) await refresh();
-        throw new Error(result.message || 'Checkout could not open. Please try again.');
-      }
-      const url = new URL(result.url);
-      if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error('Checkout could not open. Please try again.');
-      event('PayoffCheckoutOpened');
-      pixel('InitiateCheckout', { value: result.value }, visitor ? `payoff-checkout.${visitor}` : undefined);
-      location.assign(url.href);
-    } catch (error) {
-      event('PayoffCheckoutFailed');
-      status.textContent = error.message || 'Checkout could not open. Please try again.';
-      busy = false; button.disabled = !ready; button.textContent = ready ? 'Complete order' : 'Purchases are temporarily unavailable';
-    }
-  });
-  window.addEventListener('pageshow', () => {
-    busy = false;
-    if (ready) refresh();
-  });
-  refresh();
+  refreshSalesOffer();
+  window.addEventListener('pageshow', event => { if (event.persisted) refreshSalesOffer(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSalesOffer(); });
 })();

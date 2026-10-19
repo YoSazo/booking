@@ -188,8 +188,10 @@ test('the order page sells Payoff alone and the sales page shows the real tool',
   await page.goto(base + '/payoff/order');
   assert.equal(await page.$('.preorder-notice'), null);
   assert.equal(await page.$('#preorder-consent'), null);
-  assert.equal(await page.$$eval('.summary-line', lines => lines.length), 1);
-  await page.waitForFunction(() => document.getElementById('buy-button').textContent === 'Complete order');
+  assert.match(await page.locator('#summary-rows .line').first().innerText(), /^Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$ 33\.00$/);
+  assert.equal(await page.locator('#summary-rows .line').filter({ hasText: /calendar|reset/i }).count(), 0);
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#buy-label').innerText(), 'Complete Order');
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   assert.ok(width <= 390, 'no sideways scroll');
 }));

@@ -48,21 +48,21 @@ test('local composition keeps the full extracted biography and all supplied imag
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
- assert.equal(await page.locator('[data-proof="checkout"] .proof-image').count(),4);
- assert.equal(await page.locator('[data-proof="checkout"] figcaption').count(),0);
+ assert.equal(await page.locator('img.proof[src*="/comment-"]').count(),4);
  assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
 test('the order starts at $33 with both extras unchecked; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
  assert.equal(await page.locator('#preorder-consent').count(),0);
- assert.equal(await page.locator('.order-bump').count(),2);
+ assert.equal(await page.locator('.bump').count(),2);
  assert.equal(await page.locator('#cashflow').isChecked(),false);assert.equal(await page.locator('#reset').isChecked(),false);
  assert.equal(await page.locator('#order-total').innerText(),'$33.00');
  await page.locator('#cashflow').check();assert.equal(await page.locator('#order-total').innerText(),'$55.00');
  await page.locator('#cashflow').uncheck();
  await page.locator('#email').fill('preview@example.test');await page.locator('#email').press('Enter');
- await page.waitForTimeout(160);assert.equal(page.url(),base+'/payoff/order');assert.ok(await page.locator('.disabled-payment').isDisabled());
+ await page.waitForTimeout(160);assert.equal(page.url(),base+'/payoff/order');assert.ok(await page.locator('#buy-button').isDisabled());
+ assert.equal(await page.locator('#checkout-status').innerText(),'Payments are disabled in the local preview.');
  assert.equal(requests.filter(r=>r.method()!=='GET').length,0);
  assert.equal(requests.filter(r=>!r.url().startsWith(base)).length,0);
  assert.ok(await page.evaluate(()=>!JSON.stringify({...localStorage,...sessionStorage}).includes('preview@example.test')));assert.deepEqual(errors,[]);

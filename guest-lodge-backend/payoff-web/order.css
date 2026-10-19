@@ -1,0 +1,98 @@
+/* The order page, measured from the reference one-step order form at 414px:
+   Open Sans for page copy, Montserrat inside the form. */
+@font-face { font-family: 'Montserrat'; src: url('/payoff/assets/font-montserrat-06b16db7a9.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/payoff/assets/font-opensans-d8e4fe0452.woff2') format('woff2'); font-weight: 300 800; font-display: swap; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: #fff; color: #000; font-size: 16px; }
+img { max-width: 100%; }
+
+.row { padding: 0 10px; }
+.column { display: block; background: #fff; padding: 30px 0; }
+.column.grey { background: #f4f4f4; padding: 30px 0 10px; }
+.text { padding: 10px 0 0; font: 400 16px/20.8px 'Open Sans', sans-serif; text-align: center; }
+.text p { margin: 0; }
+.column > .text:first-child { margin-bottom: 10px; }
+
+.order { font-family: 'Montserrat', sans-serif; background: #fff; padding: 2px; border-radius: 5px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06); }
+.form-body { padding: 15px; }
+.info { display: grid; gap: 15px; }
+.input { display: block; width: 100%; height: 42px; margin: 0; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 5px;
+  background: #f4f4f4; color: #000; font: 400 14px/24px 'Montserrat', sans-serif; -webkit-appearance: none; appearance: none; }
+.input:focus { outline: none; border-color: #9ca3af; }
+.input.invalid { border-color: #c30; }
+.payment-bar { height: 2px; margin-top: 23px; background: #e5e7eb; }
+.form-payment { padding: 36px 10px 10px; }
+
+.grid { display: grid; grid-template-columns: 60% 20% 20%; font-size: 13px; }
+.grid .c { text-align: center; }
+.grid .r { text-align: right; }
+.head { font-weight: 700; }
+.divider { height: 2px; margin: 6px 0; background: #888; }
+.price { color: #1571a8; font-weight: 700; }
+.product { margin-bottom: 10px; }
+.product-name { display: flex; align-items: flex-start; }
+.product-name input { flex: none; width: 13px; height: 13px; margin: 3px 0 0; }
+.product-name strong { margin-left: 5px; }
+
+.bumps { padding: 5px 0; }
+.bump { margin-bottom: 10px; padding: 8px; border: 2px dashed #c7c7c7; border-radius: 5px; background: #fbf8e3; }
+.bump-main { display: flex; padding: 2px; border-radius: 5px; background: #fefcbf; }
+.bump-head { display: flex; align-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.arrow { display: block; box-sizing: content-box; flex: none; width: 22px; height: 13.34px; padding: 0 9px; fill: #f43407;
+  animation: bump-arrow .57s steps(1, end) infinite; }
+.bump-head input { flex: none; width: 13px; height: 13px; margin: 0 4px; }
+.bump-headline { margin-left: 2px; color: #090; font-weight: 700; line-height: 30px; }
+.oto { color: #c30; font-weight: 700; text-decoration: underline; }
+.copy { white-space: pre-wrap; }
+.copy b { font-weight: 700; }
+.bump-image { display: block; width: 100%; height: auto; }
+/* The reference arrow is an animated image: on 270ms, off 230ms, on 70ms. */
+@keyframes bump-arrow { 0% { opacity: 1; } 47.37% { opacity: 0; } 87.72% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .arrow { animation: none; } }
+
+.separator { display: flex; align-items: center; margin: 10px 0; padding: 1px 0; font-size: 13px; text-align: center; }
+.separator::before, .separator::after { content: ''; flex: 1 1 0%; height: 1px; border-bottom: 1px solid #cfd7df; }
+.separator::before { margin-right: .25em; }
+.separator::after { margin-left: .25em; }
+.line { margin-bottom: 10px; }
+.line .name { margin-right: 24px; }
+.order-total { display: flex; justify-content: space-between; margin-bottom: 10px; color: #333; font-size: 13px; font-weight: 700; }
+.order-total .price { color: #1571a8; }
+
+.or { position: relative; display: flex; align-items: center; height: 17px; margin: 20px 0; }
+.or hr { flex: 1; height: 1px; margin: 8px 0; border: 0; background: rgba(26, 26, 26, .1); }
+.or p { position: absolute; left: 50%; margin: 0; padding: 0 8px; transform: translateX(-50%); background: #fff; color: rgba(26, 26, 26, .5); font-size: 14px; }
+#payment-element { min-height: 1px; }
+
+.complete { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; margin-top: 16px; padding: 8px;
+  border: 1px solid rgba(0, 0, 0, .1); border-radius: 4px; background: #37ca37; box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, .2);
+  color: #fff; font: 700 32px/39px 'Montserrat', sans-serif; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.complete:disabled { background: #808080; cursor: default; }
+.complete .cart { flex: none; fill: currentColor; }
+.secure { margin: 10px 0 0; color: #9c9c9c; font-size: 12px; text-align: center; }
+.status { margin: 10px 0 0; color: #c30; font-size: 14px; line-height: 1.4; text-align: center; }
+.status:empty { display: none; }
+
+.logos { display: flex; justify-content: center; gap: 14px; margin-top: 9px; }
+.logos img { display: block; width: 48px; height: 32px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .18); }
+.guarantee { margin-top: 10px; }
+.seal { display: block; width: 300px; height: auto; margin: 20px auto 0; }
+
+.proof { display: block; width: calc(100% - 20px); height: auto; margin: 30px 10px 0; }
+
+footer { padding: 35px 10px; background: #8c8c8c; color: #fff; font: 400 13px/1.5 'Open Sans', sans-serif; text-align: center; }
+footer img { display: block; width: 200px; height: auto; margin: 0 auto 12px; filter: brightness(0) invert(1); }
+footer p { margin: 0; }
+footer a { color: #fff; }
+
+/* Desktop: the form beside the grey column, as in the reference. */
+@media (min-width: 768px) {
+  .row { display: flex; align-items: flex-start; max-width: 1072px; margin: 0 auto; }
+  .row > .column { flex: 1 1 50%; }
+  .column:not(.grey) { padding: 30px 5px; }
+  .column.grey { align-self: stretch; padding: 30px 35px 10px; }
+  .proof { width: 100%; margin: 30px 0 0; }
+}

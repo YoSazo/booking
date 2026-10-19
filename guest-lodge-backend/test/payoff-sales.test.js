@@ -4,10 +4,10 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
-const { registerPayoff, basket, paidOrder, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
+const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
 
 function fixture({ failEmail = false, ready = true, production = false, clock = Date.now } = {}) {
-  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [];
+  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [];
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
     create: async ({ data }) => {
@@ -21,7 +21,11 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     create: async (params, options) => { creates.push({ params, options }); return { url: 'https://checkout.stripe.com/c/pay/cs_test_example' }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return sessions.get(id); },
     list: async ({ customer_details }) => ({ data: [...sessions.values()].filter(s => s.customer_details?.email === customer_details.email) }),
-  } } };
+  } }, paymentIntents: {
+    create: async (params, options) => { payments.push({ params, options }); return { id: 'pi_3Created' + payments.length, client_secret: 'pi_test_created_secret_x' }; },
+    retrieve: async id => { if (!intents.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return intents.get(id); },
+    search: async ({ query }) => ({ data: [...intents.values()].filter(i => query.includes(`metadata['email']:'${i.metadata.email}'`) && i.status === 'succeeded') }),
+  } };
   const mail = { sendMail: async message => { if (failEmail) { failEmail = false; throw new Error('SMTP unavailable'); } emails.push(message); } };
   const env = production ? { STRIPE_MARKETEL_SECRET_KEY: 'sk_test_no_live_charges', NODE_ENV: 'production' } : { NODE_ENV: 'test' };
   const app = express();
@@ -29,7 +33,7 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
     isExcludedEmail: email => email === 'owner@example.test', now: clock });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
-  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi };
+  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments };
 }
 async function serve(world, fn) {
   const server = world.app.listen(0, '127.0.0.1');
@@ -74,7 +78,18 @@ test('Payoff pages and assets are published without exposing source documents or
     // Meta's pixel may load on the sales and order pages, never in the tool.
     for (const route of ['/payoff', '/payoff/order']) assert.match((await fetch(base + route)).headers.get('content-security-policy'), /script-src 'self' https:\/\/connect\.facebook\.net/, route);
     const toolCsp = (await fetch(base + '/payoff/app')).headers.get('content-security-policy');
-    assert.match(toolCsp, /default-src 'self'/); assert.doesNotMatch(toolCsp, /facebook/);
+    assert.match(toolCsp, /default-src 'self'/); assert.doesNotMatch(toolCsp, /facebook|stripe/);
+    // Stripe's payment fields load on the order page only.
+    const orderPage = await fetch(base + '/payoff/order');
+    assert.match(orderPage.headers.get('content-security-policy'), /script-src [^;]*https:\/\/js\.stripe\.com/);
+    assert.match(orderPage.headers.get('content-security-policy'), /frame-src [^;]*https:\/\/hooks\.stripe\.com/);
+    assert.match(orderPage.headers.get('permissions-policy'), /payment=\(self "https:\/\/js\.stripe\.com"/);
+    assert.doesNotMatch((await fetch(base + '/payoff')).headers.get('content-security-policy'), /stripe/);
+    for (const file of ['order.js', 'order.css']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
+    const font = fs.readdirSync(path.join(__dirname, '../payoff-web/assets')).find(name => /^font-.*\.woff2$/.test(name));
+    const fontResponse = await fetch(base + '/payoff/assets/' + font);
+    assert.equal(fontResponse.status, 200); assert.match(fontResponse.headers.get('content-type'), /font\/woff2/);
+    assert.equal(fontResponse.headers.get('cache-control'), 'public, max-age=31536000, immutable');
   });
 });
 test('checkout charges server prices for Payoff and any extras, opens the tool on return, and keeps idempotency', async () => {
@@ -397,5 +412,98 @@ test('the landing previews the actual offer without issuing or restarting its de
     const ended = await (await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } })).json();
     assert.equal(ended.checkoutOffer.discountCents, 0);
     assert.equal(ended.checkoutOffer.expiresAt, expiresAt);
+  });
+});
+
+// The order page's own payment form: a PaymentIntent per order, never a session.
+const intent = (addons = [], extra = {}) => ({ object: 'payment_intent', id: 'pi_3PaidOrder123456', status: 'succeeded', currency: 'usd', livemode: true,
+  amount_received: 3300 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0), receipt_email: 'Buyer@Example.test',
+  metadata: { product: PRODUCT, offerVersion: VERSION, checkout: 'embedded', addons: JSON.stringify(addons), visitorId: 'v_abcdefghijk', email: 'buyer@example.test' }, ...extra });
+test('the order page form creates a payment at server prices, keeps retries on one payment, and tells Meta once per visitor', async () => {
+  const w = fixture();
+  await serve(w, async ({ post }) => {
+    const r = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6400 }));
+    assert.equal(r.status, 200); assert.equal(r.body.value, 64); assert.equal(r.body.clientSecret, 'pi_test_created_secret_x');
+    const { params, options } = w.payments[0];
+    assert.equal(params.amount, 6400); assert.equal(params.currency, 'usd'); assert.deepEqual(params.automatic_payment_methods, { enabled: true });
+    assert.equal(params.receipt_email, 'Buyer@Example.test');
+    assert.equal(params.metadata.checkout, 'embedded'); assert.equal(params.metadata.email, 'buyer@example.test');
+    assert.equal(params.metadata.addons, '["cashflow","reset"]'); assert.equal(params.metadata.product, PRODUCT);
+    assert.ok(!('amount' in order()) || params.amount !== 1);
+    await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6400 }));
+    assert.equal(w.payments[1].options.idempotencyKey, options.idempotencyKey);
+    const changed = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset'], visitorId: 'v_abcdefghijk', expectedTotalCents: 4200 }));
+    assert.equal(changed.status, 200); assert.notEqual(w.payments[2].options.idempotencyKey, options.idempotencyKey);
+    assert.equal((await post('/api/payoff/pay', order({ addons: ['reset'], expectedTotalCents: 3300 }))).status, 409);
+    assert.equal((await post('/api/payoff/pay', order({ email: 'nope' }))).status, 400);
+    assert.equal((await post('/api/payoff/pay', order({ addons: ['other'] }))).status, 400);
+    const checkouts = w.capi.filter(event => event.name === 'InitiateCheckout');
+    assert.equal(checkouts.length, 3); assert.ok(checkouts.every(event => event.eventId === 'payoff-checkout.v_abcdefghijk'));
+    await post('/api/payoff/pay', order({ email: 'owner@example.test', visitorId: 'v_abcdefghijk' }));
+    await post('/api/payoff/pay', order({ visitorId: 'v_abcdefghijk' }), { 'x-marketel-no-track': '1' });
+    assert.equal(w.capi.filter(event => event.name === 'InitiateCheckout').length, 3);
+    assert.equal(w.creates.length, 0);
+  });
+});
+test('a paid order-page payment opens the tool, emails once, counts once, and finds its link again by email', async () => {
+  const w = fixture(); const pi = intent(['cashflow']); w.intents.set(pi.id, pi);
+  await serve(w, async ({ post }) => {
+    const r = await post('/api/payoff/confirm', { paymentIntent: pi.id });
+    assert.equal(r.status, 200); assert.deepEqual(r.body.extras, ['cashflow']); assert.equal(r.body.totalCents, 5500); assert.equal(r.body.emailSent, true);
+    assert.equal(verifyAccess(SECRET, r.body.access), pi.id);
+    await post('/api/payoff/confirm', { paymentIntent: pi.id });
+    assert.equal(w.emails.length, 1); assert.equal(w.emails[0].to, 'Buyer@Example.test');
+    assert.match(w.emails[0].text, /Order reference: pi_3PaidOrder123456/);
+    assert.ok(w.rows.has('payoff-paid:' + pi.id));
+    assert.equal(w.capi.filter(event => event.name === 'Purchase' && event.eventId === 'payoff-purchase.' + pi.id).length, 2);
+    const access = await post('/api/payoff/access', { token: r.body.access });
+    assert.deepEqual(access.body, { ok: true, extras: ['cashflow'] });
+    assert.deepEqual((await post('/api/payoff/resend', { email: 'BUYER@example.test' })).body, { sent: true });
+    assert.equal(w.emails.length, 2); assert.equal(verifyAccess(SECRET, decodeURIComponent(w.emails[1].text.match(/access=(\S+)/)[1])), pi.id);
+  });
+});
+test('an order-page payment that is processing, failed, altered or from hosted Checkout never opens the tool', async () => {
+  const w = fixture();
+  const processing = intent([], { id: 'pi_3Processing12345', status: 'processing' });
+  const failed = intent([], { id: 'pi_3Declined1234567', status: 'requires_payment_method' });
+  const altered = intent([], { id: 'pi_3Altered12345678', amount_received: 100 });
+  const hosted = intent([], { id: 'pi_3HostedSession12' }); delete hosted.metadata.checkout;
+  for (const pi of [processing, failed, altered, hosted]) w.intents.set(pi.id, pi);
+  await serve(w, async ({ post }) => {
+    const pending = await post('/api/payoff/confirm', { paymentIntent: processing.id });
+    assert.equal(pending.status, 202); assert.equal(pending.body.processing, true); assert.ok(!pending.body.access);
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: failed.id })).status, 402);
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: altered.id })).status, 402);
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: hosted.id })).status, 402);
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: 'pi_3Missing12345678' })).status, 404);
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: 'cs_test_wrongKind123456' })).status, 400);
+    assert.equal((await post('/api/payoff/access', { token: accessToken(SECRET, failed.id) })).body.extras, null);
+  });
+  assert.equal(w.emails.length, 0); assert.equal(w.rows.size, 0);
+  assert.equal(paidIntent({ ...intent(), currency: 'eur' }), null);
+  assert.equal(paidIntent({ ...intent(), metadata: { ...intent().metadata, checkoutDiscountCents: '900', checkoutDiscountVersion: 'payoff-checkout-5-v1' }, amount_received: 2400 }), null);
+  assert.deepEqual(paidIntent({ ...intent(), metadata: { ...intent().metadata, checkoutDiscountCents: '500', checkoutDiscountVersion: 'payoff-checkout-5-v1' }, amount_received: 2800 }), ['base']);
+});
+test('the webhook fulfills order-page payments and leaves hosted sessions\' payments to their session', async () => {
+  const w = fixture(); const pi = intent(['reset']); w.intents.set(pi.id, pi);
+  const hosted = intent([], { id: 'pi_3HostedSession12' }); delete hosted.metadata.checkout; w.intents.set(hosted.id, hosted);
+  assert.equal(await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: pi.id, metadata: pi.metadata } } }), true);
+  assert.equal(w.emails.length, 1); assert.ok(w.rows.has('payoff-paid:' + pi.id));
+  assert.equal(await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: pi.id, metadata: pi.metadata } } }), true);
+  assert.equal(w.emails.length, 1);
+  assert.equal(await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: hosted.id, metadata: hosted.metadata } } }), false);
+  assert.equal(await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: 'pi_3Other12345', metadata: { product: 'marketel-claims-trial-balance' } } } }), false);
+});
+test('config hands the order page a publishable key only from the same Stripe account and mode', async () => {
+  const account = '51AbCdEfGhIjKlMnO';
+  const world = env => { const w = fixture(); w.app = express(); registerPayoff(w.app, { prisma: w.prisma, stripe: w.stripe, mail: w.mail, env: { NODE_ENV: 'test', ...env } }); return w; };
+  await serve(world({ STRIPE_INSPECT_SECRET_KEY: `sk_test_${account}xyz`, STRIPE_INSPECT_PUBLISHABLE_KEY: `pk_test_${account}abc` }), async ({ base }) => {
+    assert.equal((await (await fetch(base + '/api/payoff/config')).json()).stripeKey, `pk_test_${account}abc`);
+  });
+  await serve(world({ STRIPE_INSPECT_SECRET_KEY: `sk_test_${account}xyz`, STRIPE_INSPECT_PUBLISHABLE_KEY: 'pk_test_51ZzZzZzZzZzZzZzZzabc' }), async ({ base }) => {
+    assert.equal((await (await fetch(base + '/api/payoff/config')).json()).stripeKey, null);
+  });
+  await serve(world({}), async ({ base }) => {
+    assert.equal((await (await fetch(base + '/api/payoff/config')).json()).stripeKey, null);
   });
 });

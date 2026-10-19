@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#ffffff">
   <title>Marketel Payoff — your debt-free date</title>
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/app.css?v=2">
+  <link rel="stylesheet" href="/payoff/app.css?v=3">
   <script src="/payoff/engine.js?v=2" defer></script>
-  <script src="/payoff/app.js?v=2" defer></script>
+  <script src="/payoff/app.js?v=3" defer></script>
 </head>
 <body>
   <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a>
@@ -24,6 +24,7 @@
       <h1 id="opening-title">Opening your plan…</h1>
       <p class="muted" id="opening-status" role="status" aria-live="polite">Checking your payment with Stripe.</p>
       <button class="big" id="opening-retry" type="button" hidden>Check again</button>
+      <a class="big" id="opening-back" href="/payoff/order" hidden>Back to checkout</a>
       <p class="fine" id="opening-help" hidden>If you were charged, don’t pay again. Email <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a>.</p>
     </section>
 

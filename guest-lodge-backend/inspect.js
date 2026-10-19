@@ -2431,6 +2431,7 @@ module.exports = {
   entitlement,
   sanitizeInspectAttribution,
   mergeInspectAttribution,
+  inspectPublishableKey,
   inspectEnvReadiness,
   LIMITS,
   hash,

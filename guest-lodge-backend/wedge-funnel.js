@@ -170,11 +170,11 @@ const labelsOf = (steps, branches) => Object.fromEntries([
 const PAYOFF_STEPS = Object.freeze([
   { key: 'landed', label: 'Landed on Payoff', names: ['PayoffLanded'] },
   { key: 'order', label: 'Viewed order', names: ['PayoffOrderViewed'] },
-  { key: 'tapped', label: 'Started secure checkout', names: ['PayoffCheckoutTapped'] },
-  { key: 'checkout', label: 'Opened Stripe', names: ['PayoffCheckoutOpened'] },
+  { key: 'tapped', label: 'Tapped Complete Order', names: ['PayoffCheckoutTapped'] },
+  { key: 'checkout', label: 'Sent payment to Stripe', names: ['PayoffCheckoutOpened'] },
   { key: 'paid', label: 'Paid', names: ['PayoffPaid'] },
   { key: 'emailed', label: 'Payoff link emailed', names: ['PayoffConfirmationEmailed'], aside: true },
-  { key: 'failed', label: 'Checkout failed', names: ['PayoffCheckoutFailed'], aside: true },
+  { key: 'failed', label: 'Payment failed or declined', names: ['PayoffCheckoutFailed'], aside: true },
   { key: 'cancelled', label: 'Returned without payment', names: ['PayoffCheckoutCancelled'], aside: true },
 ]);
 const PAYOFF_BRANCHES = Object.freeze([
@@ -188,7 +188,7 @@ const PAYOFF_BRANCHES = Object.freeze([
 const DEFINITIONS = Object.freeze({
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze(labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES)),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom']),
-    split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Started checkout', 'tapped'], ['Opened Stripe', 'checkout'], ['Paid', 'paid']] },
+    split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Sent payment', 'checkout'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
     // Events whose detail says which one (source, browser, what was picked) are

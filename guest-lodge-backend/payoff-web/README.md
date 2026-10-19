@@ -18,41 +18,72 @@ same month. Capped at 600 months.
 `app.html`, `app.js`, `app.css` are the phone UI. The buyer's numbers stay in
 `localStorage` (`payoff.v1`) and are never sent anywhere.
 
+## Order page
+
+`order.html`, `order.css` and `order.js` copy a proven one-step order form
+(True Money Saver's), measured at 414px:
+1. A bold line, then one white card holding the name and email fields, the
+   product table, the two extras and the order summary.
+   - The extras sit in dashed cream boxes with a yellow bar, a blinking red
+     arrow, a green headline and a red underlined offer line.
+2. Stripe's payment fields, and Complete Order.
+3. Under the card: card logos, the guarantee lines and the gold seal.
+4. A grey column with "Here's what happens when you order today:", the
+   crossed-out Total Value, four comment screenshots and the device image.
+
+The page uses Montserrat and Open Sans, self-hosted in `assets/` (SIL OFL).
+On desktop the grey column sits beside the form.
+
+The payment happens on the page:
+- Stripe's Payment Element and Express Checkout Element (Apple Pay, Google Pay,
+  or a pay-later button where the reference has PayPal) mount without a
+  payment existing. Ticking an extra updates their amount.
+- Complete Order checks the name, email and Stripe's fields, then
+  `/api/payoff/pay` creates a PaymentIntent at server prices (metadata
+  `checkout: embedded`), and Stripe confirms it.
+- Retrying the same order reuses the payment.
+- Stripe.js loads only when `/api/payoff/config` returns `stripeKey` (the
+  publishable key of the billing account, as for Claims).
+- Without it, or if Stripe's fields can't load, Complete Order opens Stripe's
+  hosted page (`/api/payoff/checkout`) instead.
+
 ## Checkout offer
 
-The order page offers $5 off the $33 plan for 30 minutes. Its signed,
-HttpOnly cookie preserves the original deadline across reloads. Opening
-Stripe within that window locks in the quoted price; the Stripe Session
-keeps that quote. Optional extras remain $22 and $9.
+The order page offers $5 off the $33 plan for 30 minutes. A signed, HttpOnly
+cookie keeps the original deadline across reloads. The offer shows as a row in
+the order summary with its clock. Optional extras remain $22 and $9.
 
-The page and Stripe both show regular prices and a separate $5 saving.
-Stripe uses the fixed-amount coupon `marketel-payoff-checkout-5-v1`, validated
-and created idempotently by the server when first needed. Receipts and
-fulfillment validate the resulting total. The sticky reminder shares the
-same clock and hides around typing and the payment button.
+The server only honours the offer while it is running. Complete Order never
+charges a total the buyer hasn't seen: if the offer ended on screen late, it
+repaints and asks them to review. On the hosted fallback, Stripe applies the
+fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
-Product device visuals were generated from real app screenshots, then saved
-as small WebP files. The original screenshots are preserved. Asset paths and
-prompts are in `assets/checkout-visuals.md`. The selected-software recap uses
-the previous base price and actual extra prices, and shows the sale total.
-
-The sales page previews offer eligibility without starting the timer. Returning
-visitors keep their existing deadline. Stripe uses payment methods enabled in
-the Dashboard, rather than a card-only list; Cash App Pay and Klarna appear
-when the buyer is eligible. An unpaid delayed payment does not unlock access.
+The sales page previews offer eligibility without starting the timer. Stripe
+offers the payment methods enabled in the Dashboard (Cash App Pay, Klarna,
+Afterpay and others when the buyer is eligible). An unpaid delayed payment
+does not unlock access.
 
 The owner offers a full refund within 30 days of purchase, including extras.
-The guarantee appears beside offers, in checkout, in terms and in access emails.
+The guarantee appears on the sales page, at checkout, in the terms and in
+access emails.
 
 ## Access
 
-Access is the paid Checkout Session id signed with `PAYOFF_ACCESS_SECRET`
-(falling back to `INSPECT_AUTH_SECRET`), stored in `payoff.access`.
-- Stripe returns to `/payoff/app?session_id=…`; `/api/payoff/confirm` checks
-  the session and returns the signed link, and emails it once.
+Access is the paid order's id signed with `PAYOFF_ACCESS_SECRET` (falling back
+to `INSPECT_AUTH_SECRET`), stored in `payoff.access`. The id is a PaymentIntent
+from the order page, or a Checkout Session from the hosted fallback or older
+orders.
+- After paying, the order page (or Stripe, after a redirecting method) opens
+  `/payoff/app?payment_intent=…`. The hosted page returns to
+  `/payoff/app?session_id=…`.
+  - `/api/payoff/confirm` checks the payment and returns the signed link, and
+    emails it once.
+  - A payment that didn't go through sends the buyer back to checkout.
+  - The `payment_intent.succeeded` webhook fulfils too.
 - `/payoff/app?access=…` (the emailed link) is checked by `/api/payoff/access`.
-- "Email me my link" (`/api/payoff/resend`) finds a paid session for the email
-  in Stripe and resends; owner emails (the /funnel exclusion list) get an owner
+- "Email me my link" (`/api/payoff/resend`) finds a paid order for the email
+  and resends it. It searches sessions by email, and PaymentIntents by
+  `metadata.email`. Owner emails (the /funnel exclusion list) get an owner
   link. The reply is the same either way.
 - Earlier paid preorders (`marketel-payoff-preorder` / `payoff-preorder-v1`)
   open the tool too. Their optional extras are still owed.
