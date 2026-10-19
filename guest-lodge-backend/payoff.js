@@ -110,7 +110,10 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
-    if (!/^[a-z0-9-]+\.(?:png|jpg)$/.test(req.params.file)) return res.sendStatus(404);
+    if (!/^[a-z0-9-]+\.(?:png|jpg|webp)$/.test(req.params.file)) return res.sendStatus(404);
+    if (/-[a-f0-9]{10}\.webp$/.test(req.params.file)) {
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    }
     res.sendFile(path.join(ROOT, 'assets', req.params.file));
   });
   pages.use((_req, res) => res.sendStatus(404));

@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
+const fs = require('node:fs');
+const path = require('node:path');
 const { registerPayoff, basket, paidOrder, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
 
 function fixture({ failEmail = false, ready = true, production = false } = {}) {
@@ -50,6 +52,13 @@ test('Payoff pages and assets are published without exposing source documents or
     for (const route of ['/payoff', '/payoff/', '/payoff/order', '/payoff/confirmation', '/payoff/terms', '/payoff/checkout.js', '/payoff/app', '/payoff/app.js', '/payoff/app.css', '/payoff/engine.js', '/payoff/assets/tool-result.jpg']) {
       const r = await fetch(base + route); assert.equal(r.status, 200, route); assert.equal(r.headers.get('cache-control'), 'no-store');
     }
+    const optimized = fs.readdirSync(path.join(__dirname, '../payoff-web/assets')).find(name => name.endsWith('.webp'));
+    const imageUrl = base + '/payoff/assets/' + optimized;
+    const image = await fetch(imageUrl);
+    assert.equal(image.status, 200);
+    assert.match(image.headers.get('content-type'), /image\/webp/);
+    assert.equal(image.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    assert.equal((await fetch(imageUrl, { headers: { 'If-None-Match': image.headers.get('etag'), 'Cache-Control': 'max-age=0' } })).status, 304);
     for (const route of ['/payoff/README.md', '/payoff/BIO-TRANSCRIPT.md', '/payoff/assets/README.md', '/payoff/missing', '/payoff/%2e%2e/server.js']) assert.equal((await fetch(base + route)).status, 404, route);
     assert.equal(await (await fetch(base + '/claims')).text(), 'Existing Claims page');
     for (const route of ['/payoff', '/payoff/order', '/payoff/terms']) {

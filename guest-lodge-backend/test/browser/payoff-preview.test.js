@@ -22,6 +22,7 @@ test('local composition has seven offers, fourteen images and reference-style ra
  assert.equal(await page.locator('a.cta').count(),7);
  for(const [group,count]of Object.entries({early:2,problem:2,example:4,main:6}))assert.equal(await page.locator('[data-proof="'+group+'"] > *').count(),count);
  assert.equal(await page.locator('.proof-image').count(),14);
+ assert.ok(await page.locator('.proof-image img').evaluateAll(imgs=>imgs.every(img=>img.src.endsWith('.webp')&&img.width>0&&img.height>0)));
  assert.equal(await page.locator('.proof-image > figcaption,.preview-note,.portrait-caption').count(),0);
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
  assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');

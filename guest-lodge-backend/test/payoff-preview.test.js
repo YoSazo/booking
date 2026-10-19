@@ -32,7 +32,9 @@ test('owner-confirmed testimonials are unique and byte-preserved; biography matc
   'testimony-sandy.png':'f89dd24a4061ac4ed678ddcc59e4193fea9af3b5eb085492afe35f14b788564f',
  };
  for(const image of images){
-  const name=path.basename(image.src);
+  const name=path.basename(image.src).replace(/-[a-f0-9]{10}\.webp$/,'.png');
+  assert.match(image.src,/\.webp$/);
+  assert.ok(fs.statSync(path.join(root,'assets',path.basename(image.src))).size<200000);
   const hash=createHash('sha256').update(fs.readFileSync(path.join(root,'assets',name))).digest('hex');
   assert.equal(hash,hashes[name],name);
  }
