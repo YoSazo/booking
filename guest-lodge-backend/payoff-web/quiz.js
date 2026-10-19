@@ -116,7 +116,7 @@
   function hook() {
     const screen = el('section', 'hook');
     const hero = el('div', 'hero');
-    const image = new Image(); image.src = '/payoff/assets/lauren-hero-503068be0d.webp'; image.alt = ''; image.width = 720; image.height = 811; image.decoding = 'async';
+    const image = new Image(); image.src = '/payoff/assets/lauren-hero-0fde5d8d66.webp'; image.alt = ''; image.width = 780; image.height = 691; image.decoding = 'async';
     hero.append(image, words('p', 'caption', 'CREDIT CARD HOLDERS 👇'));
     const grid = el('div', 'choices grid');
     for (const [label, count] of [['1', 1], ['2', 2], ['3', 3], ['4+', 4]]) grid.append(choice(label, () => {

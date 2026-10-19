@@ -39,7 +39,7 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 
 /* 1. The hook: Lauren, captioned like the ad. */
 .hook .hero { position: relative; height: min(42vh, 330px); margin: -18px -16px 18px; overflow: hidden; background: #e9eef2; }
-.hook .hero img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.hook .hero img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 90%; }
 .caption { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0; padding: 0 12px; text-align: center;
   color: #fff; font: 900 36px/1.05 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: .01em;
   -webkit-text-stroke: 2px #000; paint-order: stroke fill; text-shadow: 0 3px 0 #000, 0 0 14px rgba(0, 0, 0, .35); }
