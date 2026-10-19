@@ -15,13 +15,32 @@ function readOffer(secret, token, now = Date.now()) {
   const expiresAt = Number(match[2]);
   return { expiresAt, discountCents: now < expiresAt ? OFFER.discountCents : 0 };
 }
-function offerCookie(req) {
-  const entry = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${OFFER.cookie}=`));
-  return entry ? entry.slice(OFFER.cookie.length + 1) : null;
+const cookieValue = (req, name) => {
+  const entry = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`));
+  return entry ? entry.slice(name.length + 1) : null;
+};
+const offerCookie = req => cookieValue(req, OFFER.cookie);
+
+// The quiz earns the same $5: finish it within the window from the first
+// answer. The checkout offer's own 30 minutes still start at checkout.
+const QUIZ = Object.freeze({ cookie: 'payoff_quiz', windowMs: 10 * 60 * 1000 });
+function issueQuiz(secret, startAt, finishAt = 0, nonce = crypto.randomBytes(16).toString('hex')) {
+  const payload = `${nonce}.${startAt}.${finishAt}`;
+  return `${payload}.${signature(secret, `quiz:${payload}`)}`;
 }
+function readQuiz(secret, token) {
+  if (!secret || typeof token !== 'string') return null;
+  const match = /^([a-f0-9]{32})\.(\d{13})\.(0|\d{13})\.([A-Za-z0-9_-]{43})$/.exec(token);
+  if (!match) return null;
+  const expected = Buffer.from(signature(secret, `quiz:${match[1]}.${match[2]}.${match[3]}`)), supplied = Buffer.from(match[4]);
+  if (!crypto.timingSafeEqual(expected, supplied)) return null;
+  const startAt = Number(match[2]), finishAt = Number(match[3]) || null, deadline = startAt + QUIZ.windowMs;
+  return { nonce: match[1], startAt, finishAt, deadline, earned: !!finishAt && finishAt <= deadline };
+}
+const quizCookie = req => cookieValue(req, QUIZ.cookie);
 function orderDiscount(session) {
   const metadata = session?.metadata || {};
   if (metadata.checkoutDiscountCents === undefined && metadata.checkoutDiscountVersion === undefined) return 0;
   return metadata.checkoutDiscountVersion === OFFER.version && metadata.checkoutDiscountCents === String(OFFER.discountCents) ? OFFER.discountCents : null;
 }
-module.exports = { OFFER, issueOffer, readOffer, offerCookie, orderDiscount };
+module.exports = { OFFER, issueOffer, readOffer, offerCookie, orderDiscount, QUIZ, issueQuiz, readQuiz, quizCookie };

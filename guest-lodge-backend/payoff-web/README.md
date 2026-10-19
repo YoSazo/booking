@@ -39,6 +39,14 @@ The quiz is paced like the ad:
 - The extra amount moves a live "sooner / less interest" figure.
 - The plan screen keeps the exact month, the first card and the monthly
   payments locked behind Unlock My Plan.
+- A red bar offers the $5 checkout offer for finishing: "Finish your plan in
+  10 minutes and get an extra $5 off".
+  - The 10 minutes start at the first answer and are counted on the server
+    (`/api/payoff/quiz`, signed `payoff_quiz` cookie).
+  - Finishing in time unlocks the $5. Its own 30 minutes still start at
+    checkout.
+  - Quiz visitors who finish late, or not at all, get no offer cookie at
+    checkout and pay $33. The letter's visitors are unaffected.
 - The typed cards stay in the browser. When the buyer goes to pay, they are
   written to the tool's `payoff.v1`, unless the tool already has cards.
 

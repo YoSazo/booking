@@ -92,7 +92,7 @@
     const screen = render(name);
     screen.classList.add('screen', direction < 0 ? 'from-left' : 'from-right');
     stage.replaceChildren(screen);
-    if (name === 'plan') { track.paintOffers(); startOffer(); }
+    if (name === 'plan') askDeal('finish');
     $('back').hidden = quiz.at === 0;
     $('progress').style.width = `${(6 + 94 * Math.pow(quiz.at / (list.length - 1), 0.65)).toFixed(1)}%`;
     document.body.dataset.step = name.replace(/-\d+$/, '');
@@ -121,7 +121,9 @@
     hero.append(image, words('p', 'caption', 'CREDIT CARD HOLDERS 👇'));
     const grid = el('div', 'choices grid');
     for (const [label, count] of [['1', 1], ['2', 2], ['3', 3], ['4+', 4]]) grid.append(choice(label, () => {
-      quiz.count = count; quiz.cards = Array.from({ length: count }, (_, i) => quiz.cards[i] || {}); reached('q1'); advance();
+      quiz.count = count; quiz.cards = Array.from({ length: count }, (_, i) => quiz.cards[i] || {}); reached('q1');
+      if (!deal?.quiz) askDeal('start');
+      advance();
     }));
     screen.append(hero, words('h1', 'q', 'How many credit cards are you paying off?'), grid,
       next('See your debt-free date in about 2 minutes. No bank login. No spreadsheet.'));
@@ -269,7 +271,6 @@
     const reg = el('p', 'offer-reg'); const s = el('s', '', '(Reg. price $375)'); s.dataset.offerAnchor = ''; reg.append(s);
     const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
     const saved = el('p', 'offer-saved'); saved.id = 'offer-saved'; saved.hidden = true;
-    saved.append(el('span', '', 'That’s $5 (15%) off the $33 sale price. It’s saved for you for '), Object.assign(el('b', '', '30:00'), { id: 'offer-saved-clock' }), '.');
     offer.append(reg, today, saved);
     const unlock = el('a', 'go', 'Unlock My Plan →'); unlock.href = '/payoff/order';
     unlock.addEventListener('click', handOver);
@@ -289,31 +290,51 @@
     ['comment-heather-b27ecbf244.webp', 748, 521, 'Facebook comment from Heather: It showed me my plan, my next payoff, and how much faster I could be debt free if I paid a little extra.'],
   ];
 
-  // The $5 checkout offer starts when they reach their plan (the order page
-  // carries on with the same clock), and shows in the bar and under the price.
-  let offer = null, offset = 0, ticking = null, base = 3300;
-  const offerLeft = () => (offer && offer.discountCents > 0 ? offer.expiresAt - Date.now() - offset : 0);
+  // The quiz's deal: finish the plan within the window from the first answer
+  // and the $5 is theirs; its own 30 minutes start at checkout. The server
+  // keeps both clocks, so the bar here only ever says what is true.
+  let deal = null, offset = 0;
   const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  const minutes = ms => `${Math.round(ms / 60000)} minutes`;
+  // Only looks (GET) until the server says the offer exists; then starts or finishes.
+  function askDeal(action) {
+    if (action !== 'state' && !deal?.available) return Promise.resolve();
+    return fetch('/api/payoff/quiz', action === 'state' ? { headers: track.headers || {} }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json', ...(track.headers || {}) }, body: JSON.stringify({ action }) })
+      .then(response => response.ok ? response.json() : null)
+      .then(reply => { if (reply) { deal = reply; offset = Number.isFinite(reply.serverNow) ? reply.serverNow - Date.now() : 0; paintOffer(); } })
+      .catch(() => { /* Without the server the sale price stands. */ });
+  }
+  function dealState() {
+    if (!deal?.available) return { kind: 'none' };
+    const now = Date.now() + offset, offer = deal.checkoutOffer;
+    if (offer) return offer.discountCents > 0 && offer.expiresAt > now ? { kind: 'checkout', left: offer.expiresAt - now } : { kind: 'none' };
+    if (!deal.quiz) return { kind: 'offered' };
+    if (deal.quiz.earned) return { kind: 'earned' };
+    if (!deal.quiz.finished && deal.quiz.deadline > now) return { kind: 'running', left: deal.quiz.deadline - now };
+    return { kind: 'none' };
+  }
   function paintOffer() {
-    const ms = offerLeft(), active = ms > 0;
-    $('offer-bar').hidden = !(active && document.body.dataset.step === 'plan');
-    if (active) $('offer-bar-clock').textContent = clock(ms);
-    const saved = $('offer-saved');
-    if (saved) { saved.hidden = !active; if (active) $('offer-saved-clock').textContent = clock(ms); }
-    const price = document.querySelector('.plan [data-price]');
-    if (price && offer) price.textContent = window.PAYOFF_PRICE_LINES(active ? base - offer.discountCents : base).today[0];
-    if (offer && !active && ticking) { clearInterval(ticking); ticking = null; }
+    const state = dealState(), bar = $('offer-bar'), lead = $('deal-lead'), timer = $('deal-clock'), rest = $('deal-rest');
+    const text = {
+      offered: [`🎁 Finish your plan in ${minutes(deal?.windowMs || 600000)} and get an extra $5 off`, null, ''],
+      running: ['🎁 Finish in', clock(state.left), 'to unlock an extra $5 off'],
+      earned: ['🎉 You unlocked an extra $5 off!', null, 'Your 30 minutes start at checkout.'],
+      checkout: ['🎉 You got an extra $5 off! It’s saved for you for', clock(state.left), ''],
+    }[state.kind];
+    bar.hidden = !text;
+    if (text) { lead.textContent = text[0]; timer.hidden = !text[1]; timer.textContent = text[1] || ''; rest.textContent = text[2]; }
+    // On the plan: the price they'll pay, and why.
+    const price = document.querySelector('.plan [data-price]'), saved = $('offer-saved');
+    if (!price) return;
+    const discounted = state.kind === 'earned' || state.kind === 'checkout';
+    price.textContent = window.PAYOFF_PRICE_LINES(discounted ? 3300 - (deal?.discountCents || 500) : 3300).today[0];
+    saved.hidden = !discounted;
+    if (discounted) saved.textContent = state.kind === 'earned'
+      ? 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.'
+      : `That’s $5 (15%) off the $33 sale price. It’s saved for you for ${clock(state.left)}.`;
   }
-  function startOffer() {
-    if (offer) return;
-    fetch('/api/payoff/config?offer=1', { headers: track.headers || {} }).then(response => response.ok ? response.json() : null).then(config => {
-      if (!config?.offer) return;
-      offer = config.offer; base = config.priceCents || base;
-      offset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
-      paintOffer();
-      if (offerLeft() > 0) ticking = setInterval(paintOffer, 1000);
-    }).catch(() => { /* The sale price stands. */ });
-  }
+  setInterval(paintOffer, 1000);
 
   // The tool picks up the cards they typed (on this phone), unless it already has some.
   function handOver() {
@@ -328,4 +349,6 @@
   if (!E) { stage.append(el('p', 'next', 'Please reload the page.')); return; }
   if (quiz.at > 0 && !(quiz.count > 0)) quiz.at = 0;
   show(1);
+  // A reload mid-quiz keeps the clock it already had.
+  askDeal('state').then(() => { if (quiz.at > 0 && !deal?.quiz) askDeal('start'); });
 })();

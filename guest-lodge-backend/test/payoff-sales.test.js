@@ -553,3 +553,42 @@ test('the landing version and quiz steps are recorded by name only, never with n
   });
   assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]), [['PayoffVariant', 'quiz'], ['PayoffQuizStep', 'reveal']]);
 });
+test('the quiz earns the $5 only by finishing within 10 minutes; its 30 minutes still start at checkout; the letter is unaffected', async () => {
+  let time = Date.parse('2026-10-19T20:00:00Z');
+  const w = fixture({ clock: () => time });
+  await serve(w, async ({ base }) => {
+    const call = async (route, body, cookie = '') => {
+      const r = await fetch(base + route, { method: body ? 'POST' : 'GET', headers: { 'content-type': 'application/json', 'user-agent': 'Buyer Browser', cookie }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      return { body: await r.json(), cookie: (r.headers.get('set-cookie') || '').split(';')[0], status: r.status };
+    };
+    assert.equal((await call('/api/payoff/quiz')).body.quiz, null);
+    assert.equal((await call('/api/payoff/quiz')).cookie, '', 'looking starts nothing');
+    assert.equal((await call('/api/payoff/quiz', { action: 'nope' })).status, 400);
+    // In time: the window runs from the first answer; finishing earns the offer.
+    const started = await call('/api/payoff/quiz', { action: 'start' });
+    assert.equal(started.body.quiz.deadline, time + 10 * 60000); assert.equal(started.body.windowMs, 600000);
+    let quiz = started.cookie;
+    time += 4 * 60000;
+    assert.equal((await call('/api/payoff/quiz', { action: 'start' }, quiz)).body.quiz.deadline, Date.parse('2026-10-19T20:10:00Z'), 'starting again keeps the first clock');
+    assert.equal((await call('/api/payoff/config?offer=preview', null, quiz)).body.checkoutOffer.discountCents, 0, 'not yet earned');
+    const finished = await call('/api/payoff/quiz', { action: 'finish' }, quiz);
+    assert.deepEqual(finished.body.quiz, { deadline: Date.parse('2026-10-19T20:10:00Z'), finished: true, earned: true });
+    quiz = finished.cookie;
+    time += 60000;
+    const checkout = await call('/api/payoff/config?offer=1', null, quiz);
+    assert.equal(checkout.body.offer.expiresAt, time + 30 * 60000, 'the 30 minutes start at checkout');
+    // Too slow: no offer at checkout, now or later, and the preview says so.
+    time += 60 * 60000;
+    const slow = (await call('/api/payoff/quiz', { action: 'start' })).cookie;
+    time += 11 * 60000;
+    const late = await call('/api/payoff/quiz', { action: 'finish' }, slow);
+    assert.deepEqual(late.body.quiz.earned, false);
+    const denied = await call('/api/payoff/config?offer=1', null, late.cookie);
+    assert.equal(denied.body.offer, undefined); assert.equal(denied.cookie, '');
+    assert.equal((await call('/api/payoff/config?offer=preview', null, late.cookie)).body.checkoutOffer.discountCents, 0);
+    assert.equal((await call('/api/payoff/checkout', { ...order(), useCheckoutOffer: true, expectedTotalCents: 3300 }, late.cookie)).body.value, 33);
+    // A forged quiz cookie counts as no quiz; the letter's visitors get the offer as before.
+    assert.ok((await call('/api/payoff/config?offer=1', null, late.cookie.replace(/\.[^.]+$/, '.' + 'A'.repeat(43)))).body.offer);
+    assert.ok((await call('/api/payoff/config?offer=1')).body.offer);
+  });
+});

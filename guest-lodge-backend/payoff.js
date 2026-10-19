@@ -7,7 +7,7 @@ const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { sanitizeInspectAttribution, inspectPublishableKey } = require('./inspect');
-const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount } = require('./payoff-offer');
+const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount, QUIZ, issueQuiz, readQuiz, quizCookie } = require('./payoff-offer');
 
 const PRODUCT = 'marketel-payoff';
 const VERSION = 'payoff-v1';
@@ -276,25 +276,48 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     const config = { available: available(), priceCents: ITEMS.base.cents, addOns: { cashflow: 2200, reset: 900 } };
     // Without a matching publishable key the order page falls back to hosted Checkout.
     if (config.available) config.stripeKey = inspectPublishableKey(env) || null;
+    // Someone who took the quiz gets the $5 only by finishing it in time.
+    const quiz = readQuiz(secret, quizCookie(req)), quizMissed = !!quiz && !quiz.earned;
     if (req.query.offer === '1' && config.available) {
       let token = offerCookie(req);
-      if (!token) {
+      if (!token && !quizMissed) {
         token = issueOffer(secret, now());
         res.cookie(OFFER.cookie, token, { httpOnly: true, secure: env.NODE_ENV !== 'test', sameSite: 'lax',
           path: '/api/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
       }
-      const offer = readOffer(secret, token, now());
+      const offer = token ? readOffer(secret, token, now()) : null;
       if (offer) config.offer = { ...offer, basePriceCents: ITEMS.base.cents - offer.discountCents };
       config.serverNow = now();
     }
     if (req.query.offer === 'preview') {
       const token = offerCookie(req), existing = token ? readOffer(secret, token, now()) : null;
-      config.checkoutOffer = { discountCents: config.available ? (token ? existing?.discountCents || 0 : OFFER.discountCents) : 0,
+      config.checkoutOffer = { discountCents: config.available ? (token ? existing?.discountCents || 0 : quizMissed ? 0 : OFFER.discountCents) : 0,
         durationMs: OFFER.durationMs, expiresAt: existing?.expiresAt || null };
       config.serverNow = now();
     }
     res.json(config);
   });
+  // The quiz's deal: 'state' only looks, 'start' begins the window at the
+  // first answer (once), 'finish' records reaching the plan (once).
+  const quizDeal = fixed => guarded(async (req, res) => {
+    rate(req, 'quiz', 120);
+    const action = fixed || req.body?.action;
+    if (!['state', 'start', 'finish'].includes(action)) throw fail(400, 'Unknown action.');
+    let quiz = readQuiz(secret, quizCookie(req));
+    const save = (startAt, finishAt) => {
+      const token = issueQuiz(secret, startAt, finishAt, quiz?.nonce);
+      res.cookie(QUIZ.cookie, token, { httpOnly: true, secure: env.NODE_ENV !== 'test', sameSite: 'lax', path: '/api/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
+      return readQuiz(secret, token);
+    };
+    if (secret && action !== 'state' && !quiz) quiz = save(now(), 0);
+    if (secret && action === 'finish' && !quiz.finishAt) quiz = save(quiz.startAt, now());
+    const token = offerCookie(req), offer = token ? readOffer(secret, token, now()) : null;
+    res.json({ available: available(), windowMs: QUIZ.windowMs, discountCents: OFFER.discountCents, serverNow: now(),
+      quiz: quiz ? { deadline: quiz.deadline, finished: !!quiz.finishAt, earned: quiz.earned } : null,
+      checkoutOffer: offer ? { expiresAt: offer.expiresAt, discountCents: offer.discountCents } : null });
+  });
+  api.get('/quiz', quizDeal('state'));
+  api.post('/quiz', quizDeal(null));
   api.post('/event', guarded(async (req, res) => {
     if (!EVENTS.includes(req.body?.name)) throw fail(400, 'Unknown event.');
     if (noTrack(req)) return res.json({ ignored: true });

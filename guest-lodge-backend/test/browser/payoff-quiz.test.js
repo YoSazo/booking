@@ -12,8 +12,9 @@ const E = require('../../payoff-web/engine');
 const PHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS]';
 async function world(fn, { width = 390 } = {}) {
   const app = express(), rows = [];
+  let clockOffset = 0;
   const prisma = { inspectEvent: { upsert: async () => ({}), create: async ({ data }) => { rows.push(data); return data; }, delete: async () => ({}) } };
-  registerPayoff(app, { prisma, stripe: { checkout: { sessions: {} }, paymentIntents: {} }, mail: { sendMail: async () => {} }, env: { NODE_ENV: 'test' }, quizShare: 1 });
+  registerPayoff(app, { prisma, stripe: { checkout: { sessions: {} }, paymentIntents: {} }, mail: { sendMail: async () => {} }, env: { NODE_ENV: 'test' }, quizShare: 1, now: () => Date.now() + clockOffset });
   app.use(express.static(path.resolve(__dirname, '../../public')));
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -25,7 +26,7 @@ async function world(fn, { width = 390 } = {}) {
     const errors = [], requests = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('request', request => requests.push({ url: request.url(), body: request.postData() || '' }));
-    await fn({ page, base, rows, requests });
+    await fn({ page, base, rows, requests, advanceTime: ms => { clockOffset += ms; } });
     assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
@@ -39,7 +40,11 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   assert.equal(await page.locator('body').getAttribute('data-variant'), 'quiz');
   assert.equal((await page.locator('.caption').innerText()).replace(/\s+/g, ' ').trim(), 'CREDIT CARD HOLDERS 👇');
   assert.equal(await page.locator('#back').isHidden(), true);
+  await page.locator('#offer-bar:not([hidden])').waitFor();
+  assert.equal((await page.locator('#offer-bar').innerText()).trim(), '🎁 Finish your plan in 10 minutes and get an extra $5 off');
   await page.locator('.choice', { hasText: '2' }).click();
+  await page.locator('#deal-clock:not([hidden])').waitFor();
+  assert.match((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), /^🎁 Finish in (10:00|09:\d\d) to unlock an extra \$5 off$/);
   assert.match(await page.locator('.kicker').innerText(), /2 cards/);
   await page.locator('#back').click();
   assert.equal(await page.locator('.caption').count(), 1, 'back returns to the hook');
@@ -71,21 +76,16 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 (92% off)")').waitFor();
   assert.match(await page.locator('.plan .q').innerText(), /sooner\.$/);
   assert.equal(await page.locator('.locked .blurred').count(), 3);
-  // The $5 offer starts here: in the bar and under the price, with one clock the order page carries on.
-  await page.locator('#offer-bar:not([hidden])').waitFor();
-  assert.match(await page.locator('#offer-bar-clock').innerText(), /^(29:\d\d|30:00)$/);
-  assert.match(await page.locator('#offer-saved').innerText(), /That’s \$5 \(15%\) off the \$33 sale price\. It’s saved for you for (29:\d\d|30:00)\./);
+  // Finishing in time earns the $5; its 30 minutes start at checkout.
+  assert.equal((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), '🎉 You unlocked an extra $5 off! Your 30 minutes start at checkout.');
+  assert.equal(await page.locator('#offer-saved').innerText(), 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.');
   assert.equal(await page.locator('.plan img.proof').count(), 5);
-  await page.locator('#back').click();
-  assert.equal(await page.locator('#offer-bar').isHidden(), true, 'only on the plan');
-  await page.locator('.go', { hasText: 'Build my plan' }).click();
-  await page.locator('#offer-bar:not([hidden])').waitFor();
   assert.equal(await page.locator('.plan').innerText().then(text => text.includes(`${MONTHS[fastest.date.month]} ${fastest.date.year}`)), false, 'the plan\'s date stays locked');
-  await page.waitForTimeout(1100);
   await page.locator('a.go', { hasText: 'Unlock My Plan' }).click();
   await page.waitForURL(url => url.pathname === '/payoff/order');
   await page.locator('#offer-bar:not([hidden])').waitFor();
-  assert.match(await page.locator('#offer-bar-clock').innerText(), /^29:\d\d$/, 'the order page continues the same 30 minutes');
+  assert.match(await page.locator('#offer-bar-clock').innerText(), /^(30:00|29:5\d)$/, 'the 30 minutes start at checkout');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   const handed = await page.evaluate(() => JSON.parse(localStorage.getItem('payoff.v1')));
   assert.deepEqual(handed, { debts: CARDS, extra: 10000, plan: null, seen: true });
 
@@ -131,4 +131,26 @@ test('cards whose minimums never cover the interest are told so, and a plan stil
   await page.locator('.go').click();
   await page.locator('.choice', { hasText: '+$200' }).click();
   assert.match(await page.locator('.impact').innerText(), /Paid off for good/);
+}));
+
+test('taking longer than 10 minutes means no extra $5: the bar goes, the plan and checkout show $33', async () => world(async ({ page, base, advanceTime }) => {
+  await page.goto(base + '/payoff');
+  await page.locator('.choice', { hasText: '1' }).first().click();
+  await page.locator('#deal-clock:not([hidden])').waitFor();
+  await page.locator('.choice', { hasText: 'Mostly the minimums' }).click();
+  await page.fill('#balance-0', '3000'); await page.locator('.go').click();
+  await page.locator('.chip').click(); await page.locator('.chip').click();
+  advanceTime(11 * 60000);
+  await page.locator('.go').click();
+  await page.locator('.choice', { hasText: '+$50' }).click();
+  await page.locator('.go', { hasText: 'Build my plan' }).click();
+  await page.locator('#offer-bar[hidden]').waitFor({ state: 'attached' });
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#offer-bar').isHidden(), true);
+  assert.equal(await page.locator('.plan [data-price]').innerText(), 'Today: $33 (91% off)');
+  assert.equal(await page.locator('#offer-saved').isHidden(), true);
+  await page.locator('a.go').click(); await page.waitForURL(url => url.pathname === '/payoff/order');
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#offer-bar').isHidden(), true);
+  assert.equal(await page.locator('#order-total').innerText(), '$33.00');
 }));
