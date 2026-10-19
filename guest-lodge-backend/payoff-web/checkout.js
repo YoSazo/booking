@@ -75,7 +75,36 @@
   if (!form) event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
   if (!form || !button) return;
-  let ready = false, busy = false;
+  let ready = false, busy = false, currentOffer = null, basePriceCents = 3300, quotedBaseCents = null, serverOffset = 0;
+  const offerBox = document.getElementById('checkout-offer');
+  const paintOffer = () => {
+    const active = currentOffer && currentOffer.discountCents > 0 && Date.now() + serverOffset < currentOffer.expiresAt;
+    basePriceCents = active ? currentOffer.basePriceCents : 3300;
+    if (quotedBaseCents !== basePriceCents) {
+      quotedBaseCents = basePriceCents;
+      window.dispatchEvent(new CustomEvent('payoff:quote', { detail: { basePriceCents } }));
+    }
+    if (!offerBox) return;
+    offerBox.hidden = !currentOffer;
+    if (!currentOffer) return;
+    offerBox.classList.toggle('is-expired', !active);
+    document.getElementById('checkout-offer-heading').textContent = active ? 'Save 15% — $5 off' : 'Your checkout offer has ended';
+    document.getElementById('offer-original').hidden = !active;
+    document.getElementById('offer-price').textContent = active ? '$28' : '$33';
+    document.getElementById('offer-clock-row').hidden = !active;
+    document.getElementById('offer-note').textContent = active ? '$5 off your Payoff plan. Optional extras are priced separately.' : 'Payoff is still available for $33 once. Optional extras are priced separately.';
+    if (active) {
+      const left = Math.max(0, Math.ceil((currentOffer.expiresAt - Date.now() - serverOffset) / 1000));
+      document.getElementById('offer-clock').textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+    }
+  };
+  setInterval(() => {
+    if (currentOffer && currentOffer.discountCents > 0) {
+      if (Date.now() + serverOffset >= currentOffer.expiresAt) {
+        currentOffer.discountCents = 0; paintOffer(); refresh();
+      } else paintOffer();
+    }
+  }, 1000);
   const randomAttempt = () => crypto.randomUUID();
   try {
     attempt = sessionStorage.getItem('payoff.attempt') || randomAttempt();
@@ -94,16 +123,20 @@
     return addons;
   };
   form.addEventListener('change', saveExtras);
-  const refresh = () => fetch('/api/payoff/config', { headers }).then(response => {
+  const refresh = () => fetch('/api/payoff/config?offer=1', { headers }).then(response => {
     if (!response.ok) throw new Error('Unavailable');
     return response.json();
   }).then(config => {
     ready = config.available === true;
-    button.disabled = !ready;
-    button.textContent = ready ? 'Continue to secure payment' : 'Purchases are temporarily unavailable';
+    currentOffer = config.offer || null;
+    serverOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
+    paintOffer();
+    button.disabled = !ready || busy;
+    button.textContent = busy ? 'Opening secure checkout…' : ready ? 'Continue to secure payment' : 'Purchases are temporarily unavailable';
     button.classList.toggle('disabled-payment', !ready);
     if (!ready) status.textContent = config.preview ? 'Payments are disabled in the local preview.' : 'Please try again later or contact support@bookmarketel.com.';
   }).catch(() => {
+    ready = false; button.disabled = true;
     button.textContent = 'Purchases are temporarily unavailable';
     status.textContent = 'Please reload to try again or contact support@bookmarketel.com.';
   });
@@ -112,11 +145,24 @@
     if (!ready || busy || !form.reportValidity()) return;
     busy = true; button.disabled = true; button.textContent = 'Opening secure checkout…';
     status.textContent = ''; event('PayoffCheckoutTapped');
+    const displayedBasePrice = basePriceCents;
+    paintOffer();
+    if (basePriceCents !== displayedBasePrice) {
+      status.textContent = 'The checkout offer has ended. Review the updated total and continue when you’re ready.';
+      busy = false; button.disabled = !ready; button.textContent = 'Continue to secure payment';
+      return;
+    }
+    const addons = saveExtras();
+    const expectedTotalCents = basePriceCents + window.PAYOFF_CONTENT.addOns.filter(addon => addons.includes(addon.id)).reduce((sum, addon) => sum + addon.priceCents, 0);
     try {
       const response = await fetch('/api/payoff/checkout', { method: 'POST', headers,
-        body: JSON.stringify({ email: document.getElementById('email').value.trim(), addons: saveExtras(), attempt, visitorId: visitor, attribution }) });
+        body: JSON.stringify({ email: document.getElementById('email').value.trim(), addons, attempt, visitorId: visitor, attribution,
+          useCheckoutOffer: basePriceCents === 2800, expectedTotalCents }) });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Checkout could not open. Please try again.');
+      if (!response.ok) {
+        if (response.status === 409) await refresh();
+        throw new Error(result.message || 'Checkout could not open. Please try again.');
+      }
       const url = new URL(result.url);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error('Checkout could not open. Please try again.');
       event('PayoffCheckoutOpened');
@@ -125,12 +171,12 @@
     } catch (error) {
       event('PayoffCheckoutFailed');
       status.textContent = error.message || 'Checkout could not open. Please try again.';
-      busy = false; button.disabled = false; button.textContent = 'Continue to secure payment';
+      busy = false; button.disabled = !ready; button.textContent = ready ? 'Continue to secure payment' : 'Purchases are temporarily unavailable';
     }
   });
   window.addEventListener('pageshow', () => {
     busy = false;
-    if (ready) { button.disabled = false; button.textContent = 'Continue to secure payment'; }
+    if (ready) refresh();
   });
   refresh();
 })();

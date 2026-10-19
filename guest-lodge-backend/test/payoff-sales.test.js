@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { registerPayoff, basket, paidOrder, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
 
-function fixture({ failEmail = false, ready = true, production = false } = {}) {
+function fixture({ failEmail = false, ready = true, production = false, clock = Date.now } = {}) {
   const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [];
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
@@ -27,7 +27,7 @@ function fixture({ failEmail = false, ready = true, production = false } = {}) {
   const app = express();
   const registration = registerPayoff(app, { prisma, stripe: ready ? stripe : null, mail, env,
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
-    isExcludedEmail: email => email === 'owner@example.test' });
+    isExcludedEmail: email => email === 'owner@example.test', now: clock });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
   return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi };
 }
@@ -280,4 +280,62 @@ test('Meta hears nothing from the owner, no-track browsers, test browsers or san
     }
   });
   assert.deepEqual(w.capi, []);
+});
+
+test('checkout offer survives reload and restart, discounts only the base, and fulfills a discounted purchase', async () => {
+  let time = Date.parse('2026-10-19T18:00:00Z');
+  const w = fixture({ clock: () => time });
+  await serve(w, async ({ base, post }) => {
+    const response = await fetch(base + '/api/payoff/config?offer=1');
+    const cookie = response.headers.get('set-cookie').split(';')[0];
+    const first = await response.json();
+    assert.equal(first.offer.basePriceCents, 2800);
+    assert.equal(first.offer.expiresAt, time + 30 * 60000);
+    assert.match(response.headers.get('set-cookie'), /HttpOnly/);
+    time += 5 * 60000;
+    const repeated = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
+    assert.equal(repeated.offer.expiresAt, first.offer.expiresAt);
+    await serve(fixture({ clock: () => time }), async ({ base: restarted }) => {
+      const restored = await (await fetch(restarted + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
+      assert.equal(restored.offer.expiresAt, first.offer.expiresAt);
+    });
+    const body = order({ addons: ['cashflow', 'reset'], useCheckoutOffer: true, expectedTotalCents: 5900 });
+    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59);
+    assert.deepEqual(w.creates[0].params.line_items.map(item => item.price_data.unit_amount), [2800, 2200, 900]);
+    await post('/api/payoff/checkout', body, { cookie });
+    assert.equal(w.creates[0].options.idempotencyKey, w.creates[1].options.idempotencyKey);
+    const purchase = paid(['cashflow', 'reset'], { preorder: false });
+    purchase.metadata = { ...w.creates[0].params.metadata }; purchase.amount_total = 5900;
+    w.sessions.set(purchase.id, purchase);
+    const confirmed = await post('/api/payoff/confirm', { sessionId: purchase.id });
+    assert.equal(confirmed.status, 200); assert.equal(confirmed.body.totalCents, 5900);
+    assert.deepEqual(confirmed.body.extras, ['cashflow', 'reset']);
+    assert.match(w.emails[0].text, /Checkout offer: −\$5\.00/);
+    assert.match(w.emails[0].text, /Total paid: \$59\.00/);
+    assert.equal(w.capi.find(event => event.name === 'Purchase').value, 59);
+    time += 26 * 60000;
+    const ended = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
+    assert.equal(ended.offer.discountCents, 0); assert.equal(ended.offer.basePriceCents, 3300);
+    assert.equal(ended.offer.expiresAt, first.offer.expiresAt);
+    const count = w.creates.length;
+    assert.equal((await post('/api/payoff/checkout', body, { cookie })).status, 409);
+    assert.equal(w.creates.length, count);
+    assert.equal((await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 3300 }), { cookie })).body.value, 33);
+  });
+});
+
+test('forged offers and unrecognized discounted payments cannot grant a discount or access', async () => {
+  const w = fixture();
+  await serve(w, async ({ base, post }) => {
+    const cookie = 'payoff_checkout_offer=forged';
+    const config = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
+    assert.equal(config.offer, undefined);
+    assert.equal((await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie })).status, 409);
+    assert.equal(w.creates.length, 0);
+  });
+  const receipt = paid(); receipt.amount_total = 2800;
+  assert.equal(paidOrder(receipt), null);
+  receipt.metadata.checkoutDiscountVersion = 'payoff-checkout-5-v1'; receipt.metadata.checkoutDiscountCents = '500';
+  assert.deepEqual(paidOrder(receipt), ['base']);
+  receipt.metadata.checkoutDiscountCents = '1000'; assert.equal(paidOrder(receipt), null);
 });

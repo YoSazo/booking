@@ -107,16 +107,21 @@
   const order = document.getElementById('order-form');
   if (order) {
     order.addEventListener('submit', event => event.preventDefault());
+    let baseCents = content.priceCents;
     const basePrice = document.querySelector('[data-base-price]');
     if (basePrice) basePrice.textContent = money(content.priceCents);
     content.addOns.forEach(addon => { const price = document.querySelector('[data-addon-price="'+addon.id+'"]'); if (price) price.textContent = money(addon.priceCents).replace('.00', '')+' once'; });
     const update = () => {
+      if (basePrice) basePrice.textContent = money(baseCents);
       const selected = content.addOns.filter(addon => document.getElementById(addon.id)?.checked);
       const lines = document.getElementById('summary-lines');
       lines.replaceChildren();
-      for (const item of [{ name: 'Payoff plan', priceCents: content.priceCents }, ...selected]) { const row = element('div', 'summary-line'); row.append(element('span', '', item.name), element('span', '', money(item.priceCents))); lines.append(row); }
-      document.getElementById('order-total').textContent = money(selected.reduce((sum, addon) => sum+addon.priceCents, content.priceCents));
+      for (const item of [{ name: 'Payoff plan', priceCents: baseCents }, ...selected]) { const row = element('div', 'summary-line'); row.append(element('span', '', item.name), element('span', '', money(item.priceCents))); lines.append(row); }
+      document.getElementById('order-total').textContent = money(selected.reduce((sum, addon) => sum+addon.priceCents, baseCents));
     };
+    window.addEventListener('payoff:quote', event => {
+      if (Number.isInteger(event.detail?.basePriceCents) && event.detail.basePriceCents >= 0) { baseCents = event.detail.basePriceCents; update(); }
+    });
     order.addEventListener('change', update); window.addEventListener('pageshow', update); update();
   }
 })();

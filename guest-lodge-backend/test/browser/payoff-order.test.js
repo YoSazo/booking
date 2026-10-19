@@ -24,7 +24,8 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
     },
     retrieve: async () => paid,
   } } };
-  registerPayoff(app, { stripe, prisma, mail: { sendMail: async m => emails.push(m) }, env: { NODE_ENV: 'test' } });
+  let clockOffset = 0;
+  registerPayoff(app, { now: () => Date.now() + clockOffset, stripe, prisma, mail: { sendMail: async m => emails.push(m) }, env: { NODE_ENV: 'test' } });
   app.use(express.static(path.resolve(__dirname, '../../public')));
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -33,7 +34,7 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...(userAgent ? { userAgent } : {}) });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://checkout.stripe.com/**', route => route.fulfill({ body: 'Stripe checkout fixture' }));
-    await fn({ page, base, creates, emails }); assert.deepEqual(errors, []);
+    await fn({ page, base, creates, emails, advanceTime: ms => { clockOffset += ms; } }); assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 
@@ -43,16 +44,16 @@ test('the order page offers both extras unchecked and opens one Stripe checkout 
   assert.equal(await page.locator('.preorder-notice, #preorder-consent').count(), 0);
   assert.equal(await page.locator('.order-bump').count(), 2);
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
-  assert.equal(await page.locator('#order-total').innerText(), '$33.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   assert.doesNotMatch(await page.locator('.order-bump').first().innerText(), /preorder|in development/i);
   await button.click(); assert.equal(creates.length, 0);
   await page.locator('#email').fill('buyer@example.test');
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
-  assert.equal(await page.locator('#order-total').innerText(), '$64.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$59.00');
   await button.click();
   await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(creates.length, 1);
-  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 6400);
+  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 5900);
   assert.equal(creates[0].params.customer_email, 'buyer@example.test');
   assert.match(creates[0].params.custom_text.submit.message, /opens as soon as you pay/);
 }));
@@ -129,7 +130,7 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
   assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again');
   assert.deepEqual(tracked.filter(args => args[1] !== 'PageView').map(args => [args[1], args[2].value, args[3]?.eventID]), [
     ['AddToCart', 33, `payoff-cart.${visitor}`],
-    ['InitiateCheckout', 42, `payoff-checkout.${visitor}`],
+    ['InitiateCheckout', 37, `payoff-checkout.${visitor}`],
   ], 'AddToCart once per visitor, then InitiateCheckout');
   // The server gets the click ids, so its copies match the same person.
   const viewed = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('PayoffOrderViewed'));
@@ -155,3 +156,42 @@ test("Meta's pixel never loads for the owner, over http, or in the tool", async 
     assert.deepEqual(facebook, [], setup);
   }, { userAgent: PHONE_UA });
 });
+
+test('the checkout offer is clear, survives reload, and ends without resetting or changing extras', async () => world(async ({ page, base, advanceTime }) => {
+  await page.goto(base + '/payoff/order');
+  await page.locator('#buy-button:enabled').waitFor();
+  assert.match(await page.locator('#checkout-offer').innerText(), /Save 15% — \$5 off/);
+  assert.equal(await page.locator('#offer-price').innerText(), '$28');
+  assert.match(await page.locator('#offer-clock').innerText(), /^(29:\d\d|30:00)$/);
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  await page.locator('#cashflow').check();
+  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  if (process.env.PAYOFF_DISCOUNT_SHOT) await page.screenshot({ path: process.env.PAYOFF_DISCOUNT_SHOT, fullPage: false });
+  advanceTime(10 * 60000);
+  await page.reload(); await page.locator('#buy-button:enabled').waitFor();
+  assert.match(await page.locator('#offer-clock').innerText(), /^(19:\d\d|20:00)$/);
+  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  advanceTime(21 * 60000);
+  await page.reload(); await page.locator('#buy-button:enabled').waitFor();
+  assert.match(await page.locator('#checkout-offer-heading').innerText(), /offer has ended/);
+  assert.equal(await page.locator('#offer-clock-row').isHidden(), true);
+  assert.equal(await page.locator('#offer-price').innerText(), '$33');
+  assert.equal(await page.locator('#order-total').innerText(), '$55.00');
+}));
+
+for (const delayedTimer of [false, true]) test('expiry while continuing to Stripe asks the buyer to review the total (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, creates, advanceTime }) => {
+  await page.goto(base + '/payoff/order'); await page.locator('#buy-button:enabled').waitFor();
+  await page.locator('#email').fill('buyer@example.test');
+  advanceTime(31 * 60000);
+  if (delayedTimer) await page.evaluate(() => {
+    const original = Date.now; Date.now = () => original() + 31 * 60000;
+    document.getElementById('order-form').requestSubmit();
+  });
+  else await page.locator('#buy-button').click();
+  await page.locator('#checkout-status:has-text("Review the updated total")').waitFor();
+  assert.equal(creates.length, 0);
+  assert.equal(await page.locator('#order-total').innerText(), '$33.00');
+  assert.equal(await page.locator('#buy-button').isEnabled(), true);
+  await page.locator('#buy-button').click(); await page.waitForURL('https://checkout.stripe.com/**');
+  assert.equal(creates[0].params.line_items[0].price_data.unit_amount, 3300);
+}));

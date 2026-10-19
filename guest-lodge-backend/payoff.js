@@ -7,6 +7,7 @@ const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { sanitizeInspectAttribution } = require('./inspect');
+const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount } = require('./payoff-offer');
 
 const PRODUCT = 'marketel-payoff';
 const VERSION = 'payoff-v1';
@@ -54,7 +55,9 @@ function paidOrder(session) {
     || session.currency !== 'usd') return null;
   let ids;
   try { ids = basket(JSON.parse(session.metadata.addons)); } catch { return null; }
-  if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0)) return null;
+  const discount = orderDiscount(session);
+  if (discount === null || (preorder && discount)) return null;
+  if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount) return null;
   return ids;
 }
 // Meta's pixel loads from connect.facebook.net and reports to www.facebook.com,
@@ -71,7 +74,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env, now = Date.now }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -167,6 +170,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         try {
           await mail.sendMail(accessMail(email, session.id, [
             ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
+            ...(orderDiscount(session) ? ['Checkout offer: −$5.00'] : []),
             `Total paid: $${(session.amount_total / 100).toFixed(2)} USD. One payment, no subscription.`,
             `Order reference: ${session.id}`,
             ...(ids.length > 1 ? ['', `Your ${ids.slice(1).map(id => ITEMS[id].name.toLowerCase()).join(' and ')} ${ids.length > 2 ? 'are' : 'is'} inside Payoff, in the tabs at the top.`] : []),
@@ -197,7 +201,21 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   const api = express.Router();
   api.use(express.json({ limit: '8kb' }));
   api.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  api.get('/config', (_req, res) => res.json({ available: available(), priceCents: ITEMS.base.cents, addOns: { cashflow: 2200, reset: 900 } }));
+  api.get('/config', (req, res) => {
+    const config = { available: available(), priceCents: ITEMS.base.cents, addOns: { cashflow: 2200, reset: 900 } };
+    if (req.query.offer === '1' && config.available) {
+      let token = offerCookie(req);
+      if (!token) {
+        token = issueOffer(secret, now());
+        res.cookie(OFFER.cookie, token, { httpOnly: true, secure: env.NODE_ENV !== 'test', sameSite: 'lax',
+          path: '/api/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
+      }
+      const offer = readOffer(secret, token, now());
+      if (offer) config.offer = { ...offer, basePriceCents: ITEMS.base.cents - offer.discountCents };
+      config.serverNow = now();
+    }
+    res.json(config);
+  });
   api.post('/event', guarded(async (req, res) => {
     if (!EVENTS.includes(req.body?.name)) throw fail(400, 'Unknown event.');
     if (noTrack(req)) return res.json({ ignored: true });
@@ -229,11 +247,17 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     const metadata = { product: PRODUCT, offerVersion: VERSION, addons: JSON.stringify(ids.filter(id => id !== 'base')),
       visitorId: visitor || '', noTrack: noTrack(req) ? '1' : '',
       fbp: (attribution.fbp || '').slice(0, 500), fbc: (attribution.fbc || '').slice(0, 500), sourceUrl: (attribution.sourceUrl || '').slice(0, 500) };
-    const total = ids.reduce((sum, id) => sum + ITEMS[id].cents, 0);
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc])).digest('hex');
+    const offer = req.body?.useCheckoutOffer === true ? readOffer(secret, offerCookie(req), now()) : null;
+    const discount = offer?.discountCents || 0;
+    const total = ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount;
+    if (req.body?.expectedTotalCents !== undefined && req.body.expectedTotalCents !== total) {
+      throw fail(409, 'The checkout offer has ended or your order changed. Review the updated total and continue when you’re ready.');
+    }
+    if (discount) Object.assign(metadata, { checkoutDiscountVersion: OFFER.version, checkoutDiscountCents: String(discount) });
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount])).digest('hex');
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', submit_type: 'pay', payment_method_types: ['card'], customer_email: email,
-      line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
+      line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents - (id === 'base' ? discount : 0),
         product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
       custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. Questions or refund requests: support@bookmarketel.com.' } },
       success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,

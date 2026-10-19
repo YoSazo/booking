@@ -289,10 +289,11 @@ test('a buyer with both extras gets tabs, a cash-flow calendar that warns before
 
 test('the order page offers both extras, unchecked, and checkout includes the ones picked', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order');
+  await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.isChecked('#cashflow'), false);
   assert.equal(await page.isChecked('#reset'), false);
   await page.check('#cashflow');
-  assert.equal(await text(page, '#order-total'), '$55.00');
+  assert.equal(await text(page, '#order-total'), '$50.00');
   await page.check('#reset');
-  assert.equal(await text(page, '#order-total'), '$64.00');
+  assert.equal(await text(page, '#order-total'), '$59.00');
 }));
