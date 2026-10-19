@@ -18,6 +18,22 @@ same month. Capped at 600 months.
 `app.html`, `app.js`, `app.css` are the phone UI. The buyer's numbers stay in
 `localStorage` (`payoff.v1`) and are never sent anywhere.
 
+## Checkout offer
+
+The order page offers $5 off the $33 plan for 30 minutes. Its signed,
+HttpOnly cookie preserves the original deadline across reloads. Opening
+Stripe within that window locks in the quoted price; the Stripe Session
+keeps that quote. Optional extras remain $22 and $9.
+
+The page and Stripe both show regular prices and a separate $5 saving.
+Stripe uses the fixed-amount coupon `marketel-payoff-checkout-5-v1`, validated
+and created idempotently by the server when first needed. Receipts and
+fulfillment validate the resulting total. The sticky reminder shares the
+same clock and hides around typing and the payment button.
+
+Add-on previews are compressed screenshots from the real app using example
+numbers. The selected-software recap uses the actual listed prices.
+
 ## Access
 
 Access is the paid Checkout Session id signed with `PAYOFF_ACCESS_SECRET`

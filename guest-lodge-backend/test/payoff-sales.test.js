@@ -17,7 +17,7 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     },
     delete: async ({ where }) => rows.delete(where.sourceId),
   } };
-  const stripe = { checkout: { sessions: {
+  const stripe = { coupons: { retrieve: async id => ({ id, valid: true, amount_off: 500, currency: 'usd' }) }, checkout: { sessions: {
     create: async (params, options) => { creates.push({ params, options }); return { url: 'https://checkout.stripe.com/c/pay/cs_test_example' }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return sessions.get(id); },
     list: async ({ customer_details }) => ({ data: [...sessions.values()].filter(s => s.customer_details?.email === customer_details.email) }),
@@ -301,7 +301,8 @@ test('checkout offer survives reload and restart, discounts only the base, and f
     });
     const body = order({ addons: ['cashflow', 'reset'], useCheckoutOffer: true, expectedTotalCents: 5900 });
     assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59);
-    assert.deepEqual(w.creates[0].params.line_items.map(item => item.price_data.unit_amount), [2800, 2200, 900]);
+    assert.deepEqual(w.creates[0].params.line_items.map(item => item.price_data.unit_amount), [3300, 2200, 900]);
+    assert.deepEqual(w.creates[0].params.discounts, [{ coupon: 'marketel-payoff-checkout-5-v1' }]);
     await post('/api/payoff/checkout', body, { cookie });
     assert.equal(w.creates[0].options.idempotencyKey, w.creates[1].options.idempotencyKey);
     const purchase = paid(['cashflow', 'reset'], { preorder: false });
@@ -338,4 +339,24 @@ test('forged offers and unrecognized discounted payments cannot grant a discount
   receipt.metadata.checkoutDiscountVersion = 'payoff-checkout-5-v1'; receipt.metadata.checkoutDiscountCents = '500';
   assert.deepEqual(paidOrder(receipt), ['base']);
   receipt.metadata.checkoutDiscountCents = '1000'; assert.equal(paidOrder(receipt), null);
+});
+
+for (const missing of [false, true]) test('checkout coupon is validated before opening Stripe (missing: '+missing+')', async () => {
+  const w = fixture(); let created = 0;
+  w.stripe.coupons.retrieve = async () => {
+    if (missing) throw Object.assign(new Error('missing'), { code: 'resource_missing' });
+    return { id: 'wrong', valid: true, amount_off: 1000, currency: 'usd' };
+  };
+  w.stripe.coupons.create = async (params, options) => {
+    created++; assert.equal(params.amount_off, 500); assert.equal(options.idempotencyKey, params.id);
+    return { ...params, valid: true };
+  };
+  await serve(w, async ({ base, post }) => {
+    const response = await fetch(base + '/api/payoff/config?offer=1');
+    const cookie = response.headers.get('set-cookie').split(';')[0];
+    const result = await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie });
+    assert.equal(result.status, missing ? 200 : 503);
+    assert.equal(w.creates.length, missing ? 1 : 0);
+    assert.equal(created, missing ? 1 : 0);
+  });
 });

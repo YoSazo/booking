@@ -15,7 +15,7 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
     create: async ({ data }) => { if (data.sourceId && rows.has(data.sourceId)) throw Object.assign(new Error('duplicate'), { code: 'P2002' }); rows.set(data.sourceId || rows.size, data); },
     delete: async ({ where }) => rows.delete(where.sourceId),
   } };
-  const stripe = { checkout: { sessions: {
+  const stripe = { coupons: { retrieve: async id => ({ id, valid: true, amount_off: 500, currency: 'usd' }) }, checkout: { sessions: {
     create: async (params, options) => {
       creates.push({ params, options });
       await new Promise(resolve => setTimeout(resolve, 150));
@@ -53,7 +53,7 @@ test('the order page offers both extras unchecked and opens one Stripe checkout 
   await button.click();
   await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(creates.length, 1);
-  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 5900);
+  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 6400);
   assert.equal(creates[0].params.customer_email, 'buyer@example.test');
   assert.match(creates[0].params.custom_text.submit.message, /opens as soon as you pay/);
 }));
@@ -194,4 +194,34 @@ for (const delayedTimer of [false, true]) test('expiry while continuing to Strip
   assert.equal(await page.locator('#buy-button').isEnabled(), true);
   await page.locator('#buy-button').click(); await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(creates[0].params.line_items[0].price_data.unit_amount, 3300);
+}));
+
+test('the sticky offer follows scrolling, shows the same red clock, and reviews the actual selected total', async () => world(async ({ page, base, advanceTime }) => {
+  await page.goto(base + '/payoff/order'); await page.locator('#buy-button:enabled').waitFor();
+  assert.equal(await page.locator('#offer-sticky').isHidden(), true);
+  await page.locator('.order-bump').first().evaluate(el => el.scrollIntoView({ behavior: 'instant', block: 'start' }));
+  await page.locator('#offer-sticky:not([hidden])').waitFor();
+  assert.equal(await page.locator('#offer-sticky [data-offer-clock]').innerText(), await page.locator('#offer-clock').innerText());
+  assert.equal(await page.locator('#offer-clock').evaluate(el => getComputedStyle(el).color), 'rgb(180, 35, 24)');
+  await page.locator('#email').evaluate(el => el.focus({ preventScroll: true }));
+  await page.locator('#offer-sticky').waitFor({ state: 'hidden' });
+  await page.locator('#email').evaluate(el => el.blur());
+  await page.locator('#offer-sticky:not([hidden])').waitFor();
+  if (process.env.PAYOFF_STICKY_SHOT) await page.screenshot({ path: process.env.PAYOFF_STICKY_SHOT });
+  await page.locator('#offer-sticky-review').click();
+  await page.locator('#offer-sticky').waitFor({ state: 'hidden' });
+  assert.match(await page.locator('#summary-lines').innerText(), /Regular Payoff price.*\$33.00.*Checkout offer.*−\$5.00.*Payoff after offer.*\$28.00/s);
+  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  await page.locator('#cashflow').check(); await page.locator('#reset').check();
+  assert.equal(await page.locator('#selected-regular-price').innerText(), '$64.00');
+  assert.equal(await page.locator('#selected-offer-total').innerText(), '$59.00');
+  for (const width of [320, 390, 1024]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  }
+  advanceTime(31 * 60000); await page.reload(); await page.locator('#buy-button:enabled').waitFor();
+  await page.locator('.order-bump').first().evaluate(el => el.scrollIntoView({ behavior: 'instant' }));
+  assert.equal(await page.locator('#offer-sticky').isHidden(), true);
+  assert.equal(await page.locator('.summary-discount').count(), 0);
+  assert.equal(await page.locator('#order-total').innerText(), '$64.00');
 }));

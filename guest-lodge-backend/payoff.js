@@ -81,6 +81,23 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   const accessUrl = id => `${origin}/payoff/app?access=${encodeURIComponent(accessToken(secret, id))}`;
   const available = () => env.PAYOFF_ENABLED !== 'false' && !!stripe && !!mail && !!prisma?.inspectEvent && !!secret
     && (env.NODE_ENV === 'test' || (key.startsWith('sk_live_') && String(env.STRIPE_INSPECT_WEBHOOK_SECRET || '').startsWith('whsec_')));
+  const couponId = 'marketel-payoff-checkout-5-v1';
+  let couponPromise;
+  async function checkoutCoupon() {
+    if (!couponPromise) couponPromise = (async () => {
+      let coupon;
+      try { coupon = await stripe.coupons.retrieve(couponId); }
+      catch (error) {
+        if (error.code !== 'resource_missing') throw error;
+        coupon = await stripe.coupons.create({ id: couponId, name: 'Checkout offer — $5 off Payoff',
+          amount_off: OFFER.discountCents, currency: 'usd', duration: 'once' }, { idempotencyKey: couponId });
+      }
+      if (coupon.deleted || !coupon.valid || coupon.amount_off !== OFFER.discountCents || coupon.currency !== 'usd'
+        || coupon.percent_off || coupon.applies_to) throw fail(503, 'The checkout offer is temporarily unavailable. Please try again.');
+      return coupon.id;
+    })().catch(error => { couponPromise = null; throw error; });
+    return couponPromise;
+  }
   const automated = req => /HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(req.headers['user-agent'] || '');
   const noTrack = req => req.headers['x-marketel-no-track'] === '1' || automated(req);
   const hits = new Map();
@@ -254,11 +271,13 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       throw fail(409, 'The checkout offer has ended or your order changed. Review the updated total and continue when you’re ready.');
     }
     if (discount) Object.assign(metadata, { checkoutDiscountVersion: OFFER.version, checkoutDiscountCents: String(discount) });
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount])).digest('hex');
+    const coupon = discount ? await checkoutCoupon() : null;
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon])).digest('hex');
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', submit_type: 'pay', payment_method_types: ['card'], customer_email: email,
-      line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents - (id === 'base' ? discount : 0),
+      line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
         product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
+      ...(coupon ? { discounts: [{ coupon }] } : {}),
       custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. Questions or refund requests: support@bookmarketel.com.' } },
       success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,

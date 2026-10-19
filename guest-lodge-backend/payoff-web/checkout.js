@@ -77,6 +77,33 @@
   if (!form || !button) return;
   let ready = false, busy = false, currentOffer = null, basePriceCents = 3300, quotedBaseCents = null, serverOffset = 0;
   const offerBox = document.getElementById('checkout-offer');
+  const stickyOffer = document.getElementById('offer-sticky');
+  let stickyFrame = null;
+  const updateSticky = () => {
+    if (!stickyOffer || !offerBox) return;
+    const active = currentOffer && currentOffer.discountCents > 0 && Date.now() + serverOffset < currentOffer.expiresAt;
+    document.body.classList.toggle('has-checkout-offer', !!active);
+    const height = window.visualViewport?.height || innerHeight;
+    const payment = button.getBoundingClientRect();
+    const paymentVisible = payment.top < height && payment.bottom > 0;
+    const typing = document.activeElement?.matches('input:not([type="checkbox"]), textarea, select');
+    stickyOffer.hidden = !active || offerBox.getBoundingClientRect().bottom > 0 || paymentVisible || typing;
+  };
+  const scheduleSticky = () => {
+    if (stickyFrame !== null) return;
+    stickyFrame = requestAnimationFrame(() => { stickyFrame = null; updateSticky(); });
+  };
+  window.addEventListener('scroll', scheduleSticky, { passive: true });
+  window.addEventListener('resize', scheduleSticky, { passive: true });
+  window.visualViewport?.addEventListener('resize', scheduleSticky);
+  document.addEventListener('focusin', scheduleSticky);
+  document.addEventListener('focusout', scheduleSticky);
+  document.getElementById('offer-sticky-review')?.addEventListener('click', () => {
+    const summary = document.getElementById('order-summary');
+    summary?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    summary?.focus({ preventScroll: true });
+    scheduleSticky();
+  });
   const paintOffer = () => {
     const active = currentOffer && currentOffer.discountCents > 0 && Date.now() + serverOffset < currentOffer.expiresAt;
     basePriceCents = active ? currentOffer.basePriceCents : 3300;
@@ -86,17 +113,21 @@
     }
     if (!offerBox) return;
     offerBox.hidden = !currentOffer;
-    if (!currentOffer) return;
+    if (!currentOffer) { updateSticky(); return; }
     offerBox.classList.toggle('is-expired', !active);
     document.getElementById('checkout-offer-heading').textContent = active ? 'Save 15% — $5 off' : 'Your checkout offer has ended';
     document.getElementById('offer-original').hidden = !active;
     document.getElementById('offer-price').textContent = active ? '$28' : '$33';
     document.getElementById('offer-clock-row').hidden = !active;
+    const reminder = document.getElementById('summary-offer-reminder');
+    if (reminder) reminder.hidden = !active;
     document.getElementById('offer-note').textContent = active ? '$5 off your Payoff plan. Optional extras are priced separately.' : 'Payoff is still available for $33 once. Optional extras are priced separately.';
     if (active) {
       const left = Math.max(0, Math.ceil((currentOffer.expiresAt - Date.now() - serverOffset) / 1000));
-      document.getElementById('offer-clock').textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+      const clock = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+      document.querySelectorAll('#offer-clock, [data-offer-clock]').forEach(timer => { if (timer.textContent !== clock) timer.textContent = clock; });
     }
+    updateSticky();
   };
   setInterval(() => {
     if (currentOffer && currentOffer.discountCents > 0) {
