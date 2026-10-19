@@ -81,6 +81,7 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   await page.locator('.go', { hasText: 'Build my plan' }).click();
   await page.locator('#offer-bar:not([hidden])').waitFor();
   assert.equal(await page.locator('.plan').innerText().then(text => text.includes(`${MONTHS[fastest.date.month]} ${fastest.date.year}`)), false, 'the plan\'s date stays locked');
+  await page.waitForTimeout(1100);
   await page.locator('a.go', { hasText: 'Unlock My Plan' }).click();
   await page.waitForURL(url => url.pathname === '/payoff/order');
   await page.locator('#offer-bar:not([hidden])').waitFor();
