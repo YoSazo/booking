@@ -317,13 +317,13 @@
   function paintOffer() {
     const state = dealState(), bar = $('offer-bar'), lead = $('deal-lead'), timer = $('deal-clock'), rest = $('deal-rest');
     const text = {
-      offered: [`🎁 Finish your plan in ${minutes(deal?.windowMs || 600000)} and get an extra $5 off`, null, ''],
-      running: ['🎁 Finish in', clock(state.left), 'to unlock an extra $5 off'],
-      earned: ['🎉 You unlocked an extra $5 off!', null, 'Your 30 minutes start at checkout.'],
-      checkout: ['🎉 You got an extra $5 off! It’s saved for you for', clock(state.left), ''],
+      offered: ['🎁', `Finish in ${minutes(deal?.windowMs || 600000)} for an extra $5 off`, null, ''],
+      running: ['🎁', 'Finish in', clock(state.left), 'to unlock an extra $5 off'],
+      earned: ['🎉', 'You unlocked an extra $5 off!', null, 'Your 30 minutes start at checkout.'],
+      checkout: ['🎉', 'You got an extra $5 off! It’s saved for you for', clock(state.left), ''],
     }[state.kind];
     bar.hidden = !text;
-    if (text) { lead.textContent = text[0]; timer.hidden = !text[1]; timer.textContent = text[1] || ''; rest.textContent = text[2]; }
+    if (text) { $('deal-emoji').textContent = text[0]; lead.textContent = text[1]; timer.hidden = !text[2]; timer.textContent = text[2] || ''; rest.textContent = text[3]; }
     // On the plan: the price they'll pay, and why.
     const price = document.querySelector('.plan [data-price]'), saved = $('offer-saved');
     if (!price) return;

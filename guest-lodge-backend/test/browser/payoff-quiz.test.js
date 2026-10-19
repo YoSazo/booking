@@ -41,7 +41,7 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   assert.equal((await page.locator('.caption').innerText()).replace(/\s+/g, ' ').trim(), 'CREDIT CARD HOLDERS 👇');
   assert.equal(await page.locator('#back').isHidden(), true);
   await page.locator('#offer-bar:not([hidden])').waitFor();
-  assert.equal((await page.locator('#offer-bar').innerText()).trim(), '🎁 Finish your plan in 10 minutes and get an extra $5 off');
+  assert.equal((await page.locator('#offer-bar').innerText()).trim(), '🎁 Finish in 10 minutes for an extra $5 off');
   await page.locator('.choice', { hasText: '2' }).click();
   await page.locator('#deal-clock:not([hidden])').waitFor();
   assert.match((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), /^🎁 Finish in (10:00|09:\d\d) to unlock an extra \$5 off$/);

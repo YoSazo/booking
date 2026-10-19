@@ -92,6 +92,7 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .offer-bar strong { font-weight: 700; }
 .offer-bar span { display: inline-block; }
 .offer-bar b, .offer-saved b { display: inline-block; min-width: 3.1em; padding: 1px 6px; border-radius: 4px; background: #fefcbf; color: #c30; font-weight: 800; font-variant-numeric: tabular-nums; }
+.deal-emoji { display: inline-block; width: 22px; height: 22px; margin-top: -3px; border-radius: 50%; background: #fefcbf; font-size: 13px; line-height: 22px; text-align: center; vertical-align: middle; }
 .offer-saved { margin: 8px 0 0 !important; color: #c30; font-size: 14px; font-weight: 600; }
 
 /* 6. The plan: what they get free, and what unlocks. */
