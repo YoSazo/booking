@@ -34,6 +34,7 @@ test('recent purchases show the supplied names and cities once, age correctly, a
   const card = page.locator('.purchase-notice');
   await card.locator('strong:has-text("Megan")').waitFor();
   assert.match(await card.innerText(), /Westport, New York/);
+  assert.equal(await card.locator('.purchase-notice-verification').textContent(), '✓ Verified by ProofReviews');
   assert.match(await card.innerText(), /About 20 minutes ago/);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await card.screenshot({ path: '/tmp/payoff-purchase-notice.png' });

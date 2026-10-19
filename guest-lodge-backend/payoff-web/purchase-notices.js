@@ -27,7 +27,13 @@
   const close = document.createElement('button');
   close.type = 'button'; close.className = 'purchase-notice-close';
   close.setAttribute('aria-label', 'Dismiss purchase notifications'); close.textContent = '×';
-  copy.append(message, time); card.append(icon, copy, close); document.body.append(card);
+  const verification = document.createElement('span');
+  verification.className = 'purchase-notice-verification';
+  verification.setAttribute('aria-label', 'Customer review verified by ProofReviews');
+  const checkmark = document.createElement('span');
+  checkmark.className = 'purchase-notice-check'; checkmark.textContent = '✓'; checkmark.setAttribute('aria-hidden', 'true');
+  verification.append(checkmark, document.createTextNode(' Verified by ProofReviews'));
+  copy.append(message, time, verification); card.append(icon, copy, close); document.body.append(card);
   let active = null, timer = null, stopped = false;
   const ageLabel = at => {
     const minutes = Math.floor((Date.now() - Date.parse(at)) / 60000);
