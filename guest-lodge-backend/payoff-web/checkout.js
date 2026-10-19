@@ -1,8 +1,27 @@
 'use strict';
 // Price lines as in the reference letter, worded three ways down the page.
-window.PAYOFF_PRICE_LINES = (cents, regular = 37500) => {
-  const price = '$' + (cents / 100).toFixed(2).replace('.00', ''), off = Math.floor((1 - cents / regular) * 100);
-  return { today: [`Today: ${price} (${off}% off)`, ''], sale: [`Sale Price: ${price}`, `(${off}% off)`], caps: [`SALE PRICE: ${price}`, `That's ${off}% off.`] };
+// With the extra $5, the sale price is crossed out too and the $5 is named.
+window.PAYOFF_PRICE_LINES = (cents, base = 3300, regular = 37500) => {
+  const dollars = value => '$' + (value / 100).toFixed(2).replace('.00', '');
+  const extra = base - cents, extraOff = Math.round(extra / base * 100), off = Math.floor((1 - cents / regular) * 100);
+  if (extra > 0) return {
+    today: { was: `Today: ${dollars(base)}`, line: `Today: ${dollars(cents)} (${dollars(extra)} off · ${extraOff}% off)`, note: '' },
+    sale: { was: `Sale Price: ${dollars(base)}`, line: `Sale Price: ${dollars(cents)}`, note: `(${dollars(extra)} off · ${extraOff}% off)` },
+    caps: { was: `SALE PRICE: ${dollars(base)}`, line: `SALE PRICE: ${dollars(cents)}`, note: `That's an extra ${dollars(extra)} (${extraOff}%) off.` },
+  };
+  return {
+    today: { was: '', line: `Today: ${dollars(cents)} (${off}% off)`, note: '' },
+    sale: { was: '', line: `Sale Price: ${dollars(cents)}`, note: `(${off}% off)` },
+    caps: { was: '', line: `SALE PRICE: ${dollars(cents)}`, note: `That's ${off}% off.` },
+  };
+};
+window.PAYOFF_PAINT_PRICE = (box, cents) => {
+  const lines = window.PAYOFF_PRICE_LINES(cents)[box.dataset.wording || 'today'];
+  const was = box.querySelector('[data-was]');
+  if (was) { was.textContent = lines.was; was.parentElement.hidden = !lines.was; }
+  box.querySelector('[data-price]').textContent = lines.line;
+  const note = box.querySelector('[data-off]');
+  if (note) note.textContent = lines.note;
 };
 (() => {
   const form = document.getElementById('order-form');
@@ -92,12 +111,24 @@ window.PAYOFF_PRICE_LINES = (cents, regular = 37500) => {
   // Preview eligibility without starting or resetting the checkout deadline.
   let salesTimer, salesDeadline = null;
   let salesActive = false;
-  const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => {
-    const lines = window.PAYOFF_PRICE_LINES(active ? 2800 : 3300)[box.dataset.wording];
-    if (!lines) return;
-    box.querySelector('[data-price]').textContent = lines[0];
-    box.querySelector('[data-off]').textContent = lines[1];
-  }));
+  const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => window.PAYOFF_PAINT_PRICE(box, active ? 2800 : 3300)));
+  // The letter's bar: the extra $5 they have, and its clock once checkout started it.
+  let salesOffer = null, salesOffset = 0;
+  const salesClock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  const paintSalesBar = () => {
+    const bar = document.getElementById('offer-bar');
+    if (!bar || document.body.dataset.variant !== 'letter') return;
+    const left = salesOffer?.expiresAt ? salesOffer.expiresAt - Date.now() - salesOffset : null;
+    const state = !salesOffer || salesOffer.discountCents !== 500 ? null : left === null ? 'offered' : left > 0 ? 'running' : null;
+    bar.hidden = !state;
+    if (!state) return;
+    document.getElementById('deal-emoji').textContent = state === 'offered' ? '🎁' : '🎉';
+    document.getElementById('deal-lead').textContent = state === 'offered' ? 'You’ve got an extra $5 off!' : 'You got an extra $5 off! It’s saved for you for';
+    const clock = document.getElementById('deal-clock');
+    clock.hidden = state !== 'running'; clock.textContent = state === 'running' ? salesClock(left) : '';
+    document.getElementById('deal-rest').textContent = state === 'offered' ? 'Your 30 minutes start at checkout.' : '';
+  };
+  setInterval(paintSalesBar, 1000);
   window.PayoffTrack = { event, pixel, attribution, visitor, headers, paintOffers: () => paintSalesOffer(salesActive) };
   const refreshSalesOffer = () => {
     if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
@@ -107,6 +138,8 @@ window.PAYOFF_PRICE_LINES = (cents, regular = 37500) => {
     }).then(config => {
       const offer = config.checkoutOffer;
       if (!offer) return;
+      salesOffer = offer; salesOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
+      paintSalesBar();
       clearTimeout(salesTimer);
       const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
       salesDeadline = remaining === null ? null : Date.now() + remaining;

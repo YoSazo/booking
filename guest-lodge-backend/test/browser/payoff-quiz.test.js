@@ -92,14 +92,16 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   const planned = E.plan(CARDS, { extra: 10000, start }), fastest = planned.plans.find(plan => plan.key === planned.fastest);
   await page.locator('.impact span', { hasText: money(minimums.totalInterest - fastest.totalInterest) + ' less interest' }).waitFor();
   await page.locator('.go', { hasText: 'Build my plan' }).click();
-  await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 (92% off)")').waitFor();
+  await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').waitFor();
+  assert.equal(await page.locator('.plan .offer-was').innerText(), 'Today: $33');
   assert.match(await page.locator('.plan .q').innerText(), /sooner\.$/);
   assert.equal(await page.locator('.locked .blurred').count(), 3);
   assert.equal((await page.locator('.told').innerText()).replace(/\s+/g, ' ').trim(), 'You told us: “I don’t know which card to pay first.” Your plan: The exact order, and what to pay on each card every month.');
-  assert.equal(await page.locator('#worth').innerText(), `Your plan could save you ${money(minimums.totalInterest - fastest.totalInterest)} in interest. It costs $28, once.`);
+  assert.equal(await page.locator('#worth').innerText(), `Your plan could save you ${money(minimums.totalInterest - fastest.totalInterest)} in interest. It costs $375 $33 $28, once.`);
+  assert.deepEqual(await page.locator('#worth s').allInnerTexts(), ['$375', '$33'], 'the earlier prices are crossed out');
   // Finishing in time earns the $5; its 30 minutes start at checkout.
   assert.equal((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), '🎉 You unlocked an extra $5 off! Your 30 minutes start at checkout.');
-  assert.equal(await page.locator('#offer-saved').innerText(), 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.');
+  assert.equal(await page.locator('#offer-saved').innerText(), 'Your 30 minutes to use the extra $5 start when you open checkout.');
   assert.equal(await page.locator('.plan img.proof').count(), 5);
   assert.equal(await page.locator('.plan').innerText().then(text => text.includes(`${MONTHS[fastest.date.month]} ${fastest.date.year}`)), false, 'the plan\'s date stays locked');
   await page.locator('a.go', { hasText: 'Unlock My Plan' }).click();

@@ -383,10 +383,11 @@
     const lock = el('p', 'lock', '🔒 Unlocks the moment you pay'); locked.append(lock);
     const offer = el('div', 'sales-offer'); offer.dataset.wording = 'today';
     const reg = el('p', 'offer-reg'); const s = el('s', '', '(Reg. price $375)'); s.dataset.offerAnchor = ''; reg.append(s);
+    const was = el('p', 'offer-was'); was.hidden = true; const wasPrice = el('s'); wasPrice.dataset.was = ''; was.append(wasPrice);
     const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
     const saved = el('p', 'offer-saved'); saved.id = 'offer-saved'; saved.hidden = true;
     const worth = el('p', 'worth'); worth.id = 'worth'; worth.dataset.savedCents = String(savedCents); worth.hidden = true;
-    offer.append(reg, today, worth, saved);
+    offer.append(reg, was, today, worth, saved);
     const unlock = el('a', 'go', 'Unlock My Plan →'); unlock.href = '/payoff/order';
     unlock.addEventListener('click', handOver);
     const proof = COMMENTS.map(([file, width, height, alt]) => {
@@ -443,13 +444,18 @@
     const price = document.querySelector('.plan [data-price]'), saved = $('offer-saved');
     if (!price) return;
     const discounted = state.kind === 'earned' || state.kind === 'checkout', cost = discounted ? 3300 - (deal?.discountCents || 500) : 3300;
-    price.textContent = window.PAYOFF_PRICE_LINES(cost).today[0];
+    window.PAYOFF_PAINT_PRICE(price.closest('.sales-offer'), cost);
+    // "It costs $375 $33 $28, once": the earlier prices crossed out, as in the price block.
     const worth = $('worth'), savedCents = Number(worth?.dataset.savedCents) || 0;
-    if (worth) { worth.hidden = savedCents < cost * 10; worth.textContent = `Your plan could save you ${money(savedCents)} in interest. It costs ${money(cost)}, once.`; }
+    if (worth) {
+      worth.hidden = savedCents < cost * 10;
+      worth.replaceChildren(`Your plan could save you ${money(savedCents)} in interest. It costs `, el('s', '', '$375'), ' ',
+        ...(cost < 3300 ? [el('s', '', money(3300)), ' '] : []), el('b', '', money(cost)), ', once.');
+    }
     saved.hidden = !discounted;
     if (discounted) saved.textContent = state.kind === 'earned'
-      ? 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.'
-      : `That’s $5 (15%) off the $33 sale price. It’s saved for you for ${clock(state.left)}.`;
+      ? 'Your 30 minutes to use the extra $5 start when you open checkout.'
+      : `Your extra $5 off is saved for you for ${clock(state.left)}.`;
   }
   setInterval(paintOffer, 1000);
 

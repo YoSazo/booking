@@ -8,13 +8,14 @@
   <title>Marketel Payoff — Your debt payoff plan, without the spreadsheet</title>
   <meta name="description" content="See the month you could be debt-free. Marketel Payoff compares payoff plans on your phone. One payment, no subscription.">
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/style.css?v=20">
+  <link rel="stylesheet" href="/payoff/style.css?v=21">
   <script src="/payoff/content.js?v=19" defer></script>
-  <script src="/payoff/checkout.js?v=21" defer></script>
-  <script src="/payoff/page.js?v=21" defer></script>
+  <script src="/payoff/checkout.js?v=22" defer></script>
+  <script src="/payoff/page.js?v=22" defer></script>
   <script src="/payoff/purchase-notices.js?v=2" defer></script>
 </head>
 <body data-page="sales" data-variant="letter">
+  <div class="offer-bar" id="offer-bar" hidden><span class="deal-emoji" id="deal-emoji" aria-hidden="true"></span> <strong id="deal-lead"></strong> <b id="deal-clock" role="timer" aria-live="off" hidden></b> <span id="deal-rest"></span></div>
   <main id="main">
     <section class="hero" data-section="hero">
       <div class="wrap">
@@ -143,7 +144,7 @@
     </section>
   </main>
   <footer><img src="/marketel.svg" width="120" height="28" alt="Marketel"><p>Marketel Payoff</p><p>Educational planning software. Projections are not financial advice, lender statements or guaranteed outcomes.</p></footer>
-  <template id="offer-template"><div class="offer sales-offer"><p class="offer-reg"><s data-offer-anchor>(Reg. price $375)</s></p><p class="offer-today"><strong data-price>Today: $33 (91% off)</strong><span data-off></span></p><a class="cta" href="/payoff/order">Get My Debt-Free Date</a></div></template>
+  <template id="offer-template"><div class="offer sales-offer"><p class="offer-reg"><s data-offer-anchor>(Reg. price $375)</s></p><p class="offer-was" hidden><s data-was></s></p><p class="offer-today"><strong data-price>Today: $33 (91% off)</strong><span data-off></span></p><a class="cta" href="/payoff/order">Get My Debt-Free Date</a></div></template>
   <noscript><p class="noscript-note">This page uses JavaScript for its content. <a href="/payoff/order">Get Payoff</a>.</p></noscript>
 </body>
 </html>

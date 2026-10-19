@@ -63,3 +63,10 @@
 .sales-offer .cta{min-height:44px;margin-top:26px;padding:12px 20px;border:1px solid transparent;border-radius:100px;background:#ff7d47;font:700 16px/19px 'Montserrat',sans-serif;box-shadow:0 1px 5px rgba(0,0,0,.4)}
 /* On the raspberry band the block sits on a light pink panel, as in the reference. */
 .rose-band .sales-offer{padding:20px 10px;background:#f8e2e9}
+.sales-offer .offer-was{margin:0}
+/* The extra $5, pinned to the top as on the order page. */
+.offer-bar{position:sticky;top:0;z-index:25;padding:9px 12px;background:#c30;color:#fff;font:400 15px/1.35 'Montserrat',sans-serif;text-align:center}
+.offer-bar strong{font-weight:700}
+.offer-bar b{display:inline-block;min-width:3.1em;padding:1px 6px;border-radius:4px;background:#fefcbf;color:#c30;font-weight:800;font-variant-numeric:tabular-nums}
+.offer-bar #deal-rest{display:inline-block}
+.deal-emoji{display:inline-block;width:22px;height:22px;margin-top:-3px;border-radius:50%;background:#fefcbf;font-size:13px;line-height:22px;text-align:center;vertical-align:middle}

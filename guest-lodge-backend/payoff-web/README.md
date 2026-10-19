@@ -118,8 +118,12 @@ fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
 The sales page's price blocks copy the reference letter: "(Reg. price $375)"
 crossed out, then one bold line worded three ways (`Today:`, `Sale Price:`,
-`SALE PRICE:`), then the orange pill button. They preview offer eligibility
-($28) without starting the timer. Stripe
+`SALE PRICE:`), then the orange pill button. They preview offer eligibility without starting
+the timer. While the extra $5 applies, the sale price is crossed out too:
+"~~(Reg. price $375)~~ / ~~Today: $33~~ / Today: $28 ($5 off · 15% off)". A red
+bar pinned to the top of the letter says "You've got an extra $5 off! Your 30
+minutes start at checkout", or shows the running clock once checkout started
+it. Stripe
 offers the payment methods enabled in the Dashboard (Cash App Pay, Klarna,
 Afterpay and others when the buyer is eligible). An unpaid delayed payment
 does not unlock access.

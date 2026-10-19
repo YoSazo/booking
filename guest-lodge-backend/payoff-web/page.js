@@ -36,9 +36,7 @@
     const box = slot.querySelector('.sales-offer'), wording = wordings[index % wordings.length];
     box.dataset.wording = wording;
     box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
-    const [line, note] = window.PAYOFF_PRICE_LINES(content.priceCents, content.regularPriceCents)[wording];
-    box.querySelector('[data-price]').textContent = line;
-    box.querySelector('[data-off]').textContent = note;
+    window.PAYOFF_PAINT_PRICE(box, content.priceCents);
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });

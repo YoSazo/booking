@@ -134,6 +134,8 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .sales-offer p { margin: 0; }
 .sales-offer strong { font-weight: 700; }
 .sales-offer [data-off]:empty { display: none; }
+.worth s { font-weight: 400; color: var(--muted); }
+.worth b { font-weight: 800; }
 .plan .go { margin-top: 12px; }
 .fine { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
 .proof { display: block; width: 100%; height: auto; margin: 20px 0 0; border-radius: 10px; }
