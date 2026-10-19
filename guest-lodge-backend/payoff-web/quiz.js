@@ -36,7 +36,7 @@
     track.event('PayoffQuizStep', detail);
   };
 
-  const steps = () => ['count', 'paying', ...Array.from({ length: quiz.count }, (_, i) => ['balance', 'apr', 'minimum'].map(field => `${field}-${i}`)).flat(), 'reveal', 'extra', 'plan'];
+  const steps = () => ['count', 'paying', 'why', 'insight', ...Array.from({ length: quiz.count }, (_, i) => ['balance', 'apr', 'minimum'].map(field => `${field}-${i}`)).flat(), 'reveal', 'extra', 'plan'];
   const debts = () => quiz.cards.slice(0, quiz.count).map((card, i) => ({ id: `q${i + 1}`, name: `Card ${i + 1}`, type: 'card',
     balance: Math.round(card.balance * 100), apr: card.apr, minimum: Math.round(card.minimum * 100) }));
   const outcome = extra => E.plan(debts(), { extra: Math.round(extra * 100), start });
@@ -52,13 +52,46 @@
     const button = el('button', 'go', label); button.type = 'button'; button.disabled = disabled;
     button.addEventListener('click', onClick); return button;
   };
-  const choice = (label, onPick, className = '') => {
+  // A tap ticks the answer, then the next screen slides in. Screens that open
+  // the keyboard come in inside the same tap instead: iPhone only raises it for
+  // a field focused during the tap itself.
+  const choice = (label, onPick, { className = '', wait = false } = {}) => {
     const button = el('button', 'choice ' + className, label); button.type = 'button';
-    // The next screen comes in inside the same tap: iPhone only raises the
-    // keyboard for a field focused during the tap itself.
-    button.addEventListener('click', () => { button.classList.add('picked'); onPick(); });
+    button.addEventListener('click', () => {
+      if (stage.dataset.busy) return;
+      button.classList.add('picked');
+      if (!wait || reduced) return onPick();
+      stage.dataset.busy = '1';
+      setTimeout(() => { delete stage.dataset.busy; onPick(); }, 240);
+    });
     return button;
   };
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Numbers that roll to their value, like a counter, instead of just appearing.
+  function countUp(node, from, to, format, ms = 900) {
+    if (reduced || from === to) { node.textContent = format(to); return; }
+    const begin = performance.now();
+    const frame = time => {
+      const t = Math.min(1, (time - begin) / ms), eased = 1 - Math.pow(1 - t, 3);
+      node.textContent = format(Math.round(from + (to - from) * eased));
+      if (t < 1 && node.isConnected) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  // A short burst when the plan is ready.
+  function confetti(screen) {
+    if (reduced) return;
+    const burst = el('div', 'confetti'); burst.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 28; i++) {
+      const piece = el('i'); piece.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`); piece.style.setProperty('--d', `${Math.round(Math.random() * 300)}ms`);
+      piece.style.setProperty('--r', `${Math.round(Math.random() * 720 - 360)}deg`); piece.style.setProperty('--c', ['#ff7d47', '#b4214b', '#2e7d5b', '#fefcbf', '#f4b400'][i % 5]);
+      burst.append(piece);
+    }
+    screen.append(burst);
+    setTimeout(() => burst.remove(), 2200);
+  }
+  const interestOf = card => card.balance * (card.apr || 0) / 1200;
+  const dollars = value => '$' + Math.round(value).toLocaleString('en-US');
   const next = text => el('p', 'next', text);
 
   // The balance line falling month by month, for one plan or two.
@@ -92,7 +125,7 @@
     const screen = render(name);
     screen.classList.add('screen', direction < 0 ? 'from-left' : 'from-right');
     stage.replaceChildren(screen);
-    if (name === 'plan') askDeal('finish');
+    if (name === 'plan') { askDeal('finish'); confetti(screen); }
     $('back').hidden = quiz.at === 0;
     $('progress').style.width = `${(6 + 94 * Math.pow(quiz.at / (list.length - 1), 0.65)).toFixed(1)}%`;
     document.body.dataset.step = name.replace(/-\d+$/, '');
@@ -107,6 +140,8 @@
     const [field, index] = name.split('-');
     if (name === 'count') return hook();
     if (name === 'paying') return paying();
+    if (name === 'why') return why();
+    if (name === 'insight') return insight();
     if (['balance', 'apr', 'minimum'].includes(field)) return number(field, Number(index));
     if (name === 'reveal') return reveal();
     if (name === 'extra') return extra();
@@ -124,7 +159,7 @@
       quiz.count = count; quiz.cards = Array.from({ length: count }, (_, i) => quiz.cards[i] || {}); reached('q1');
       if (!deal?.quiz) askDeal('start');
       advance();
-    }));
+    }, { wait: true }));
     screen.append(hero, words('h1', 'q', 'How many credit cards are you paying off?'), grid,
       next('See your debt-free date in about 2 minutes. No bank login. No spreadsheet.'));
     return screen;
@@ -143,9 +178,58 @@
       words('h1', 'q', 'How are you paying them right now?'));
     const list = el('div', 'choices stack');
     for (const [key, label] of [['minimums', 'Mostly the minimums'], ['extra', 'A little extra when I can'], ['max', 'As much as I can'], ['changes', 'It changes month to month']]) {
-      list.append(choice(label, () => { quiz.paying = key; reached('q2'); advance(); }));
+      list.append(choice(label, () => { quiz.paying = key; reached('q2'); advance(); }, { wait: true }));
     }
-    screen.append(list, next('Next: your cards, one number at a time.'));
+    screen.append(list, next('Next: what’s been in the way.'));
+    return screen;
+  }
+
+  // 3. What's stopping them. Every answer is something the plan really fixes,
+  // so whichever they pick puts them on the path to it.
+  const WHY = {
+    interest: { answer: 'The interest eats most of what I pay',
+      title: 'That’s the trap.',
+      body: ['On minimum payments, a big part of every payment is interest, so the balance barely moves.',
+        'The way out isn’t just paying more. It’s paying in the right order, so every card you clear frees up its payment for the next one.'],
+      echo: null,
+      plan: saved => saved ? `${saved} less interest, just by paying in the right order.` : 'Every payment goes where it cuts the most interest.' },
+    order: { answer: 'I don’t know which card to pay first',
+      title: 'That’s the part nobody tells you.',
+      body: ['Which card you pay first can change how fast you’re done and how much interest you pay.',
+        'Get the order right, and every card you clear frees up its payment for the next one. The money you already pay starts working harder.'],
+      echo: 'That’s paying every card its minimum, with no order.',
+      plan: () => 'The exact order, and what to pay on each card every month.' },
+    tracking: { answer: 'I’ve tried spreadsheets and gave up',
+      title: 'Spreadsheets make you do the hard part.',
+      body: ['Interest, minimums that shrink, which card is next: it’s a lot of math to keep up with by hand.',
+        'When something does the math for you, all you have to do is follow it.'],
+      echo: 'No spreadsheet needed to see it, and none needed to change it.',
+      plan: () => 'No formulas. Change any number and your date updates on the spot.' },
+    life: { answer: 'Something always comes up',
+      title: 'That’s normal. Your plan should expect it.',
+      body: ['A plan that breaks the first time life happens isn’t much of a plan.',
+        'You need one you can change in a second: pay less this month, more next month, and see your new date straight away.'],
+      echo: 'And that’s if nothing comes up between now and then.',
+      plan: () => 'Change your amount any month and see your new date straight away.' },
+  };
+  function why() {
+    const screen = el('section');
+    screen.append(el('p', 'kicker', REPLIES[quiz.paying] || 'Let’s get you a plan.'), words('h1', 'q', 'You want these cards gone. What’s been getting in the way?'));
+    const list = el('div', 'choices stack');
+    for (const [key, { answer }] of Object.entries(WHY)) {
+      list.append(choice(answer, () => { quiz.why = key; reached(`why-${key}`); advance(); }, { wait: true }));
+    }
+    screen.append(list, next('Next: the way out.'));
+    return screen;
+  }
+  // Their answer, turned toward the plan: order and doing the math for them.
+  function insight() {
+    const reason = WHY[quiz.why] || WHY.interest;
+    const screen = el('section', 'insight');
+    screen.append(el('p', 'kicker', `You said: “${reason.answer}.”`), words('h1', 'q', reason.title),
+      ...reason.body.map(text => el('p', 'insight-body', text)),
+      el('p', 'insight-turn', 'Let’s see where your cards stand right now.'),
+      go('Show me with my cards →', advance), next('Next: your cards, one number at a time.'));
     return screen;
   }
 
@@ -154,7 +238,12 @@
     const card = quiz.cards[index] || (quiz.cards[index] = {});
     const last = index === quiz.count - 1;
     const screen = el('section', 'number');
-    const kicker = index === 0 && field === 'balance' && quiz.paying ? REPLIES[quiz.paying] : `Card ${index + 1} of ${quiz.count}`;
+    const kicker = `Card ${index + 1} of ${quiz.count}`;
+    const previous = index > 0 && field === 'balance' ? quiz.cards[index - 1] : null;
+    const done = previous?.minimum ? el('p', 'done', interestOf(previous) >= previous.minimum
+      ? `✓ Card ${index} added: its ${dollars(previous.minimum)} minimum doesn’t even cover its ${dollars(interestOf(previous))} of interest.`
+      : `✓ Card ${index} added: about ${dollars(interestOf(previous))} of its ${dollars(previous.minimum)} minimum is interest.`) : null;
+    const fact = field === 'minimum' && card.apr > 0 ? el('p', 'fact', `At ${card.apr}%, this card adds about ${dollars(interestOf(card))} in interest every month.`) : null;
     const question = { balance: `What’s the balance on card ${index + 1}?`, apr: `What’s card ${index + 1}’s interest rate (APR)?`, minimum: `What’s card ${index + 1}’s minimum payment?` }[field];
     const box = el('label', 'field');
     const input = el('input');
@@ -191,7 +280,7 @@
     const total = quiz.cards.slice(0, quiz.count).reduce((sum, item) => sum + (item.balance || 0), 0);
     const nextText = field === 'balance' ? 'Next: its interest rate.' : field === 'apr' ? 'Next: its minimum payment.'
       : last ? 'Next: your debt-free date if you only pay the minimums.' : `Next: card ${index + 2}.`;
-    screen.append(el('p', 'kicker', kicker), words('h1', 'q', question), box, error, helpers, go('Next', submit),
+    screen.append(...(done ? [done] : []), el('p', 'kicker', kicker), words('h1', 'q', question), ...(fact ? [fact] : []), box, error, helpers, go('Next', submit),
       el('p', 'hint', field === 'balance' ? 'It’s on your statement or in your card’s app. A close guess is fine.' : field === 'apr' ? 'It’s on your statement. You can change it later in your plan.' : 'It’s on your statement, next to the due date.'),
       ...(total && quiz.count > 1 ? [el('p', 'tally', `All your cards so far: ${money(total * 100)}`)] : []), next(nextText));
     return screen;
@@ -202,12 +291,23 @@
     const minimums = outcome(0).minimums;
     reached('reveal');
     const screen = el('section', 'reveal');
+    const cards = quiz.cards.slice(0, quiz.count);
+    const monthlyInterest = cards.reduce((sum, card) => sum + interestOf(card), 0), monthlyMinimums = cards.reduce((sum, card) => sum + (card.minimum || 0), 0);
+    const fact = monthlyInterest > 0 ? el('p', 'fact', monthlyInterest >= monthlyMinimums
+      ? `Right now, your ${dollars(monthlyMinimums)} in minimums doesn’t even cover the ${dollars(monthlyInterest)} of interest each month.`
+      : `Right now, about ${dollars(monthlyInterest)} of your ${dollars(monthlyMinimums)} in minimums goes to interest every month.`) : null;
+    const echo = WHY[quiz.why]?.echo;
     if (minimums.months) {
-      screen.append(el('p', 'kicker', 'If you only pay the minimums'), words('h1', 'q', 'You’d be debt-free in'), el('p', 'big', monthName(minimums.date)),
+      const big = el('p', 'big', monthName(minimums.date));
+      screen.append(el('p', 'kicker', 'If you only pay the minimums'), words('h1', 'q', 'You’d be debt-free in'), big,
         el('p', 'sub', `That’s ${duration(minimums.months)} from now, with ${money(minimums.totalInterest)} paid in interest.`));
+      countUp(big, start.year, minimums.date.year, year => `${MONTHS[minimums.date.month]} ${year}`, 1100);
+      if (fact) screen.append(fact);
+      if (echo) screen.append(el('p', 'echo', echo));
     } else {
       screen.append(el('p', 'kicker', 'If you only pay the minimums'), words('h1', 'q', 'These cards would never be paid off.'),
         el('p', 'sub', 'On at least one card the interest is bigger than the minimum, so the balance never goes down.'));
+      if (fact) screen.append(fact);
     }
     screen.append(chart([{ plan: minimums, className: 'slow' }]), go('Show me a faster way →', advance), next('Next: how much sooner it could be.'));
     return screen;
@@ -222,6 +322,11 @@
     const chips = el('div', 'choices row');
     const other = el('input'); Object.assign(other, { type: 'text', inputMode: 'decimal', autocomplete: 'off', placeholder: 'Other', id: 'extra-other' });
     other.setAttribute('aria-label', 'Another amount each month');
+    const plain = outcome(0), plainFastest = plain.plans.find(plan => plan.key === plain.fastest);
+    const baseline = plainFastest && plain.minimums.months && plain.minimums.months > plainFastest.months
+      ? el('p', 'baseline', `Before adding a dollar: keep paying what you pay now, in the right order, and you’re out ${duration(plain.minimums.months - plainFastest.months)} sooner.`)
+      : plainFastest && !plain.minimums.months ? el('p', 'baseline', `Before adding a dollar: keep paying what you pay now, in the right order, and they’re paid off in ${duration(plainFastest.months)}, instead of never.`) : null;
+    let shownMonths = 0, shownSaved = 0;
     function paint() {
       if (quiz.extra === null) { impact.replaceChildren(el('strong', '', 'Tap an amount'), el('span', '', 'and watch your date move.')); graph.replaceChildren(chart([{ plan: outcome(0).minimums, className: 'slow' }])); return; }
       const result = outcome(quiz.extra), minimums = result.minimums, fastest = result.plans.find(plan => plan.key === result.fastest);
@@ -229,9 +334,14 @@
       if (!fastest) { impact.replaceChildren(el('strong', '', 'Still not enough'), el('span', '', 'The interest outruns this amount. Try a bigger one.')); build.disabled = true; return; }
       build.disabled = false;
       const lead = quiz.extra === 0 ? 'Same money you pay now, used in the right order:' : `With ${money(quiz.extra * 100)} more a month:`;
-      impact.replaceChildren(el('small', '', lead), ...(minimums.months
-        ? [el('strong', '', `${duration(minimums.months - fastest.months)} sooner`), el('span', '', `and ${money(minimums.totalInterest - fastest.totalInterest)} less interest`)]
-        : [el('strong', '', 'Paid off for good'), el('span', '', `in about ${duration(fastest.months)}, instead of never`)]));
+      if (minimums.months) {
+        const sooner = el('strong'), less = el('span');
+        impact.replaceChildren(el('small', '', lead), sooner, less);
+        const months = minimums.months - fastest.months, saved = Math.round((minimums.totalInterest - fastest.totalInterest) / 100);
+        countUp(sooner, shownMonths, months, value => `${duration(value)} sooner`);
+        countUp(less, shownSaved, saved, value => `and ${dollars(value)} less interest`);
+        shownMonths = months; shownSaved = saved;
+      } else impact.replaceChildren(el('small', '', lead), el('strong', '', 'Paid off for good'), el('span', '', `in about ${duration(fastest.months)}, instead of never`));
       save();
     }
     for (const amount of [0, 50, 100, 200]) {
@@ -246,7 +356,7 @@
       quiz.extra = Math.min(value, 100000); chips.querySelectorAll('.choice').forEach(b => b.classList.remove('picked')); paint();
     });
     const otherBox = el('label', 'field small'); otherBox.append(el('span', 'unit', '+$'), other);
-    screen.append(el('p', 'kicker', 'Here’s where it changes'), words('h1', 'q', 'What could you add each month, on top of the minimums?'),
+    screen.append(el('p', 'kicker', 'Here’s where it changes'), ...(baseline ? [baseline] : []), words('h1', 'q', 'Now, what could you add each month, on top of that?'),
       impact, graph, chips, otherBox, build, next('Next: your plan.'));
     paint();
     return screen;
@@ -262,6 +372,10 @@
     const wins = el('ul', 'wins');
     for (const line of [fastest && minimums.months ? `${money(minimums.totalInterest - fastest.totalInterest)} less interest than paying minimums` : null,
       quiz.count === 1 ? 'A plan for your card, worked out to the month' : quiz.count === 2 ? 'A plan for both cards, worked out to the month' : `A plan for all ${quiz.count} cards, worked out to the month`, 'The exact order to pay them in'].filter(Boolean)) wins.append(el('li', '', line));
+    const reason = WHY[quiz.why];
+    const savedCents = fastest && minimums.months ? minimums.totalInterest - fastest.totalInterest : 0;
+    const told = reason ? el('div', 'told') : null;
+    if (told) told.append(el('p', 'told-said', `You told us: “${reason.answer}.”`), el('p', 'told-plan', `Your plan: ${reason.plan(savedCents ? money(savedCents) : '')}`));
     const locked = el('div', 'locked');
     for (const [label, value] of [['Your debt-free date', '●●●●●●● 20●●'], ['Pay this card first', 'Card ●'], ['What to pay each month', '●●●●●']]) {
       const row = el('div', 'locked-row'); row.append(el('span', '', label), el('b', 'blurred', value)); locked.append(row);
@@ -271,14 +385,15 @@
     const reg = el('p', 'offer-reg'); const s = el('s', '', '(Reg. price $375)'); s.dataset.offerAnchor = ''; reg.append(s);
     const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
     const saved = el('p', 'offer-saved'); saved.id = 'offer-saved'; saved.hidden = true;
-    offer.append(reg, today, saved);
+    const worth = el('p', 'worth'); worth.id = 'worth'; worth.dataset.savedCents = String(savedCents); worth.hidden = true;
+    offer.append(reg, today, worth, saved);
     const unlock = el('a', 'go', 'Unlock My Plan →'); unlock.href = '/payoff/order';
     unlock.addEventListener('click', handOver);
     const proof = COMMENTS.map(([file, width, height, alt]) => {
       const image = new Image(); Object.assign(image, { src: `/payoff/assets/${file}`, width, height, alt, loading: 'lazy', decoding: 'async', className: 'proof' });
       return image;
     });
-    screen.append(el('p', 'kicker', 'Your plan is ready'), words('h1', 'q', headline), wins, locked, offer, unlock,
+    screen.append(el('p', 'kicker', 'Your plan is ready'), words('h1', 'q', headline), wins, ...(told ? [told] : []), locked, offer, unlock,
       el('p', 'fine', 'One payment. Your plan opens right after you pay, with these cards already in it. 30-day money-back guarantee.'), ...proof);
     return screen;
   }
@@ -327,8 +442,10 @@
     // On the plan: the price they'll pay, and why.
     const price = document.querySelector('.plan [data-price]'), saved = $('offer-saved');
     if (!price) return;
-    const discounted = state.kind === 'earned' || state.kind === 'checkout';
-    price.textContent = window.PAYOFF_PRICE_LINES(discounted ? 3300 - (deal?.discountCents || 500) : 3300).today[0];
+    const discounted = state.kind === 'earned' || state.kind === 'checkout', cost = discounted ? 3300 - (deal?.discountCents || 500) : 3300;
+    price.textContent = window.PAYOFF_PRICE_LINES(cost).today[0];
+    const worth = $('worth'), savedCents = Number(worth?.dataset.savedCents) || 0;
+    if (worth) { worth.hidden = savedCents < cost * 10; worth.textContent = `Your plan could save you ${money(savedCents)} in interest. It costs ${money(cost)}, once.`; }
     saved.hidden = !discounted;
     if (discounted) saved.textContent = state.kind === 'earned'
       ? 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.'

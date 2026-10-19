@@ -55,7 +55,13 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .choices.grid .choice, .choices.row .choice { text-align: center; font-size: 22px; }
 .choices.row .choice { min-height: 50px; padding: 8px 4px; font-size: 18px; }
 .choice:active { transform: scale(.97); }
-.choice.picked { border-color: var(--orange); background: #fff3ec; color: var(--orange-dark); }
+.choice.picked { position: relative; border-color: var(--orange); background: #fff3ec; color: var(--orange-dark); animation: picked .24s ease; }
+.choices.stack .choice.picked { padding-right: 44px; }
+.choice.picked::after { content: '✓'; position: absolute; right: 14px; top: 50%; display: grid; place-items: center; width: 24px; height: 24px; margin-top: -12px;
+  border-radius: 50%; background: var(--orange); color: #fff; font-size: 14px; animation: tick .24s cubic-bezier(.3, 1.6, .6, 1) both; }
+.choices.grid .choice.picked::after, .choices.row .choice.picked::after { display: none; }
+@keyframes picked { 50% { transform: scale(1.03); } }
+@keyframes tick { from { opacity: 0; transform: scale(.3); } }
 
 .field { display: flex; align-items: center; gap: 6px; height: 64px; padding: 0 16px; border: 2px solid var(--line); border-radius: 14px; background: #fff; }
 .field:focus-within { border-color: var(--orange); }
@@ -73,6 +79,18 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
   background: var(--orange); color: #fff; font-size: 19px; font-weight: 700; text-decoration: none; box-shadow: 0 3px 10px #ff7d4740; cursor: pointer; transition: transform .14s ease; }
 .go:active { transform: scale(.97); background: var(--orange-dark); }
 .go:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
+
+/* 3. What's in the way, turned toward the plan. */
+.insight .q { font-size: 30px; }
+.insight-body { margin: 0 0 12px; font-size: 19px; line-height: 1.45; }
+.insight-turn { margin: 18px 0 0; color: var(--head); font-weight: 700; }
+/* Their own numbers, said back to them. */
+.done { margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; background: var(--green-pale); color: var(--green); font-size: 15px; font-weight: 700; animation: rise .35s ease both .1s; }
+.fact { margin: -6px 0 14px; padding: 10px 12px; border-radius: 12px; background: var(--rose-pale); color: var(--head); font-size: 16px; font-weight: 700; animation: rise .35s ease both .25s; }
+.reveal .fact { margin: 4px 0 8px; }
+.echo { margin: 0 0 6px; color: var(--muted); font-size: 16px; font-style: italic; }
+.baseline { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--green-pale); color: var(--green); font-size: 16px; font-weight: 700; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 /* 4–5. Their date, then the line that moves. */
 .big { margin: -6px 0 8px; color: var(--head); font-size: 44px; font-weight: 700; line-height: 1.05; }
@@ -95,7 +113,16 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .deal-emoji { display: inline-block; width: 22px; height: 22px; margin-top: -3px; border-radius: 50%; background: #fefcbf; font-size: 13px; line-height: 22px; text-align: center; vertical-align: middle; }
 .offer-saved { margin: 8px 0 0 !important; color: #c30; font-size: 14px; font-weight: 600; }
 
-/* 6. The plan: what they get free, and what unlocks. */
+/* 6. The plan: their words back, then what unlocks. */
+.told { margin: 0 0 16px; padding: 14px 16px; border-left: 4px solid var(--orange); border-radius: 12px; background: #fff3ec; }
+.told-said { margin: 0 0 6px; color: var(--muted); font-size: 15px; font-style: italic; }
+.told-plan { margin: 0; font-size: 17px; font-weight: 700; }
+.worth { margin: 6px 0 0 !important; color: var(--green); font-size: 15px; font-weight: 700; }
+.plan { position: relative; }
+.confetti { position: absolute; inset: -18px -16px auto; height: 0; pointer-events: none; z-index: 4; }
+.confetti i { position: absolute; top: 0; left: var(--x); width: 8px; height: 12px; border-radius: 2px; background: var(--c); opacity: 0;
+  animation: fall 1.6s cubic-bezier(.2, .6, .4, 1) var(--d) forwards; }
+@keyframes fall { 0% { opacity: 1; transform: translateY(-10px) rotate(0); } 100% { opacity: 0; transform: translateY(520px) rotate(var(--r)); } }
 .wins { margin: 0 0 16px; padding: 0; list-style: none; }
 .wins li { position: relative; margin: 0 0 8px; padding-left: 30px; font-size: 17px; font-weight: 700; }
 .wins li::before { content: '✓'; position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff; font-size: 13px; }
@@ -113,7 +140,7 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .noscript { padding: 20px; text-align: center; }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen, .word, .caption .word { animation: none; }
+  .screen, .word, .caption .word, .choice.picked, .choice.picked::after, .done, .fact { animation: none; }
   .chart .line { animation: none; stroke-dashoffset: 0; }
   .progress-fill { transition: none; }
 }

@@ -102,6 +102,8 @@ test('the quiz previews locally with ?v=quiz, with no outside requests',async()=
  await page.locator('.caption').waitFor();
  await page.locator('.choice',{hasText:'1'}).first().click();
  await page.locator('.choice',{hasText:'Mostly the minimums'}).click();
+ await page.locator('.choice',{hasText:'Something always comes up'}).click();
+ await page.locator('.go',{hasText:'Show me with my cards'}).click();
  assert.equal(await page.locator('#balance-0').count(),1);
  assert.equal(requests.filter(r=>!r.url().startsWith(base)).length,0);
  assert.equal(requests.filter(r=>r.method()!=='GET').length,0);

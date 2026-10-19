@@ -29,7 +29,7 @@ const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
-const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
+const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
 const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;

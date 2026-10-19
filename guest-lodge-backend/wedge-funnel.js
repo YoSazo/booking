@@ -58,6 +58,12 @@ const BRANCHES = Object.freeze([
   { key: 'scroll', label: 'How far down the page', steps: [['Saw the video on screen', ['OfferSawVideo']], ['Saw the offer card on screen', ['OfferSawOffer']], ['Scrolled to 25%', ['OfferScroll25']], ['Scrolled to 50%', ['OfferScroll50']], ['Scrolled to 75%', ['OfferScroll75']], ['Scrolled to the bottom', ['OfferScroll100']], ['Tapped "see a report built"', ['OfferCueTapped']]] },
   // Where each landing came from. "ad" is a visit that carried Meta's click id; "direct" has no
   // referrer (typed, a QR code, a bookmark, or the owner's own browser).
+  { key: 'why', label: 'Quiz: what’s been in the way', hideWhenEmpty: true, steps: [
+    ['The interest eats most of what I pay', ['PayoffQuizStep:why-interest']],
+    ['I don’t know which card to pay first', ['PayoffQuizStep:why-order']],
+    ['I’ve tried spreadsheets and gave up', ['PayoffQuizStep:why-tracking']],
+    ['Something always comes up', ['PayoffQuizStep:why-life']],
+  ] },
   { key: 'from', label: 'Where they came from', steps: [['Clicked the ad (Meta click id)', ['OfferFrom:ad']], ['From Facebook or Instagram, no click id', ['OfferFrom:social']], ['No referrer: typed, QR, or you', ['OfferFrom:direct']], ['From another site', ['OfferFrom:other']]] },
   { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['OfferBrowser:instagram']], ['Facebook app', ['OfferBrowser:facebook']], ['Safari', ['OfferBrowser:safari']], ['Chrome', ['OfferBrowser:chrome']], ['Other', ['OfferBrowser:other']]] },
   { key: 'checks', hideWhenEmpty: true, label: 'Could they answer? (checks)', steps: [['Buttons were reachable', ['OfferPickReady']], ['Buttons were blocked', ['OfferPickBlocked']], ['Touched the screen', ['OfferPickTouched']]] },
@@ -154,6 +160,12 @@ const TRACE_BRANCHES = Object.freeze([
   { key: 'price', label: 'When they saw the price', steps: [['Tapped "Buy $14.99" in the top bar', ['TracePaywallShown:top']], ['Tapped "Already sure? Unlock everything" on the first screen', ['TracePaywallShown:now']], ['Tapped "Unlock everything" on the old home page (before Oct 16)', ['TracePaywallShown:home']], ['After tapping Done (traced 30s or more: the cheer)', ['TracePaywallShown:done']], ['After tapping Done before tracing 30s (no cheer)', ['TracePaywallShown:quick']], ['Picked a second picture', ['TracePaywallShown:second']], ['Asked for a second AI picture', ['TracePaywallShown:ai']], ['Came back from Stripe unpaid', ['TracePaywallShown:cancelled']], ['Closed it ("Not now")', ['TracePaywallClosed']]] },
   { key: 'checkout', label: 'Checkout', steps: [['Tapped Unlock', ['TraceCheckoutTapped']], ["Checkout didn't open", ['TraceCheckoutFailed']], ['Came back without paying', ['TraceCheckoutCancelled']], ['Paid', ['TracePaid']]] },
   { key: 'restore', hideWhenEmpty: true, label: 'Already paid?', steps: [['Asked to restore', ['TraceRestoreAsked']], ['Unlocked with the code', ['TraceUnlocked:code']], ['Unlocked with the email link', ['TraceUnlocked:link']]] },
+  { key: 'why', label: 'Quiz: what’s been in the way', hideWhenEmpty: true, steps: [
+    ['The interest eats most of what I pay', ['PayoffQuizStep:why-interest']],
+    ['I don’t know which card to pay first', ['PayoffQuizStep:why-order']],
+    ['I’ve tried spreadsheets and gave up', ['PayoffQuizStep:why-tracking']],
+    ['Something always comes up', ['PayoffQuizStep:why-life']],
+  ] },
   { key: 'from', label: 'Where they came from', steps: [['Clicked the ad (Meta click id)', ['TraceFrom:ad']], ['From Facebook or Instagram, no click id', ['TraceFrom:social']], ['No referrer: typed, QR, or you', ['TraceFrom:direct']], ['From another site', ['TraceFrom:other']]] },
   { key: 'browser', label: 'Which browser', steps: [['Instagram app', ['TraceBrowser:instagram']], ['Facebook app', ['TraceBrowser:facebook']], ['Safari', ['TraceBrowser:safari']], ['Chrome', ['TraceBrowser:chrome']], ['Other', ['TraceBrowser:other']]] },
   { key: 'where', label: 'Web or iPhone app', steps: [['On the web', ['TraceLanded:web']], ['In the iPhone app', ['TraceLanded:app']]] },
@@ -182,12 +194,19 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Saw the quiz', ['PayoffVariant:quiz']],
     ['Answered how many cards', ['PayoffQuizStep:q1']],
     ['Answered how they pay now', ['PayoffQuizStep:q2']],
+    ['Said what’s in the way', ['PayoffQuizStep:why-interest', 'PayoffQuizStep:why-order', 'PayoffQuizStep:why-tracking', 'PayoffQuizStep:why-life']],
     ['Entered card 1', ['PayoffQuizStep:card-1']],
     ['Entered all their cards', ['PayoffQuizStep:cards']],
     ['Saw their date on minimums', ['PayoffQuizStep:reveal']],
     ['Picked an extra amount', ['PayoffQuizStep:extra']],
     ['Saw their locked plan', ['PayoffQuizStep:plan']],
     ['Tapped Unlock My Plan', ['PayoffQuizStep:unlock']],
+  ] },
+  { key: 'why', label: 'Quiz: what’s been in the way', hideWhenEmpty: true, steps: [
+    ['The interest eats most of what I pay', ['PayoffQuizStep:why-interest']],
+    ['I don’t know which card to pay first', ['PayoffQuizStep:why-order']],
+    ['I’ve tried spreadsheets and gave up', ['PayoffQuizStep:why-tracking']],
+    ['Something always comes up', ['PayoffQuizStep:why-life']],
   ] },
   { key: 'from', label: 'Where they came from', steps: [
     ['Clicked the ad (Meta click id)', ['PayoffFrom:ad']],

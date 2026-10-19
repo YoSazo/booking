@@ -34,6 +34,11 @@ const now = new Date(), start = { year: now.getFullYear(), month: now.getMonth()
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const CARDS = [{ id: 'q1', name: 'Card 1', type: 'card', balance: 420000, apr: 24, minimum: 12600 }, { id: 'q2', name: 'Card 2', type: 'card', balance: 150000, apr: 19.99, minimum: 3500 }];
 const money = cents => '$' + Math.round(cents / 100).toLocaleString('en-US');
+// The "what's in the way" question and the screen that answers it.
+const pastWhy = async (page, answer = 'which card to pay first') => {
+  await page.locator('.choice', { hasText: answer }).click();
+  await page.locator('.go', { hasText: 'Show me with my cards' }).click();
+};
 
 test('the quiz opens on the ad\'s hook and walks to the real date on minimums, the plan and the order page, with the cards handed to the tool', async () => world(async ({ page, base, rows, requests }) => {
   await page.goto(base + '/payoff');
@@ -50,12 +55,20 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   assert.equal(await page.locator('.caption').count(), 1, 'back returns to the hook');
   await page.locator('.choice', { hasText: '2' }).click();
   await page.locator('.choice', { hasText: 'Mostly the minimums' }).click();
+  // What's in the way, said back and turned toward the plan.
+  await page.locator('.kicker', { hasText: 'No judgment. Most people start right here.' }).waitFor();
+  await page.locator('.choice', { hasText: 'which card to pay first' }).click();
+  await page.locator('.insight .kicker', { hasText: 'You said: “I don’t know which card to pay first.”' }).waitFor();
+  assert.equal(await page.locator('.insight .q').innerText(), 'That’s the part nobody tells you.');
+  await page.locator('.go', { hasText: 'Show me with my cards' }).click();
   assert.equal(await page.evaluate(() => document.activeElement.id), 'balance-0', 'the number field is ready to type');
   await page.locator('.go').click();
   assert.match(await page.locator('.error').innerText(), /Enter a number/);
   await page.fill('#balance-0', '4,200'); await page.keyboard.press('Enter');
   await page.locator('.chip', { hasText: 'Use 24%' }).click();
+  assert.equal(await page.locator('.fact').innerText(), 'At 24%, this card adds about $84 in interest every month.');
   await page.locator('.chip', { hasText: 'Use about $126' }).click();
+  assert.equal(await page.locator('.done').innerText(), '✓ Card 1 added: about $84 of its $126 minimum is interest.');
   await page.fill('#balance-1', '1500'); await page.locator('.go').click();
   await page.reload();
   assert.equal(await page.locator('#apr-1').count(), 1, 'a reload keeps their place');
@@ -65,17 +78,25 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   await page.fill('#minimum-1', '35'); await page.locator('.go').click();
 
   const minimums = E.plan(CARDS, { start }).minimums;
-  assert.equal(await page.locator('.big').innerText(), `${MONTHS[minimums.date.month]} ${minimums.date.year}`);
+  // The year rolls up from this year to theirs.
+  await page.locator('.big', { hasText: `${MONTHS[minimums.date.month]} ${minimums.date.year}` }).waitFor();
   assert.match(await page.locator('.reveal .sub').innerText(), new RegExp(`with \\${money(minimums.totalInterest)} paid in interest`));
+  assert.equal(await page.locator('.reveal .fact').innerText(), 'Right now, about $109 of your $161 in minimums goes to interest every month.');
+  assert.equal(await page.locator('.reveal .echo').innerText(), 'That’s paying every card its minimum, with no order.');
   await page.locator('.go').click();
+  const plain = E.plan(CARDS, { start }), plainFastest = plain.plans.find(plan => plan.key === plain.fastest);
+  assert.match(await page.locator('.baseline').innerText(), new RegExp(`keep paying what you pay now, in the right order, and you’re out .+ sooner\\.$`));
+  assert.ok(plainFastest.months < minimums.months);
   assert.equal(await page.locator('.go', { hasText: 'Build my plan' }).isDisabled(), true);
   await page.locator('.choice', { hasText: '+$100' }).click();
   const planned = E.plan(CARDS, { extra: 10000, start }), fastest = planned.plans.find(plan => plan.key === planned.fastest);
-  assert.match(await page.locator('.impact').innerText(), new RegExp(`\\${money(minimums.totalInterest - fastest.totalInterest)} less interest`));
+  await page.locator('.impact span', { hasText: money(minimums.totalInterest - fastest.totalInterest) + ' less interest' }).waitFor();
   await page.locator('.go', { hasText: 'Build my plan' }).click();
   await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 (92% off)")').waitFor();
   assert.match(await page.locator('.plan .q').innerText(), /sooner\.$/);
   assert.equal(await page.locator('.locked .blurred').count(), 3);
+  assert.equal((await page.locator('.told').innerText()).replace(/\s+/g, ' ').trim(), 'You told us: “I don’t know which card to pay first.” Your plan: The exact order, and what to pay on each card every month.');
+  assert.equal(await page.locator('#worth').innerText(), `Your plan could save you ${money(minimums.totalInterest - fastest.totalInterest)} in interest. It costs $28, once.`);
   // Finishing in time earns the $5; its 30 minutes start at checkout.
   assert.equal((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), '🎉 You unlocked an extra $5 off! Your 30 minutes start at checkout.');
   assert.equal(await page.locator('#offer-saved').innerText(), 'That’s $5 (15%) off the $33 sale price. Your 30 minutes to use it start when you open checkout.');
@@ -90,7 +111,7 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   assert.deepEqual(handed, { debts: CARDS, extra: 10000, plan: null, seen: true });
 
   const sent = rows.map(row => row.name + (row.detail ? ':' + row.detail : ''));
-  for (const name of ['PayoffLanded', 'PayoffVariant:quiz', 'PayoffQuizStep:q1', 'PayoffQuizStep:q2', 'PayoffQuizStep:card-1', 'PayoffQuizStep:cards',
+  for (const name of ['PayoffLanded', 'PayoffVariant:quiz', 'PayoffQuizStep:q1', 'PayoffQuizStep:q2', 'PayoffQuizStep:why-order', 'PayoffQuizStep:card-1', 'PayoffQuizStep:cards',
     'PayoffQuizStep:reveal', 'PayoffQuizStep:extra', 'PayoffQuizStep:plan', 'PayoffQuizStep:unlock', 'PayoffOrderViewed']) assert.ok(sent.includes(name), name);
   assert.equal(sent.filter(name => name === 'PayoffQuizStep:q1').length, 1, 'each step once, even after going back');
   for (const secret of ['4200', '4,200', '1500', '19.99', '12600', '126']) {
@@ -105,6 +126,7 @@ test('the tool keeps cards it already has; one card and "4 or more" read right; 
   await page.locator('#back').click();
   await page.locator('.choice', { hasText: '1' }).first().click();
   await page.locator('.choice', { hasText: 'As much as I can' }).click();
+  await pastWhy(page, 'spreadsheets');
   await page.fill('#balance-0', '900'); await page.locator('.go').click();
   await page.fill('#apr-0', '0'); await page.locator('.go').click();
   await page.fill('#minimum-0', '30'); await page.locator('.go').click();
@@ -124,6 +146,7 @@ test('cards whose minimums never cover the interest are told so, and a plan stil
   await page.goto(base + '/payoff');
   await page.locator('.choice', { hasText: '1' }).first().click();
   await page.locator('.choice', { hasText: 'Mostly the minimums' }).click();
+  await pastWhy(page, 'interest');
   await page.fill('#balance-0', '10000'); await page.locator('.go').click();
   await page.fill('#apr-0', '29.99'); await page.locator('.go').click();
   await page.fill('#minimum-0', '200'); await page.locator('.go').click();
@@ -138,6 +161,7 @@ test('taking longer than 10 minutes means no extra $5: the bar goes, the plan an
   await page.locator('.choice', { hasText: '1' }).first().click();
   await page.locator('#deal-clock:not([hidden])').waitFor();
   await page.locator('.choice', { hasText: 'Mostly the minimums' }).click();
+  await pastWhy(page, 'interest');
   await page.fill('#balance-0', '3000'); await page.locator('.go').click();
   await page.locator('.chip').click(); await page.locator('.chip').click();
   advanceTime(11 * 60000);

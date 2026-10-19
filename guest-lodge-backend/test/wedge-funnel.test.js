@@ -378,7 +378,7 @@ test('Payoff compares the sales letter and the quiz on each version\'s own visit
   assert.deepEqual(funnel.variants.map(v => [v.key, v.steps.map(s => s.people)]), [['letter', [2, 1, 0, 0]], ['quiz', [2, 1, 1, 1]]]);
   assert.equal(funnel.variants[1].steps.find(s => s.label === 'Paid').ofLanded, 0.5);
   const quiz = funnel.branches.find(b => b.key === 'quiz');
-  assert.deepEqual(quiz.steps.map(s => s.people), [2, 2, 0, 0, 0, 1, 0, 0, 1]);
+  assert.deepEqual(quiz.steps.map(s => s.people), [2, 2, 0, 0, 0, 0, 1, 0, 0, 1]);
   for (const name of ['PayoffVariant', 'PayoffQuizStep']) assert.equal(definition.visitorEvents.has(name), true);
   assert.equal(buildWedgeFunnel([ev('PayoffLanded', 'v_x')], definition).branches.some(b => b.key === 'quiz'), false, 'hidden until someone takes the quiz');
 });

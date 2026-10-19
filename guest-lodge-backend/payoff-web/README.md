@@ -32,6 +32,27 @@ Both versions lead to the same order page, price and checkout. The Meta pixel
 loads on both. On the quiz its automatic collection is off, because people
 type balances there.
 
+The quiz is built to leave the visitor believing one thing: "I'm stuck because
+of [what they named]. The fix is paying in the right order, with something
+doing the maths for me. Payoff does that for my cards, and it costs far less
+than it saves." Each step puts a bit of that belief in or strengthens it:
+- **The question.** "You want these cards gone. What's been getting in the
+  way?" Four answers, each something the tool really fixes. Their answer comes
+  back as a "that's the trap" screen that points to paying in order and
+  letting the tool do the maths.
+- **Their own numbers.**
+  - "At 24%, this card adds about $84 in interest every month."
+  - "✓ Card 1 added: about $84 of its $126 minimum is interest."
+  - "Right now, about $109 of your $161 in minimums goes to interest every
+    month."
+- **Before any extra money.** "Keep paying what you pay now, in the right
+  order, and you're out X sooner."
+- **The plan.** It says their answer back ("You told us: … Your plan: …") and
+  puts the saving next to the price ("could save you $7,144 … It costs $28,
+  once").
+- **Taps that reward.** A ✓ pops on the chosen answer. The debt-free year and
+  the "sooner" and "less interest" figures count up. Confetti on the plan.
+
 The quiz is paced like the ad:
 - It opens with the ad's caption ("CREDIT CARD HOLDERS 👇") over Lauren.
 - One tap per question, then one number per screen.
