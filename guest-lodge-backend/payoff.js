@@ -106,7 +106,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'checkout.js', 'confirmation.js', 'style.css', 'app.js', 'app.css', 'engine.js']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'confirmation.js', 'style.css', 'app.js', 'app.css', 'engine.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {

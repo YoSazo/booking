@@ -3,6 +3,11 @@ window.PAYOFF_CONTENT = {
   product: 'Marketel Payoff',
   priceCents: 3300,
   currency: 'USD',
+  purchaseNotices: [
+    { id: 'nicole-20261019', name: 'Nicole', city: 'Bentley, Kansas', purchasedAt: '2026-10-19T15:04:45Z' },
+    { id: 'megan-20261019', name: 'Megan', city: 'Westport, New York', purchasedAt: '2026-10-19T16:44:45Z' },
+    { id: 'rachel-20261019', name: 'Rachel', city: 'Woodland, Minnesota', purchasedAt: '2026-10-19T14:04:45Z' },
+  ],
   rating: {
     stars: 5,
     label: 'Join 10,000+ people',
