@@ -71,9 +71,20 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 (92% off)")').waitFor();
   assert.match(await page.locator('.plan .q').innerText(), /sooner\.$/);
   assert.equal(await page.locator('.locked .blurred').count(), 3);
+  // The $5 offer starts here: in the bar and under the price, with one clock the order page carries on.
+  await page.locator('#offer-bar:not([hidden])').waitFor();
+  assert.match(await page.locator('#offer-bar-clock').innerText(), /^(29:\d\d|30:00)$/);
+  assert.match(await page.locator('#offer-saved').innerText(), /That’s \$5 \(15%\) off the \$33 sale price\. It’s saved for you for (29:\d\d|30:00)\./);
+  assert.equal(await page.locator('.plan img.proof').count(), 5);
+  await page.locator('#back').click();
+  assert.equal(await page.locator('#offer-bar').isHidden(), true, 'only on the plan');
+  await page.locator('.go', { hasText: 'Build my plan' }).click();
+  await page.locator('#offer-bar:not([hidden])').waitFor();
   assert.equal(await page.locator('.plan').innerText().then(text => text.includes(`${MONTHS[fastest.date.month]} ${fastest.date.year}`)), false, 'the plan\'s date stays locked');
   await page.locator('a.go', { hasText: 'Unlock My Plan' }).click();
   await page.waitForURL(url => url.pathname === '/payoff/order');
+  await page.locator('#offer-bar:not([hidden])').waitFor();
+  assert.match(await page.locator('#offer-bar-clock').innerText(), /^29:\d\d$/, 'the order page continues the same 30 minutes');
   const handed = await page.evaluate(() => JSON.parse(localStorage.getItem('payoff.v1')));
   assert.deepEqual(handed, { debts: CARDS, extra: 10000, plan: null, seen: true });
 

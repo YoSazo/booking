@@ -92,10 +92,11 @@
     const screen = render(name);
     screen.classList.add('screen', direction < 0 ? 'from-left' : 'from-right');
     stage.replaceChildren(screen);
-    if (name === 'plan') track.paintOffers();
+    if (name === 'plan') { track.paintOffers(); startOffer(); }
     $('back').hidden = quiz.at === 0;
     $('progress').style.width = `${(6 + 94 * Math.pow(quiz.at / (list.length - 1), 0.65)).toFixed(1)}%`;
     document.body.dataset.step = name.replace(/-\d+$/, '');
+    paintOffer();
     window.scrollTo(0, 0);
     // Focus the number field inside the tap that opened it, so the keyboard comes up.
     if (screen.classList.contains('number')) screen.querySelector('input').focus({ preventScroll: true });
@@ -267,15 +268,53 @@
     const offer = el('div', 'sales-offer'); offer.dataset.wording = 'today';
     const reg = el('p', 'offer-reg'); const s = el('s', '', '(Reg. price $375)'); s.dataset.offerAnchor = ''; reg.append(s);
     const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
-    offer.append(reg, today);
+    const saved = el('p', 'offer-saved'); saved.id = 'offer-saved'; saved.hidden = true;
+    saved.append(el('span', '', 'That’s $5 (15%) off the $33 sale price. It’s saved for you for '), Object.assign(el('b', '', '30:00'), { id: 'offer-saved-clock' }), '.');
+    offer.append(reg, today, saved);
     const unlock = el('a', 'go', 'Unlock My Plan →'); unlock.href = '/payoff/order';
     unlock.addEventListener('click', handOver);
-    const proof = new Image(); proof.src = '/payoff/assets/comment-nicole-58896e3927.webp'; proof.width = 748; proof.height = 677; proof.loading = 'lazy'; proof.className = 'proof';
-    proof.alt = 'Facebook comment from Nicole: I typed in all my balances and it immediately showed me my payoff date and the plan that makes the most sense for me.';
+    const proof = COMMENTS.map(([file, width, height, alt]) => {
+      const image = new Image(); Object.assign(image, { src: `/payoff/assets/${file}`, width, height, alt, loading: 'lazy', decoding: 'async', className: 'proof' });
+      return image;
+    });
     screen.append(el('p', 'kicker', 'Your plan is ready'), words('h1', 'q', headline), wins, locked, offer, unlock,
-      el('p', 'fine', 'One payment. Your plan opens right after you pay, with these cards already in it. 30-day money-back guarantee.'), proof);
+      el('p', 'fine', 'One payment. Your plan opens right after you pay, with these cards already in it. 30-day money-back guarantee.'), ...proof);
     return screen;
   }
+  const COMMENTS = [
+    ['comment-nicole-58896e3927.webp', 748, 677, 'Facebook comment from Nicole: I typed in all my balances and it immediately showed me my payoff date and the plan that makes the most sense for me.'],
+    ['comment-amanda-5fe641f7e2.webp', 748, 469, 'Facebook comment from Amanda: I bought this about a month ago and absolutely love it. I’ve already paid off two medical bills.'],
+    ['comment-megan-070b24c8d2.webp', 748, 471, 'Facebook comment from Megan: I just put in my balances and payments and it showed me exactly what to do. I already paid off one smaller card.'],
+    ['comment-tara-8c25b94a76.webp', 748, 456, 'Facebook comment from Tara: This has been so much easier than every debt spreadsheet I ever tried. I already knocked out one card.'],
+    ['comment-heather-b27ecbf244.webp', 748, 521, 'Facebook comment from Heather: It showed me my plan, my next payoff, and how much faster I could be debt free if I paid a little extra.'],
+  ];
+
+  // The $5 checkout offer starts when they reach their plan (the order page
+  // carries on with the same clock), and shows in the bar and under the price.
+  let offer = null, offset = 0, ticking = null, base = 3300;
+  const offerLeft = () => (offer && offer.discountCents > 0 ? offer.expiresAt - Date.now() - offset : 0);
+  const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  function paintOffer() {
+    const ms = offerLeft(), active = ms > 0;
+    $('offer-bar').hidden = !(active && document.body.dataset.step === 'plan');
+    if (active) $('offer-bar-clock').textContent = clock(ms);
+    const saved = $('offer-saved');
+    if (saved) { saved.hidden = !active; if (active) $('offer-saved-clock').textContent = clock(ms); }
+    const price = document.querySelector('.plan [data-price]');
+    if (price && offer) price.textContent = window.PAYOFF_PRICE_LINES(active ? base - offer.discountCents : base).today[0];
+    if (offer && !active && ticking) { clearInterval(ticking); ticking = null; }
+  }
+  function startOffer() {
+    if (offer) return;
+    fetch('/api/payoff/config?offer=1', { headers: track.headers || {} }).then(response => response.ok ? response.json() : null).then(config => {
+      if (!config?.offer) return;
+      offer = config.offer; base = config.priceCents || base;
+      offset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
+      paintOffer();
+      if (offerLeft() > 0) ticking = setInterval(paintOffer, 1000);
+    }).catch(() => { /* The sale price stands. */ });
+  }
+
   // The tool picks up the cards they typed (on this phone), unless it already has some.
   function handOver() {
     reached('unlock');

@@ -87,6 +87,13 @@ button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
 .impact strong { font-size: 28px; line-height: 1.15; }
 .impact span { font-size: 16px; font-weight: 700; }
 
+/* The $5 checkout offer, as on the order page, pinned under the progress bar. */
+.offer-bar { position: sticky; top: calc(56px + env(safe-area-inset-top, 0px)); z-index: 5; padding: 9px 12px; background: #c30; color: #fff; font: 400 15px/1.35 'Montserrat', sans-serif; text-align: center; }
+.offer-bar strong { font-weight: 700; }
+.offer-bar span { display: inline-block; }
+.offer-bar b, .offer-saved b { display: inline-block; min-width: 3.1em; padding: 1px 6px; border-radius: 4px; background: #fefcbf; color: #c30; font-weight: 800; font-variant-numeric: tabular-nums; }
+.offer-saved { margin: 8px 0 0 !important; color: #c30; font-size: 14px; font-weight: 600; }
+
 /* 6. The plan: what they get free, and what unlocks. */
 .wins { margin: 0 0 16px; padding: 0; list-style: none; }
 .wins li { position: relative; margin: 0 0 8px; padding-left: 30px; font-size: 17px; font-weight: 700; }
