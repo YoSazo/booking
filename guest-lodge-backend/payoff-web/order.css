@@ -88,6 +88,12 @@ footer img { display: block; width: 200px; height: auto; margin: 0 auto 12px; fi
 footer p { margin: 0; }
 footer a { color: #fff; }
 
+/* The $5 checkout offer, visible from the first frame and while scrolling. */
+.offer-bar { position: sticky; top: 0; z-index: 10; padding: 9px 12px; background: #c30; color: #fff; font: 400 15px/1.35 'Montserrat', sans-serif; text-align: center; }
+.offer-bar strong { font-weight: 700; }
+.offer-bar span { display: inline-block; }
+.offer-bar b { display: inline-block; min-width: 3.1em; padding: 1px 6px; border-radius: 4px; background: #fefcbf; color: #c30; font-weight: 800; font-variant-numeric: tabular-nums; }
+
 /* Desktop: the form beside the grey column, as in the reference. */
 @media (min-width: 768px) {
   .row { display: flex; align-items: flex-start; max-width: 1072px; margin: 0 auto; }

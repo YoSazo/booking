@@ -507,3 +507,49 @@ test('config hands the order page a publishable key only from the same Stripe ac
     assert.equal((await (await fetch(base + '/api/payoff/config')).json()).stripeKey, null);
   });
 });
+
+test('the landing splits new visitors between the letter and the quiz, keeps each on theirs, and lets the owner pick', async () => {
+  const world = options => { const w = fixture(); w.app = express(); registerPayoff(w.app, { prisma: w.prisma, stripe: w.stripe, mail: w.mail, env: { NODE_ENV: 'test' }, ...options }); return w; };
+  const page = async (base, headers = {}, query = '') => { const r = await fetch(base + '/payoff' + query, { headers: { 'user-agent': 'Buyer Browser', ...headers } }); return { html: await r.text(), cookie: r.headers.get('set-cookie') || '' }; };
+  const isQuiz = html => /data-variant="quiz"/.test(html), isLetter = html => /data-variant="letter"/.test(html);
+  let draws = [0.2, 0.8];
+  await serve(world({ quizShare: 0.5, random: () => draws.shift() }), async ({ base }) => {
+    const first = await page(base);
+    assert.ok(isQuiz(first.html)); assert.match(first.cookie, /payoff_variant=quiz; Max-Age=7776000; Path=\/payoff; .*HttpOnly/);
+    const second = await page(base);
+    assert.ok(isLetter(second.html)); assert.match(second.cookie, /payoff_variant=letter/);
+    // A returning visitor keeps their version without a new draw.
+    assert.ok(isQuiz((await page(base, { cookie: 'payoff_variant=quiz' })).html));
+    assert.equal((await page(base, { cookie: 'payoff_variant=quiz' })).cookie, '');
+    assert.equal(draws.length, 0);
+    // The owner (or a test) can open either one.
+    const forced = await page(base, { cookie: 'payoff_variant=quiz' }, '?v=letter');
+    assert.ok(isLetter(forced.html)); assert.match(forced.cookie, /payoff_variant=letter/);
+    // Crawlers and Meta's ad review see the letter and get no cookie.
+    for (const agent of ['facebookexternalhit/1.1', 'Mozilla/5.0 HeadlessChrome/120', 'Googlebot/2.1 (+http://www.google.com/bot.html)']) {
+      const bot = await page(base, { 'user-agent': agent });
+      assert.ok(isLetter(bot.html), agent); assert.equal(bot.cookie, '', agent);
+    }
+    const quizCsp = (await fetch(base + '/payoff', { headers: { cookie: 'payoff_variant=quiz' } })).headers.get('content-security-policy');
+    assert.match(quizCsp, /script-src 'self' https:\/\/connect\.facebook\.net/); assert.doesNotMatch(quizCsp, /stripe/);
+    for (const file of ['quiz.js', 'quiz.css', 'engine.js']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
+  });
+  // Ending the test sends everyone to one version, whatever their cookie says.
+  await serve(world({ env: { NODE_ENV: 'test', PAYOFF_QUIZ_SHARE: '1' } }), async ({ base }) => {
+    assert.ok(isQuiz((await page(base, { cookie: 'payoff_variant=letter' })).html));
+  });
+  await serve(world({ env: { NODE_ENV: 'test', PAYOFF_QUIZ_SHARE: '0' } }), async ({ base }) => {
+    const r = await page(base, { cookie: 'payoff_variant=quiz' });
+    assert.ok(isLetter(r.html)); assert.equal(r.cookie, '');
+  });
+});
+test('the landing version and quiz steps are recorded by name only, never with numbers', async () => {
+  const w = fixture();
+  await serve(w, async ({ post }) => {
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffVariant', detail: 'quiz', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffQuizStep', detail: 'reveal', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffQuizStep', detail: '4200', visitorId: 'v_abcdefghijk' })).status, 400);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffVariant', detail: 'other', visitorId: 'v_abcdefghijk' })).status, 400);
+  });
+  assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]), [['PayoffVariant', 'quiz'], ['PayoffQuizStep', 'reveal']]);
+});

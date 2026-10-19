@@ -26,14 +26,22 @@
     if (entry.caption) figure.append(element('figcaption', '', entry.caption));
     return figure;
   }
-  for (const slot of document.querySelectorAll('.offer-slot')) {
+  // Price blocks as in the reference letter: the crossed-out regular price and
+  // one bold line, worded three ways down the page.
+  const wordings = ['today', 'sale', 'caps'];
+  [...document.querySelectorAll('.offer-slot')].forEach((slot, index) => {
     const template = document.querySelector('#offer-template');
-    if (!template) continue;
+    if (!template) return;
     slot.append(template.content.cloneNode(true));
-    slot.querySelector('[data-price]').textContent = money(content.priceCents).replace('.00', '')+' once';
+    const box = slot.querySelector('.sales-offer'), wording = wordings[index % wordings.length];
+    box.dataset.wording = wording;
+    box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
+    const [line, note] = window.PAYOFF_PRICE_LINES(content.priceCents, content.regularPriceCents)[wording];
+    box.querySelector('[data-price]').textContent = line;
+    box.querySelector('[data-off]').textContent = note;
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
-  }
+  });
   const rating = document.querySelector('.rating-slot');
   if (rating) {
     if (content.rating && Number.isFinite(content.rating.stars) && content.rating.stars >= 0 && content.rating.stars <= 5 && content.rating.label) {

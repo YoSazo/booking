@@ -320,27 +320,32 @@ for (const delayedTimer of [false, true]) test('expiry while paying asks the buy
 
 test('sales offer blocks show the eligible price without starting the deadline; an expired offer returns to regular price', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("$28 once")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Today: $28 (92% off)")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
+  // Worded three ways down the page, as in the reference letter.
+  assert.deepEqual(await page.locator('.sales-offer').evaluateAll(boxes => boxes.slice(0, 3).map(box => box.innerText.replace(/\s+/g, ' ').trim())), [
+    '(Reg. price $375) Today: $28 (92% off) Get My Debt-Free Date',
+    '(Reg. price $375) Sale Price: $28 (92% off) Get My Debt-Free Date',
+    "(Reg. price $375) SALE PRICE: $28 That's 92% off. Get My Debt-Free Date"]);
   assert.equal((await page.context().cookies()).filter(c => c.name === 'payoff_checkout_offer').length, 0);
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("$28 once")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Today: $28 (92% off)")').first().waitFor();
   advanceTime(31 * 60000);
   const previewDone = page.waitForResponse(r => r.url().includes('offer=preview'));
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
   await previewDone;
-  await page.locator('.sales-offer [data-price]:has-text("$33 once")').first().waitFor();
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), '$33 once');
+  await page.locator('.sales-offer [data-price]:has-text("Today: $33 (91% off)")').first().waitFor();
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $33 (91% off)');
   assert.equal(await page.locator('.sales-offer [data-offer-anchor]').first().isHidden(), false);
 }));
 test('sales offers retain the regular price and usable checkout when the offer lookup fails', async () => world(async ({ page, base }) => {
   await page.route('**/api/payoff/config?offer=preview', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer .cta').first().waitFor();
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), '$33 once');
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $33 (91% off)');
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');

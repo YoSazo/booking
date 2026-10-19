@@ -25,7 +25,12 @@ const ITEMS = Object.freeze({
   reset: { name: 'Spending reset', cents: 900 },
 });
 const ROOT = path.join(__dirname, 'payoff-web');
-const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
+const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
+// The A/B test on the landing: the sales letter or the quiz, kept per visitor.
+const VARIANTS = Object.freeze(['letter', 'quiz']);
+const VARIANT_COOKIE = 'payoff_variant';
+const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
+const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
@@ -101,7 +106,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env, now = Date.now }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env, now = Date.now, quizShare, random = Math.random }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -126,6 +131,21 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return couponPromise;
   }
   const automated = req => /HeadlessChrome|bot\b|crawler|spider|Playwright/i.test(req.headers['user-agent'] || '');
+  // Half of new visitors get the quiz (PAYOFF_QUIZ_SHARE overrides; 0 or 1
+  // ends the test for everyone, whatever their cookie says).
+  const share = Math.min(1, Math.max(0, Number(quizShare ?? env.PAYOFF_QUIZ_SHARE ?? (env.NODE_ENV === 'test' ? 0 : 0.5)) || 0));
+  function landing(req, res) {
+    const remember = variant => res.cookie(VARIANT_COOKIE, variant, { httpOnly: true, secure: env.NODE_ENV !== 'test', sameSite: 'lax', path: '/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
+    if (VARIANTS.includes(req.query.v)) { remember(req.query.v); return req.query.v; }
+    if (share === 0 || share === 1) return share ? 'quiz' : 'letter';
+    const saved = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${VARIANT_COOKIE}=`))?.slice(VARIANT_COOKIE.length + 1);
+    if (VARIANTS.includes(saved)) return saved;
+    // Crawlers and Meta's ad review always see the letter and get no cookie.
+    if (automated(req) || /facebookexternalhit|Facebot/i.test(req.headers['user-agent'] || '')) return 'letter';
+    const variant = random() < share ? 'quiz' : 'letter';
+    remember(variant);
+    return variant;
+  }
   const noTrack = req => req.headers['x-marketel-no-track'] === '1' || automated(req);
   const hits = new Map();
   function rate(req, action, limit) {
@@ -147,14 +167,18 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (!['GET', 'HEAD'].includes(req.method)) return res.status(405).send('Use the secure checkout to buy.');
     next();
   });
-  for (const [route, file] of [['/', 'index.html'], ['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
+  pages.get('/', (req, res) => {
+    res.set('Content-Security-Policy', META_CSP);
+    res.sendFile(path.join(ROOT, landing(req, res) === 'quiz' ? 'quiz.html' : 'index.html'));
+  });
+  for (const [route, file] of [['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
       if (file === 'order.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
       else if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'confirmation.js', 'style.css', 'order.css', 'app.js', 'app.css', 'engine.js']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
@@ -275,7 +299,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (!EVENTS.includes(req.body?.name)) throw fail(400, 'Unknown event.');
     if (noTrack(req)) return res.json({ ignored: true });
     rate(req, 'event', 300);
-    const detail = req.body.name === 'PayoffFrom' && ['ad', 'social', 'direct', 'other'].includes(req.body.detail) ? req.body.detail : null;
+    const detail = EVENT_DETAILS[req.body.name]?.includes(req.body.detail) ? req.body.detail : null;
+    if (EVENT_DETAILS[req.body.name] && !detail && req.body.name !== 'PayoffFrom') throw fail(400, 'Unknown event.');
     const visitor = visitorId(req.body.visitorId);
     await record(req.body.name, visitor, null, detail);
     // Reaching the order page is Meta's AddToCart (every "Get My Debt-Free
@@ -422,4 +447,4 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return true;
   } };
 }
-module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER };
+module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER, VARIANTS, QUIZ_STEPS };

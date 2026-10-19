@@ -46,6 +46,8 @@
     $('summary-rows').replaceChildren(row(NAME, '1', base()), ...selected().map(extra => row(extra.name, '1', priceOf(extra))),
       ...(off ? [row(`Checkout offer: $5 off, ends in ${clock(offerLeft())}`, '', -off)] : []));
     $('order-total').textContent = money(total());
+    $('offer-bar').hidden = !off;
+    if (off) $('offer-bar-clock').textContent = clock(offerLeft());
     const price = base() - off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;

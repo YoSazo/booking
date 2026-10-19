@@ -178,6 +178,17 @@ const PAYOFF_STEPS = Object.freeze([
   { key: 'cancelled', label: 'Returned without payment', names: ['PayoffCheckoutCancelled'], aside: true },
 ]);
 const PAYOFF_BRANCHES = Object.freeze([
+  { key: 'quiz', label: 'Quiz: how far they got', hideWhenEmpty: true, steps: [
+    ['Saw the quiz', ['PayoffVariant:quiz']],
+    ['Answered how many cards', ['PayoffQuizStep:q1']],
+    ['Answered how they pay now', ['PayoffQuizStep:q2']],
+    ['Entered card 1', ['PayoffQuizStep:card-1']],
+    ['Entered all their cards', ['PayoffQuizStep:cards']],
+    ['Saw their date on minimums', ['PayoffQuizStep:reveal']],
+    ['Picked an extra amount', ['PayoffQuizStep:extra']],
+    ['Saw their locked plan', ['PayoffQuizStep:plan']],
+    ['Tapped Unlock My Plan', ['PayoffQuizStep:unlock']],
+  ] },
   { key: 'from', label: 'Where they came from', steps: [
     ['Clicked the ad (Meta click id)', ['PayoffFrom:ad']],
     ['From Facebook or Instagram, no click id', ['PayoffFrom:social']],
@@ -186,8 +197,11 @@ const PAYOFF_BRANCHES = Object.freeze([
   ] },
 ]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze(labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES)),
-    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom']),
+  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step' }),
+    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep']),
+    // The landing A/B test: each version's own ladder, judged on purchases per visitor.
+    variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
+      steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },
     split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Sent payment', 'checkout'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
@@ -251,7 +265,15 @@ function buildWedgeFunnel(events, definition = DEFINITIONS.report) {
   const recent = [...events].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 150).map(event => ({
     name: event.name, label: LABEL_MAP[event.name] || event.name, detail: event.detail || null,
     who: personOf(event).replace(/^(v_|account:|event:)/, '').slice(-6), at: new Date(event.createdAt).toISOString() }));
-  return { steps: shown, branches, split, recent, events: events.length, ...(definition.tiles ? { tiles: definition.tiles } : {}) };
+  const variants = definition.variants ? definition.variants.values.map(([value, label]) => {
+    const who = new Set(events.filter(event => event.name === definition.variants.event && event.detail === value).map(personOf));
+    const theirs = events.filter(event => who.has(personOf(event)));
+    return { key: value, label, steps: definition.variants.steps.map(([stepLabel, key]) => {
+      const n = key === STEP_LIST[0].key ? who.size : people(theirs, STEP_LIST.find(step => step.key === key).names);
+      return { label: stepLabel, people: n, ofLanded: who.size ? n / who.size : null };
+    }) };
+  }) : null;
+  return { steps: shown, branches, split, recent, events: events.length, ...(definition.tiles ? { tiles: definition.tiles } : {}), ...(variants ? { variants } : {}) };
 }
 
 // Owner and App Review accounts, including plus-aliases of the owner emails

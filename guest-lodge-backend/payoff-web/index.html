@@ -8,13 +8,13 @@
   <title>Marketel Payoff — Your debt payoff plan, without the spreadsheet</title>
   <meta name="description" content="See the month you could be debt-free. Marketel Payoff compares payoff plans on your phone. One payment, no subscription.">
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/style.css?v=19">
+  <link rel="stylesheet" href="/payoff/style.css?v=20">
   <script src="/payoff/content.js?v=19" defer></script>
-  <script src="/payoff/page.js?v=20" defer></script>
-  <script src="/payoff/checkout.js?v=20" defer></script>
+  <script src="/payoff/checkout.js?v=21" defer></script>
+  <script src="/payoff/page.js?v=21" defer></script>
   <script src="/payoff/purchase-notices.js?v=2" defer></script>
 </head>
-<body data-page="sales">
+<body data-page="sales" data-variant="letter">
   <main id="main">
     <section class="hero" data-section="hero">
       <div class="wrap">
@@ -143,7 +143,7 @@
     </section>
   </main>
   <footer><img src="/marketel.svg" width="120" height="28" alt="Marketel"><p>Marketel Payoff</p><p>Educational planning software. Projections are not financial advice, lender statements or guaranteed outcomes.</p></footer>
-  <template id="offer-template"><div class="offer sales-offer"><p class="offer-anchor" data-offer-anchor><s>Regular price $375</s></p><p class="offer-amount"><span data-offer-label>Sale price</span><strong data-price>$33 once</strong></p><p class="offer-saving" data-offer-saving>Save $342 · Over 91% off</p><a class="cta" href="/payoff/order">Get My Debt-Free Date</a><p class="offer-fine">Instant access. One-time payment.<br>No monthly fees. Your access link is emailed too.<span class="offer-policy" data-sales-guarantee>30-day money-back guarantee.</span></p><p class="offer-window" data-offer-window hidden>Your 30-minute offer starts when you open checkout.</p><a class="offer-terms" href="/payoff/terms">Terms</a></div></template>
+  <template id="offer-template"><div class="offer sales-offer"><p class="offer-reg"><s data-offer-anchor>(Reg. price $375)</s></p><p class="offer-today"><strong data-price>Today: $33 (91% off)</strong><span data-off></span></p><a class="cta" href="/payoff/order">Get My Debt-Free Date</a></div></template>
   <noscript><p class="noscript-note">This page uses JavaScript for its content. <a href="/payoff/order">Get Payoff</a>.</p></noscript>
 </body>
 </html>

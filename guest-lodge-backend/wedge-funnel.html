@@ -62,6 +62,11 @@
   .card h2 { margin: 0 0 4px; font-size: 16px; }
   .card > p.muted { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
   .ladder { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .variants table { width: 100%; margin: 8px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .variants th { color: var(--muted); font-size: 12px; font-weight: 600; text-align: right; padding: 0 0 6px 10px; }
+  .variants td { padding: 6px 0 6px 10px; border-top: 1px solid var(--border-soft); text-align: right; font-size: 14px; }
+  .variants td:first-child, .variants th:first-child { text-align: left; padding-left: 0; }
+  .variants .muted { font-size: 12px; color: var(--muted); }
   .ladder th { text-align: right; color: var(--muted); font-size: 12px; font-weight: 600; padding: 0 0 8px 10px; }
   .ladder th:first-child, .ladder th:nth-child(2) { text-align: left; padding-left: 0; }
   .ladder td { padding: 5px 0 5px 10px; text-align: right; white-space: nowrap; font-size: 14px; }
@@ -158,6 +163,7 @@
   <p class="track-note" id="since-note" hidden></p>
   <p class="track-note" id="ad-note" hidden>Only visitors with a recorded Meta click id. Their activity must occur inside the selected range; the ad click may have happened earlier. This is not a campaign-specific filter.</p>
   <section class="tiles" id="tiles" aria-live="polite"></section>
+  <section class="card variants" id="variants" hidden></section>
 
   <section class="card">
     <h2>From arrival to paying</h2>
@@ -306,6 +312,15 @@ function render(data) {
   const started = (split.phone || 0) + (split.desktop || 0) + (split.unknown || 0);
   const share = n => started ? ` (${Math.round(n / started * 100)}%)` : '';
   $('split').innerHTML = `<span><b>${split.phone || 0}</b>on a phone${share(split.phone || 0)}</span><span><b>${split.desktop || 0}</b>on a computer${share(split.desktop || 0)}</span>${split.unknown ? `<span><b>${split.unknown}</b>before this was recorded</span>` : ''}`;
+  // The landing A/B test, side by side: the winner is the one with more purchases per visitor.
+  $('variants').hidden = !data.variants;
+  if (data.variants) {
+    const [a, b] = data.variants;
+    $('variants').innerHTML = `<h2>A/B test: ${esc(a.label)} vs ${esc(b.label)}</h2><table><thead><tr><th></th><th>${esc(a.label)}</th><th>${esc(b.label)}</th></tr></thead><tbody>${a.steps.map((step, i) => {
+      const other = b.steps[i], cell = s => `<b>${s.people}</b>${i ? ` <span class="muted">${pct(s.ofLanded)}</span>` : ''}`;
+      return `<tr><td>${esc(step.label)}</td><td>${cell(step)}</td><td>${cell(other)}</td></tr>`;
+    }).join('')}</tbody></table><p class="muted">Percentages are of each version's own visitors. The winner sells more per visitor, not the one that sends more people to the order page.</p>`;
+  }
   $('branches').innerHTML = data.branches.map(b => `<div class="card"><h2>${esc(b.label)}</h2><ul>${b.steps.map(s => `<li><span>${esc(s.label)}</span><b>${s.people}</b></li>`).join('')}</ul></div>`).join('');
   const shown = feedAll ? data.recent : data.recent.slice(0, 25);
   $('feed-more').hidden = feedAll || data.recent.length <= 25;

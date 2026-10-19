@@ -1,0 +1,111 @@
+/* The quiz looks like the app in the ad (DM Sans, raspberry, orange) and opens
+   with the ad's own caption style: white capitals with a black outline. */
+@font-face{font-family:'DM Sans';font-weight:400;font-display:swap;src:url('/frontdesk/assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'DM Sans';font-weight:700;font-display:swap;src:url('/frontdesk/assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:100 900;font-display:swap;src:url('/payoff/assets/font-montserrat-06b16db7a9.woff2') format('woff2')}
+:root { --head: #b4214b; --rose-pale: #fbeef3; --orange: #ff7d47; --orange-dark: #ed6834; --green: #2e7d5b; --green-pale: #e8f5ee;
+  --ink: #171717; --muted: #5f5f66; --line: #e6e1e3; --paper: #fff; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 17px/1.4 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+button, input, a { font: inherit; color: inherit; touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 9px; height: 52px; padding: 0 16px; padding-top: env(safe-area-inset-top, 0px); background: #fff; }
+.back { display: grid; place-items: center; width: 34px; height: 34px; margin-left: -8px; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.back svg { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--head); }
+.brand { font-weight: 700; font-size: 16px; }
+.brand b { color: var(--head); }
+.progress { position: sticky; top: calc(52px + env(safe-area-inset-top, 0px)); z-index: 5; height: 4px; background: var(--rose-pale); }
+.progress-fill { width: 6%; height: 100%; border-radius: 0 4px 4px 0; background: var(--orange); transition: width .35s ease; }
+
+.stage { max-width: 480px; margin: 0 auto; padding: 18px 16px 40px; overflow-x: hidden; }
+.screen { animation: in-right .26s ease both; }
+.screen.from-left { animation-name: in-left; }
+@keyframes in-right { from { opacity: 0; transform: translateX(28px); } }
+@keyframes in-left { from { opacity: 0; transform: translateX(-28px); } }
+/* Words land one after another, like the captions in the ad. */
+.word { display: inline-block; animation: word .3s ease both; animation-delay: calc(var(--i) * 45ms + 60ms); }
+@keyframes word { from { opacity: 0; transform: translateY(8px) scale(.96); } }
+
+.kicker { margin: 4px 0 6px; color: var(--head); font-size: 15px; font-weight: 700; }
+.q { margin: 0 0 18px; font-size: 26px; line-height: 1.2; letter-spacing: -.01em; }
+.next { margin: 18px 0 0; color: var(--muted); font-size: 14px; text-align: center; }
+.hint { margin: 12px 0 0; color: var(--muted); font-size: 14px; }
+.tally { margin: 12px 0 0; padding: 9px 12px; border-radius: 10px; background: var(--rose-pale); color: var(--head); font-size: 15px; font-weight: 700; text-align: center; }
+
+/* 1. The hook: Lauren, captioned like the ad. */
+.hook .hero { position: relative; height: min(42vh, 330px); margin: -18px -16px 18px; overflow: hidden; background: #e9eef2; }
+.hook .hero img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.caption { position: absolute; left: 0; right: 0; bottom: 14px; margin: 0; padding: 0 12px; text-align: center;
+  color: #fff; font: 900 36px/1.05 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: .01em;
+  -webkit-text-stroke: 2px #000; paint-order: stroke fill; text-shadow: 0 3px 0 #000, 0 0 14px rgba(0, 0, 0, .35); }
+.caption .word { animation-name: pop; animation-delay: calc(var(--i) * 120ms); }
+@keyframes pop { from { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.08); } }
+.hook .q { text-align: center; }
+
+.choices { display: grid; gap: 10px; }
+.choices.grid { grid-template-columns: 1fr 1fr; }
+.choices.row { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.choice { min-height: 58px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 14px; background: #fff; font-size: 18px; font-weight: 700;
+  text-align: left; cursor: pointer; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+.choices.grid .choice, .choices.row .choice { text-align: center; font-size: 22px; }
+.choices.row .choice { min-height: 50px; padding: 8px 4px; font-size: 18px; }
+.choice:active { transform: scale(.97); }
+.choice.picked { border-color: var(--orange); background: #fff3ec; color: var(--orange-dark); }
+
+.field { display: flex; align-items: center; gap: 6px; height: 64px; padding: 0 16px; border: 2px solid var(--line); border-radius: 14px; background: #fff; }
+.field:focus-within { border-color: var(--orange); }
+.field input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; font-size: 30px; font-weight: 700; }
+.field input::placeholder { color: #d9d2d5; opacity: 1; }
+.field .unit { color: var(--muted); font-size: 26px; font-weight: 700; }
+.field.small { height: 50px; margin-top: 10px; }
+.field.small input, .field.small .unit { font-size: 20px; }
+.error { min-height: 0; margin: 6px 0 0; color: #b42318; font-size: 14px; }
+.error:empty { display: none; }
+.helpers { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip { padding: 9px 14px; border: 0; border-radius: 999px; background: var(--rose-pale); color: var(--head); font-size: 15px; font-weight: 700; cursor: pointer; }
+
+.go { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; margin-top: 14px; padding: 12px 20px; border: 0; border-radius: 999px;
+  background: var(--orange); color: #fff; font-size: 19px; font-weight: 700; text-decoration: none; box-shadow: 0 3px 10px #ff7d4740; cursor: pointer; transition: transform .14s ease; }
+.go:active { transform: scale(.97); background: var(--orange-dark); }
+.go:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
+
+/* 4–5. Their date, then the line that moves. */
+.big { margin: -6px 0 8px; color: var(--head); font-size: 44px; font-weight: 700; line-height: 1.05; }
+.sub { margin: 0 0 14px; font-size: 18px; }
+.chart { display: block; width: 100%; height: auto; margin: 6px 0 4px; overflow: visible; }
+.chart .line { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.2s ease-out .2s forwards; }
+.chart .slow { stroke: #c9a3b0; }
+.chart .fast { stroke: var(--orange); stroke-width: 4.5; animation-duration: .9s; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.impact { display: grid; gap: 2px; min-height: 92px; margin-bottom: 4px; padding: 14px 16px; border-radius: 16px; background: var(--green-pale); color: var(--green); text-align: center; }
+.impact small { color: var(--ink); font-size: 14px; }
+.impact strong { font-size: 28px; line-height: 1.15; }
+.impact span { font-size: 16px; font-weight: 700; }
+
+/* 6. The plan: what they get free, and what unlocks. */
+.wins { margin: 0 0 16px; padding: 0; list-style: none; }
+.wins li { position: relative; margin: 0 0 8px; padding-left: 30px; font-size: 17px; font-weight: 700; }
+.wins li::before { content: '✓'; position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff; font-size: 13px; }
+.locked { padding: 6px 16px 12px; border: 2px dashed #e5b6c4; border-radius: 16px; background: var(--rose-pale); }
+.locked-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1d5de; font-size: 15px; }
+.blurred { filter: blur(4px); color: #7d1534; font-weight: 700; user-select: none; }
+.lock { margin: 10px 0 0; color: var(--head); font-size: 14px; font-weight: 700; text-align: center; }
+.sales-offer { margin: 18px 0 0; color: #000; font: 400 16px/20.8px 'Montserrat', sans-serif; text-align: center; }
+.sales-offer p { margin: 0; }
+.sales-offer strong { font-weight: 700; }
+.sales-offer [data-off]:empty { display: none; }
+.plan .go { margin-top: 12px; }
+.fine { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+.proof { display: block; width: 100%; height: auto; margin: 20px 0 0; border-radius: 10px; }
+.noscript { padding: 20px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .screen, .word, .caption .word { animation: none; }
+  .chart .line { animation: none; stroke-dashoffset: 0; }
+  .progress-fill { transition: none; }
+}

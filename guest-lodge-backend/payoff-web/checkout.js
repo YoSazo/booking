@@ -1,4 +1,9 @@
 'use strict';
+// Price lines as in the reference letter, worded three ways down the page.
+window.PAYOFF_PRICE_LINES = (cents, regular = 37500) => {
+  const price = '$' + (cents / 100).toFixed(2).replace('.00', ''), off = Math.floor((1 - cents / regular) * 100);
+  return { today: [`Today: ${price} (${off}% off)`, ''], sale: [`Sale Price: ${price}`, `(${off}% off)`], caps: [`SALE PRICE: ${price}`, `That's ${off}% off.`] };
+};
 (() => {
   const form = document.getElementById('order-form');
   let visitor = null, excluded = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent);
@@ -26,6 +31,8 @@
     /* eslint-disable */
     !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
     /* eslint-enable */
+    // People type balances on the quiz: no automatic collection there.
+    if (document.body.dataset.variant === 'quiz') window.fbq('set', 'autoConfig', false, PIXEL_ID);
     window.fbq('init', PIXEL_ID);
     window.fbq('track', 'PageView');
   }
@@ -75,17 +82,23 @@
   }
   event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
+  // Which landing this visitor saw (the A/B test), once per visitor.
+  const variant = document.body.dataset.variant;
+  if (['letter', 'quiz'].includes(variant)) {
+    let first = true;
+    try { first = sessionStorage.getItem('payoff.variantSent') !== visitor; sessionStorage.setItem('payoff.variantSent', visitor || ''); } catch { /* Send it. */ }
+    if (first) event('PayoffVariant', variant);
+  }
   // Preview eligibility without starting or resetting the checkout deadline.
   let salesTimer, salesDeadline = null;
-  const paintSalesOffer = (active, started = false) => document.querySelectorAll('.sales-offer').forEach(box => {
-    box.querySelector('[data-offer-anchor]').hidden = false;
-    box.querySelector('[data-offer-saving]').hidden = false;
-    box.querySelector('[data-offer-saving]').textContent = active ? 'Save $347 · Over 92% off' : 'Save $342 · Over 91% off';
-    box.querySelector('[data-offer-window]').hidden = !active;
-    box.querySelector('[data-offer-label]').textContent = active ? 'Sale price $33 · Extra $5 off at checkout' : 'Sale price';
-    box.querySelector('[data-price]').textContent = active ? '$28 once' : '$33 once';
-    box.querySelector('[data-offer-window]').textContent = started ? 'Continue to checkout before your current offer ends.' : 'Your 30-minute offer starts when you open checkout.';
-  });
+  let salesActive = false;
+  const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => {
+    const lines = window.PAYOFF_PRICE_LINES(active ? 2800 : 3300)[box.dataset.wording];
+    if (!lines) return;
+    box.querySelector('[data-price]').textContent = lines[0];
+    box.querySelector('[data-off]').textContent = lines[1];
+  }));
+  window.PayoffTrack = { event, pixel, attribution, visitor, headers, paintOffers: () => paintSalesOffer(salesActive) };
   const refreshSalesOffer = () => {
     if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
     return fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
@@ -97,7 +110,7 @@
       clearTimeout(salesTimer);
       const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
       salesDeadline = remaining === null ? null : Date.now() + remaining;
-      paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0), !!offer.expiresAt);
+      paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0));
       if (remaining > 0) salesTimer = setTimeout(() => paintSalesOffer(false), remaining);
     }).catch(() => { /* The sale price and checkout link remain usable. */ });
   };

@@ -363,3 +363,22 @@ test('Payoff counts checkout, purchases, delivery and sources separately', () =>
   assert.equal(onlyAdClicks(events, events, definition.fromEvent).length, 8);
   for (const name of ['PayoffPaid', 'PayoffConfirmationEmailed']) assert.equal(definition.visitorEvents.has(name), false);
 });
+
+test('Payoff compares the sales letter and the quiz on each version\'s own visitors, and shows how far quiz visitors got', () => {
+  const definition = require('../wedge-funnel').definitionFor('payoff');
+  const events = [
+    ev('PayoffLanded', 'v_l1'), ev('PayoffVariant', 'v_l1', { detail: 'letter' }), ev('PayoffOrderViewed', 'v_l1'),
+    ev('PayoffLanded', 'v_l2'), ev('PayoffVariant', 'v_l2', { detail: 'letter' }),
+    ev('PayoffLanded', 'v_q1'), ev('PayoffVariant', 'v_q1', { detail: 'quiz' }), ev('PayoffQuizStep', 'v_q1', { detail: 'q1' }),
+    ev('PayoffQuizStep', 'v_q1', { detail: 'reveal' }), ev('PayoffQuizStep', 'v_q1', { detail: 'unlock' }),
+    ev('PayoffOrderViewed', 'v_q1'), ev('PayoffCheckoutTapped', 'v_q1'), ev('PayoffPaid', 'v_q1'),
+    ev('PayoffLanded', 'v_q2'), ev('PayoffVariant', 'v_q2', { detail: 'quiz' }), ev('PayoffQuizStep', 'v_q2', { detail: 'q1' }),
+  ];
+  const funnel = buildWedgeFunnel(events, definition);
+  assert.deepEqual(funnel.variants.map(v => [v.key, v.steps.map(s => s.people)]), [['letter', [2, 1, 0, 0]], ['quiz', [2, 1, 1, 1]]]);
+  assert.equal(funnel.variants[1].steps.find(s => s.label === 'Paid').ofLanded, 0.5);
+  const quiz = funnel.branches.find(b => b.key === 'quiz');
+  assert.deepEqual(quiz.steps.map(s => s.people), [2, 2, 0, 0, 0, 1, 0, 0, 1]);
+  for (const name of ['PayoffVariant', 'PayoffQuizStep']) assert.equal(definition.visitorEvents.has(name), true);
+  assert.equal(buildWedgeFunnel([ev('PayoffLanded', 'v_x')], definition).branches.some(b => b.key === 'quiz'), false, 'hidden until someone takes the quiz');
+});

@@ -97,3 +97,13 @@ for(const width of [320,390,430,1280])test('no horizontal overflow and accessibl
  if(process.env.PAYOFF_SHOTS){await page.locator('img[src^="/payoff/assets/"]').evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));await page.screenshot({path:path.join(process.env.PAYOFF_SHOTS,'order-'+width+'.png'),fullPage:true});}
  assert.deepEqual(errors,[]);
 },{width,reducedMotion:width===320?'reduce':'no-preference'}));
+test('the quiz previews locally with ?v=quiz, with no outside requests',async()=>world(async({page,base,errors,requests})=>{
+ await page.goto(base+'/payoff?v=quiz');
+ await page.locator('.caption').waitFor();
+ await page.locator('.choice',{hasText:'1'}).first().click();
+ await page.locator('.choice',{hasText:'Mostly the minimums'}).click();
+ assert.equal(await page.locator('#balance-0').count(),1);
+ assert.equal(requests.filter(r=>!r.url().startsWith(base)).length,0);
+ assert.equal(requests.filter(r=>r.method()!=='GET').length,0);
+ assert.deepEqual(errors,[]);
+}));

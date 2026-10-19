@@ -18,7 +18,7 @@ function createPreview() {
   });
   app.get('/',(_req,res)=>res.redirect('/payoff'));
   app.get('/api/payoff/config',(_req,res)=>res.json({available:false,preview:true}));
-  app.get(['/payoff','/payoff/'],(_req,res)=>res.sendFile(path.join(ROOT,'index.html')));
+  app.get(['/payoff','/payoff/'],(req,res)=>res.sendFile(path.join(ROOT,req.query.v==='quiz'?'quiz.html':'index.html')));
   app.get(['/payoff/order','/payoff/order/'],(_req,res)=>res.sendFile(path.join(ROOT,'order.html')));
   app.get('/marketel.svg',(_req,res)=>res.sendFile(path.join(PUBLIC,'marketel.svg')));
   app.get('/marketel-frontdesk-icon.png',(_req,res)=>res.sendFile(path.join(PUBLIC,'marketel-frontdesk-icon.png')));

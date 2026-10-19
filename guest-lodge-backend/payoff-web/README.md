@@ -18,6 +18,34 @@ same month. Capped at 600 months.
 `app.html`, `app.js`, `app.css` are the phone UI. The buyer's numbers stay in
 `localStorage` (`payoff.v1`) and are never sent anywhere.
 
+## Landing A/B test: sales letter vs quiz
+
+`/payoff` serves the sales letter (`index.html`) or the quiz (`quiz.html`).
+- Each new visitor is drawn 50/50 and kept on that version by an HttpOnly
+  `payoff_variant` cookie.
+- `?v=letter` or `?v=quiz` picks one, and sticks.
+- Crawlers and Meta's ad review always get the letter.
+- `PAYOFF_QUIZ_SHARE` (0–1) changes the split. 0 or 1 ends the test for
+  everyone, whatever their cookie says.
+
+Both versions lead to the same order page, price and checkout. The Meta pixel
+loads on both. On the quiz its automatic collection is off, because people
+type balances there.
+
+The quiz is paced like the ad:
+- It opens with the ad's caption ("CREDIT CARD HOLDERS 👇") over Lauren.
+- One tap per question, then one number per screen.
+- Their real date on minimums (the engine's `minimums` plan).
+- The extra amount moves a live "sooner / less interest" figure.
+- The plan screen keeps the exact month, the first card and the monthly
+  payments locked behind Unlock My Plan.
+- The typed cards stay in the browser. When the buyer goes to pay, they are
+  written to the tool's `payoff.v1`, unless the tool already has cards.
+
+/funnel shows a "Sales letter vs Quiz" table (`PayoffVariant`) and "Quiz: how
+far they got" (`PayoffQuizStep`, step names only, never numbers). Judge the test
+on purchases per visitor of each version.
+
 ## Order page
 
 `order.html`, `order.css` and `order.js` copy a proven one-step order form
@@ -50,15 +78,19 @@ The payment happens on the page:
 ## Checkout offer
 
 The order page offers $5 off the $33 plan for 30 minutes. A signed, HttpOnly
-cookie keeps the original deadline across reloads. The offer shows as a row in
-the order summary with its clock. Optional extras remain $22 and $9.
+cookie keeps the original deadline across reloads. The offer shows in a red bar
+pinned to the top of the order page, and as a row in the order summary, both
+with the clock. Optional extras remain $22 and $9.
 
 The server only honours the offer while it is running. Complete Order never
 charges a total the buyer hasn't seen: if the offer ended on screen late, it
 repaints and asks them to review. On the hosted fallback, Stripe applies the
 fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
-The sales page previews offer eligibility without starting the timer. Stripe
+The sales page's price blocks copy the reference letter: "(Reg. price $375)"
+crossed out, then one bold line worded three ways (`Today:`, `Sale Price:`,
+`SALE PRICE:`), then the orange pill button. They preview offer eligibility
+($28) without starting the timer. Stripe
 offers the payment methods enabled in the Dashboard (Cash App Pay, Klarna,
 Afterpay and others when the buyer is eligible). An unpaid delayed payment
 does not unlock access.
