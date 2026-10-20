@@ -152,7 +152,7 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'elements'), [['elements', 'payment', 2800, 'usd'], ['elements', 'payment', 2800, 'usd']]);
   const created = (await stripeLog()).filter(entry => entry[0] === 'create');
   assert.deepEqual(created.map(entry => entry[1]), ['payment', 'expressCheckout']);
-  assert.deepEqual(created[0][2], { layout: 'tabs', wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
+  assert.deepEqual(created[0][2], { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
   assert.equal(await page.locator('#or').isHidden(), false, 'a wallet is available, so OR shows');
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
   assert.equal(await page.locator('#order-total').innerText(), '$59.00');

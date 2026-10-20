@@ -110,7 +110,7 @@
       quoted = total();
       const options = { mode: 'payment', amount: quoted, currency: 'usd' };
       cardElements = stripe.elements(options);
-      const card = cardElements.create('payment', { layout: 'tabs', wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
+      const card = cardElements.create('payment', { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
       card.on('ready', () => { formReady = true; setButton(); });
       card.on('loaderror', useHosted);
       card.mount('#payment-element');

@@ -109,6 +109,9 @@ The payment happens on the page:
   `/api/payoff/pay` creates a PaymentIntent at server prices (metadata
   `checkout: embedded`), and Stripe confirms it.
 - Retrying the same order reuses the payment.
+- The Payment Element's tabs are ordered card (open by default), bank
+  (`us_bank_account`), then Klarna; Stripe puts any other enabled methods in
+  its "more" menu.
 - Stripe.js loads only when `/api/payoff/config` returns `stripeKey` (the
   publishable key of the billing account, as for Claims).
 - Without it, or if Stripe’s fields can’t load, the button opens Stripe's
