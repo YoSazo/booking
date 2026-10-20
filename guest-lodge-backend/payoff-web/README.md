@@ -130,7 +130,15 @@ knowing exception to the real-deadline rule in `docs/wedges/FRAMEWORK.md`; do
 not "fix" it back to an expiring offer without the owner.
 
 The extras show their regular prices, set by the owner: Cash-flow calendar
-~~$79~~ $22 and Spending reset ~~$49~~ $9. On the hosted fallback, Stripe applies
+~~$79~~ $22 and Spending reset ~~$49~~ $9.
+
+Under the product picture: "★★★★★ Over 10,000 sold" with eight face crops.
+"Sold" counts purchases (about 11,300 per the owner, to be confirmed with
+Lauren); keep it a true, rounded-down figure.
+
+Frozen from October 20, 2026 to measure the new order page against the old one
+on `/funnel`. Next test, only if many visitors reach the card fields and do not
+pay: move Tara's comment from the grey column to right under the button. On the hosted fallback, Stripe applies
 the fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
 The sales page's price blocks copy the reference letter: "(Reg. price $375)"

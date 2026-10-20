@@ -98,6 +98,8 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.deepEqual([await page.locator('.reserve-name').innerText(), await page.locator('.reserve-lead').innerText()], ['Your Debt-Free Date & Payoff Plan', 'Is Reserved For:']);
   assert.match(`${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`, /^(05:00|04:5\d)$/);
   assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
+  assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ Over 10,000 sold');
+  assert.equal(await page.locator('.social-proof .avatars img').count(), 8);
   assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), 'Your Debt-Free Date & Payoff Plan (Valued at $375 -> Today Only $28)');
   assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
   assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
