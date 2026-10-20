@@ -37,8 +37,9 @@
     box.dataset.wording = wording;
     box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
     window.PAYOFF_PAINT_PRICE(box, content.priceCents);
-    // The first offer, as in the reference: the terms right under the button.
+    // As in the reference: the terms right under the first and the last button.
     if (slot.dataset.placement === 'hero') box.append(element('p', 'offer-terms-line', 'One-time purchase. No monthly fees.\n30-day money-back guarantee.'));
+    if (slot.dataset.placement === 'faq') box.append(element('p', 'offer-terms-line', 'Opens right after you pay. One-time charge.\n100% money-back guarantee for 30 days.'));
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });
@@ -100,7 +101,7 @@
     const table = element('table', 'interface-table');
     table.setAttribute('aria-label', 'Illustrative debt balances');
     for (const [index, row] of [['Debt', 'Balance', 'APR'], ['Card', '$5,000', '24%'], ['Other debt', '$1,000', '0%']].entries()) { const tr = element('tr', ''); for (const cell of row) tr.append(element(index ? 'td' : 'th', '', cell)); table.append(tr); }
-    demo.append(top, body, table); slot.append(demo, element('p', 'interface-caption', 'Example data'));
+    demo.append(top, body, table); slot.append(demo);
   }
   // Real press feedback, not focus-dependent; no tracking or remote requests.
   document.addEventListener('touchstart', () => {}, { passive: true });

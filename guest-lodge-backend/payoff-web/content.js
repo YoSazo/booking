@@ -57,7 +57,7 @@ window.PAYOFF_CONTENT = {
     imageAlt: 'Lauren, founder of Marketel Payoff',
     caption: '',
   },
-  productImage: { src: '/payoff/assets/tool-result.jpg', alt: 'Marketel Payoff showing a debt-free date and five plans compared', caption: 'The real app, with the example numbers above' },
+  productImage: { src: '/payoff/assets/tool-result.jpg', alt: 'Marketel Payoff showing a debt-free date and five plans compared' },
   refundPolicy: '30-day money-back guarantee. Email support@bookmarketel.com with your order reference within 30 days of purchase for a full refund, including any extras you bought.' ,
   addOns: [
     { id: 'cashflow', name: 'Cash-flow calendar', priceCents: 2200 },

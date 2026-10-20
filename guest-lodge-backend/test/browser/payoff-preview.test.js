@@ -24,6 +24,10 @@ test('local composition has eight offers, fourteen images and reference-style ra
  assert.equal(await page.locator('.proof-image').count(),14);
  assert.ok(await page.locator('.proof-image img').evaluateAll(imgs=>imgs.every(img=>img.src.endsWith('.webp')&&img.width>0&&img.height>0)));
  assert.equal(await page.locator('.proof-image > figcaption,.preview-note,.portrait-caption').count(),0);
+ // Nothing that reads like a mock-up: no "example" or "not a customer result" labels.
+ assert.doesNotMatch(await page.locator('body').innerText(),/example plan|not a customer result|simplified projection|example data|example screens|illustrative/i);
+ assert.equal(await page.locator('.faq h2').innerText(),'Frequently Asked Questions');
+ assert.equal(await page.locator('.faq-list details').count(),11);
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
  assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
  assert.match(await page.locator('.rating-label').innerText(),/using Marketel Payoff to turn their balances into a clear plan for paying off debt\./);
@@ -45,7 +49,8 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.equal(paragraphs[7],'I’d be honored to help you too.');
  assert.deepEqual(paragraphs,await page.evaluate(()=>window.PAYOFF_CONTENT.founder.paragraphs));
  const assets=page.locator('img[src^="/payoff/assets/"]');
- assert.equal(await assets.count(),19);
+ // The FAQ goes straight to its button, as in the reference, so the product shot appears once.
+ assert.equal(await assets.count(),18);
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
