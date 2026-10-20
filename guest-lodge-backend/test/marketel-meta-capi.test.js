@@ -6,7 +6,10 @@ const {
     marketelCapiRetryDelayMs,
     marketelMetaRequestContext,
     normalizeMetaPhone,
+    metaNameHashes,
 } = require('../marketel-meta-capi');
+const { createHash } = require('node:crypto');
+const sha = value => createHash('sha256').update(value).digest('hex');
 
 test('normalizes US phone numbers for Meta matching', () => {
     assert.equal(normalizeMetaPhone('(612) 555-0199'), '16125550199');
@@ -54,4 +57,16 @@ test('uses bounded retry backoff', () => {
     assert.equal(marketelCapiRetryDelayMs(1), 60_000);
     assert.equal(marketelCapiRetryDelayMs(3), 15 * 60_000);
     assert.equal(marketelCapiRetryDelayMs(99), 12 * 60 * 60_000);
+});
+
+test('first and last names follow Meta\'s rule (lowercase, no punctuation) and are sent only as SHA-256', () => {
+    assert.deepEqual(metaNameHashes('  Mary-Ann  O\'Brien Smith '), { fnHash: sha('maryann'), lnHash: sha('smith') });
+    assert.deepEqual(metaNameHashes('JOSÉ'), { fnHash: sha('josé'), lnHash: '' });
+    assert.deepEqual(metaNameHashes(''), { fnHash: '', lnHash: '' });
+    const event = buildMarketelCapiEvent('Purchase', { eventId: 'payoff-purchase.pi_1', ...metaNameHashes('Test Buyer') });
+    assert.deepEqual(event.user_data.fn, [sha('test')]);
+    assert.deepEqual(event.user_data.ln, [sha('buyer')]);
+    assert.doesNotMatch(JSON.stringify(event), /Test|Buyer/);
+    // Anything that isn't a hash is never passed through.
+    assert.equal(buildMarketelCapiEvent('Purchase', { eventId: 'x', fnHash: 'Test' }).user_data.fn, undefined);
 });

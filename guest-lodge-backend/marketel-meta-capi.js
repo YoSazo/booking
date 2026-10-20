@@ -20,6 +20,20 @@ function hashMetaValue(value) {
     return crypto.createHash('sha256').update(String(value)).digest('hex');
 }
 
+// Meta's rule for fn/ln: lowercase, no punctuation, UTF-8, then SHA-256. A
+// full name gives its first and last words ("Mary-Ann O'Brien Smith" →
+// "maryann", "smith"); a single word is a first name only.
+function normalizeMetaName(value) {
+    return String(value || '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '').slice(0, 100);
+}
+function metaNameHashes(fullName) {
+    const words = cleanText(fullName, 200).split(/\s+/).map(normalizeMetaName).filter(Boolean);
+    return {
+        fnHash: words.length ? hashMetaValue(words[0]) : '',
+        lnHash: words.length > 1 ? hashMetaValue(words[words.length - 1]) : '',
+    };
+}
+
 function cleanMetaBrowserId(value, kind) {
     // Click ids can be long; a cut one is worse than none, so allow 500.
     const text = cleanText(value, 500);
@@ -71,6 +85,9 @@ function buildMarketelCapiEvent(eventName, input = {}) {
     if (email) userData.em = [hashMetaValue(email)];
     if (phone) userData.ph = [hashMetaValue(phone)];
     if (externalId) userData.external_id = [hashMetaValue(externalId)];
+    // Names arrive already hashed: the plain name is never stored.
+    if (/^[a-f0-9]{64}$/.test(input.fnHash || '')) userData.fn = [input.fnHash];
+    if (/^[a-f0-9]{64}$/.test(input.lnHash || '')) userData.ln = [input.lnHash];
     if (input.ip) userData.client_ip_address = cleanText(input.ip, 100);
     if (input.userAgent) userData.client_user_agent = cleanText(input.userAgent, 500);
     const fbp = cleanMetaBrowserId(input.fbp, 'fbp');
@@ -113,4 +130,6 @@ module.exports = {
     marketelMetaRequestContext,
     normalizeMetaEmail,
     normalizeMetaPhone,
+    normalizeMetaName,
+    metaNameHashes,
 };

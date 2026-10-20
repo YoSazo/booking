@@ -47,6 +47,7 @@ const {
     buildMarketelCapiEvent,
     marketelCapiRetryDelayMs,
     marketelMetaRequestContext,
+    metaNameHashes,
 } = require('./marketel-meta-capi');
 const {
     createGuestIdentityToken,
@@ -861,6 +862,7 @@ async function queueMarketelCAPI(eventName, input = {}) {
         attempts: 0,
         nextAttemptAt: now.toISOString(),
         eventTime: Math.max(1, Math.floor(Number(input.eventTime) || Date.now() / 1000)),
+        ...(input.fullName ? metaNameHashes(input.fullName) : {}),
         testMode: !!testEventCode,
         ...(testEventCode ? { testEventCode } : {}),
     };
@@ -924,6 +926,8 @@ async function deliverMarketelCapiRow(id) {
             sourceUrl: metadata.sourceUrl || '',
             fbp: metadata.fbp || '',
             fbc: metadata.fbc || '',
+            fnHash: metadata.fnHash || '',
+            lnHash: metadata.lnHash || '',
             value: row.value,
             currency: row.currency || 'USD',
             contentName: row.contentName || '',

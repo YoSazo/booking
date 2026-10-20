@@ -86,6 +86,7 @@ function paidPurchase(object) {
   const ids = intent ? paidIntent(object) : paidOrder(object);
   return ids && { id: object.id, ids, livemode: object.livemode, metadata: object.metadata,
     email: intent ? object.receipt_email || object.metadata.email : object.customer_details?.email,
+    name: (intent ? object.latest_charge?.billing_details?.name : object.customer_details?.name) || '',
     totalCents: intent ? object.amount_received : object.amount_total };
 }
 // Meta's pixel loads from connect.facebook.net and reports to www.facebook.com,
@@ -218,7 +219,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         eventId: `payoff-purchase.${order.id}`,
         hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
         externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
-        email: email || '',
+        email: email || '', fullName: order.name,
         // A webhook request is Stripe's, never the buyer's IP or browser.
         ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
         sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
@@ -256,7 +257,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return { paid: true, reference: order.id, totalCents: order.totalCents, items: ids.map(id => ITEMS[id].name), emailSent,
       access: accessToken(secret, order.id), extras: ids.filter(id => id !== 'base') };
   }
-  const retrieve = id => id.startsWith('pi_') ? stripe.paymentIntents.retrieve(id) : stripe.checkout.sessions.retrieve(id);
+  // The latest charge carries the buyer's name for Meta's matching.
+  const retrieve = id => id.startsWith('pi_') ? stripe.paymentIntents.retrieve(id, { expand: ['latest_charge'] }) : stripe.checkout.sessions.retrieve(id);
   // One email for every way of getting the link: after payment and on request.
   function accessMail(to, id, lines = []) {
     return { from: '"Marketel" <support@bookmarketel.com>', to, subject: 'Your Marketel Payoff link',
@@ -459,7 +461,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       const object = event.data?.object;
       if (object?.metadata?.product !== PRODUCT || object.metadata.checkout !== 'embedded') return false;
       if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
-      await confirm(await stripe.paymentIntents.retrieve(object.id), { retryMail: true, webhook: true });
+      await confirm(await retrieve(object.id), { retryMail: true, webhook: true });
       return true;
     }
     if (!['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)

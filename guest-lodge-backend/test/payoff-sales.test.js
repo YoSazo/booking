@@ -417,6 +417,7 @@ test('the landing previews the actual offer without issuing or restarting its de
 
 // The order page's own payment form: a PaymentIntent per order, never a session.
 const intent = (addons = [], extra = {}) => ({ object: 'payment_intent', id: 'pi_3PaidOrder123456', status: 'succeeded', currency: 'usd', livemode: true,
+  latest_charge: { billing_details: { name: 'Test Buyer' } },
   amount_received: 3300 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0), receipt_email: 'Buyer@Example.test',
   metadata: { product: PRODUCT, offerVersion: VERSION, checkout: 'embedded', addons: JSON.stringify(addons), visitorId: 'v_abcdefghijk', email: 'buyer@example.test' }, ...extra });
 test('the order page form creates a payment at server prices, keeps retries on one payment, and tells Meta once per visitor', async () => {
@@ -455,7 +456,10 @@ test('a paid order-page payment opens the tool, emails once, counts once, and fi
     assert.equal(w.emails.length, 1); assert.equal(w.emails[0].to, 'Buyer@Example.test');
     assert.match(w.emails[0].text, /Order reference: pi_3PaidOrder123456/);
     assert.ok(w.rows.has('payoff-paid:' + pi.id));
-    assert.equal(w.capi.filter(event => event.name === 'Purchase' && event.eventId === 'payoff-purchase.' + pi.id).length, 2);
+    const purchases = w.capi.filter(event => event.name === 'Purchase' && event.eventId === 'payoff-purchase.' + pi.id);
+    assert.equal(purchases.length, 2);
+    // The buyer's name from Stripe goes with the Purchase, for Meta's matching (hashed when queued).
+    assert.equal(purchases[0].fullName, 'Test Buyer');
     const access = await post('/api/payoff/access', { token: r.body.access });
     assert.deepEqual(access.body, { ok: true, extras: ['cashflow'] });
     assert.deepEqual((await post('/api/payoff/resend', { email: 'BUYER@example.test' })).body, { sent: true });
