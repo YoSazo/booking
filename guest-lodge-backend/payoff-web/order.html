@@ -6,23 +6,50 @@
   <title>Marketel Payoff Checkout</title>
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=3">
-  <script src="/payoff/checkout.js?v=22" defer></script>
-  <script src="/payoff/order.js?v=2" defer></script>
+  <link rel="stylesheet" href="/payoff/order.css?v=4">
+  <script src="/payoff/checkout.js?v=23" defer></script>
+  <script src="/payoff/order.js?v=3" defer></script>
 </head>
 <body data-page="order">
-  <div class="offer-bar" id="offer-bar" hidden><span class="deal-emoji" aria-hidden="true">🎉</span> <strong>You got an extra $5 off!</strong> <span>It's saved for you for <b id="offer-bar-clock" role="timer" aria-live="off">30:00</b></span></div>
+  <header class="reserve" id="reserve">
+    <p class="reserve-name">Your Debt-Free Date &amp; Payoff Plan</p>
+    <p class="reserve-lead">Is Reserved For:</p>
+    <div class="reserve-clock" id="reserve-clock" role="timer" aria-live="off" aria-label="Time your order is reserved for">
+      <span class="unit"><b id="reserve-minutes">05</b><small>Minutes</small></span><span class="colon" aria-hidden="true">:</span><span class="unit"><b id="reserve-seconds">00</b><small>Seconds</small></span>
+    </div>
+  </header>
   <div class="row">
     <main class="column">
-      <div class="text"><p><strong>Enter your info below to see your Debt-Free Date in the next 5 minutes:</strong></p></div>
+      <section class="glance">
+        <p class="summary-label"><img src="/payoff/assets/cart-icon-59bb789d7c.webp" width="24" height="20" alt=""> Order Summary</p>
+        <img class="glance-image" src="/payoff/assets/payoff-devices-80eded1499.webp" width="1280" height="720" decoding="async" fetchpriority="high" alt="Marketel Payoff on a desktop, laptop, tablet and phone, showing a debt-free date">
+        <p class="glance-price"><em>Your Debt-Free Date &amp; Payoff Plan</em> (Valued at $375 -&gt; Today Only <span class="today" id="glance-price">$33</span>)</p>
+        <p class="glance-gift" id="glance-gift" hidden>Includes your FREE $5 gift</p>
+        <div class="safe" role="group" aria-label="Guaranteed safe checkout">
+          <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
+          <div class="safe-badges">
+            <img src="/payoff/assets/secure-aes-f70c90acfb.webp" width="200" height="233" decoding="async" alt="AES-256bit encryption">
+            <img src="/payoff/assets/secure-ssl-d9718c548a.webp" width="200" height="194" decoding="async" alt="SSL certified">
+            <img src="/payoff/assets/secure-stripe-f82e44a40b.webp" width="220" height="202" decoding="async" alt="Powered by Stripe, secure site">
+            <div class="safe-cards" aria-label="Visa, Mastercard, American Express and Discover"><img src="/payoff/assets/payment-visa.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-discover.svg" width="36" height="24" alt=""></div>
+          </div>
+        </div>
+        <img class="glance-guarantee" src="/payoff/assets/guarantee-30-day-2ba0eb796b.webp" width="440" height="336" decoding="async" alt="30-day 100% money back guarantee">
+      </section>
       <form class="order" id="order-form" novalidate>
         <div class="form-body">
+          <h2 class="section-head"><span aria-hidden="true">----</span> Contact Details <span aria-hidden="true">----</span></h2>
           <section class="info">
+            <label class="field" for="name">Full Name:</label>
             <input class="input" type="text" id="name" name="name" placeholder="Full Name" autocomplete="name" maxlength="100">
+            <label class="field" for="email">Email Address:</label>
             <input class="input" type="email" id="email" name="email" placeholder="Email Address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254">
           </section>
-          <div class="payment-bar"></div>
+          <h2 class="section-head"><span aria-hidden="true">----</span> Payment Information <span aria-hidden="true">----</span></h2>
           <div class="form-payment">
+            <div id="express-checkout"></div>
+            <div class="or" id="or" hidden><hr><p>OR</p></div>
+            <div id="payment-element"></div>
             <section class="product-detail">
               <div class="grid head"><span>Total Payment</span><span class="c">Quantity</span><span class="r">Price</span></div>
               <div class="divider"></div>
@@ -31,32 +58,12 @@
             <div class="bumps">
               <section class="bump">
                 <div class="bump-main"><label class="bump-head"><svg class="arrow" viewBox="0 0 28 17" width="22" height="13" aria-hidden="true"><path d="M0 4.5h15.5V0L28 8.5 15.5 17v-4.5H0z"/></svg><input type="checkbox" id="cashflow" name="cashflow" aria-label="Add the Cash-flow calendar for $22"><span class="bump-headline">Plan Around Payday</span></label></div>
-                <div><span class="oto">ONE TIME OFFER: Add The Cash-Flow Calendar To Your Payoff Plan - Just $22</span><span class="copy"><br><br>Wondering if you'll have enough before payday?
-<br><br>
-Put your income, bills and debt payments on one <b>Cash-flow calendar</b> and see your projected balance up to <b>18 months ahead</b>.
-<br><br>
-✔ Plan around your pay dates
-<br>
-✔ Spot a shortfall before the bill arrives
-<br>
-✔ Your Payoff debt payments, already on it
-<br><br>
-<b>Just $22, one payment!</b></span></div>
+                <p class="bump-copy"><span class="oto">ONE TIME OFFER</span>: Add The Cash-Flow Calendar To Your Payoff Plan. Wondering if you'll have enough before payday? Put your income, bills and debt payments on one <b>Cash-flow calendar</b> and see your projected balance up to <b>18 months ahead</b>. This is a one-time offer, and you will never see this price again. <b>(Just $22 today)</b></p>
                 <img class="bump-image" src="/payoff/assets/cashflow-devices-d08f6b83ca.webp" width="1040" height="693" loading="lazy" decoding="async" alt="The Cash-flow calendar on a phone and tablet">
               </section>
               <section class="bump">
                 <div class="bump-main"><label class="bump-head"><svg class="arrow" viewBox="0 0 28 17" width="22" height="13" aria-hidden="true"><path d="M0 4.5h15.5V0L28 8.5 15.5 17v-4.5H0z"/></svg><input type="checkbox" id="reset" name="reset" aria-label="Add the Spending reset for $9"><span class="bump-headline">Get A Fresh Start</span></label></div>
-                <div><span class="oto">Add The Spending Reset To Your Payoff Plan - Just $9</span><span class="copy"><br><br>Want to free up money for your plan, fast?
-<br><br>
-The <b>Spending reset</b> helps you pause what you choose, keep the essentials covered and check in day by day.
-<br><br>
-✔ Set your own ground rules
-<br>
-✔ Check in once a day
-<br>
-✔ See what you saved and put it toward your debt
-<br><br>
-<b>Just $9, one payment!</b></span></div>
+                <p class="bump-copy"><span class="oto">ONE TIME OFFER</span>: Add The Spending Reset To Your Payoff Plan. Want to free up money for your plan, fast? The <b>Spending reset</b> helps you pause what you choose, keep the essentials covered and put what you save toward your debt. This is a one-time offer, and you will never see this price again. <b>(Just $9 today)</b></p>
                 <img class="bump-image" src="/payoff/assets/reset-devices-a5b2880cad.webp" width="1040" height="693" loading="lazy" decoding="async" alt="The Spending reset on a phone and tablet">
               </section>
             </div>
@@ -68,18 +75,24 @@ The <b>Spending reset</b> helps you pause what you choose, keep the essentials c
               <div class="divider"></div>
               <div class="order-total"><strong>Order Total</strong><output class="price" id="order-total" aria-live="polite">$33.00</output></div>
             </section>
-            <div id="express-checkout"></div>
-            <div class="or" id="or" hidden><hr><p>OR</p></div>
-            <div id="payment-element"></div>
-            <button class="complete" id="buy-button" type="submit" disabled><svg class="cart" viewBox="0 0 24 22" width="25" height="22" aria-hidden="true"><path d="M0 1.5C0 .7.7 0 1.5 0h2.3c.7 0 1.3.5 1.5 1.2L5.6 3H22c1 0 1.7.9 1.4 1.9l-2 7.5c-.2.7-.8 1.1-1.5 1.1H8l.4 2h11.1a1.5 1.5 0 0 1 0 3H7.2c-.7 0-1.3-.5-1.5-1.2L2.7 3H1.5C.7 3 0 2.3 0 1.5z"/><circle cx="9" cy="20" r="2"/><circle cx="19" cy="20" r="2"/></svg><span id="buy-label">Complete Order</span></button>
+            <button class="complete" id="buy-button" type="submit" disabled><svg class="cart" viewBox="0 0 24 22" width="25" height="22" aria-hidden="true"><path d="M0 1.5C0 .7.7 0 1.5 0h2.3c.7 0 1.3.5 1.5 1.2L5.6 3H22c1 0 1.7.9 1.4 1.9l-2 7.5c-.2.7-.8 1.1-1.5 1.1H8l.4 2h11.1a1.5 1.5 0 0 1 0 3H7.2c-.7 0-1.3-.5-1.5-1.2L2.7 3H1.5C.7 3 0 2.3 0 1.5z"/><circle cx="9" cy="20" r="2"/><circle cx="19" cy="20" r="2"/></svg><span class="buy-text"><span id="buy-label">Get My Debt-Free Date</span><small>Opens right after you pay</small></span></button>
             <p class="secure">* 100% Secure &amp; Safe Payments *</p>
             <p class="status" id="checkout-status" role="status" aria-live="polite"></p>
           </div>
         </div>
       </form>
-      <div class="logos" aria-label="Visa, Mastercard, American Express, Discover and Klarna"><img src="/payoff/assets/payment-visa.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-discover.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-klarna.svg" width="48" height="32" alt=""></div>
+      <img class="seal" src="/payoff/assets/guarantee-30-day-2ba0eb796b.webp" width="440" height="336" loading="lazy" decoding="async" alt="30-day 100% money back guarantee">
       <div class="text guarantee"><p>30-day money-back guarantee. </p><p>One-time payment. No monthly fees.</p></div>
-      <img class="seal" src="/payoff/assets/guarantee-seal-7b33193dab.webp" width="600" height="566" decoding="async" alt="100% money-back guarantee">
+      <div class="safe" role="group" aria-label="Guaranteed safe checkout">
+        <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
+        <div class="safe-badges">
+          <img src="/payoff/assets/secure-aes-f70c90acfb.webp" width="200" height="233" loading="lazy" decoding="async" alt="AES-256bit encryption">
+          <img src="/payoff/assets/secure-ssl-d9718c548a.webp" width="200" height="194" loading="lazy" decoding="async" alt="SSL certified">
+          <img src="/payoff/assets/secure-stripe-f82e44a40b.webp" width="220" height="202" loading="lazy" decoding="async" alt="Powered by Stripe, secure site">
+          <div class="safe-cards" aria-label="Visa, Mastercard, American Express and Discover"><img src="/payoff/assets/payment-visa.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-discover.svg" width="36" height="24" alt=""></div>
+        </div>
+      </div>
+      <div class="logos" aria-label="Visa, Mastercard, American Express, Discover and Klarna"><img src="/payoff/assets/payment-visa.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-discover.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-klarna.svg" width="48" height="32" alt=""></div>
     </main>
     <aside class="column grey">
       <div class="text"><p><strong>Here's what happens when you order today:</strong></p><p><br></p><p><strong>✅ Payoff opens on your phone the moment you pay.</strong></p><p><br></p><p><strong>✅ Enter your balances, interest rates and minimum payments.</strong></p><p><br></p><p><strong>✅ See your exact Debt-Free Date and fastest plan in seconds.</strong></p><p><br></p><p><strong>✅ Follow your month-by-month plan and watch your balances shrink.</strong></p><p><br></p><p><strong><s>Total Value: <u>$375</u></s></strong></p><p><strong><u id="only-today">Only $33 Today!</u></strong><br><strong><u id="percent-off">(91% off)</u></strong></p></div>
@@ -87,9 +100,12 @@ The <b>Spending reset</b> helps you pause what you choose, keep the essentials c
       <img class="proof" src="/payoff/assets/comment-nicole-58896e3927.webp" width="748" height="677" loading="lazy" decoding="async" alt="Facebook comment from Nicole: I typed in all my balances and it immediately showed me my payoff date and the plan that makes the most sense for me.">
       <img class="proof" src="/payoff/assets/comment-megan-070b24c8d2.webp" width="748" height="471" loading="lazy" decoding="async" alt="Facebook comment from Megan: I just put in my balances and payments and it showed me exactly what to do. I already paid off one smaller card.">
       <img class="proof" src="/payoff/assets/comment-tara-8c25b94a76.webp" width="748" height="456" loading="lazy" decoding="async" alt="Facebook comment from Tara: This has been so much easier than every debt spreadsheet I ever tried. I already knocked out one card.">
-      <img class="proof" src="/payoff/assets/payoff-devices-383d0b9af5.webp" width="1040" height="693" loading="lazy" decoding="async" alt="Marketel Payoff on a phone and tablet">
+      <img class="proof" src="/payoff/assets/payoff-devices-80eded1499.webp" width="1280" height="720" loading="lazy" decoding="async" alt="Marketel Payoff on a desktop, laptop, tablet and phone">
     </aside>
   </div>
-  <footer><img src="/marketel.svg" width="200" height="36" alt="Marketel"><p>Marketel Payoff · <a href="/payoff/terms" target="_blank" rel="noopener">Terms</a> · <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></p></footer>
+  <footer class="legal">
+    <p class="legal-links"><a href="/payoff/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> | <a href="/payoff/privacy" target="_blank" rel="noopener">Privacy Policy</a></p>
+    <p>Copyright 2026 Marketel. All Rights Reserved. · <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></p>
+  </footer>
 </body>
 </html>

@@ -18,13 +18,17 @@ img { max-width: 100%; }
 .order { font-family: 'Montserrat', sans-serif; background: #fff; padding: 2px; border-radius: 5px;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px 0 rgba(0, 0, 0, .06); }
 .form-body { padding: 15px; }
-.info { display: grid; gap: 15px; }
+.section-head { margin: 0 0 14px; padding: 10px 8px; background: #222; color: #fff; font: 600 18px/1.3 'Montserrat', sans-serif; text-align: center; }
+.section-head span { color: #f5c400; }
+.info { display: grid; gap: 6px; margin-bottom: 22px; }
+.field { margin-top: 6px; color: #333; font-size: 12px; font-weight: 700; }
+.field:first-child { margin-top: 0; }
 .input { display: block; width: 100%; height: 42px; margin: 0; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 5px;
   background: #f4f4f4; color: #000; font: 400 14px/24px 'Montserrat', sans-serif; -webkit-appearance: none; appearance: none; }
 .input:focus { outline: none; border-color: #9ca3af; }
 .input.invalid { border-color: #c30; }
-.payment-bar { height: 2px; margin-top: 23px; background: #e5e7eb; }
-.form-payment { padding: 36px 10px 10px; }
+.form-payment { padding: 0 0 10px; }
+#payment-element + .product-detail { margin-top: 22px; }
 
 .grid { display: grid; grid-template-columns: 60% 20% 20%; font-size: 13px; }
 .grid .c { text-align: center; }
@@ -46,8 +50,8 @@ img { max-width: 100%; }
 .bump-head input { flex: none; width: 13px; height: 13px; margin: 0 4px; }
 .bump-headline { margin-left: 2px; color: #090; font-weight: 700; line-height: 30px; }
 .oto { color: #c30; font-weight: 700; text-decoration: underline; }
-.copy { white-space: pre-wrap; }
-.copy b { font-weight: 700; }
+.bump-copy { margin: 6px 2px 8px; font-size: 13px; line-height: 1.45; }
+.bump-copy b { font-weight: 700; }
 .bump-image { display: block; width: 100%; height: auto; }
 /* The reference arrow is an animated image: on 270ms, off 230ms, on 70ms. */
 @keyframes bump-arrow { 0% { opacity: 1; } 47.37% { opacity: 0; } 87.72% { opacity: 1; } }
@@ -69,9 +73,11 @@ img { max-width: 100%; }
 
 .complete { display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%; margin-top: 16px; padding: 8px;
   border: 1px solid rgba(0, 0, 0, .1); border-radius: 4px; background: #37ca37; box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, .2);
-  color: #fff; font: 700 32px/39px 'Montserrat', sans-serif; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  color: #fff; font: 700 24px/30px 'Montserrat', sans-serif; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .complete:disabled { background: #808080; cursor: default; }
 .complete .cart { flex: none; fill: currentColor; }
+.buy-text { display: flex; flex-direction: column; align-items: center; }
+.buy-text small { font-size: 13px; font-weight: 600; line-height: 17px; letter-spacing: .04em; text-transform: uppercase; }
 .secure { margin: 10px 0 0; color: #9c9c9c; font-size: 12px; text-align: center; }
 .status { margin: 10px 0 0; color: #c30; font-size: 14px; line-height: 1.4; text-align: center; }
 .status:empty { display: none; }
@@ -79,21 +85,45 @@ img { max-width: 100%; }
 .logos { display: flex; justify-content: center; gap: 14px; margin-top: 9px; }
 .logos img { display: block; width: 48px; height: 32px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .18); }
 .guarantee { margin-top: 10px; }
-.seal { display: block; width: 300px; height: auto; margin: 20px auto 0; }
+.seal { display: block; width: 220px; height: auto; margin: 20px auto 0; }
 
 .proof { display: block; width: calc(100% - 20px); height: auto; margin: 30px 10px 0; }
 
-footer { padding: 35px 10px; background: #8c8c8c; color: #fff; font: 400 13px/1.5 'Open Sans', sans-serif; text-align: center; }
-footer img { display: block; width: 200px; height: auto; margin: 0 auto 12px; filter: brightness(0) invert(1); }
-footer p { margin: 0; }
-footer a { color: #fff; }
+/* The first screen, as in the reference order page: the reservation, the
+   product, its price and why it is safe, before any field. */
+.reserve { padding: 12px 10px 10px; background: #1e7d67; color: #fff; font-family: 'Montserrat', sans-serif; text-align: center; }
+.reserve p { margin: 0; }
+.reserve-name { font-size: clamp(16px, 4.6vw, 22px); font-style: italic; font-weight: 700; line-height: 1.2; }
+.reserve-lead { font-size: 19px; font-weight: 700; line-height: 1.25; }
+.reserve-clock { display: flex; justify-content: center; align-items: flex-start; gap: 6px; margin-top: 8px; }
+.reserve-clock .unit { display: flex; flex-direction: column; align-items: center; min-width: 66px; }
+.reserve-clock b { display: block; width: 100%; padding: 2px 8px; border-radius: 5px; background: #fff; color: #222; font-size: 30px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.reserve-clock small { margin-top: 3px; font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.reserve-clock .colon { font-size: 28px; font-weight: 800; line-height: 1.3; }
+.column > .glance:first-child { margin-top: -22px; }
+.glance { margin-bottom: 18px; font-family: 'Open Sans', sans-serif; text-align: center; }
+.glance-image { display: block; width: 100%; max-width: 380px; height: auto; margin: 0 auto; }
+.glance-price { margin: 4px 0 0; font-size: 17px; line-height: 1.35; }
+.glance-price em { color: #1e7d67; font-weight: 700; }
+.glance-price .today { color: #090; font-weight: 700; }
+.glance-gift { margin: 2px 0 0; color: #c30; font-size: 14px; font-weight: 700; }
+.summary-label { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font: 700 14px/1.3 'Montserrat', sans-serif; text-align: left; }
+.summary-label img { width: 20px; height: auto; }
+/* "Guaranteed SAFE Checkout": a titled orange frame around the badges, as in the reference. */
+.safe { position: relative; max-width: 380px; margin: 18px auto 0; padding: 14px 8px 8px; border: 2px solid #f39c12; border-radius: 4px; }
+.safe-title { position: absolute; top: 0; left: 50%; margin: 0; padding: 0 6px; transform: translate(-50%, -58%); background: #fff; color: #f39c12;
+  font: 800 19px/1 'Montserrat', sans-serif; white-space: nowrap; }
+.safe-title b { color: #2e9e5b; }
+.safe-badges { display: grid; grid-template-columns: 1fr 1fr 1.15fr 1.15fr; align-items: center; gap: 6px; }
+.safe-badges > img { width: 100%; height: auto; }
+.safe-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.safe-cards img { display: block; width: 100%; height: auto; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .08); }
+.glance-guarantee { display: block; width: 200px; height: auto; margin: 12px auto 0; }
 
-/* The $5 checkout offer, visible from the first frame and while scrolling. */
-.offer-bar { position: sticky; top: 0; z-index: 10; padding: 9px 12px; background: #c30; color: #fff; font: 400 15px/1.35 'Montserrat', sans-serif; text-align: center; }
-.offer-bar strong { font-weight: 700; }
-.deal-emoji { display: inline-block; width: 22px; height: 22px; margin-top: -3px; border-radius: 50%; background: #fefcbf; font-size: 13px; line-height: 22px; text-align: center; vertical-align: middle; }
-.offer-bar span { display: inline-block; }
-.offer-bar b { display: inline-block; min-width: 3.1em; padding: 1px 6px; border-radius: 4px; background: #fefcbf; color: #c30; font-weight: 800; font-variant-numeric: tabular-nums; }
+footer.legal { padding: 28px 10px 32px; background: #fff; color: #777; font: 400 14px/1.5 'Open Sans', sans-serif; text-align: center; }
+footer.legal p { margin: 0; }
+footer.legal a { color: #34508a; }
+.legal-links { margin-bottom: 4px !important; font-weight: 700; }
 
 /* Desktop: the form beside the grey column, as in the reference. */
 @media (min-width: 768px) {

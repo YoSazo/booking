@@ -93,10 +93,23 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
 const ready = page => page.locator('#buy-button:enabled').waitFor();
 const fillBuyer = async page => { await page.locator('#name').fill('Test Buyer'); await page.locator('#email').fill('buyer@example.test'); };
 
-test('the order page follows the reference form: two unchecked extras with flashing arrows, the summary, guarantee and proof', async () => world(async ({ page, base }) => {
+test('the order page follows the reference: reservation, product, price and safe checkout first, then the labeled form, extras, summary, guarantee and proof', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
-  assert.equal(await page.locator('main .text').first().innerText(), 'Enter your info below to see your Debt-Free Date in the next 5 minutes:');
+  assert.deepEqual([await page.locator('.reserve-name').innerText(), await page.locator('.reserve-lead').innerText()], ['Your Debt-Free Date & Payoff Plan', 'Is Reserved For:']);
+  assert.match(`${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`, /^(05:00|04:5\d)$/);
+  assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
+  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), 'Your Debt-Free Date & Payoff Plan (Valued at $375 -> Today Only $28)');
+  assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
+  assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
+  assert.equal(await page.locator('.glance-guarantee').getAttribute('alt'), '30-day 100% money back guarantee');
+  assert.deepEqual(await page.locator('.section-head').allInnerTexts(), ['---- Contact Details ----', '---- Payment Information ----']);
+  assert.deepEqual(await page.locator('.info label').allInnerTexts(), ['Full Name:', 'Email Address:']);
   assert.deepEqual(await page.locator('.info input').evaluateAll(inputs => inputs.map(input => input.placeholder)), ['Full Name', 'Email Address']);
+  // Payment comes before the extras, as in the reference.
+  const order = await page.evaluate(() => ['#payment-element', '.product', '.bumps', '#order-summary', '#buy-button']
+    .map(sel => document.querySelector(sel).getBoundingClientRect().top));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This is a one-time offer, and you will never see this price again\. \(Just \$\d+ today\)$/);
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.00/);
   assert.equal(await page.locator('.bump').count(), 2);
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
@@ -108,15 +121,19 @@ test('the order page follows the reference form: two unchecked extras with flash
   });
   assert.deepEqual(look, { arrow: 'bump-arrow', headline: 'rgb(0, 153, 0)', oto: ['rgb(204, 51, 0)', 'underline'],
     bump: ['rgb(251, 248, 227)', 'dashed'], button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
-  assert.equal(await page.locator('#buy-label').innerText(), 'Complete Order');
+  assert.equal(await page.locator('#buy-label').innerText(), 'Get My Debt-Free Date');
+  assert.equal(await page.locator('.buy-text small').innerText(), 'OPENS RIGHT AFTER YOU PAY');
   assert.equal(await page.locator('.secure').innerText(), '* 100% Secure & Safe Payments *');
-  assert.match(await page.locator('#summary-rows').innerText(), /Checkout offer: \$5 off, ends in (29:\d\d|30:00)\s+-\$ 5\.00/);
+  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off\s+-\$ 5\.00/);
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   assert.equal(await page.locator('#only-today').innerText(), 'Only $28 Today!');
   assert.equal(await page.locator('#percent-off').innerText(), '(92% off)');
   assert.equal(await page.locator('.logos img').count(), 5);
   assert.match(await page.locator('.guarantee').innerText(), /30-day money-back guarantee\.\s+One-time payment\. No monthly fees\./);
   assert.equal(await page.locator('img.seal').count(), 1);
+  assert.equal(await page.locator('main > .safe').count(), 1, 'the safe-checkout box repeats under the button');
+  assert.equal(await page.locator('#offer-bar').count(), 0);
+  assert.match((await page.locator('footer.legal').innerText()).replace(/\s+/g, ' '), /Terms & Conditions \| Privacy Policy Copyright 2026 Marketel\. All Rights Reserved\./);
   assert.match(await page.locator('.grey .text').innerText(), /Here's what happens when you order today:/);
   assert.equal(await page.locator('.grey s').innerText(), 'Total Value: $375');
   assert.equal(await page.locator('img.proof[src*="/comment-"]').count(), 4);
@@ -160,7 +177,7 @@ test('a declined card says why, keeps the same payment for the retry, and stays 
   await page.locator('#buy-button').click();
   await page.locator('#checkout-status:has-text("Your card was declined.")').waitFor();
   assert.equal(await page.locator('#buy-button').isEnabled(), true);
-  assert.equal(await page.locator('#buy-label').innerText(), 'Complete Order');
+  assert.equal(await page.locator('#buy-label').innerText(), 'Get My Debt-Free Date');
   assert.ok(page.url().endsWith('/payoff/order'));
   await page.locator('#buy-button').click();
   await page.waitForURL(url => url.pathname === '/payoff/app');
@@ -176,7 +193,7 @@ test('a payment Stripe reports as not paid sends the buyer back to checkout and 
   assert.equal(await page.evaluate(() => localStorage.getItem('payoff.access')), null);
   assert.equal(emails.length, 0);
 }, { unpaid: true }));
-test('when Stripe\'s fields can\'t be used, Complete Order opens Stripe\'s hosted checkout with the extras picked', async () => world(async ({ page, base, creates, payments }) => {
+test('when Stripe\'s fields can\'t be used, the button opens Stripe\'s hosted checkout with the extras picked', async () => world(async ({ page, base, creates, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.equal(await page.locator('#payment-element').isHidden(), true);
   assert.equal(await page.locator('#or').isHidden(), true);
@@ -286,46 +303,61 @@ test("Meta's pixel never loads for the owner, over http, or in the tool", async 
   }, { userAgent: PHONE_UA });
 });
 
-test('the checkout offer shows in the summary, survives reload, and ends without resetting the extras', async () => world(async ({ page, base, advanceTime }) => {
+const reserveClock = async page => `${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`;
+test('the free gift shows in the summary and survives reload; the reservation clock starts over at 00:00 without changing the total or the extras', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   await page.locator('#cashflow').check();
   assert.equal(await page.locator('#order-total').innerText(), '$50.00');
-  advanceTime(10 * 60000);
+  advanceTime(12 * 60000);
   await page.reload(); await ready(page);
-  assert.match(await page.locator('#summary-rows').innerText(), /ends in (19:\d\d|20:00)/);
+  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
+  assert.match(await reserveClock(page), /^(03:00|02:5\d)$/, 'the clock follows the server across reloads');
   assert.equal(await page.locator('#order-total').innerText(), '$50.00');
-  advanceTime(21 * 60000);
+  // Past 00:00 in the browser: the clock starts again at five minutes.
+  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000 + 2000; });
+  await page.waitForTimeout(1300);
+  assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
+  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  assert.equal(await page.locator('#cashflow').isChecked(), true);
+  advanceTime(31 * 60000);
   await page.reload(); await ready(page);
-  assert.doesNotMatch(await page.locator('#summary-rows').innerText(), /Checkout offer/);
-  assert.equal(await page.locator('#order-total').innerText(), '$55.00');
-  assert.equal(await page.locator('#only-today').innerText(), 'Only $33 Today!');
-  assert.equal(await page.locator('#percent-off').innerText(), '(91% off)');
+  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
+  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  assert.equal(await page.locator('#only-today').innerText(), 'Only $28 Today!');
 }));
-for (const delayedTimer of [false, true]) test('expiry while paying asks the buyer to review the total (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, payments, advanceTime }) => {
+for (const delayedTimer of [false, true]) test('days later the buyer still pays $28: the reservation never ends the gift (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, payments, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
-  advanceTime(31 * 60000);
+  advanceTime(3 * 24 * 60 * 60000);
   if (delayedTimer) await page.evaluate(() => {
-    const original = Date.now; Date.now = () => original() + 31 * 60000;
+    const original = Date.now; Date.now = () => original() + 3 * 24 * 60 * 60000;
     document.getElementById('order-form').requestSubmit();
   });
   else await page.locator('#buy-button').click();
-  await page.locator('#checkout-status:has-text("Review the updated total")').waitFor();
-  assert.equal(await page.locator('#order-total').innerText(), '$33.00');
-  assert.equal(await page.locator('#buy-button').isEnabled(), true);
-  await page.locator('#buy-button').click(); await page.waitForURL(url => url.pathname === '/payoff/app');
-  assert.equal(payments.at(-1).params.amount, 3300);
+  await page.waitForURL(url => url.pathname === '/payoff/app');
+  assert.equal(payments.at(-1).params.amount, 2800);
+}));
+// The first screen answers what, held, price and safety before any field.
+test('the order page\'s first screen shows the reservation, product, price, safe checkout and guarantee, on phones', async () => world(async ({ page, base }) => {
+  for (const [width, height] of [[375, 667], [390, 664], [390, 844], [414, 736]]) {
+    await page.setViewportSize({ width, height });
+    await page.goto(base + '/payoff/order'); await ready(page);
+    await page.evaluate(() => document.fonts.ready);
+    const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.summary-label', '.glance-image', '.glance-price', '#glance-gift', '.glance .safe']
+      .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
+    for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  }
 }));
 
-// The first screen is the hook: with the $5 bar and the three-line price (the
-// tallest it gets), the button, the guarantee, the stars and who uses it fit
-// without scrolling on small phones and inside Facebook's browser.
+// The first screen is the hook: with the three-line price (the tallest it
+// gets), the button, the guarantee, the stars and who uses it fit without
+// scrolling on small phones and inside Facebook's browser.
 test('the letter\'s first screen fits everything needed to tap the button, on small phones', async () => world(async ({ page, base }) => {
   for (const [width, height] of [[375, 548], [360, 640], [390, 664], [414, 640]]) {
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff');
-    await page.locator('#offer-bar:not([hidden])').waitFor();
     await page.locator('.hero .offer-was:not([hidden])').waitFor();
     await page.evaluate(() => document.fonts.ready);
     const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .offer-terms-line', '.hero .rating-stars', '.hero .rating-label']
@@ -335,7 +367,7 @@ test('the letter\'s first screen fits everything needed to tap the button, on sm
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
 }));
-test('sales offer blocks show the eligible price without starting the deadline; an expired offer returns to regular price', async () => world(async ({ page, base, advanceTime }) => {
+test('sales offer blocks show the free gift price without starting its clock, the letter has no bar, and the gift never ends', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
@@ -346,24 +378,21 @@ test('sales offer blocks show the eligible price without starting the deadline; 
     '(Reg. price $375) Sale Price: $33 Sale Price: $28 ($5 off · 15% off) Get My Debt-Free Date',
     "(Reg. price $375) SALE PRICE: $33 SALE PRICE: $28 That's an extra $5 (15%) off. Get My Debt-Free Date"]);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
-  assert.equal((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), '🎁 You’ve got an extra $5 off! Your 30 minutes start at checkout.');
+  assert.equal(await page.locator('#offer-bar').count(), 0, 'the letter has no bar; the clock is on the order page');
   assert.equal((await page.context().cookies()).filter(c => c.name === 'payoff_checkout_offer').length, 0);
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').first().waitFor();
-  await page.locator('#deal-clock:not([hidden])').waitFor();
-  assert.match((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), /^🎉 You got an extra \$5 off! It’s saved for you for (29:\d\d|30:00)$/);
   advanceTime(31 * 60000);
   const previewDone = page.waitForResponse(r => r.url().includes('offer=preview'));
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
   await previewDone;
-  await page.locator('.sales-offer [data-price]:has-text("Today: $33 (91% off)")').first().waitFor();
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $33 (91% off)');
-  assert.equal(await page.locator('.sales-offer [data-offer-anchor]').first().isHidden(), false);
-  assert.equal(await page.locator('.sales-offer .offer-was').first().isHidden(), true, 'no crossed-out $33 once the extra $5 ends');
-  assert.equal(await page.locator('#offer-bar').isHidden(), true);
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $28 ($5 off · 15% off)');
+  assert.equal(await page.locator('.sales-offer .offer-was').first().isHidden(), false, 'the crossed-out $33 stays');
+  assert.match((await page.locator('footer').innerText()).replace(/\s+/g, ' '), /Terms & Conditions \| Privacy Policy Copyright 2026 Marketel\. All Rights Reserved\./);
 }));
 test('sales offers retain the regular price and usable checkout when the offer lookup fails', async () => world(async ({ page, base }) => {
   await page.route('**/api/payoff/config?offer=preview', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));

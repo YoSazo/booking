@@ -2,7 +2,7 @@
 // The order page is one form, like the reference one-step order. Stripe's
 // payment fields sit on the page; ticking an extra changes the amount they
 // will charge without reloading them, and the server creates the payment only
-// when the buyer taps Complete Order. If Stripe's fields can't load, the same
+// when the buyer taps the button. If Stripe's fields can't load, the same
 // button opens Stripe's hosted page instead.
 (() => {
   const track = window.PayoffTrack || { event() {}, pixel() {}, attribution: {}, visitor: null, headers: { 'Content-Type': 'application/json' } };
@@ -19,10 +19,24 @@
   const selected = () => EXTRAS.filter(extra => $(extra.id).checked);
   const priceOf = extra => config?.addOns?.[extra.id] ?? extra.cents;
   const base = () => config?.priceCents || 3300;
-  const offerLeft = () => (offer && offer.discountCents > 0 ? offer.expiresAt - Date.now() - serverOffset : 0);
-  const discount = () => (offerLeft() > 0 ? offer.discountCents : 0);
+  const discount = () => (offer && offer.discountCents > 0 ? offer.discountCents : 0);
   const total = () => base() - discount() + selected().reduce((sum, extra) => sum + priceOf(extra), 0);
-  const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+  // The "reserved for" clock repeats every five minutes and never ends the
+  // order or the gift. It follows the gift's server clock when there is one.
+  const LOOP_MS = 5 * 60 * 1000;
+  let reserve = { expiresAt: Date.now() + LOOP_MS, loopMs: LOOP_MS };
+  const reserveLeft = () => {
+    const now = Date.now() + serverOffset;
+    while (reserve.expiresAt <= now) reserve.expiresAt += reserve.loopMs;
+    return reserve.expiresAt - now;
+  };
+  const pad = value => String(value).padStart(2, '0');
+  function paintClock() {
+    $('reserve-clock').hidden = config?.available === false;
+    const seconds = Math.ceil(reserveLeft() / 1000);
+    $('reserve-minutes').textContent = pad(Math.floor(seconds / 60));
+    $('reserve-seconds').textContent = pad(seconds % 60);
+  }
 
   try {
     attempt = sessionStorage.getItem('payoff.attempt') || crypto.randomUUID();
@@ -44,11 +58,12 @@
   function paint() {
     const off = discount();
     $('summary-rows').replaceChildren(row(NAME, '1', base()), ...selected().map(extra => row(extra.name, '1', priceOf(extra))),
-      ...(off ? [row(`Checkout offer: $5 off, ends in ${clock(offerLeft())}`, '', -off)] : []));
+      ...(off ? [row('Free gift: $5 off', '', -off)] : []));
     $('order-total').textContent = money(total());
-    $('offer-bar').hidden = !off;
-    if (off) $('offer-bar-clock').textContent = clock(offerLeft());
+    paintClock();
     const price = base() - off;
+    $('glance-price').textContent = money(price).replace('.00', '');
+    $('glance-gift').hidden = !off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;
     const amount = total();
@@ -61,7 +76,7 @@
   }
   function setButton() {
     button.disabled = busy || !config?.available || !(formReady || hosted);
-    label.textContent = busy ? 'Processing…' : 'Complete Order';
+    label.textContent = busy ? 'Processing…' : 'Get My Debt-Free Date';
   }
 
   async function refresh() {
@@ -70,6 +85,7 @@
     config = await response.json();
     offer = config.offer || null;
     serverOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
+    if (offer?.expiresAt && offer.loopMs > 0) reserve = offer;
     paint();
   }
 
@@ -154,12 +170,11 @@
     busy = false; setButton(); paint();
   }
 
-  // Never charge a total the buyer hasn't seen (a late timer can leave an
-  // ended offer on screen for a moment).
+  // Never charge a total the buyer hasn't seen.
   function totalChanged() {
     if (total() === shown) return false;
     paint();
-    status.textContent = 'The checkout offer has ended. Review the updated total and continue when you’re ready.';
+    status.textContent = 'Your total changed. Review the updated total and continue when you’re ready.';
     return true;
   }
   form.addEventListener('submit', async submit => {
@@ -219,15 +234,11 @@
   window.addEventListener('pageshow', event => { if (event.persisted) { busy = false; setButton(); } });
 
   paint();
+  setInterval(paintClock, 1000);
   refresh().then(() => {
     if (!config.available) status.textContent = config.preview ? 'Payments are disabled in the local preview.' : 'Purchases are temporarily unavailable. Please try again later or contact support@bookmarketel.com.';
     else startStripe();
     setButton();
-    setInterval(() => {
-      if (!offer || offer.discountCents <= 0) return;
-      if (offerLeft() <= 0) offer.discountCents = 0;
-      paint();
-    }, 1000);
   }).catch(() => {
     status.textContent = 'Please reload to try again or contact support@bookmarketel.com.';
     setButton();

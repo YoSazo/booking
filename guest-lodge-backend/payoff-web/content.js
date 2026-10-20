@@ -58,7 +58,7 @@ window.PAYOFF_CONTENT = {
     caption: '',
   },
   productImage: { src: '/payoff/assets/tool-result.jpg', alt: 'Marketel Payoff showing a debt-free date and five plans compared' },
-  refundPolicy: '30-day money-back guarantee. Email support@bookmarketel.com with your order reference within 30 days of purchase for a full refund, including any extras you bought.' ,
+  refundPolicy: '30-day money-back guarantee. To request a refund, email support@bookmarketel.com with your order reference. See our Terms & Conditions for refund eligibility.' ,
   addOns: [
     { id: 'cashflow', name: 'Cash-flow calendar', priceCents: 2200 },
     { id: 'reset', name: 'Spending reset', priceCents: 900 },

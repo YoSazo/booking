@@ -64,7 +64,7 @@ The quiz is paced like the ad:
   10 minutes and get an extra $5 off".
   - The 10 minutes start at the first answer and are counted on the server
     (`/api/payoff/quiz`, signed `payoff_quiz` cookie).
-  - Finishing in time unlocks the $5. Its own 30 minutes still start at
+  - Finishing in time unlocks the $5. Its own repeating clock starts at
     checkout.
   - Quiz visitors who finish late, or not at all, get no offer cookie at
     checkout and pay $33. The letter's visitors are unaffected.
@@ -77,16 +77,26 @@ on purchases per visitor of each version.
 
 ## Order page
 
-`order.html`, `order.css` and `order.js` copy a proven one-step order form
-(True Money Saver's), measured at 414px:
-1. A bold line, then one white card holding the name and email fields, the
-   product table, the two extras and the order summary.
+`order.html`, `order.css` and `order.js` follow the reference two-step order
+page (The Last Wish's), in this order:
+1. The first screen, before any field: a green header "Your Debt-Free Date &
+   Payoff Plan / Is Reserved For: MM : SS", the device picture, "(Valued at
+   $375 -> Today Only $28)" with "Includes your FREE $5 gift", and a trust box
+   (guarantee seal, 30-day money-back guarantee, "Secure checkout, powered by
+   Stripe", card logos). A browser test keeps all of it on the first screen of
+   phones from 375x667 to 414x736.
+2. One white card: "Contact Details" (labeled name and email), "Payment
+   Information" (wallet buttons, OR, Stripe's card fields), the product line,
+   the two extras, the order summary and the two-line button "Get My Debt-Free
+   Date / Opens right after you pay".
    - The extras sit in dashed cream boxes with a yellow bar, a blinking red
-     arrow, a green headline and a red underlined offer line.
-2. Stripe's payment fields, and Complete Order.
-3. Under the card: card logos, the guarantee lines and the gold seal.
+     arrow, a green headline and a short "ONE TIME OFFER" paragraph ending
+     "This is a one-time offer, and you will never see this price again."
+3. Under the card: the gold seal, the guarantee lines and card logos.
 4. A grey column with "Here's what happens when you order today:", the
    crossed-out Total Value, four comment screenshots and the device image.
+5. A footer with Terms & Conditions | Privacy Policy and the copyright line,
+   as on every Payoff page.
 
 The page uses Montserrat and Open Sans, self-hosted in `assets/` (SIL OFL).
 On desktop the grey column sits beside the form.
@@ -95,42 +105,58 @@ The payment happens on the page:
 - Stripe's Payment Element and Express Checkout Element (Apple Pay, Google Pay,
   or a pay-later button where the reference has PayPal) mount without a
   payment existing. Ticking an extra updates their amount.
-- Complete Order checks the name, email and Stripe's fields, then
+- The button checks the name, email and Stripe's fields, then
   `/api/payoff/pay` creates a PaymentIntent at server prices (metadata
   `checkout: embedded`), and Stripe confirms it.
 - Retrying the same order reuses the payment.
 - Stripe.js loads only when `/api/payoff/config` returns `stripeKey` (the
   publishable key of the billing account, as for Claims).
-- Without it, or if Stripe's fields can't load, Complete Order opens Stripe's
+- Without it, or if Stripe’s fields can’t load, the button opens Stripe's
   hosted page (`/api/payoff/checkout`) instead.
 
-## Checkout offer
+## Free $5 gift and the reservation clock
 
-The order page offers $5 off the $33 plan for 30 minutes. A signed, HttpOnly
-cookie keeps the original deadline across reloads. The offer shows in a red bar
-pinned to the top of the order page, and as a row in the order summary, both
-with the clock. Optional extras remain $22 and $9.
+Every order page visitor gets a free $5 gift on the $33 plan ("Free gift: $5
+off" in the summary, $28 total). Optional extras remain $22 and $9. A signed,
+HttpOnly cookie anchors the gift's clock across reloads.
 
-The server only honours the offer while it is running. Complete Order never
-charges a total the buyer hasn't seen: if the offer ended on screen late, it
-repaints and asks them to review. On the hosted fallback, Stripe applies the
-fixed-amount coupon `marketel-payoff-checkout-5-v1`.
+The "Is Reserved For" clock counts down from 05:00 and starts again at 00:00,
+forever: neither the order nor the gift ever ends, and the server always
+honours the $5. This is a deliberate owner decision (October 20, 2026) and a
+knowing exception to the real-deadline rule in `docs/wedges/FRAMEWORK.md`; do
+not "fix" it back to an expiring offer without the owner. Cookies issued under
+the old 30-minute offer join the loop. On the hosted fallback, Stripe applies
+the fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
 The sales page's price blocks copy the reference letter: "(Reg. price $375)"
 crossed out, then one bold line worded three ways (`Today:`, `Sale Price:`,
 `SALE PRICE:`), then the orange pill button. They preview offer eligibility without starting
 the timer. While the extra $5 applies, the sale price is crossed out too:
-"~~(Reg. price $375)~~ / ~~Today: $33~~ / Today: $28 ($5 off · 15% off)". A red
-bar pinned to the top of the letter says "You've got an extra $5 off! Your 30
-minutes start at checkout", or shows the running clock once checkout started
-it. Stripe
+"~~(Reg. price $375)~~ / ~~Today: $33~~ / Today: $28 ($5 off · 15% off)". The
+letter has no bar or clock; the reservation clock is on the order page only.
+Stripe
 offers the payment methods enabled in the Dashboard (Cash App Pay, Klarna,
 Afterpay and others when the buyer is eligible). An unpaid delayed payment
 does not unlock access.
 
-The owner offers a full refund within 30 days of purchase, including extras.
-The guarantee appears on the sales page, at checkout, in the terms and in
-access emails.
+The pages show a "30-day money-back guarantee" without details; the terms'
+Refund Eligibility Requirements (copied from the reference) define it: 30
+consecutive days of documented use, then a request within 90 days of purchase,
+including extras. The request window must stay longer than the required use,
+or no one could qualify. Short copy (the letter's FAQ, receipt email, Stripe's
+note, the privacy policy) points to the terms instead of promising "within 30
+days". A test checks every page names the same 30 days. Orders placed before
+October 20, 2026 keep the unconditional guarantee they were sold with.
+
+## Terms and privacy
+
+`terms.html` (`/payoff/terms`) has the offer, delivery, guarantee, Refund
+Eligibility Requirements, a Disclaimer (educational purposes only, no
+guaranteed results, you are responsible for your decisions, assumption of
+risk, limitation of liability) and planning estimates. `privacy.html`
+(`/payoff/privacy`) follows the reference's eight sections and adds nothing
+beyond them except two true lines: the hashed email and name sent to Meta, and
+balances never leaving the device.
 
 ## Access
 

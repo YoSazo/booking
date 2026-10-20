@@ -172,7 +172,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     res.set('Content-Security-Policy', META_CSP);
     res.sendFile(path.join(ROOT, landing(req, res) === 'quiz' ? 'quiz.html' : 'index.html'));
   });
-  for (const [route, file] of [['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/app', 'app.html']]) {
+  for (const [route, file] of [['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
       if (file === 'order.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
       else if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
@@ -241,7 +241,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         try {
           await mail.sendMail(accessMail(email, order.id, [
             ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
-            ...(orderDiscount(order) ? ['Checkout offer: −$5.00'] : []),
+            ...(orderDiscount(order) ? ['Free gift: −$5.00'] : []),
             `Total paid: $${(order.totalCents / 100).toFixed(2)} USD. One payment, no subscription.`,
             `Order reference: ${order.id}`,
             ...(ids.length > 1 ? ['', `Your ${ids.slice(1).map(id => ITEMS[id].name.toLowerCase()).join(' and ')} ${ids.length > 2 ? 'are' : 'is'} inside Payoff, in the tabs at the top.`] : []),
@@ -267,7 +267,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         accessUrl(id), '',
         'Keep this email. The link opens your plan on any phone or computer. Your numbers stay on the device where you type them.', '',
         ...(lines.length ? [...lines, ''] : []),
-        '30-day money-back guarantee: reply to this email or contact support@bookmarketel.com with your order reference within 30 days of purchase for a full refund, including any extras.',
+        '30-day money-back guarantee: to request a refund, reply to this email or contact support@bookmarketel.com with your order reference. Refund eligibility is set out in the terms:',
         `${origin}/payoff/terms`,
       ].join('\n') };
   }
@@ -294,7 +294,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (req.query.offer === 'preview') {
       const token = offerCookie(req), existing = token ? readOffer(secret, token, now()) : null;
       config.checkoutOffer = { discountCents: config.available ? (token ? existing?.discountCents || 0 : quizMissed ? 0 : OFFER.discountCents) : 0,
-        durationMs: OFFER.durationMs, expiresAt: existing?.expiresAt || null };
+        durationMs: OFFER.durationMs, loopMs: OFFER.loopMs, expiresAt: existing?.expiresAt || null };
       config.serverNow = now();
     }
     res.json(config);
@@ -316,7 +316,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     const token = offerCookie(req), offer = token ? readOffer(secret, token, now()) : null;
     res.json({ available: available(), windowMs: QUIZ.windowMs, discountCents: OFFER.discountCents, serverNow: now(),
       quiz: quiz ? { deadline: quiz.deadline, finished: !!quiz.finishAt, earned: quiz.earned } : null,
-      checkoutOffer: offer ? { expiresAt: offer.expiresAt, discountCents: offer.discountCents } : null });
+      checkoutOffer: offer ? { expiresAt: offer.expiresAt, discountCents: offer.discountCents, loopMs: offer.loopMs } : null });
   });
   api.get('/quiz', quizDeal('state'));
   api.post('/quiz', quizDeal(null));
@@ -391,7 +391,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,
         product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
       ...(coupon ? { discounts: [{ coupon }] } : {}),
-      custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. 30-day money-back guarantee: request a full refund at support@bookmarketel.com.' } },
+      custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. 30-day money-back guarantee: see our terms for refund eligibility.' } },
       success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,
       metadata, payment_intent_data: { metadata },

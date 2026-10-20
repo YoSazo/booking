@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#ffffff">
   <title>Marketel Payoff — your debt-free date</title>
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/app.css?v=3">
+  <link rel="stylesheet" href="/payoff/app.css?v=4">
   <script src="/payoff/engine.js?v=2" defer></script>
   <script src="/payoff/app.js?v=3" defer></script>
 </head>
@@ -60,6 +60,8 @@
 
     <section class="view" id="result" hidden>
       <button class="link-back" id="edit-debts" type="button">← Edit my debts</button>
+      <div class="result-grid">
+      <div class="result-main">
       <div class="date-card">
         <p class="date-label" id="date-label">Debt-free</p>
         <p class="date-big" id="date-big"></p>
@@ -79,7 +81,9 @@
         <label class="field"><span>One-time amount, like a tax refund</span>
           <span class="money-input"><b>$</b><input id="one-time" inputmode="decimal" autocomplete="off" placeholder="0"></span></label>
       </div>
+      </div>
 
+      <div class="result-side">
       <h2>Compare plans</h2>
       <p class="muted small">Same money every month. Tap a plan to see its order and schedule.</p>
       <div class="plans" id="plans"></div>
@@ -99,6 +103,8 @@
       </div>
       <p class="fine">Your numbers stay on this phone. They are never sent to us.</p>
       <p class="fine">Estimates only, not financial advice. Interest is the yearly rate ÷ 12 each month, with no new charges, fees or rate changes. Your lender’s statement is the source of truth.</p>
+      </div>
+      </div>
     </section>
 
     <section class="view" id="cashflow" hidden>

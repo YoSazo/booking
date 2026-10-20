@@ -202,7 +202,18 @@ select { width: 100%; min-height: 52px; padding: 10px 12px; border: 1.5px solid 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
+/* Computers: the date and "What if" stay in view on the left while the plans
+   and schedule scroll on the right. Phones keep the single column. */
+@media (min-width: 1000px) {
+  main:has(> #result:not([hidden])) { max-width: 1120px; padding-left: 32px; padding-right: 32px; }
+  .result-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; align-items: start; }
+  .result-main { position: sticky; top: 16px; }
+  .result-side > h2:first-child { margin-top: 0; }
+}
+
 @media print {
+  .result-grid { display: block; }
+  .result-main { position: static; }
   body { background: #fff; font-size: 12px; }
   .bar, .link-back, .whatif, .actions, .sheet-backdrop, .toast, #cashflow, #reset { display: none !important; }
   main { max-width: none; padding: 0; }

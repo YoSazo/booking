@@ -108,45 +108,17 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     try { first = sessionStorage.getItem('payoff.variantSent') !== visitor; sessionStorage.setItem('payoff.variantSent', visitor || ''); } catch { /* Send it. */ }
     if (first) event('PayoffVariant', variant);
   }
-  // Preview eligibility without starting or resetting the checkout deadline.
-  let salesTimer, salesDeadline = null;
+  // The price blocks show the free $5 gift whenever this visitor has it. Only
+  // looks: the gift's clock starts at checkout, and it never ends.
   let salesActive = false;
   const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => window.PAYOFF_PAINT_PRICE(box, active ? 2800 : 3300)));
-  // The letter's bar: the extra $5 they have, and its clock once checkout started it.
-  let salesOffer = null, salesOffset = 0;
-  const salesClock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
-  const paintSalesBar = () => {
-    const bar = document.getElementById('offer-bar');
-    if (!bar || document.body.dataset.variant !== 'letter') return;
-    const left = salesOffer?.expiresAt ? salesOffer.expiresAt - Date.now() - salesOffset : null;
-    const state = !salesOffer || salesOffer.discountCents !== 500 ? null : left === null ? 'offered' : left > 0 ? 'running' : null;
-    bar.hidden = !state;
-    if (!state) return;
-    document.getElementById('deal-emoji').textContent = state === 'offered' ? '🎁' : '🎉';
-    document.getElementById('deal-lead').textContent = state === 'offered' ? 'You’ve got an extra $5 off!' : 'You got an extra $5 off! It’s saved for you for';
-    const clock = document.getElementById('deal-clock');
-    clock.hidden = state !== 'running'; clock.textContent = state === 'running' ? salesClock(left) : '';
-    document.getElementById('deal-rest').textContent = state === 'offered' ? 'Your 30 minutes start at checkout.' : '';
-  };
-  setInterval(paintSalesBar, 1000);
   window.PayoffTrack = { event, pixel, attribution, visitor, headers, paintOffers: () => paintSalesOffer(salesActive) };
-  const refreshSalesOffer = () => {
-    if (salesDeadline && Date.now() >= salesDeadline) paintSalesOffer(false);
-    return fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
-      if (!response.ok) throw new Error('Unavailable');
-      return response.json();
-    }).then(config => {
-      const offer = config.checkoutOffer;
-      if (!offer) return;
-      salesOffer = offer; salesOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
-      paintSalesBar();
-      clearTimeout(salesTimer);
-      const remaining = offer.expiresAt ? offer.expiresAt - config.serverNow : null;
-      salesDeadline = remaining === null ? null : Date.now() + remaining;
-      paintSalesOffer(offer.discountCents === 500 && (remaining === null || remaining > 0));
-      if (remaining > 0) salesTimer = setTimeout(() => paintSalesOffer(false), remaining);
-    }).catch(() => { /* The sale price and checkout link remain usable. */ });
-  };
+  const refreshSalesOffer = () => fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
+    if (!response.ok) throw new Error('Unavailable');
+    return response.json();
+  }).then(config => {
+    if (config.checkoutOffer) paintSalesOffer(config.checkoutOffer.discountCents === 500);
+  }).catch(() => { /* The sale price and checkout link remain usable. */ });
   refreshSalesOffer();
   window.addEventListener('pageshow', event => { if (event.persisted) refreshSalesOffer(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSalesOffer(); });

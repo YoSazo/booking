@@ -407,8 +407,8 @@
   ];
 
   // The quiz's deal: finish the plan within the window from the first answer
-  // and the $5 is theirs; its own 30 minutes start at checkout. The server
-  // keeps both clocks, so the bar here only ever says what is true.
+  // and the $5 is theirs; its repeating checkout clock starts at checkout.
+  // The server keeps both clocks.
   let deal = null, offset = 0;
   const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
   const minutes = ms => `${Math.round(ms / 60000)} minutes`;
@@ -424,7 +424,11 @@
   function dealState() {
     if (!deal?.available) return { kind: 'none' };
     const now = Date.now() + offset, offer = deal.checkoutOffer;
-    if (offer) return offer.discountCents > 0 && offer.expiresAt > now ? { kind: 'checkout', left: offer.expiresAt - now } : { kind: 'none' };
+    if (offer) {
+      if (!(offer.discountCents > 0)) return { kind: 'none' };
+      if (offer.loopMs > 0) while (offer.expiresAt <= now) offer.expiresAt += offer.loopMs;
+      return offer.expiresAt > now ? { kind: 'checkout', left: offer.expiresAt - now } : { kind: 'none' };
+    }
     if (!deal.quiz) return { kind: 'offered' };
     if (deal.quiz.earned) return { kind: 'earned' };
     if (!deal.quiz.finished && deal.quiz.deadline > now) return { kind: 'running', left: deal.quiz.deadline - now };
@@ -435,7 +439,7 @@
     const text = {
       offered: ['🎁', `Finish in ${minutes(deal?.windowMs || 600000)} for an extra $5 off`, null, ''],
       running: ['🎁', 'Finish in', clock(state.left), 'to unlock an extra $5 off'],
-      earned: ['🎉', 'You unlocked an extra $5 off!', null, 'Your 30 minutes start at checkout.'],
+      earned: ['🎉', 'You unlocked an extra $5 off!', null, 'It’s reserved for you at checkout.'],
       checkout: ['🎉', 'You got an extra $5 off! It’s saved for you for', clock(state.left), ''],
     }[state.kind];
     bar.hidden = !text;
@@ -454,7 +458,7 @@
     }
     saved.hidden = !discounted;
     if (discounted) saved.textContent = state.kind === 'earned'
-      ? 'Your 30 minutes to use the extra $5 start when you open checkout.'
+      ? 'Your extra $5 is reserved for you when you open checkout.'
       : `Your extra $5 off is saved for you for ${clock(state.left)}.`;
   }
   setInterval(paintOffer, 1000);

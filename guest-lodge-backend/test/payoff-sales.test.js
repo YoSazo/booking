@@ -53,7 +53,7 @@ const SECRET = 'payoff-test-secret';
 
 test('Payoff pages and assets are published without exposing source documents or catching other products', async () => {
   await serve(fixture(), async ({ base }) => {
-    for (const route of ['/payoff', '/payoff/', '/payoff/order', '/payoff/confirmation', '/payoff/terms', '/payoff/checkout.js', '/payoff/app', '/payoff/app.js', '/payoff/app.css', '/payoff/engine.js', '/payoff/assets/tool-result.jpg']) {
+    for (const route of ['/payoff', '/payoff/', '/payoff/order', '/payoff/confirmation', '/payoff/terms', '/payoff/privacy', '/payoff/checkout.js', '/payoff/app', '/payoff/app.js', '/payoff/app.css', '/payoff/engine.js', '/payoff/assets/tool-result.jpg']) {
       const r = await fetch(base + route); assert.equal(r.status, 200, route); assert.equal(r.headers.get('cache-control'), 'no-store');
     }
     for (const brand of ['visa', 'mastercard', 'americanexpress', 'discover', 'cashapp', 'klarna']) {
@@ -91,6 +91,36 @@ test('Payoff pages and assets are published without exposing source documents or
     assert.equal(fontResponse.status, 200); assert.match(fontResponse.headers.get('content-type'), /font\/woff2/);
     assert.equal(fontResponse.headers.get('cache-control'), 'public, max-age=31536000, immutable');
   });
+});
+test('the terms carry the disclaimer, the privacy policy is Payoff\'s own, and every page states the same 30-day guarantee', async () => {
+  await serve(fixture(), async ({ base }) => {
+    const terms = await (await fetch(base + '/payoff/terms')).text();
+    assert.match(terms, /<h1>Marketel Payoff Terms &amp; Conditions<\/h1>/);
+    for (const heading of ['Disclaimer', 'Educational purposes only', 'No guaranteed results', 'You are responsible for your decisions', 'Assumption of risk', 'Limitation of liability']) assert.match(terms, new RegExp(`>${heading}<`), heading);
+    assert.match(terms, /free \$5 gift/);
+    assert.doesNotMatch(terms, /30-minute|minute window/);
+    for (const heading of ['Refund Eligibility Requirements', 'Duration of Product Usage', 'Submission of Proof', 'Evaluation Process', 'Refund Consideration', 'Time Limit for Submission', 'Non-Transferability', 'Discretionary Authority']) assert.match(terms, new RegExp(`>${heading}<`), heading);
+    assert.match(terms, /thirty \(30\) consecutive days/);
+    assert.match(terms, /within ninety \(90\) days after their purchase/, 'the request window is longer than the required use');
+    assert.match(terms, /Your applicable consumer rights are unaffected/);
+    const privacy = await (await fetch(base + '/payoff/privacy')).text();
+    assert.match(privacy, /<h1>Marketel Payoff Privacy Policy<\/h1>/);
+    assert.match(privacy, /stay on your device and are not sent to us/);
+    assert.match(privacy, /hashed before they are sent/);
+    for (const route of ['/payoff', '/payoff/order', '/payoff/confirmation', '/payoff/terms', '/payoff/privacy']) {
+      const html = await (await fetch(base + route)).text();
+      assert.match(html, /<a href="\/payoff\/terms"[^>]*>Terms &amp; Conditions<\/a> \| <a href="\/payoff\/privacy"[^>]*>Privacy Policy<\/a>/, route);
+      assert.match(html, /Copyright 2026 Marketel\. All Rights Reserved\./, route);
+    }
+  });
+  // The badge and the terms must never disagree: one number of days, everywhere.
+  const sources = ['payoff.js', 'payoff-web/content.js', 'payoff-web/page.js', 'payoff-web/order.html', 'payoff-web/terms.html', 'payoff-web/privacy.html']
+    .map(file => [file, fs.readFileSync(path.join(__dirname, '..', file), 'utf8')]);
+  for (const [file, text] of sources) {
+    const days = [...text.matchAll(/(\d+)-day money-back|money-back guarantee for (\d+) days|within (\d+) days of purchase|(\d+)-DAY/g)].map(m => m.slice(1).find(Boolean));
+    assert.ok(days.length, `${file} states the guarantee`);
+    assert.deepEqual([...new Set(days)], ['30'], file);
+  }
 });
 test('checkout charges server prices for Payoff and any extras, opens the tool on return, and keeps idempotency', async () => {
   const w = fixture();
@@ -302,7 +332,7 @@ test('Meta hears nothing from the owner, no-track browsers, test browsers or san
   assert.deepEqual(w.capi, []);
 });
 
-test('checkout offer survives reload and restart, discounts only the base, and fulfills a discounted purchase', async () => {
+test('the free $5 gift survives reload and restart, discounts only the base, fulfills a discounted purchase, and its clock loops every 5 minutes without ending', async () => {
   let time = Date.parse('2026-10-19T18:00:00Z');
   const w = fixture({ clock: () => time });
   await serve(w, async ({ base, post }) => {
@@ -310,9 +340,10 @@ test('checkout offer survives reload and restart, discounts only the base, and f
     const cookie = response.headers.get('set-cookie').split(';')[0];
     const first = await response.json();
     assert.equal(first.offer.basePriceCents, 2800);
-    assert.equal(first.offer.expiresAt, time + 30 * 60000);
+    assert.equal(first.offer.expiresAt, time + 5 * 60000);
+    assert.equal(first.offer.loopMs, 5 * 60000);
     assert.match(response.headers.get('set-cookie'), /HttpOnly/);
-    time += 5 * 60000;
+    time += 2 * 60000;
     const repeated = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
     assert.equal(repeated.offer.expiresAt, first.offer.expiresAt);
     await serve(fixture({ clock: () => time }), async ({ base: restarted }) => {
@@ -331,18 +362,31 @@ test('checkout offer survives reload and restart, discounts only the base, and f
     const confirmed = await post('/api/payoff/confirm', { sessionId: purchase.id });
     assert.equal(confirmed.status, 200); assert.equal(confirmed.body.totalCents, 5900);
     assert.deepEqual(confirmed.body.extras, ['cashflow', 'reset']);
-    assert.match(w.emails[0].text, /Checkout offer: −\$5\.00/);
+    assert.match(w.emails[0].text, /Free gift: −\$5\.00/);
     assert.match(w.emails[0].text, /Total paid: \$59\.00/);
     assert.equal(w.capi.find(event => event.name === 'Purchase').value, 59);
+    // 28 minutes in: the clock has started over five times and the gift remains.
     time += 26 * 60000;
-    const ended = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
-    assert.equal(ended.offer.discountCents, 0); assert.equal(ended.offer.basePriceCents, 3300);
-    assert.equal(ended.offer.expiresAt, first.offer.expiresAt);
-    const count = w.creates.length;
-    assert.equal((await post('/api/payoff/checkout', body, { cookie })).status, 409);
-    assert.equal(w.creates.length, count);
-    assert.equal((await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 3300 }), { cookie })).body.value, 33);
+    const looped = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
+    assert.equal(looped.offer.discountCents, 500); assert.equal(looped.offer.basePriceCents, 2800);
+    assert.equal(looped.offer.expiresAt, first.offer.expiresAt + 25 * 60000);
+    // Exactly at a boundary the next five minutes begin.
+    time = looped.offer.expiresAt;
+    assert.equal((await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json()).offer.expiresAt, time + 5 * 60000);
+    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59);
+    time += 3 * 24 * 60 * 60000 + 1234;
+    assert.equal((await post('/api/payoff/pay', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie })).status, 200, 'days later the $28 total is still accepted');
   });
+});
+
+test('an offer cookie issued under the old 30-minute window joins the 5-minute loop', () => {
+  const { issueOffer, readOffer } = require('../payoff-offer');
+  const start = Date.parse('2026-10-19T18:00:00Z');
+  // Old tokens stored issue time + 30 minutes, which is what issuing 25 minutes later now stores.
+  const old = issueOffer(SECRET, start + 25 * 60000);
+  assert.deepEqual(readOffer(SECRET, old, start + 10 * 60000), { expiresAt: start + 15 * 60000, discountCents: 500, loopMs: 300000 });
+  assert.deepEqual(readOffer(SECRET, old, start + 31 * 60000), { expiresAt: start + 35 * 60000, discountCents: 500, loopMs: 300000 });
+  assert.equal(readOffer(SECRET, old.replace(/.$/, old.endsWith('A') ? 'B' : 'A'), start), null);
 });
 
 test('forged offers and unrecognized discounted payments cannot grant a discount or access', async () => {
@@ -395,7 +439,7 @@ test('a delayed payment unlocks only after Stripe confirms success, and repeated
   assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffPaid').length, 1);
 });
 
-test('the landing previews the actual offer without issuing or restarting its deadline', async () => {
+test('the landing previews the free gift without issuing or restarting its clock, and the gift never ends', async () => {
   let time = Date.now(); const w = fixture({ clock: () => time });
   await serve(w, async ({ base }) => {
     const preview = await fetch(base + '/api/payoff/config?offer=preview');
@@ -407,11 +451,12 @@ test('the landing previews the actual offer without issuing or restarting its de
     time += 10 * 60000;
     const ongoing = await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } });
     assert.equal(ongoing.headers.get('set-cookie'), null);
-    assert.equal((await ongoing.json()).checkoutOffer.expiresAt, expiresAt);
+    const shown = (await ongoing.json()).checkoutOffer;
+    assert.equal(shown.expiresAt, expiresAt + 10 * 60000); assert.equal(shown.loopMs, 300000);
     time += 21 * 60000;
-    const ended = await (await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } })).json();
-    assert.equal(ended.checkoutOffer.discountCents, 0);
-    assert.equal(ended.checkoutOffer.expiresAt, expiresAt);
+    const later = await (await fetch(base + '/api/payoff/config?offer=preview', { headers: { cookie } })).json();
+    assert.equal(later.checkoutOffer.discountCents, 500);
+    assert.equal(later.checkoutOffer.expiresAt, expiresAt + 30 * 60000);
   });
 });
 
@@ -557,7 +602,7 @@ test('the landing version and quiz steps are recorded by name only, never with n
   });
   assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]), [['PayoffVariant', 'quiz'], ['PayoffQuizStep', 'reveal']]);
 });
-test('the quiz earns the $5 only by finishing within 10 minutes; its 30 minutes still start at checkout; the letter is unaffected', async () => {
+test('the quiz earns the $5 only by finishing within 10 minutes; its looping clock starts at checkout; the letter is unaffected', async () => {
   let time = Date.parse('2026-10-19T20:00:00Z');
   const w = fixture({ clock: () => time });
   await serve(w, async ({ base }) => {
@@ -580,7 +625,7 @@ test('the quiz earns the $5 only by finishing within 10 minutes; its 30 minutes 
     quiz = finished.cookie;
     time += 60000;
     const checkout = await call('/api/payoff/config?offer=1', null, quiz);
-    assert.equal(checkout.body.offer.expiresAt, time + 30 * 60000, 'the 30 minutes start at checkout');
+    assert.equal(checkout.body.offer.expiresAt, time + 5 * 60000, 'the clock starts at checkout');
     // Too slow: no offer at checkout, now or later, and the preview says so.
     time += 60 * 60000;
     const slow = (await call('/api/payoff/quiz', { action: 'start' })).cookie;
