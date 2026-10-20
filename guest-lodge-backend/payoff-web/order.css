@@ -52,6 +52,9 @@ img { max-width: 100%; }
 .oto { color: #c30; font-weight: 700; text-decoration: underline; }
 .bump-copy { margin: 6px 2px 8px; font-size: 13px; line-height: 1.45; }
 .bump-copy b { font-weight: 700; }
+.bump-price { margin: 0 2px 8px; font-size: 14px; }
+.bump-price s { font-weight: 700; }
+.bump-price b { font-weight: 700; }
 .bump-image { display: block; width: 100%; height: auto; }
 /* The reference arrow is an animated image: on 270ms, off 230ms, on 70ms. */
 @keyframes bump-arrow { 0% { opacity: 1; } 47.37% { opacity: 0; } 87.72% { opacity: 1; } }

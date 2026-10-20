@@ -12,7 +12,7 @@
   const REGULAR_CENTS = 37500;
   const EXTRAS = [{ id: 'cashflow', name: 'Cash-flow calendar', cents: 2200 }, { id: 'reset', name: 'Spending reset', cents: 900 }];
   const RETURN_URL = location.origin + '/payoff/app';
-  let config = null, offer = null, serverOffset = 0, attempt = null;
+  let config = null, offer = null, attempt = null;
   let stripe = null, cardElements = null, expressElements = null, formReady = false, hosted = false, busy = false, payment = null, quoted = null, shown = null;
 
   const money = cents => (cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
@@ -21,15 +21,17 @@
   const base = () => config?.priceCents || 3300;
   const discount = () => (offer && offer.discountCents > 0 ? offer.discountCents : 0);
   const total = () => base() - discount() + selected().reduce((sum, extra) => sum + priceOf(extra), 0);
-  // The "reserved for" clock repeats every five minutes and never ends the
-  // order or the gift. It follows the gift's server clock when there is one.
-  const LOOP_MS = 5 * 60 * 1000;
-  let reserve = { expiresAt: Date.now() + LOOP_MS, loopMs: LOOP_MS };
-  const reserveLeft = () => {
-    const now = Date.now() + serverOffset;
-    while (reserve.expiresAt <= now) reserve.expiresAt += reserve.loopMs;
-    return reserve.expiresAt - now;
-  };
+  // The "reserved for" clock: five minutes, carried through reloads; at 00:00
+  // it stays there, and the next page load starts a new five minutes. It never
+  // ends the order or the gift, which the server honours whatever it shows.
+  const RESERVE_MS = 5 * 60 * 1000, RESERVE = 'payoff.reserveEnd';
+  let reserveEnd = Date.now() + RESERVE_MS;
+  try {
+    const saved = Number(localStorage.getItem(RESERVE));
+    if (saved > Date.now() && saved <= Date.now() + RESERVE_MS) reserveEnd = saved;
+    localStorage.setItem(RESERVE, String(reserveEnd));
+  } catch { /* A fresh five minutes on each visit. */ }
+  const reserveLeft = () => Math.max(0, reserveEnd - Date.now());
   const pad = value => String(value).padStart(2, '0');
   function paintClock() {
     $('reserve-clock').hidden = config?.available === false;
@@ -84,8 +86,6 @@
     if (!response.ok) throw new Error('Unavailable');
     config = await response.json();
     offer = config.offer || null;
-    serverOffset = Number.isFinite(config.serverNow) ? config.serverNow - Date.now() : 0;
-    if (offer?.expiresAt && offer.loopMs > 0) reserve = offer;
     paint();
   }
 

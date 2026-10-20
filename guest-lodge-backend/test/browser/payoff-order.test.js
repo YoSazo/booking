@@ -109,7 +109,9 @@ test('the order page follows the reference: reservation, product, price and safe
   const order = await page.evaluate(() => ['#payment-element', '.product', '.bumps', '#order-summary', '#buy-button']
     .map(sel => document.querySelector(sel).getBoundingClientRect().top));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
-  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This is a one-time offer, and you will never see this price again\. \(Just \$\d+ today\)$/);
+  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This is a one-time offer, and you will never see this price again\.$/);
+  assert.deepEqual(await page.locator('.bump-price').allInnerTexts(), ['Regular price: $79 Today only $22!', 'Regular price: $49 Today only $9!']);
+  assert.equal(await page.locator('.bump-price s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.00/);
   assert.equal(await page.locator('.bump').count(), 2);
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
@@ -304,22 +306,31 @@ test("Meta's pixel never loads for the owner, over http, or in the tool", async 
 });
 
 const reserveClock = async page => `${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`;
-test('the free gift shows in the summary and survives reload; the reservation clock starts over at 00:00 without changing the total or the extras', async () => world(async ({ page, base, advanceTime }) => {
+test('the free gift survives reload; the reservation clock carries on through a reload, stays at 00:00, and the next load after that starts a new 05:00', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
+  assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
   await page.locator('#cashflow').check();
   assert.equal(await page.locator('#order-total').innerText(), '$50.00');
-  advanceTime(12 * 60000);
+  // Two minutes in, a reload carries on instead of starting over.
+  await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.now() + 2 * 60000 + 30000)));
   await page.reload(); await ready(page);
+  assert.match(await reserveClock(page), /^(02:30|02:2\d)$/, 'a reload carries on');
   assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
-  assert.match(await reserveClock(page), /^(03:00|02:5\d)$/, 'the clock follows the server across reloads');
   assert.equal(await page.locator('#order-total').innerText(), '$50.00');
-  // Past 00:00 in the browser: the clock starts again at five minutes.
-  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000 + 2000; });
+  // At 00:00 it stays there, and the total and extras do not change.
+  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000; });
   await page.waitForTimeout(1300);
-  assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
+  assert.equal(await reserveClock(page), '00:00');
+  await page.waitForTimeout(1100);
+  assert.equal(await reserveClock(page), '00:00', 'it stays at 00:00');
   assert.equal(await page.locator('#order-total').innerText(), '$50.00');
   assert.equal(await page.locator('#cashflow').isChecked(), true);
+  assert.equal(await page.locator('#glance-gift').isHidden(), false);
+  // The next load after 00:00 starts a new five minutes.
+  await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.parse('2026-01-01T00:00:00Z'))));
+  await page.reload(); await ready(page);
+  assert.match(await reserveClock(page), /^(05:00|04:5\d)$/, 'a new five minutes');
   advanceTime(31 * 60000);
   await page.reload(); await ready(page);
   assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
