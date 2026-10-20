@@ -37,6 +37,8 @@
     box.dataset.wording = wording;
     box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
     window.PAYOFF_PAINT_PRICE(box, content.priceCents);
+    // The first offer, as in the reference: the terms right under the button.
+    if (slot.dataset.placement === 'hero') box.append(element('p', 'offer-terms-line', 'One-time purchase. No monthly fees.\n30-day money-back guarantee.'));
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });

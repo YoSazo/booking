@@ -15,9 +15,10 @@ window.PAYOFF_CONTENT = {
     description: 'using Marketel Payoff to turn their balances into a clear plan for paying off debt.',
   },
   proof: {
+    // Right under the first offer, as plain comment screenshots.
     early: [
-      { src: '/payoff/assets/testimony-alexis-hannah-1de935f20a.webp', width: 1080, height: 1350, alt: 'Testimonials from Alexis and Hannah' },
-      { src: '/payoff/assets/email-to-lauren-a7fe45a539.webp', width: 1080, height: 1350, alt: 'Email from Jeanne to Lauren' },
+      { src: '/payoff/assets/comment-amanda-5fe641f7e2.webp', width: 748, height: 469, alt: 'Testimonial from Amanda' },
+      { src: '/payoff/assets/comment-megan-070b24c8d2.webp', width: 748, height: 471, alt: 'Testimonial from Megan' },
     ],
     problem: [
       { src: '/payoff/assets/testimony-heather-3689f2eb9b.webp', width: 1080, height: 810, alt: 'Testimonial from Heather' },
@@ -26,12 +27,12 @@ window.PAYOFF_CONTENT = {
     example: [
       { src: '/payoff/assets/testimony-barbara-55dfb61744.webp', width: 1080, height: 1350, alt: 'Testimonial from Barbara' },
       { src: '/payoff/assets/testimony-lindsay-f56c36ef82.webp', width: 1080, height: 810, alt: 'Testimonial from Lindsay' },
-      { src: '/payoff/assets/testimony-amanda-905b7e5b7e.webp', width: 1080, height: 810, alt: 'Testimonial from Amanda' },
+      { src: '/payoff/assets/testimony-alexis-hannah-1de935f20a.webp', width: 1080, height: 1350, alt: 'Testimonials from Alexis and Hannah' },
       { src: '/payoff/assets/testimony-tara-b1fb931c48.webp', width: 1080, height: 810, alt: 'Testimonial from Tara' },
     ],
     main: [
       { src: '/payoff/assets/testimony-nicole-342ee8a7e1.webp', width: 1080, height: 1350, alt: 'Testimonial from Nicole' },
-      { src: '/payoff/assets/testimony-megan-76f218cbd4.webp', width: 1080, height: 810, alt: 'Testimonial from Megan' },
+      { src: '/payoff/assets/email-to-lauren-a7fe45a539.webp', width: 1080, height: 1350, alt: 'Email from Jeanne to Lauren' },
       { src: '/payoff/assets/testimony-rachel-fd2b4acb7b.webp', width: 1080, height: 1350, alt: 'Email from Rachel to Lauren' },
       { src: '/payoff/assets/testimony-dana-cdbf3ec39d.webp', width: 1080, height: 1350, alt: 'Email from Dana to Lauren' },
       { src: '/payoff/assets/testimony-melissa-4c9cf6cc99.webp', width: 1080, height: 1350, alt: 'Email from Melissa to Lauren' },

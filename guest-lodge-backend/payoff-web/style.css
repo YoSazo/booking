@@ -70,3 +70,31 @@
 .offer-bar b{display:inline-block;min-width:3.1em;padding:1px 6px;border-radius:4px;background:#fefcbf;color:#c30;font-weight:800;font-variant-numeric:tabular-nums}
 .offer-bar #deal-rest{display:inline-block}
 .deal-emoji{display:inline-block;width:22px;height:22px;margin-top:-3px;border-radius:50%;background:#fefcbf;font-size:13px;line-height:22px;text-align:center;vertical-align:middle}
+/* The first screen, as in the reference: the terms under the first button, then
+   the stars, who uses it, and a real comment, before any scrolling. */
+.offer-terms-line{margin:14px 0 0;color:#333;font-size:12.5px;line-height:1.45;white-space:pre-line}
+.hero .rating-slot{margin:18px auto 14px}
+.hero .rating-stars{font-size:46px;letter-spacing:4px;line-height:1;margin:0 0 10px}
+.hero .rating-label{font-size:17px;line-height:1.35}
+.hero .rating-label strong{color:#b4214b}
+.hero .sales-offer{margin-bottom:0}
+/* Phones: the first screen is the hook. Everything needed to tap the button
+   (headline, price, button, guarantee, stars and who uses it) fits without
+   scrolling, from an iPhone SE to a Pro Max inside Facebook's browser: sizes
+   follow the screen's height, never below a readable floor or a 44px button.
+   Each value is given in vh first and in svh for browsers that know it. */
+@media(max-width:759px){
+  .offer-bar{padding:5px 10px;font-size:12.5px;line-height:1.3}
+  .offer-bar .deal-emoji{width:19px;height:19px;font-size:11px;line-height:19px}
+  .hero .wrap{padding-top:clamp(8px,2vh,22px);padding-top:clamp(8px,2svh,22px)}
+  .hero h1{font-size:clamp(21px,3.9vh,30px);font-size:clamp(21px,3.9svh,30px);line-height:1.14;margin:0 0 clamp(6px,1.6vh,18px);margin:0 0 clamp(6px,1.6svh,18px)}
+  .hero .lead{font-size:clamp(13.5px,2.45vh,17px);font-size:clamp(13.5px,2.45svh,17px);line-height:1.3;margin:0 0 clamp(6px,1.4vh,16px);margin:0 0 clamp(6px,1.4svh,16px)}
+  .hero .strong-line{font-size:clamp(14.5px,2.65vh,20px);font-size:clamp(14.5px,2.65svh,20px);line-height:1.25;margin:0}
+  .hero .sales-offer{margin:clamp(8px,1.8vh,24px) auto 0;margin:clamp(8px,1.8svh,24px) auto 0;padding:0;font-size:clamp(14px,2.5vh,16px);font-size:clamp(14px,2.5svh,16px);line-height:1.25}
+  .hero .sales-offer .cta{margin-top:clamp(8px,1.8vh,26px);margin-top:clamp(8px,1.8svh,26px)}
+  .hero .offer-terms-line{margin-top:clamp(4px,0.9vh,14px);margin-top:clamp(4px,0.9svh,14px);font-size:11.5px;line-height:1.35}
+  .hero .rating-slot{margin:clamp(6px,1.5vh,18px) auto clamp(8px,1.4vh,14px);margin:clamp(6px,1.5svh,18px) auto clamp(8px,1.4svh,14px)}
+  .hero .rating-stars{font-size:clamp(24px,4.6vh,46px);font-size:clamp(24px,4.6svh,46px);margin:0 0 clamp(2px,0.8vh,10px);margin:0 0 clamp(2px,0.8svh,10px)}
+  .hero .rating-label{font-size:clamp(13.5px,2.35vh,17px);font-size:clamp(13.5px,2.35svh,17px);line-height:1.3}
+}
+.nowrap{white-space:nowrap}

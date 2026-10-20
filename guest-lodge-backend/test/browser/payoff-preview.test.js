@@ -27,7 +27,8 @@ test('local composition has eight offers, fourteen images and reference-style ra
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
  assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
  assert.match(await page.locator('.rating-label').innerText(),/using Marketel Payoff to turn their balances into a clear plan for paying off debt\./);
- assert.equal(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize),'56px');
+ // The stars scale with the phone's height (24–46px) so the first screen fits.
+ const stars=parseFloat(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize));assert.ok(stars>=24&&stars<=46,String(stars));
  assert.equal(await page.locator('.proof-slot,.owner-placeholder,.policy-slot').count(),0);
  assert.doesNotMatch(await page.locator('body').innerText(),/your testimonial|refund-policy slot|customer feedback will appear/i);
  assert.equal(await page.locator('.proof-image img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);

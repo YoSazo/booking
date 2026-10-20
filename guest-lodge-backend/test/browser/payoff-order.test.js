@@ -318,6 +318,23 @@ for (const delayedTimer of [false, true]) test('expiry while paying asks the buy
   assert.equal(payments.at(-1).params.amount, 3300);
 }));
 
+// The first screen is the hook: with the $5 bar and the three-line price (the
+// tallest it gets), the button, the guarantee, the stars and who uses it fit
+// without scrolling on small phones and inside Facebook's browser.
+test('the letter\'s first screen fits everything needed to tap the button, on small phones', async () => world(async ({ page, base }) => {
+  for (const [width, height] of [[375, 548], [360, 640], [390, 664], [414, 640]]) {
+    await page.setViewportSize({ width, height });
+    await page.goto(base + '/payoff');
+    await page.locator('#offer-bar:not([hidden])').waitFor();
+    await page.locator('.hero .offer-was:not([hidden])').waitFor();
+    await page.evaluate(() => document.fonts.ready);
+    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .offer-terms-line', '.hero .rating-stars', '.hero .rating-label']
+      .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
+    for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    assert.ok(await page.locator('.hero .cta').evaluate(el => el.getBoundingClientRect().height >= 44), 'the button keeps a 44px tap target');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  }
+}));
 test('sales offer blocks show the eligible price without starting the deadline; an expired offer returns to regular price', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').first().waitFor();
@@ -325,7 +342,7 @@ test('sales offer blocks show the eligible price without starting the deadline; 
   // Worded three ways down the page, as in the reference letter.
   // With the extra $5, the sale price is crossed out too.
   assert.deepEqual(await page.locator('.sales-offer').evaluateAll(boxes => boxes.slice(0, 3).map(box => box.innerText.replace(/\s+/g, ' ').trim())), [
-    '(Reg. price $375) Today: $33 Today: $28 ($5 off · 15% off) Get My Debt-Free Date',
+    '(Reg. price $375) Today: $33 Today: $28 ($5 off · 15% off) Get My Debt-Free Date One-time purchase. No monthly fees. 30-day money-back guarantee.',
     '(Reg. price $375) Sale Price: $33 Sale Price: $28 ($5 off · 15% off) Get My Debt-Free Date',
     "(Reg. price $375) SALE PRICE: $33 SALE PRICE: $28 That's an extra $5 (15%) off. Get My Debt-Free Date"]);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
