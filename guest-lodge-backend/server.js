@@ -18868,6 +18868,7 @@ const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
     : marketelStripe;
 const payoffRegistration = require('./payoff').registerPayoff(app, {
+    quizShare: 0, // Sales letter for all landing traffic, including prior quiz visitors.
     prisma,
     mail: emailTransporter,
     stripe: inspectStripe,

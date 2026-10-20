@@ -18,15 +18,15 @@ same month. Capped at 600 months.
 `app.html`, `app.js`, `app.css` are the phone UI. The buyer's numbers stay in
 `localStorage` (`payoff.v1`) and are never sent anywhere.
 
-## Landing A/B test: sales letter vs quiz
+## Landing: sales letter
 
-`/payoff` serves the sales letter (`index.html`) or the quiz (`quiz.html`).
-- Each new visitor is drawn 50/50 and kept on that version by an HttpOnly
-  `payoff_variant` cookie.
-- `?v=letter` or `?v=quiz` picks one, and sticks.
-- Crawlers and Meta's ad review always get the letter.
-- `PAYOFF_QUIZ_SHARE` (0–1) changes the split. 0 or 1 ends the test for
-  everyone, whatever their cookie says.
+Production passes `quizShare: 0` to `registerPayoff` in `server.js`. All normal
+`/payoff` visits get the sales letter, including browsers previously assigned
+to the quiz. The 50/50 split is off.
+
+The quiz remains available for preview at `?v=quiz`; `?v=letter` selects the
+letter. The reusable router still supports `quizShare` / `PAYOFF_QUIZ_SHARE`
+for a future test, but the explicit production setting takes precedence.
 
 Both versions lead to the same order page, price and checkout. The Meta pixel
 loads on both. On the quiz its automatic collection is off, because people
