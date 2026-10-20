@@ -132,7 +132,7 @@ not "fix" it back to an expiring offer without the owner.
 The extras show their regular prices, set by the owner: Cash-flow calendar
 ~~$79~~ $22 and Spending reset ~~$49~~ $9.
 
-Under the product picture: "★★★★★ Over 10,000 sold" with eight face crops.
+Under the product picture: "★★★★★ 10,000+ sold" with six face crops.
 "Sold" counts purchases (about 11,300 per the owner, to be confirmed with
 Lauren); keep it a true, rounded-down figure.
 
