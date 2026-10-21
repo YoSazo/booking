@@ -461,6 +461,11 @@ test('after paying, YES on the 107 offer charges the card from the order in one 
   assert.equal(await page.locator('#offer-no').evaluate(el => getComputedStyle(el).color), 'rgb(154, 154, 154)', 'the no is muted');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
   assert.match(await text(page, '.up-example'), /Example: \$65,000 of debt, \$1,350 a month .*Saves \$22,710 after fees .*An example, not your numbers/);
+  // Real buyers' emails, right under the button, with results qualified.
+  assert.deepEqual(await page.locator('.up-proof img').evaluateAll(imgs => imgs.map(img => img.alt.split(':')[0])), ['Email from Melissa', 'Email from Sarah']);
+  assert.match(await text(page, '.up-proof .up-note'), /^Individual results vary\./);
+  const below = await page.evaluate(() => document.querySelector('.up-proof').getBoundingClientRect().top >= document.querySelector('#offer-yes').getBoundingClientRect().bottom);
+  assert.equal(below, true, 'the testimonials follow the YES button, which stays on the first screen');
   await page.locator('#offer-yes').click();
   await page.locator('#stage-done:not([hidden])').waitFor();
   const charge = payments.at(-1).params;
