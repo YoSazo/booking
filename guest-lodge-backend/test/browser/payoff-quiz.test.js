@@ -116,8 +116,10 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   for (const name of ['PayoffLanded', 'PayoffVariant:quiz', 'PayoffQuizStep:q1', 'PayoffQuizStep:q2', 'PayoffQuizStep:why-order', 'PayoffQuizStep:card-1', 'PayoffQuizStep:cards',
     'PayoffQuizStep:reveal', 'PayoffQuizStep:extra', 'PayoffQuizStep:plan', 'PayoffQuizStep:unlock', 'PayoffOrderViewed']) assert.ok(sent.includes(name), name);
   assert.equal(sent.filter(name => name === 'PayoffQuizStep:q1').length, 1, 'each step once, even after going back');
+  // As whole values: random visitor and attempt ids can contain the same digits.
   for (const secret of ['4200', '4,200', '1500', '19.99', '12600', '126']) {
-    assert.ok(requests.every(request => !request.url.includes(secret) && !request.body.includes(secret)), `${secret} left the phone`);
+    const value = new RegExp(`(?<![A-Za-z0-9_.,-])${secret.replace(/[.,]/g, '\\$&')}(?![A-Za-z0-9_-])`);
+    assert.ok(requests.every(request => !value.test(request.url) && !value.test(request.body)), `${secret} left the phone`);
   }
 }));
 test('the tool keeps cards it already has; one card and "4 or more" read right; no sideways scroll', async () => world(async ({ page, base }) => {
