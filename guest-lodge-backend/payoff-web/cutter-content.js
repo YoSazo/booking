@@ -33,8 +33,8 @@ window.PAYOFF_CUTTER = {
     no: 'No thanks, I’ll keep paying full interest',
   },
   discount: {
-    headline: 'Wait, before you go...',
-    lead: 'Get the Interest Cutter for less than half.',
+    headline: 'I get it. Money’s tight right now.',
+    lead: 'That’s exactly why you’re paying off debt. So here’s the Interest Cutter for less than half: one lowered rate could save you more than it costs.',
     yes: 'YES! Add it for 47',
     no: 'No thanks, take me to my plan',
   },

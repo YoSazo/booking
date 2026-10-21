@@ -493,7 +493,8 @@ test('the 107 offer moves to the 47 discount when its clock ends; the discount e
   await payThenOffer(page, base);
   await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 2 * 60000 + 2000; });
   await page.locator('#stage-discount:not([hidden])').waitFor({ timeout: 4000 });
-  assert.equal(await text(page, '#discount-headline'), 'Wait, before you go...');
+  assert.equal(await text(page, '#discount-headline'), 'I get it. Money’s tight right now.');
+  assert.match(await text(page, '#discount-lead'), /^That’s exactly why you’re paying off debt\..*one lowered rate could save you more than it costs\.$/);
   assert.equal(await text(page, '#stage-discount .up-price'), '$107 Today Only 47');
   assert.match(await page.locator('#discount-clock').innerText(), /^(02:00|01:5\d)$/);
   assert.equal(await text(page, '#discount-no'), 'No thanks, take me to my plan');

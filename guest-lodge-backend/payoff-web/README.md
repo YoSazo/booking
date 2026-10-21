@@ -192,7 +192,8 @@ The sale, the ClickFunnels sequence:
    yet...", the stars row, a labeled example comparison, "~~$147~~ Today Only
    107", YES, the guarantee and badges, a real 2:00 clock and a muted "No
    thanks".
-2. "No thanks" or 00:00 shows "Wait, before you go..." at "~~$107~~ Today
+2. "No thanks" or 00:00 shows "I get it. Money's tight right now." (the
+   reason answers why they said no) at "~~$107~~ Today
    Only 47", with its own 2:00 clock. Its "No thanks" or 00:00 opens Payoff.
    Each clock survives a reload; the server refuses 107 and 47 more than 30
    minutes after the order was paid.
