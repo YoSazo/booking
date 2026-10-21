@@ -99,7 +99,8 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     window.PayoffTrack = { event, pixel, attribution, visitor, headers };
     return;
   }
-  event('PayoffFrom', query.has('fbclid') ? 'ad'
+  // A visitor sent on by the story page was counted there, with the ad click.
+  if (query.get('from') !== 'story') event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
   // Which landing this visitor saw (the A/B test), once per visitor.
   const variant = document.body.dataset.variant;

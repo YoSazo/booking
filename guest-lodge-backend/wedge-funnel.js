@@ -208,6 +208,11 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['I’ve tried spreadsheets and gave up', ['PayoffQuizStep:why-tracking']],
     ['Something always comes up', ['PayoffQuizStep:why-life']],
   ] },
+  // The story page the static ad opens, before the sales letter.
+  { key: 'story', label: 'Story page (static ad)', hideWhenEmpty: true, steps: [
+    ['Opened the story page', ['PayoffStory:viewed']],
+    ['Tapped through to the sales letter', ['PayoffStory:tapped']],
+  ] },
   { key: 'from', label: 'Where they came from', steps: [
     ['Clicked the ad (Meta click id)', ['PayoffFrom:ad']],
     ['From Facebook or Instagram, no click id', ['PayoffFrom:social']],
@@ -228,10 +233,10 @@ const PAYOFF_BRANCHES = Object.freeze([
   ] },
 ]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step',
+  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page',
     PayoffUpgradeDeclined: 'Said no to an Interest Cutter offer', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
-      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired']),
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
       steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },

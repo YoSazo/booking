@@ -32,6 +32,25 @@ Both versions lead to the same order page, price and checkout. The Meta pixel
 loads on both. On the quiz its automatic collection is off, because people
 type balances there.
 
+## Story page (the static ad's landing)
+
+`/payoff/hidden-payoff` (`story.html`, `story.css`, `story.js`) is the page
+Lauren's static ad opens: a long article in the reference advertorial's layout
+(dark top bar, breadcrumb, quote headline, dated byline, the story, the
+$79,000 example, what you get, comments, price) and the reference's
+"advertisement, not a news article" notice at the foot. Its three buttons open
+the sales letter at `/payoff?v=letter&from=story`, as the reference sends its
+readers to its sales page rather than straight to checkout.
+
+The story page counts the landing and the ad click (`PayoffLanded`,
+`PayoffFrom`), then `PayoffStory:viewed` once per visitor and
+`PayoffStory:tapped` on a button. The letter skips `PayoffFrom` for
+`from=story`, so the source stays the ad. `/funnel` shows both steps as
+"Story page (static ad)". The $6,500 note and the $79,000 example are worked
+out with `engine.js` (the debts are listed on the page); change a figure only
+by rerunning it. Lauren's own figures are her real statements and Payoff
+result.
+
 The quiz is built to leave the visitor believing one thing: "I'm stuck because
 of [what they named]. The fix is paying in the right order, with something
 doing the maths for me. Payoff does that for my cards, and it costs far less

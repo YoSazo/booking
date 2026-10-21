@@ -615,6 +615,22 @@ test('the landing splits new visitors between the letter and the quiz, keeps eac
     assert.ok(isLetter(r.html)); assert.equal(r.cookie, '');
   });
 });
+test('the story page is served with the pixel-only policy and records only its two steps', async () => {
+  const w = fixture();
+  await serve(w, async ({ base, post }) => {
+    const r = await fetch(base + '/payoff/hidden-payoff');
+    assert.equal(r.status, 200);
+    assert.match(await r.text(), /class="adv-topbar"/);
+    const csp = r.headers.get('content-security-policy');
+    assert.match(csp, /script-src 'self' https:\/\/connect\.facebook\.net/); assert.doesNotMatch(csp, /stripe/);
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow');
+    for (const file of ['story.js', 'story.css']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'viewed', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'tapped', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'shared', visitorId: 'v_abcdefghijk' })).status, 400);
+  });
+  assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]), [['PayoffStory', 'viewed'], ['PayoffStory', 'tapped']]);
+});
 test('the landing version and quiz steps are recorded by name only, never with numbers', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
