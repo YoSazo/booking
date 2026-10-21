@@ -196,10 +196,14 @@ test('the order page sells Payoff alone and the sales page shows the real tool',
   assert.ok(width <= 390, 'no sideways scroll');
 }));
 
-test('a buyer without extras sees no tabs', async () => world(async ({ page, base }) => {
+test('a buyer without extras sees Plan and the locked Interest Cutter tab only', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/app?session_id=cs_test_appOrder1234567');
   await page.waitForSelector('#debts:not([hidden])');
-  assert.equal(await page.isVisible('#tabs'), false);
+  assert.equal(await page.isVisible('#tabs'), true);
+  assert.deepEqual(await page.$$eval('#tabs button:not([hidden])', tabs => tabs.map(tab => tab.textContent)), ['Plan', 'Interest Cutter']);
+  await page.locator('#tabs button[data-tab="cutter"]').click();
+  await page.waitForSelector('#cutter-locked:not([hidden])');
+  assert.equal(await page.isVisible('#cutter-tool'), false);
   assert.doesNotMatch(await text(page, '#toast'), /tabs/);
 }));
 
@@ -208,7 +212,7 @@ test('a buyer with both extras gets tabs, a cash-flow calendar that warns before
   await page.waitForSelector('#debts:not([hidden])');
   assert.match(await text(page, '#toast'), /cash-flow calendar and spending reset are in the tabs/);
   assert.equal(await page.isVisible('#tabs'), true);
-  assert.equal(await page.$$eval('#tabs button:not([hidden])', tabs => tabs.length), 3);
+  assert.equal(await page.$$eval('#tabs button:not([hidden])', tabs => tabs.length), 4, 'Plan, Cash flow, Reset and the Interest Cutter');
   await addDebt(page, { name: 'Visa', balance: '3000', apr: '24', minimum: '90' });
   await page.click('#show-result');
   await page.waitForSelector('#result:not([hidden])');

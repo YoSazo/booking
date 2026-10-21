@@ -171,8 +171,49 @@ Eligibility Requirements, a Disclaimer (educational purposes only, no
 guaranteed results, you are responsible for your decisions, assumption of
 risk, limitation of liability) and planning estimates. `privacy.html`
 (`/payoff/privacy`) follows the reference's eight sections and adds nothing
-beyond them except two true lines: the hashed email and name sent to Meta, and
-balances never leaving the device.
+beyond them except true lines: the hashed email and name sent to Meta,
+balances never leaving the device, and the card kept for the same visit.
+
+## Interest Cutter (the offer after purchase)
+
+A tool inside Payoff (`cutter` in `extras`, its own tab): `compareLowerRate` in
+`engine.js` runs the buyer's debts with some moved to a 0% balance transfer
+(fee, promo months, rate after, card limit, partial amounts) or a
+consolidation loan (APR, term, origination fee), at the same monthly budget,
+and answers "saves $X after fees" or "your current plan costs less". It also
+has call scripts with notes (lower rate, late-fee refund, hardship program)
+and a 0% promo tracker. Words live in `cutter-content.js`, a DRAFT for Lauren
+to review before launch. Everything typed stays on the device.
+
+The sale, the ClickFunnels sequence:
+1. After paying, the order page goes to `/payoff/upgrade` (hosted Checkout
+   returns there too). The page confirms the order first (unlocking Payoff
+   and sending its email), then shows "WAIT! Your plan isn't complete
+   yet...", the stars row, a labeled example comparison, "~~$147~~ Today Only
+   107", YES, the guarantee and badges, a real 2:00 clock and a muted "No
+   thanks".
+2. "No thanks" or 00:00 shows "Wait, before you go..." at "~~$107~~ Today
+   Only 47", with its own 2:00 clock. Its "No thanks" or 00:00 opens Payoff.
+   Each clock survives a reload; the server refuses 107 and 47 more than 30
+   minutes after the order was paid.
+3. Inside Payoff the locked tab offers it at $147 (`/payoff/upgrade?offer=regular`).
+
+Payment: `/pay` creates a Stripe customer and keeps cards for this visit only
+(`payment_method_options.card.setup_future_usage: on_session`, matched by the
+order page's Elements). `POST /api/payoff/upgrade` charges that card in one
+click, for the 107 and 47 offers in that visit only; the 147 price bought
+later from inside Payoff always uses the payment form, as the order page and
+terms promise. Apple Pay and Google Pay can't be reused while the buyer is present
+(Apple's rules), so they, Klarna, bank and hosted-checkout orders get a pop-up
+payment form. One Interest Cutter per order. A paid one is its own
+PaymentIntent (`product: marketel-payoff-cutter`, `parentOrder`), written onto
+its order as `cutter`; `/access` adds `cutter` while it is paid and not
+refunded. The receipt says it is covered by the same 30-day guarantee.
+
+Meta hears it as the custom `InterestCutterPurchase` (pixel and Conversions
+API, one event id), never `Purchase`, so the ads keep optimizing for first
+purchases. `/funnel` has an "Interest Cutter after purchase" table. Add a real
+Interest Cutter testimonial above YES once buyers give one, with permission.
 
 ## Access
 

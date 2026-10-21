@@ -178,6 +178,6 @@ test('taking longer than 10 minutes means no extra $5: the bar goes, the plan an
   await page.locator('a.go').click(); await page.waitForURL(url => url.pathname === '/payoff/order');
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#glance-gift').isHidden(), true, 'no free gift line');
-  assert.equal(await page.locator('#glance-price').innerText(), '$33');
+  assert.equal(await page.locator('#glance-price').innerText(), '33');
   assert.equal(await page.locator('#order-total').innerText(), '$33.00');
 }));

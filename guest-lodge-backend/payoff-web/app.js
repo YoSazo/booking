@@ -7,7 +7,8 @@
   const $ = id => document.getElementById(id);
   const DATA = 'payoff.v1', ACCESS = 'payoff.access', EXTRAS = 'payoff.extras', TAB = 'payoff.tab';
   const CASHFLOW = 'payoff.cashflow.v1', RESET = 'payoff.reset.v1';
-  const EXTRA_NAMES = { cashflow: 'cash-flow calendar', reset: 'spending reset' };
+  const EXTRA_NAMES = { cashflow: 'cash-flow calendar', reset: 'spending reset', cutter: 'Interest Cutter' };
+  const CUTTER = 'payoff.cutter.v1';
   const store = {
     get: key => { try { return localStorage.getItem(key); } catch { return null; } },
     set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* Kept in memory for this visit. */ } },
@@ -57,7 +58,7 @@
 
   function show(next) {
     view = next;
-    for (const id of ['opening', 'gate', 'debts', 'result', 'cashflow', 'reset']) $(id).hidden = id !== next;
+    for (const id of ['opening', 'gate', 'debts', 'result', 'cashflow', 'reset', 'cutter']) $(id).hidden = id !== next;
     syncTabs();
     window.scrollTo(0, 0);
   }
@@ -282,13 +283,14 @@
     }
   }
 
-  // Tabs: Plan, plus the extras this order includes.
+  // Tabs: Plan, the extras this order includes, and the Interest Cutter,
+  // which shows its locked preview to anyone who doesn't own it yet.
   function syncTabs() {
-    const inTool = ['debts', 'result', 'cashflow', 'reset'].includes(view);
-    $('tabs').hidden = !inTool || !extras.length;
+    const inTool = ['debts', 'result', 'cashflow', 'reset', 'cutter'].includes(view);
+    $('tabs').hidden = !inTool;
     const current = view === 'debts' || view === 'result' ? 'plan' : view;
     for (const button of document.querySelectorAll('#tabs button')) {
-      button.hidden = button.dataset.tab !== 'plan' && !owns(button.dataset.tab);
+      button.hidden = !['plan', 'cutter'].includes(button.dataset.tab) && !owns(button.dataset.tab);
       if (button.dataset.tab === current) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
     }
   }
@@ -299,7 +301,7 @@
     syncTabs();
   }
   function openTab(name) {
-    if (name !== 'plan' && !owns(name)) name = 'plan';
+    if (!['plan', 'cutter'].includes(name) && !owns(name)) name = 'plan';
     store.set(TAB, name);
     if (name === 'cashflow') {
       $('cf-balance').value = cf.balance ? (cf.balance / 100).toFixed(2).replace(/\.00$/, '') : '';
@@ -307,6 +309,7 @@
       cfMonth = 0; cfPicked = null;
       renderCashflow(); show('cashflow');
     } else if (name === 'reset') { resetPicked = null; renderReset(); show('reset'); }
+    else if (name === 'cutter') { renderCutter(); show('cutter'); }
     else if (state.debts.length && state.seen) { renderResult(); show('result'); }
     else { renderDebts(); show('debts'); }
   }
@@ -712,6 +715,182 @@
       $('resend-status').textContent = reply.ok ? 'If that email bought Payoff, your link is on its way. Check spam too.' : (reply.body.message || 'Please try again.');
     } catch { $('resend-status').textContent = 'We couldn’t send it. Check your connection and try again.'; }
     button.disabled = false; button.textContent = 'Email me my link';
+  });
+
+  // Interest Cutter: a lower rate against the plan as it is, call scripts with
+  // notes, and a tracker for when each 0% promo ends. All on this phone.
+  const C = window.PAYOFF_CUTTER || null;
+  const make = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  let cut = { kind: 'transfer', moves: {}, fee: '3', months: '18', after: '24.99', limit: '', loanApr: '11.99', loanTerm: '48', loanFee: '5', logs: {}, promos: [] };
+  try {
+    const saved = JSON.parse(store.get(CUTTER) || 'null');
+    if (saved && typeof saved === 'object') cut = { ...cut, ...saved,
+      moves: saved.moves && typeof saved.moves === 'object' ? saved.moves : {},
+      logs: saved.logs && typeof saved.logs === 'object' ? saved.logs : {},
+      promos: Array.isArray(saved.promos) ? saved.promos.filter(promo => promo && /^\d{4}-\d{2}-\d{2}$/.test(promo.end)).slice(0, 30) : [] };
+  } catch { /* Start fresh. */ }
+  const saveCut = () => store.set(CUTTER, JSON.stringify(cut));
+  let openScript = null;
+
+  function renderCutter() {
+    const owned = owns('cutter');
+    $('cutter-locked').hidden = owned;
+    $('cutter-tool').hidden = !owned;
+    if (!owned) {
+      $('cutter-locked-title').textContent = C?.locked.title || 'Interest Cutter';
+      $('cutter-locked-lead').textContent = C?.locked.lead || '';
+      $('cutter-locked-benefits').replaceChildren(...(C?.offer.benefits || []).map(text => make('li', '', text)));
+      $('cutter-buy').textContent = C?.locked.yes || 'Get the Interest Cutter';
+      $('cutter-locked-fine').textContent = 'One-time payment. No subscription. Covered by the same 30-day money-back guarantee.';
+      return;
+    }
+    $('cutter-disclaimer').textContent = C?.disclaimer || '';
+    renderCutterCompare(); renderScripts(); renderPromos();
+  }
+  const movesOn = debt => cut.moves[debt.id]?.on ?? debt.type === 'card';
+  function cutterScenario() {
+    const moves = state.debts.filter(movesOn).map(debt => ({ id: debt.id, amount: cut.moves[debt.id]?.amount ?? debt.balance }));
+    if (cut.kind === 'loan') return { kind: 'loan', moves, apr: parseRate(cut.loanApr), termMonths: Number(cut.loanTerm), feePercent: parseRate(cut.loanFee) };
+    const limit = parseMoney(cut.limit);
+    return { kind: 'transfer', moves, feePercent: parseRate(cut.fee), promoApr: 0, promoMonths: Number(cut.months), afterApr: parseRate(cut.after), limit: limit > 0 ? limit : null };
+  }
+  function renderCutterCompare() {
+    const has = state.debts.length > 0;
+    $('cutter-needs-debts').hidden = has;
+    $('cutter-compare').hidden = !has;
+    if (!has) return;
+    const loan = cut.kind === 'loan';
+    for (const button of document.querySelectorAll('[data-cutter-kind]')) button.setAttribute('aria-checked', String(button.dataset.cutterKind === cut.kind));
+    $('cutter-transfer-fields').hidden = loan;
+    $('cutter-loan-fields').hidden = !loan;
+    $('cutter-kind-hint').textContent = loan
+      ? 'Tick the debts a loan would pay off. Its fixed payment replaces their minimums.'
+      : 'Tick what you’d move to a 0% card, and how much. Everything else stays as it is.';
+    const list = $('cutter-moves');
+    list.replaceChildren();
+    for (const debt of state.debts) {
+      const item = make('li', 'cutter-move');
+      const label = make('label', 'check');
+      const box = make('input'); box.type = 'checkbox'; box.checked = movesOn(debt);
+      label.append(box, make('span', '', `${debt.name} · ${debt.apr}% · ${money(debt.balance)}`));
+      const amount = make('input'); amount.inputMode = 'decimal'; amount.autocomplete = 'off';
+      amount.setAttribute('aria-label', `Amount to move from ${debt.name}`);
+      const saved = cut.moves[debt.id]?.amount;
+      amount.value = ((saved ?? debt.balance) / 100).toFixed(2).replace(/\.00$/, '');
+      const wrap = make('span', 'money-input'); wrap.append(make('b', '', '$'), amount);
+      wrap.hidden = !box.checked;
+      const remember = () => {
+        const value = parseMoney(amount.value);
+        cut.moves[debt.id] = { on: box.checked, amount: value > 0 ? Math.min(value, debt.balance) : debt.balance };
+        wrap.hidden = !box.checked; saveCut(); renderCutterResult();
+      };
+      box.addEventListener('change', remember);
+      amount.addEventListener('input', remember);
+      item.append(label, wrap);
+      list.append(item);
+    }
+    renderCutterResult();
+  }
+  function renderCutterResult() {
+    const box = $('cutter-result');
+    box.replaceChildren();
+    const result = E.compareLowerRate(state.debts, cutterScenario(), { extra: state.extra, start });
+    if (!result.current) { box.append(make('p', 'muted', 'Your plan doesn’t finish with these numbers yet. Check your debts in Plan.')); return; }
+    if (!result.option) { box.append(make('p', 'muted', 'Tick at least one debt to compare.')); return; }
+    const column = (title, run) => {
+      const col = make('div', 'cutter-col');
+      col.append(make('p', 'cutter-col-title', title), make('p', 'cutter-cost', moneyWhole(run.cost)),
+        make('p', 'muted small', run.fees ? `interest + ${moneyWhole(run.fees)} fees` : 'interest'),
+        make('p', 'cutter-date', run.date ? `Debt-free ${monthName(run.date)}` : ''));
+      return col;
+    };
+    const cols = make('div', 'cutter-cols');
+    cols.append(column('Your plan as it is', result.current), column(cut.kind === 'loan' ? 'With the loan' : 'With the 0% transfer', result.option));
+    const sooner = result.monthsSooner > 0 ? ` and finishes ${duration(result.monthsSooner)} sooner` : '';
+    box.append(make('p', result.cheaper ? 'cutter-verdict win' : 'cutter-verdict',
+      result.cheaper ? `Saves ${moneyWhole(result.savings)} after fees${sooner}.` : `Your current plan costs less, by ${moneyWhole(-result.savings)}. Keep it as it is.`), cols);
+    box.append(make('p', 'muted small', `Moves ${moneyWhole(result.moved)}${result.fees ? `, with ${moneyWhole(result.fees)} in fees` : ''}.`));
+    if (result.promoEnds && result.promoLeft > 0) {
+      box.append(make('p', 'warning', `When the 0% ends in ${monthName(result.promoEnds)}, about ${moneyWhole(result.promoLeft)} would still be on that card at ${parseRate(cut.after) || 0}%. Add it to the promo tracker below.`));
+    }
+    if (result.budgetRaised) box.append(make('p', 'warning', `The loan payment needs ${moneyWhole(result.option.monthly - result.budget)} more a month than you pay now, so this isn’t the same money.`));
+    box.append(make('p', 'fine', `The same ${moneyWhole(result.budget)} a month in both, each with its cheapest payoff order. A lender sets the real rate and fees after a credit check.`));
+  }
+  function renderScripts() {
+    const box = $('cutter-scripts');
+    box.replaceChildren();
+    for (const script of C?.scripts || []) {
+      const card = make('details', 'cutter-script');
+      card.open = openScript === script.id;
+      card.append(make('summary', '', script.title), make('p', 'muted small', script.when));
+      const lines = make('ol', 'cutter-lines');
+      for (const line of script.lines) lines.append(make('li', '', line));
+      card.append(lines);
+      const notes = cut.logs[script.id] || [];
+      if (notes.length) {
+        const list = make('ul', 'cutter-log');
+        for (const entry of notes) list.append(make('li', '', script.log.map(key => entry[key]).filter(Boolean).join(' · ')));
+        card.append(make('p', 'cutter-log-title', 'Your notes'), list);
+      }
+      const form = make('form', 'cutter-log-form'); form.noValidate = true;
+      for (const key of script.log) {
+        const label = make('label', 'field'); label.append(make('span', '', key));
+        const input = make('input'); input.name = key; input.maxLength = 60; input.autocomplete = 'off';
+        if (/^Date/.test(key)) input.type = 'date';
+        label.append(input); form.append(label);
+      }
+      const saveButton = make('button', 'ghost', 'Save these notes'); saveButton.type = 'submit';
+      form.append(saveButton);
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const entry = {};
+        for (const key of script.log) { const value = form.elements[key].value.trim(); if (value) entry[key] = value; }
+        if (!Object.keys(entry).length) return;
+        cut.logs[script.id] = [...(cut.logs[script.id] || []), entry].slice(-20);
+        openScript = script.id; saveCut(); renderScripts(); toast('Saved on this phone.');
+      });
+      card.addEventListener('toggle', () => { if (card.open) openScript = script.id; });
+      card.append(form);
+      box.append(card);
+    }
+  }
+  function renderPromos() {
+    const list = $('cutter-promos');
+    list.replaceChildren();
+    const today = Date.parse(todayIso() + 'T12:00:00');
+    for (const promo of cut.promos.slice().sort((a, b) => a.end.localeCompare(b.end))) {
+      const days = Math.round((Date.parse(promo.end + 'T12:00:00') - today) / 86400000);
+      const row = make('div', 'debt-row cutter-promo' + (days <= 60 ? ' soon' : ''));
+      const who = span('who', '');
+      who.append(make('strong', '', promo.name),
+        span('', `Ends ${shortDay(promo.end)}, ${promo.end.slice(0, 4)}${promo.rate ? ` · then ${promo.rate}%` : ''}`));
+      const remove = make('button', 'link', 'Remove'); remove.type = 'button';
+      remove.addEventListener('click', () => { cut.promos = cut.promos.filter(item => item !== promo); saveCut(); renderPromos(); });
+      row.append(who, span('amount', days < 0 ? 'Ended' : days === 0 ? 'Ends today' : `${days} day${days === 1 ? '' : 's'} left`), remove);
+      const item = make('li'); item.append(row); list.append(item);
+    }
+  }
+  for (const button of document.querySelectorAll('[data-cutter-kind]')) {
+    button.addEventListener('click', () => { cut.kind = button.dataset.cutterKind; saveCut(); renderCutterCompare(); });
+  }
+  for (const [id, key] of [['cutter-fee', 'fee'], ['cutter-months', 'months'], ['cutter-after', 'after'], ['cutter-limit', 'limit'],
+    ['cutter-loan-apr', 'loanApr'], ['cutter-loan-term', 'loanTerm'], ['cutter-loan-fee', 'loanFee']]) {
+    $(id).value = cut[key];
+    $(id).addEventListener('input', () => { cut[key] = $(id).value; saveCut(); renderCutterResult(); });
+  }
+  $('cutter-to-plan').addEventListener('click', () => openTab('plan'));
+  $('cutter-promo-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const name = $('cutter-promo-name').value.trim(), end = $('cutter-promo-end').value, rate = parseRate($('cutter-promo-rate').value);
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(end)) { toast('Add the card and the date its promo ends.'); return; }
+    cut.promos = [...cut.promos, { name, end, ...(rate > 0 ? { rate } : {}) }].slice(-30);
+    $('cutter-promo-name').value = ''; $('cutter-promo-end').value = ''; $('cutter-promo-rate').value = '';
+    saveCut(); renderPromos();
   });
 
   for (const button of document.querySelectorAll('#tabs button')) button.addEventListener('click', () => openTab(button.dataset.tab));

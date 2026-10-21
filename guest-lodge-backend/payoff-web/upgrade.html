@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#ffffff">
+  <title>Marketel Payoff: one more thing for your plan</title>
+  <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/payoff/order.css?v=9">
+  <link rel="stylesheet" href="/payoff/upgrade.css?v=2">
+  <script src="/payoff/cutter-content.js?v=1" defer></script>
+  <script src="/payoff/upgrade.js?v=2" defer></script>
+</head>
+<body data-page="upgrade">
+  <ol class="progress" aria-label="Your order">
+    <li class="done">✓ Order complete</li><li class="now">Optional upgrade</li><li>Open your plan</li>
+  </ol>
+
+  <main class="upgrade" id="stage-wait">
+    <h1 class="up-wait">Confirming your order…</h1>
+    <p class="status" id="wait-status" role="status" aria-live="polite"></p>
+  </main>
+
+  <main class="upgrade" id="stage-offer" hidden>
+    <p class="up-wait-banner" id="offer-headline"></p>
+    <p class="up-clock" id="offer-clock-row">This offer ends in <b id="offer-clock" role="timer" aria-live="off">02:00</b></p>
+    <p class="up-ready"><span id="offer-ready"></span> ✓</p>
+    <p class="social-proof"><span class="stars" aria-hidden="true">★★★★★</span> <span>10,000+ sold</span> <span class="avatars" aria-hidden="true"><img src="/payoff/assets/avatar-01-874e564a67.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-02-2209fc25e7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-04-5d31c567b7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-05-81fe59d790.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-06-6574065c85.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-07-883c4b0955.webp" width="72" height="72" decoding="async" alt=""></span></p>
+    <p class="up-gap" id="offer-gap"></p>
+    <h1 class="up-name" id="offer-built"></h1>
+    <div class="up-example" aria-label="Example comparison">
+      <p class="up-example-label" id="example-label"></p>
+      <div class="up-cols">
+        <div class="up-col"><p class="up-col-title" id="example-current-title"></p><p class="up-col-cost" id="example-current-interest"></p><p class="up-col-date" id="example-current-date"></p></div>
+        <div class="up-col win"><p class="up-col-title" id="example-option-title"></p><p class="up-col-cost" id="example-option-interest"></p><p class="up-col-date" id="example-option-date"></p></div>
+      </div>
+      <p class="up-saving" id="example-saving"></p>
+      <p class="up-note" id="example-note"></p>
+    </div>
+    <p class="up-price"><s>$147</s> <span>Today Only <b class="today" id="offer-price">107</b></span> <span class="up-save" id="offer-save">Save 40</span></p>
+    <button class="complete up-yes" type="button" id="offer-yes"><span class="buy-text"><span id="offer-yes-label"></span><small id="offer-one-click"></small></span></button>
+    <p class="status" id="offer-status" role="status" aria-live="polite"></p>
+    <ul class="up-benefits" id="offer-benefits"></ul>
+    <p class="up-question" id="offer-question"></p>
+    <p class="up-guarantee" id="offer-guarantee"></p>
+        <div class="safe" role="group" aria-label="Guaranteed safe checkout">
+          <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
+          <div class="safe-badges">
+            <img src="/payoff/assets/secure-aes-f70c90acfb.webp" width="200" height="233" decoding="async" alt="AES-256bit encryption">
+            <img src="/payoff/assets/secure-ssl-d9718c548a.webp" width="200" height="194" decoding="async" alt="SSL certified">
+            <img src="/payoff/assets/secure-stripe-f82e44a40b.webp" width="220" height="202" decoding="async" alt="Powered by Stripe, secure site">
+            <div class="safe-cards" aria-label="Visa, Mastercard, American Express and Discover"><img src="/payoff/assets/payment-visa.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-discover.svg" width="36" height="24" alt=""></div>
+          </div>
+        </div>
+    <button class="up-no" type="button" id="offer-no"></button>
+  </main>
+
+  <main class="upgrade" id="stage-discount" hidden>
+    <p class="up-wait-banner" id="discount-headline"></p>
+    <p class="up-clock">This offer ends in <b id="discount-clock" role="timer" aria-live="off">02:00</b></p>
+    <p class="up-lead" id="discount-lead"></p>
+    <p class="up-price"><s>$107</s> <span>Today Only <b class="today" id="discount-price">47</b></span></p>
+    <button class="complete up-yes" type="button" id="discount-yes"><span class="buy-text"><span id="discount-yes-label"></span><small id="discount-one-click"></small></span></button>
+    <p class="status" id="discount-status" role="status" aria-live="polite"></p>
+    <p class="up-guarantee" id="discount-guarantee"></p>
+    <button class="up-no" type="button" id="discount-no"></button>
+  </main>
+
+  <main class="upgrade" id="stage-done" hidden>
+    <h1 class="up-name">The Interest Cutter is in your plan ✓</h1>
+    <p class="up-lead">It’s in its own tab at the top of Payoff. We emailed you the receipt.</p>
+    <a class="complete up-yes" id="done-open" href="/payoff/app"><span class="buy-text"><span>Continue to my plan</span></span></a>
+  </main>
+
+  <div class="pay-sheet" id="pay-sheet" hidden>
+    <div class="pay-card" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+      <h2 id="pay-title">Add the Interest Cutter</h2>
+      <p class="pay-amount" id="pay-amount"></p>
+      <div id="pay-express"></div>
+      <div class="or" id="pay-or" hidden><hr><p>OR</p></div>
+      <div id="pay-element"></div>
+      <button class="complete up-yes" type="button" id="pay-button" disabled><span class="buy-text"><span id="pay-label">Pay now</span></span></button>
+      <p class="status" id="pay-status" role="status" aria-live="polite"></p>
+      <button class="up-no" type="button" id="pay-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <footer class="legal">
+    <p class="legal-links"><a href="/payoff/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> | <a href="/payoff/privacy" target="_blank" rel="noopener">Privacy Policy</a></p>
+    <p>Copyright 2026 Marketel. All Rights Reserved. · <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></p>
+  </footer>
+</body>
+</html>

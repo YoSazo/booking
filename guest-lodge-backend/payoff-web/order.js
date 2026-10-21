@@ -11,7 +11,7 @@
   const NAME = 'Marketel Payoff - Your Debt-Free Date & Payoff Plan (Reg. $375)';
   const REGULAR_CENTS = 37500;
   const EXTRAS = [{ id: 'cashflow', name: 'Cash-flow calendar', cents: 2200 }, { id: 'reset', name: 'Spending reset', cents: 900 }];
-  const RETURN_URL = location.origin + '/payoff/app';
+  const RETURN_URL = location.origin + '/payoff/upgrade';
   let config = null, offer = null, attempt = null;
   let stripe = null, cardElements = null, expressElements = null, formReady = false, hosted = false, busy = false, payment = null, quoted = null, shown = null;
 
@@ -64,7 +64,8 @@
     $('order-total').textContent = money(total());
     paintClock();
     const price = base() - off;
-    $('glance-price').textContent = money(price).replace('.00', '');
+    // No $ on the price they pay, as on the reference order pages.
+    $('glance-price').textContent = (price / 100).toFixed(2).replace('.00', '');
     $('glance-gift').hidden = !off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;
@@ -108,7 +109,8 @@
     try {
       stripe = window.Stripe(config.stripeKey);
       quoted = total();
-      const options = { mode: 'payment', amount: quoted, currency: 'usd' };
+      // Must match the PaymentIntent from /api/payoff/pay: cards are kept for this visit only.
+      const options = { mode: 'payment', amount: quoted, currency: 'usd', paymentMethodOptions: { card: { setup_future_usage: 'on_session' } } };
       cardElements = stripe.elements(options);
       const card = cardElements.create('payment', { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
       card.on('ready', () => { formReady = true; setButton(); });
@@ -161,7 +163,7 @@
 
   function paid(intent) {
     try { sessionStorage.removeItem('payoff.attempt'); } catch { /* Optional. */ }
-    location.assign('/payoff/app?payment_intent=' + encodeURIComponent(intent.id));
+    location.assign('/payoff/upgrade?payment_intent=' + encodeURIComponent(intent.id));
   }
   function failed(error) {
     if (error?.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') return paid(error.payment_intent);

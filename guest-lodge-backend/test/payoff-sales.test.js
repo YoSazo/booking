@@ -4,10 +4,11 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
-const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
+const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER, CUTTER } = require('../payoff');
 
 function fixture({ failEmail = false, ready = true, production = false, clock = Date.now } = {}) {
-  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [];
+  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [], methods = new Map(), customers = [];
+  const world = { decline: false };
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
     create: async ({ data }) => {
@@ -21,8 +22,26 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     create: async (params, options) => { creates.push({ params, options }); return { url: 'https://checkout.stripe.com/c/pay/cs_test_example' }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return sessions.get(id); },
     list: async ({ customer_details }) => ({ data: [...sessions.values()].filter(s => s.customer_details?.email === customer_details.email) }),
-  } }, paymentIntents: {
-    create: async (params, options) => { payments.push({ params, options }); return { id: 'pi_3Created' + payments.length, client_secret: 'pi_test_created_secret_x' }; },
+    update: async (id, { metadata }) => { const s = sessions.get(id); s.metadata = { ...s.metadata, ...metadata }; return s; },
+  } }, customers: {
+    create: async (params, options) => { customers.push({ params, options }); return { id: 'cus_test' + customers.length }; },
+  }, paymentMethods: {
+    retrieve: async id => { if (!methods.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return methods.get(id); },
+  }, paymentIntents: {
+    create: async (params, options) => {
+      payments.push({ params, options });
+      const id = 'pi_3Created' + payments.length;
+      // A saved card charged on the spot (the Interest Cutter's one click).
+      if (params.confirm && params.payment_method) {
+        if (world.decline) throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' });
+        const made = { object: 'payment_intent', id, status: 'succeeded', currency: 'usd', livemode: true, amount: params.amount, amount_received: params.amount,
+          customer: params.customer, payment_method: params.payment_method, metadata: params.metadata, latest_charge: { refunded: false, amount_refunded: 0 }, client_secret: id + '_secret_x' };
+        intents.set(id, made); return made;
+      }
+      if (params.metadata?.product === 'marketel-payoff-cutter') intents.set(id, { object: 'payment_intent', id, status: 'requires_payment_method', currency: 'usd', amount: params.amount, metadata: params.metadata });
+      return { id, client_secret: 'pi_test_created_secret_x' };
+    },
+    update: async (id, { metadata }) => { const i = intents.get(id); i.metadata = { ...i.metadata, ...metadata }; return i; },
     retrieve: async id => { if (!intents.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return intents.get(id); },
     search: async ({ query }) => ({ data: [...intents.values()].filter(i => query.includes(`metadata['email']:'${i.metadata.email}'`) && i.status === 'succeeded') }),
   } };
@@ -33,7 +52,7 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
     isExcludedEmail: email => email === 'owner@example.test', now: clock });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
-  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments };
+  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments, methods, customers, world };
 }
 async function serve(world, fn) {
   const server = world.app.listen(0, '127.0.0.1');
@@ -134,7 +153,7 @@ test('checkout charges server prices for Payoff and any extras, opens the tool o
       assert.equal(params.line_items[0].price_data.unit_amount, 3300);
       assert.match(params.custom_text.submit.message, /opens as soon as you pay/);
       assert.doesNotMatch(JSON.stringify(params), /preorder|not yet available|in development/i);
-      assert.equal(params.success_url, 'https://bookmarketel.com/payoff/app?session_id={CHECKOUT_SESSION_ID}');
+      assert.equal(params.success_url, 'https://bookmarketel.com/payoff/upgrade?session_id={CHECKOUT_SESSION_ID}');
       assert.equal(params.metadata.product, PRODUCT); assert.equal(params.metadata.offerVersion, VERSION); assert.equal(params.metadata.addons, JSON.stringify(addons));
       assert.match(options.idempotencyKey, /^payoff:/);
     }
@@ -202,7 +221,7 @@ test('access tells the tool which extras the order has; owners get both; Stripe 
     const { body } = await post('/api/payoff/confirm', { sessionId: session.id });
     assert.deepEqual(body.extras, []);
     assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: [] });
-    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, 'own_0123456789abcdef01234567') })).body, { ok: true, extras: ['cashflow', 'reset'] });
+    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, 'own_0123456789abcdef01234567') })).body, { ok: true, extras: ['cashflow', 'reset', 'cutter'] });
     w.stripe.checkout.sessions.retrieve = async () => { throw new Error('Stripe down'); };
     assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: null });
   });
@@ -473,6 +492,10 @@ test('the order page form creates a payment at server prices, keeps retries on o
     const { params, options } = w.payments[0];
     assert.equal(params.amount, 6400); assert.equal(params.currency, 'usd'); assert.deepEqual(params.automatic_payment_methods, { enabled: true });
     assert.equal(params.receipt_email, 'Buyer@Example.test');
+    // A customer for the order, and the card kept for this visit only (the Interest Cutter's one click).
+    assert.equal(params.customer, 'cus_test1'); assert.equal(w.customers[0].params.email, 'Buyer@Example.test');
+    assert.deepEqual(params.payment_method_options, { card: { setup_future_usage: 'on_session' } });
+    assert.equal(params.setup_future_usage, undefined, 'never for every method: Klarna and bank stay available');
     assert.equal(params.metadata.checkout, 'embedded'); assert.equal(params.metadata.email, 'buyer@example.test');
     assert.equal(params.metadata.addons, '["cashflow","reset"]'); assert.equal(params.metadata.product, PRODUCT);
     assert.ok(!('amount' in order()) || params.amount !== 1);
@@ -639,5 +662,121 @@ test('the quiz earns the $5 only by finishing within 10 minutes; its looping clo
     // A forged quiz cookie counts as no quiz; the letter's visitors get the offer as before.
     assert.ok((await call('/api/payoff/config?offer=1', null, late.cookie.replace(/\.[^.]+$/, '.' + 'A'.repeat(43)))).body.offer);
     assert.ok((await call('/api/payoff/config?offer=1')).body.offer);
+  });
+});
+
+// Interest Cutter: the offer right after paying, and at the regular price from Payoff.
+function cutterWorld({ wallet = null, time = Date.parse('2026-10-21T18:00:00Z') } = {}) {
+  let now = time;
+  const w = fixture({ clock: () => now });
+  const parent = intent([], { customer: 'cus_buyer', payment_method: 'pm_buyer', created: Math.floor(time / 1000) });
+  w.intents.set(parent.id, parent);
+  w.methods.set('pm_buyer', { id: 'pm_buyer', type: 'card', customer: 'cus_buyer', card: { wallet: wallet ? { type: wallet } : null } });
+  return { w, parent, advance: ms => { now += ms; } };
+}
+
+test('the Interest Cutter charges the card kept from the order in one click, unlocks its tab, emails a receipt and tells Meta its own event', async () => {
+  const { w, parent } = cutterWorld();
+  await serve(w, async ({ post }) => {
+    const confirmed = await post('/api/payoff/confirm', { paymentIntent: parent.id });
+    assert.equal(confirmed.status, 200); assert.equal(confirmed.body.oneClick, true, 'a plain card can be charged again');
+    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
+    assert.equal(r.status, 200); assert.equal(r.body.paid, true); assert.equal(r.body.value, 107);
+    assert.deepEqual(r.body.extras, ['cutter']);
+    const { params, options } = w.payments.at(-1);
+    assert.equal(params.amount, CUTTER.prices.offer); assert.equal(params.amount, 10700);
+    assert.equal(params.customer, 'cus_buyer'); assert.equal(params.payment_method, 'pm_buyer');
+    assert.equal(params.confirm, true); assert.deepEqual(params.payment_method_types, ['card']);
+    assert.equal(params.off_session, undefined, 'the buyer is right there; never an unattended charge');
+    assert.deepEqual({ ...params.metadata }, { product: 'marketel-payoff-cutter', offerVersion: 'payoff-cutter-v1', offer: 'offer', parentOrder: parent.id,
+      visitorId: 'v_abcdefghijk', noTrack: '', email: 'buyer@example.test' });
+    assert.equal(options.idempotencyKey, `payoff-cutter:${parent.id}:offer:saved`);
+    assert.equal(w.intents.get(parent.id).metadata.cutter, r.body.reference, 'the order records its Interest Cutter');
+    assert.equal(w.emails.at(-1).subject, 'Your Interest Cutter is ready');
+    assert.match(w.emails.at(-1).text, /Interest Cutter: \$107\.00 USD/); assert.match(w.emails.at(-1).text, /30-day money-back guarantee/);
+    assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffUpgradePaid').length, 1);
+    assert.deepEqual(w.capi.filter(e => e.name === 'InterestCutterPurchase').map(e => [e.value, e.eventId]), [[107, `payoff-cutter.${r.body.reference}`]]);
+    assert.equal(w.capi.filter(e => e.name === 'Purchase').length, 1, 'only the first purchase is a Purchase');
+    const access = await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) });
+    assert.deepEqual(access.body.extras, ['cutter']);
+    // One per order.
+    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'discount' })).status, 409);
+    // A refund takes it away again.
+    w.intents.get(r.body.reference).latest_charge = { refunded: true, amount_refunded: 10700 };
+    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) })).body.extras, []);
+  });
+});
+
+test('the one-time prices end 30 minutes after the order; the regular price works any time from the access link', async () => {
+  const { w, parent, advance } = cutterWorld();
+  await serve(w, async ({ post }) => {
+    advance(31 * 60000);
+    for (const offer of ['offer', 'discount']) assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer })).status, 410, offer);
+    assert.equal((await post('/api/payoff/upgrade', { access: accessToken(SECRET, parent.id), offer: 'offer' })).status, 410, 'the link never unlocks a one-time price');
+    const regular = await post('/api/payoff/upgrade', { access: accessToken(SECRET, parent.id), offer: 'regular' });
+    assert.equal(regular.status, 200); assert.equal(w.payments.at(-1).params.amount, 14700);
+    assert.equal(regular.body.next, 'form', 'a later visit never reuses the card kept from the order');
+    assert.equal(w.payments.at(-1).params.payment_method, undefined);
+    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'free' })).status, 400);
+    assert.equal((await post('/api/payoff/upgrade', { access: 'forged.token', offer: 'regular' })).status, 400);
+    assert.equal((await post('/api/payoff/upgrade', { access: accessToken(SECRET, 'own_0123456789abcdef01234567'), offer: 'regular' })).status, 400);
+    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: 'pi_3MissingOrder1234', offer: 'regular' })).status, 404);
+  });
+});
+
+for (const wallet of ['apple_pay', 'google_pay']) test(`a ${wallet} order pays for the Interest Cutter in a payment form, never with the saved wallet`, async () => {
+  const { w, parent } = cutterWorld({ wallet });
+  await serve(w, async ({ post }) => {
+    assert.equal((await post('/api/payoff/confirm', { paymentIntent: parent.id })).body.oneClick, false);
+    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'discount' });
+    assert.equal(r.status, 200); assert.equal(r.body.next, 'form'); assert.equal(r.body.amount, 4700); assert.ok(r.body.clientSecret);
+    const { params, options } = w.payments.at(-1);
+    assert.equal(params.payment_method, undefined); assert.equal(params.confirm, undefined);
+    assert.deepEqual(params.automatic_payment_methods, { enabled: true }); assert.equal(params.customer, 'cus_buyer');
+    assert.equal(options.idempotencyKey, `payoff-cutter:${parent.id}:discount:form`);
+    // Paid in the form: confirming it unlocks the tab.
+    const made = w.intents.get(r.body.id);
+    Object.assign(made, { status: 'processing' });
+    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 202);
+    Object.assign(made, { status: 'succeeded', amount_received: 4700, livemode: true, latest_charge: { refunded: false, amount_refunded: 0 } });
+    const done = await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id });
+    assert.equal(done.status, 200); assert.deepEqual(done.body.extras, ['cutter']);
+    assert.equal(w.intents.get(parent.id).metadata.cutter, made.id);
+  });
+});
+
+test('a declined saved card falls back to the payment form; a hosted-checkout order uses the form; a wrong amount never unlocks', async () => {
+  const { w, parent } = cutterWorld();
+  await serve(w, async ({ post }) => {
+    w.world.decline = true;
+    const declined = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
+    assert.equal(declined.status, 200); assert.equal(declined.body.next, 'form'); assert.equal(declined.body.declined, 'Your card was declined.');
+    w.world.decline = false;
+    // A hosted-checkout order has no card kept on the page.
+    const session = { ...paid([], { preorder: false }), created: Math.floor(Date.parse('2026-10-21T18:00:00Z') / 1000) };
+    w.sessions.set(session.id, session);
+    const hosted = await post('/api/payoff/upgrade', { sessionId: session.id, offer: 'offer' });
+    assert.equal(hosted.body.next, 'form'); assert.equal(w.payments.at(-1).params.customer, undefined);
+    const made = w.intents.get(hosted.body.id);
+    Object.assign(made, { status: 'succeeded', amount_received: 999, latest_charge: {} });
+    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 402, 'not one of the listed prices');
+    Object.assign(made, { amount_received: 10700 });
+    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 200);
+    assert.equal(w.sessions.get(session.id).metadata.cutter, made.id, 'a hosted order records it on its session');
+    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: parent.id })).status, 404, 'an order is not an upgrade');
+  });
+});
+
+test('the payment_intent.succeeded webhook finishes an Interest Cutter paid in a form, once', async () => {
+  const { w, parent } = cutterWorld({ wallet: 'apple_pay' });
+  await serve(w, async ({ post }) => {
+    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
+    const made = Object.assign(w.intents.get(r.body.id), { status: 'succeeded', amount_received: 10700, livemode: true, latest_charge: { refunded: false } });
+    const event = { type: 'payment_intent.succeeded', data: { object: { id: made.id, metadata: made.metadata } } };
+    assert.equal(await w.registration.handleStripeEvent(event, {}), true);
+    assert.equal(await w.registration.handleStripeEvent(event, {}), true);
+    assert.equal(w.emails.filter(m => m.subject === 'Your Interest Cutter is ready').length, 1);
+    assert.equal(w.capi.filter(e => e.name === 'InterestCutterPurchase').length, 1);
+    assert.equal(w.intents.get(parent.id).metadata.cutter, made.id);
   });
 });

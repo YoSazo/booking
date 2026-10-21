@@ -7,9 +7,10 @@
   <meta name="theme-color" content="#ffffff">
   <title>Marketel Payoff — your debt-free date</title>
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/app.css?v=4">
-  <script src="/payoff/engine.js?v=2" defer></script>
-  <script src="/payoff/app.js?v=3" defer></script>
+  <link rel="stylesheet" href="/payoff/app.css?v=5">
+  <script src="/payoff/engine.js?v=3" defer></script>
+  <script src="/payoff/cutter-content.js?v=1" defer></script>
+  <script src="/payoff/app.js?v=4" defer></script>
 </head>
 <body>
   <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a>
@@ -17,6 +18,7 @@
       <button type="button" data-tab="plan">Plan</button>
       <button type="button" data-tab="cashflow" hidden>Cash flow</button>
       <button type="button" data-tab="reset" hidden>Reset</button>
+      <button type="button" data-tab="cutter">Interest Cutter</button>
     </nav>
   </header>
   <main id="main">
@@ -190,6 +192,57 @@
         <p class="muted" id="reset-essentials-view"></p>
         <button class="ghost" id="reset-new" type="button" hidden>Start another reset</button>
         <button class="ghost danger" id="reset-end" type="button">End this reset</button>
+      </div>
+    </section>
+    <section class="view" id="cutter" hidden>
+      <div id="cutter-locked" hidden>
+        <h1 id="cutter-locked-title"></h1>
+        <p class="muted" id="cutter-locked-lead"></p>
+        <ul class="cutter-benefits" id="cutter-locked-benefits"></ul>
+        <a class="big" id="cutter-buy" href="/payoff/upgrade?offer=regular"></a>
+        <p class="fine" id="cutter-locked-fine"></p>
+      </div>
+      <div id="cutter-tool" hidden>
+        <h1>Interest Cutter</h1>
+        <p class="muted">Check whether a lower rate would really save you money, ask your card companies for one, and never miss when a 0% promo ends.</p>
+
+        <h2>Would a lower rate save you money?</h2>
+        <p class="muted small" id="cutter-needs-debts" hidden>Add your debts in <button class="link" type="button" id="cutter-to-plan">Plan</button> first, then compare.</p>
+        <div id="cutter-compare">
+          <div class="segmented" role="radiogroup" aria-label="Lower-rate option">
+            <button type="button" role="radio" data-cutter-kind="transfer" aria-checked="true">0% balance transfer</button>
+            <button type="button" role="radio" data-cutter-kind="loan" aria-checked="false">Consolidation loan</button>
+          </div>
+          <p class="muted small" id="cutter-kind-hint"></p>
+          <ul class="cutter-moves" id="cutter-moves"></ul>
+          <div class="cutter-fields" id="cutter-transfer-fields">
+            <label class="field"><span>Transfer fee</span><span class="money-input suffix"><input id="cutter-fee" inputmode="decimal" autocomplete="off" value="3"><b>%</b></span></label>
+            <label class="field"><span>0% for how many months</span><input id="cutter-months" inputmode="numeric" autocomplete="off" value="18"></label>
+            <label class="field"><span>Rate after the promo</span><span class="money-input suffix"><input id="cutter-after" inputmode="decimal" autocomplete="off" value="24.99"><b>%</b></span></label>
+            <label class="field"><span>Credit limit on the new card <em>(optional)</em></span><span class="money-input"><b>$</b><input id="cutter-limit" inputmode="decimal" autocomplete="off" placeholder="No limit"></span></label>
+          </div>
+          <div class="cutter-fields" id="cutter-loan-fields" hidden>
+            <label class="field"><span>Loan interest rate (APR)</span><span class="money-input suffix"><input id="cutter-loan-apr" inputmode="decimal" autocomplete="off" value="11.99"><b>%</b></span></label>
+            <label class="field"><span>Loan length in months</span><input id="cutter-loan-term" inputmode="numeric" autocomplete="off" value="48"></label>
+            <label class="field"><span>Origination fee</span><span class="money-input suffix"><input id="cutter-loan-fee" inputmode="decimal" autocomplete="off" value="5"><b>%</b></span></label>
+          </div>
+          <div class="cutter-result" id="cutter-result" role="status" aria-live="polite"></div>
+        </div>
+
+        <h2>Call scripts</h2>
+        <p class="muted small">Read it, call the number on the back of your card, and keep notes of what they said.</p>
+        <div id="cutter-scripts"></div>
+
+        <h2>0% promo tracker</h2>
+        <p class="muted small">Add each 0% or promo rate and when it ends, so the new rate never surprises you.</p>
+        <ul class="debt-list" id="cutter-promos"></ul>
+        <form class="cutter-promo-form" id="cutter-promo-form" novalidate>
+          <label class="field"><span>Card or loan</span><input id="cutter-promo-name" maxlength="40" autocomplete="off" placeholder="e.g. Citi transfer card"></label>
+          <label class="field"><span>Promo ends</span><input id="cutter-promo-end" type="date"></label>
+          <label class="field"><span>Rate after <em>(optional)</em></span><span class="money-input suffix"><input id="cutter-promo-rate" inputmode="decimal" autocomplete="off" placeholder="0"><b>%</b></span></label>
+          <button class="ghost" type="submit">+ Add promo</button>
+        </form>
+        <p class="fine" id="cutter-disclaimer"></p>
       </div>
     </section>
   </main>

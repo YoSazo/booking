@@ -57,10 +57,14 @@
     return { year: Math.floor(total / 12), month: total % 12 };
   }
 
-  function simulate(debts, plan, { extra = 0, oneTime = 0, start } = {}) {
+  // A promotional rate (a 0% balance transfer, say) applies for its first
+  // `promoMonths` months, then `afterApr`.
+  const aprIn = (debt, month) => (debt.promoMonths && month > debt.promoMonths ? debt.afterApr ?? debt.apr : debt.apr);
+
+  function simulate(debts, plan, { extra = 0, oneTime = 0, start, budget: fixedBudget = null } = {}) {
     const rules = new Map(debts.map(debt => [debt.id, minimumRule(debt)]));
     const balances = new Map(debts.map(debt => [debt.id, debt.balance]));
-    const budget = debts.reduce((sum, debt) => sum + debt.minimum, 0) + Math.max(0, Math.round(extra));
+    const budget = Math.max(fixedBudget ?? 0, debts.reduce((sum, debt) => sum + debt.minimum, 0) + Math.max(0, Math.round(extra)));
     const targets = order(debts, plan);
     const payoffMonth = {};
     const rows = [];
@@ -71,7 +75,7 @@
       for (const debt of debts) {
         const balance = balances.get(debt.id);
         if (balance <= 0) continue;
-        const interest = monthlyInterest(balance, debt.apr);
+        const interest = monthlyInterest(balance, aprIn(debt, month));
         totalInterest += interest;
         balances.set(debt.id, balance + interest);
         const owed = month === 1 ? debt.minimum : rules.get(debt.id)(balance, interest);
@@ -128,6 +132,75 @@
       if (debt.apr === 0) warnings.push({ id: debt.id, kind: 'zero-rate' });
     }
     return { debts, plans: results, fastest: fastest && fastest.key, minimums: results.find(result => result.key === 'minimums'), warnings };
+  }
+
+  // Interest Cutter: the same monthly budget with some debts moved to a 0%
+  // balance transfer or a consolidation loan, against the plan as it is.
+  // Fees are counted on their own, so "cost" is interest plus fees, and the
+  // answer can honestly be that the current plan costs less.
+  //   transfer: { kind: 'transfer', moves: [{ id, amount }], feePercent, promoApr, promoMonths, afterApr, limit }
+  //   loan:     { kind: 'loan', moves: [{ id, amount }], apr, termMonths, feePercent }
+  const PAYING = PLANS.filter(info => info.key !== 'minimums').map(info => info.key);
+  const cheapest = runs => runs.filter(run => run.months).sort((a, b) => a.cost - b.cost || a.months - b.months)[0] || null;
+  function loanPayment(principal, apr, months) {
+    const rate = apr / 1200;
+    return Math.ceil(rate ? principal * rate / (1 - (1 + rate) ** -months) : principal / months);
+  }
+  function compareLowerRate(input, scenario = {}, { extra = 0, start = null } = {}) {
+    const debts = clean(input);
+    const budget = debts.reduce((sum, debt) => sum + debt.minimum, 0) + Math.max(0, Math.round(extra));
+    const best = (list, fees, fixed) => cheapest(PAYING.map(key => {
+      const run = simulate(list, key, { start, budget: fixed });
+      return { ...run, fees, cost: run.totalInterest + fees };
+    }));
+    const current = best(debts, 0, budget);
+    const loan = scenario.kind === 'loan';
+    const feeRate = Math.min(20, Math.max(0, Number(scenario.feePercent) || 0)) / 100;
+    // How much of each debt moves, never more than it owes or the new card's limit allows.
+    const limit = !loan && Number(scenario.limit) > 0 ? Math.round(Number(scenario.limit)) : Infinity;
+    let room = loan ? Infinity : Math.floor(limit / (1 + feeRate));
+    const moved = new Map();
+    for (const move of Array.isArray(scenario.moves) ? scenario.moves : []) {
+      const debt = debts.find(item => item.id === String(move.id));
+      if (!debt || moved.has(debt.id)) continue;
+      const amount = Math.min(debt.balance, Math.max(0, Math.round(Number(move.amount) || 0)), room);
+      if (amount > 0) { moved.set(debt.id, amount); room -= amount; }
+    }
+    const total = [...moved.values()].reduce((sum, amount) => sum + amount, 0);
+    if (!total) return { current, option: null, budget, moved: 0, fees: 0, savings: 0, monthsSooner: 0, cheaper: false };
+    // What stays on each original debt keeps its share of the minimum.
+    const remaining = debts.map(debt => {
+      const left = debt.balance - (moved.get(debt.id) || 0);
+      return left > 0 ? { ...debt, balance: left, minimum: Math.max(Math.min(debt.minimum, left), Math.round(debt.minimum * left / debt.balance)) } : null;
+    }).filter(Boolean);
+    let fees, added;
+    if (loan) {
+      const months = Math.min(120, Math.max(6, Math.round(Number(scenario.termMonths) || 36)));
+      const apr = Math.min(100, Math.max(0, Number(scenario.apr) || 0));
+      // An origination fee comes out of the loan, so it borrows enough to clear the debts after the fee.
+      const principal = Math.round(total / (1 - feeRate));
+      fees = principal - total;
+      added = { id: 'cutter-loan', name: 'Consolidation loan', type: 'loan', balance: principal, apr, minimum: loanPayment(principal, apr, months) };
+    } else {
+      fees = Math.round(total * feeRate);
+      const balance = total + fees;
+      const promoApr = Math.min(100, Math.max(0, Number(scenario.promoApr) || 0));
+      added = { id: 'cutter-transfer', name: 'Balance transfer card', type: 'card', balance, apr: promoApr,
+        promoMonths: Math.min(60, Math.max(0, Math.round(Number(scenario.promoMonths) || 0))),
+        afterApr: Math.min(100, Math.max(0, Number(scenario.afterApr ?? promoApr) || 0)),
+        minimum: Math.max(Math.min(CARD_FLOOR, balance), Math.round(balance * 0.02)) };
+    }
+    const option = best([...remaining, added], fees, budget);
+    const promoEnds = !loan && added.promoMonths && start ? addMonths(start, added.promoMonths) : null;
+    // What would still sit on the transfer card when its promotional rate ends.
+    const promoLeft = option && !loan && added.promoMonths
+      ? (option.rows[added.promoMonths - 1]?.balances[added.id] ?? 0) : null;
+    const savings = current && option ? current.cost - option.cost : 0;
+    return {
+      current, option, budget, budgetRaised: option ? option.monthly > budget : false,
+      moved: total, fees, promoEnds, promoLeft, added,
+      savings, monthsSooner: current && option ? current.months - option.months : 0, cheaper: savings > 0,
+    };
   }
 
   // Cash-flow calendar. Dates are 'YYYY-MM-DD' and handled as UTC day numbers,
@@ -217,6 +290,6 @@
       saved: Math.max(0, Math.round(perDay * (kept + slipped)) - spent), perDay: Math.round(perDay), days, end: fromDay(first + length - 1) };
   }
 
-  return { plan, simulate, clean, order, addMonths, monthlyInterest, PLANS, MAX_MONTHS, MAX_DEBTS,
+  return { plan, simulate, compareLowerRate, loanPayment, clean, order, addMonths, monthlyInterest, PLANS, MAX_MONTHS, MAX_DEBTS,
     cashflow, occurrences, resetSummary, toDay, fromDay, REPEATS };
 });

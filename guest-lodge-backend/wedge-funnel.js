@@ -214,10 +214,24 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['No referrer: typed, QR, or bookmark', ['PayoffFrom:direct']],
     ['From another site', ['PayoffFrom:other']],
   ] },
+  // The Interest Cutter, sold after the first purchase: each price on its own page.
+  { key: 'cutter', label: 'Interest Cutter after purchase', hideWhenEmpty: true, steps: [
+    ['Saw the 107 offer', ['PayoffUpgradeViewed:offer']],
+    ['Tapped YES at 107', ['PayoffUpgradeAccepted:offer']],
+    ['Bought at 107', ['PayoffUpgradePaid:offer']],
+    ['Saw the 47 discount', ['PayoffUpgradeViewed:discount']],
+    ['Tapped YES at 47', ['PayoffUpgradeAccepted:discount']],
+    ['Bought at 47', ['PayoffUpgradePaid:discount']],
+    ['Opened the 147 page in Payoff', ['PayoffUpgradeViewed:regular']],
+    ['Bought at 147', ['PayoffUpgradePaid:regular']],
+    ['Let a 2-minute offer run out', ['PayoffUpgradeExpired:offer', 'PayoffUpgradeExpired:discount']],
+  ] },
 ]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step' }),
-    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep']),
+  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step',
+    PayoffUpgradeDeclined: 'Said no to an Interest Cutter offer', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed' }),
+    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
       steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },

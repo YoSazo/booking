@@ -177,3 +177,67 @@ test('spending reset: days kept, slips, a streak, and money saved from the pause
   assert.equal(summary.end, '2026-10-23');
   assert.equal(E.resetSummary(reset, '2026-10-24').done, true);
 });
+
+// Interest Cutter: a lower rate against the plan as it is, same monthly budget.
+const cutterDebts = [
+  { id: 'chase', type: 'card', balance: 1200000, apr: 24.99, minimum: 30000 },
+  { id: 'wells', type: 'card', balance: 900000, apr: 22.99, minimum: 22500 },
+  { id: 'capone', type: 'card', balance: 750000, apr: 26.99, minimum: 19000 },
+  { id: 'car', type: 'loan', balance: 1600000, apr: 7.5, minimum: 26000 },
+];
+const transfer = extra => ({ kind: 'transfer', moves: [{ id: 'chase', amount: 1200000 }, { id: 'capone', amount: 750000 }],
+  feePercent: 3, promoApr: 0, promoMonths: 18, afterApr: 24.99, limit: 2000000, ...extra });
+
+test('a promotional rate applies for its months, then the rate after', () => {
+  const debt = { id: 'promo', type: 'loan', balance: 100000, apr: 0, promoMonths: 2, afterApr: 12, minimum: 10000 };
+  const run = E.simulate([debt], 'avalanche', { start });
+  assert.equal(run.rows[0].payments.promo, 10000, 'no interest in month 1');
+  assert.equal(run.rows[1].payments.promo, 10000);
+  assert.equal(run.totalInterest > 0, true, 'interest starts after the promotion');
+  assert.equal(E.simulate([{ ...debt, promoMonths: 0 }], 'avalanche', { start }).totalInterest, 0);
+});
+
+test('a balance transfer moves only what the new card allows after its fee, counts the fee apart from interest, and keeps the budget', () => {
+  const result = E.compareLowerRate(cutterDebts, transfer(), { start });
+  // $20,000 limit with a 3% fee: $19,417.47 can move ($12,000 from Chase, the rest from Capital One).
+  assert.equal(result.moved, Math.floor(2000000 / 1.03));
+  assert.equal(result.fees, Math.round(result.moved * 0.03));
+  assert.equal(result.added.balance, result.moved + result.fees);
+  assert.equal(result.option.fees, result.fees);
+  assert.equal(result.option.cost, result.option.totalInterest + result.fees);
+  assert.equal(result.current.fees, 0);
+  assert.equal(result.budget, 30000 + 22500 + 19000 + 26000);
+  assert.equal(result.option.monthly, result.budget, 'the same money every month');
+  assert.equal(result.budgetRaised, false);
+  assert.equal(result.cheaper, true);
+  assert.equal(result.savings, result.current.cost - result.option.cost);
+  assert.equal(result.monthsSooner, result.current.months - result.option.months);
+  assert.deepEqual(result.promoEnds, E.addMonths(start, 18));
+  assert.equal(result.promoLeft > 0, true, 'some of the transfer is still owed when the 0% ends');
+});
+
+test('a partial transfer moves only the amount chosen, and a smaller limit moves less', () => {
+  const partial = E.compareLowerRate(cutterDebts, transfer({ moves: [{ id: 'chase', amount: 500000 }], limit: null }), { start });
+  assert.equal(partial.moved, 500000);
+  const tight = E.compareLowerRate(cutterDebts, transfer({ limit: 515000 }), { start });
+  assert.equal(tight.moved, 500000);
+  const none = E.compareLowerRate(cutterDebts, transfer({ moves: [] }), { start });
+  assert.equal(none.option, null); assert.equal(none.cheaper, false);
+});
+
+test('a consolidation loan borrows enough to clear the debts after its fee, and says when its payment needs more than the budget', () => {
+  const cards = cutterDebts.filter(debt => debt.type === 'card');
+  const result = E.compareLowerRate(cutterDebts, { kind: 'loan', moves: cards.map(debt => ({ id: debt.id, amount: debt.balance })), apr: 11.99, termMonths: 48, feePercent: 5 }, { start });
+  const principal = Math.round(2850000 / 0.95);
+  assert.equal(result.added.balance, principal);
+  assert.equal(result.fees, principal - 2850000);
+  assert.equal(result.added.minimum, E.loanPayment(principal, 11.99, 48));
+  assert.equal(result.budgetRaised, true, 'the loan payment is more than the cards needed');
+  assert.equal(E.loanPayment(120000, 0, 12), 10000);
+});
+
+test('when the fees outweigh the savings, the current plan costs less', () => {
+  const result = E.compareLowerRate(cutterDebts, { kind: 'loan', moves: [{ id: 'car', amount: 1600000 }], apr: 9.99, termMonths: 60, feePercent: 8 }, { start });
+  assert.equal(result.cheaper, false);
+  assert.equal(result.savings < 0, true);
+});

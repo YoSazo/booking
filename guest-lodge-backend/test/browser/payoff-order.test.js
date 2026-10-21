@@ -16,7 +16,9 @@ window.Stripe = function (key) {
   return {
     elements(options) {
       log('elements', options.mode, options.amount, options.currency);
+      if (options.clientSecret) log('elements-intent', options.clientSecret);
       return {
+        clientSecret: options.clientSecret,
         update(next) { log('update', next.amount); },
         submit: async () => ({}),
         create(type, options) {
@@ -30,17 +32,19 @@ window.Stripe = function (key) {
         },
       };
     },
-    async confirmPayment({ clientSecret, confirmParams }) {
-      log('confirm', clientSecret, confirmParams.return_url, confirmParams.payment_method_data || null);
+    async confirmPayment({ clientSecret, elements, confirmParams }) {
+      const secret = clientSecret || elements.clientSecret;
+      log('confirm', secret, confirmParams.return_url, confirmParams.payment_method_data || null);
       if ((window.__stripeOutcomes || []).shift() === 'decline') return { error: { type: 'card_error', code: 'card_declined', message: 'Your card was declined.' } };
-      return { paymentIntent: { id: clientSecret.split('_secret')[0], status: 'succeeded' } };
+      return { paymentIntent: { id: secret.split('_secret')[0], status: 'succeeded' } };
     },
+    async handleNextAction({ clientSecret }) { log('action', clientSecret); return {}; },
   };
 };`;
 const ACCOUNT = '51AbCdEfGhIjKlMnO';
 
-async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null, embedded = true, outcomes = [] } = {}) {
-  const app = express(), creates = [], payments = [], emails = [], rows = new Map();
+async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null, embedded = true, outcomes = [], wallet = null } = {}) {
+  const app = express(), creates = [], payments = [], emails = [], rows = new Map(), updates = new Map();
   const paid = { id: 'cs_test_browserOrder123', mode: 'payment', status: 'complete', payment_status: unpaid ? 'unpaid' : 'paid', currency: 'usd', amount_total: 3300, livemode: false,
     metadata: { product: PRODUCT, offerVersion: VERSION, addons: '[]' }, customer_details: { email: 'buyer@example.test' } };
   const prisma = { inspectEvent: {
@@ -55,20 +59,29 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
       if (rejectFirst) { rejectFirst = false; throw new Error('Stripe unavailable'); }
       return { url: 'https://checkout.stripe.com/c/pay/cs_test_browser' };
     },
-    retrieve: async () => paid,
-  } }, paymentIntents: {
+    retrieve: async () => ({ ...paid, metadata: { ...paid.metadata, ...updates.get(paid.id) } }),
+    update: async (id, { metadata }) => { updates.set(id, { ...updates.get(id), ...metadata }); return paid; },
+  } }, customers: {
+    create: async () => ({ id: 'cus_browser1' }),
+  }, paymentMethods: {
+    // The card the order was paid with, kept on its customer for this visit.
+    retrieve: async id => ({ id, type: 'card', customer: 'cus_browser1', card: { wallet: wallet ? { type: wallet } : null } }),
+  }, paymentIntents: {
     create: async (params, options) => {
-      payments.push({ params, options });
+      payments.push({ params, options, created: Math.floor(Date.now() / 1000) });
       await new Promise(resolve => setTimeout(resolve, 100));
       if (rejectFirst) { rejectFirst = false; throw new Error('Stripe unavailable'); }
       const id = 'pi_3BrowserPay' + payments.length;
+      if (params.confirm && params.payment_method) return { id, status: 'succeeded', client_secret: id + '_secret_fixture' };
       return { id, client_secret: id + '_secret_fixture' };
     },
+    update: async (id, { metadata }) => { updates.set(id, { ...updates.get(id), ...metadata }); return {}; },
     retrieve: async id => {
       const made = payments[Number(id.replace('pi_3BrowserPay', '')) - 1];
       if (!made) throw Object.assign(new Error('missing'), { code: 'resource_missing' });
       return { object: 'payment_intent', id, status: unpaid ? 'requires_payment_method' : 'succeeded', currency: 'usd', amount_received: made.params.amount,
-        livemode: false, receipt_email: made.params.receipt_email, metadata: made.params.metadata };
+        livemode: false, receipt_email: made.params.receipt_email, metadata: { ...made.params.metadata, ...updates.get(id) }, created: made.created,
+        customer: made.params.customer, payment_method: made.params.payment_method || 'pm_browser_card', latest_charge: { refunded: false, amount_refunded: 0 } };
     },
   } };
   let clockOffset = 0;
@@ -91,6 +104,15 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 const ready = page => page.locator('#buy-button:enabled').waitFor();
+// After paying, the Interest Cutter offer comes first; saying no twice opens Payoff.
+const skipOffers = async page => {
+  await page.waitForURL(url => url.pathname === '/payoff/upgrade');
+  await page.locator('#stage-offer:not([hidden])').waitFor();
+  await page.locator('#offer-no').click();
+  await page.locator('#stage-discount:not([hidden])').waitFor();
+  await page.locator('#discount-no').click();
+  await page.waitForURL(url => url.pathname === '/payoff/app');
+};
 const fillBuyer = async page => { await page.locator('#name').fill('Test Buyer'); await page.locator('#email').fill('buyer@example.test'); };
 
 test('the order page follows the reference: reservation, product, price and safe checkout first, then the labeled form, extras, summary, guarantee and proof', async () => world(async ({ page, base }) => {
@@ -100,7 +122,7 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
   assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ 10,000+ sold');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
-  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), 'Your Debt-Free Date & Payoff Plan (Valued at $375 -> Today Only $28)');
+  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), 'Your Debt-Free Date & Payoff Plan (Valued at $375 -> Today Only 28)');
   assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
   assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
   assert.equal(await page.locator('.glance-guarantee').getAttribute('alt'), '30-day 100% money back guarantee');
@@ -162,14 +184,14 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.equal(await page.locator('#checkout-status').innerText(), 'Please enter your full name.');
   await fillBuyer(page);
   await page.locator('#buy-button').click();
-  await page.waitForURL(url => url.pathname === '/payoff/app');
+  await skipOffers(page);
   await page.locator('#debts:not([hidden])').waitFor();
   assert.equal(payments.length, 1);
   assert.equal(payments[0].params.amount, 5900); assert.equal(payments[0].params.metadata.addons, '["cashflow","reset"]');
   assert.equal(payments[0].params.receipt_email, 'buyer@example.test');
   const confirm = (await stripeLog()).find(entry => entry[0] === 'confirm');
   assert.deepEqual(confirm[3], { billing_details: { name: 'Test Buyer', email: 'buyer@example.test' } });
-  assert.equal(confirm[2], base + '/payoff/app');
+  assert.equal(confirm[2], base + '/payoff/upgrade');
   assert.equal(await page.isVisible('#tabs'), true);
   assert.ok(await page.evaluate(() => localStorage.getItem('payoff.access')));
   assert.equal(new URL(page.url()).search, '');
@@ -184,7 +206,7 @@ test('a declined card says why, keeps the same payment for the retry, and stays 
   assert.equal(await page.locator('#buy-label').innerText(), 'Get My Debt-Free Date');
   assert.ok(page.url().endsWith('/payoff/order'));
   await page.locator('#buy-button').click();
-  await page.waitForURL(url => url.pathname === '/payoff/app');
+  await page.waitForURL(url => url.pathname === '/payoff/upgrade');
   assert.equal(payments.length, 1, 'the retry confirms the same payment');
 }, { outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {
@@ -275,9 +297,10 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
   await fillBuyer(page);
   await page.locator('#reset').check();
   await page.locator('#buy-button').click();
-  await page.waitForURL('https://payoff.test/payoff/app**');
+  await page.waitForURL('https://payoff.test/payoff/upgrade**');
+  await page.locator('#stage-offer:not([hidden])').waitFor();
   const tracked = calls.filter(args => args[0] === 'track');
-  assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again (never the tool)');
+  assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again (never the offer page or the tool)');
   assert.deepEqual(tracked.filter(args => args[1] !== 'PageView').map(args => [args[1], args[2].value, args[3]?.eventID]), [
     ['AddToCart', 33, `payoff-cart.${visitor}`],
     ['InitiateCheckout', 37, `payoff-checkout.${visitor}`],
@@ -348,7 +371,7 @@ for (const delayedTimer of [false, true]) test('days later the buyer still pays 
     document.getElementById('order-form').requestSubmit();
   });
   else await page.locator('#buy-button').click();
-  await page.waitForURL(url => url.pathname === '/payoff/app');
+  await page.waitForURL(url => url.pathname === '/payoff/upgrade');
   assert.equal(payments.at(-1).params.amount, 2800);
 }));
 // The first screen answers what, held, price and safety before any field.
@@ -415,4 +438,113 @@ test('sales offers retain the regular price and usable checkout when the offer l
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+}));
+
+// The Interest Cutter, offered right after paying.
+const payThenOffer = async (page, base) => {
+  await page.goto(base + '/payoff/order'); await ready(page);
+  await fillBuyer(page);
+  await page.locator('#buy-button').click();
+  await page.waitForURL(url => url.pathname === '/payoff/upgrade');
+  await page.locator('#stage-offer:not([hidden])').waitFor();
+};
+const text = async (page, selector) => (await page.locator(selector).innerText()).replace(/\s+/g, ' ').trim();
+test('after paying, YES on the 107 offer charges the card from the order in one click, and Payoff opens on the Interest Cutter tab', async () => world(async ({ page, base, payments, emails }) => {
+  await payThenOffer(page, base);
+  assert.equal(await text(page, '#offer-headline'), 'WAIT! Your plan isn’t complete yet...');
+  assert.equal(await text(page, '#stage-offer .up-price'), '$147 Today Only 107 Save 40');
+  assert.equal(await page.locator('#stage-offer .up-price s').evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
+  assert.equal(await page.locator('#offer-price').evaluate(el => getComputedStyle(el).color), 'rgb(0, 153, 0)', 'the price they pay is green, with no $');
+  assert.match(await page.locator('#offer-clock').innerText(), /^(02:00|01:5\d)$/);
+  assert.equal(await text(page, '#offer-one-click'), 'ONE CLICK. NO CARD TO RE-ENTER.');
+  assert.equal(await text(page, '#offer-no'), 'No thanks, I’ll keep paying full interest');
+  assert.equal(await page.locator('#offer-no').evaluate(el => getComputedStyle(el).color), 'rgb(154, 154, 154)', 'the no is muted');
+  assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
+  assert.match(await text(page, '.up-example'), /Example: \$65,000 of debt, \$1,350 a month .*Saves \$22,710 after fees .*An example, not your numbers/);
+  await page.locator('#offer-yes').click();
+  await page.locator('#stage-done:not([hidden])').waitFor();
+  const charge = payments.at(-1).params;
+  assert.equal(charge.amount, 10700); assert.equal(charge.payment_method, 'pm_browser_card'); assert.equal(charge.customer, 'cus_browser1');
+  assert.equal(charge.confirm, true); assert.equal(charge.metadata.parentOrder, 'pi_3BrowserPay1'); assert.equal(charge.metadata.offer, 'offer');
+  assert.equal(payments[0].params.customer, 'cus_browser1');
+  assert.deepEqual(payments[0].params.payment_method_options, { card: { setup_future_usage: 'on_session' } });
+  assert.ok(emails.some(mail => mail.subject === 'Your Interest Cutter is ready'));
+  await page.locator('#done-open').click();
+  await page.waitForURL(url => url.pathname === '/payoff/app');
+  await page.locator('#cutter:not([hidden])').waitFor();
+  assert.equal(await page.locator('#cutter-tool').isHidden(), false, 'the tool, not the locked preview');
+  assert.equal(await page.locator('#tabs button[data-tab="cutter"]').getAttribute('aria-current'), 'page');
+  // The tool: its comparison waits for debts, the three scripts, and the promo tracker.
+  assert.equal(await page.locator('#cutter-needs-debts').isHidden(), false);
+  assert.deepEqual(await page.locator('.cutter-script summary').allInnerTexts(), ['Ask for a lower interest rate', 'Ask for a late fee to be refunded', 'Ask about a hardship program']);
+  await page.locator('#cutter-promo-name').fill('Citi transfer card');
+  await page.locator('#cutter-promo-end').fill('2028-04-01');
+  await page.locator('#cutter-promo-rate').fill('24.99');
+  await page.locator('#cutter-promo-form button[type="submit"]').click();
+  assert.match(await text(page, '#cutter-promos'), /^Citi transfer card Ends Apr 1, 2028 · then 24\.99% \d+ days left Remove$/);
+  assert.match(await text(page, '#cutter-disclaimer'), /nothing here guarantees they will/);
+}));
+test('the 107 offer moves to the 47 discount when its clock ends; the discount ends the same way, Payoff opens, and the offer never comes back', async () => world(async ({ page, base, payments }) => {
+  await payThenOffer(page, base);
+  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 2 * 60000 + 2000; });
+  await page.locator('#stage-discount:not([hidden])').waitFor({ timeout: 4000 });
+  assert.equal(await text(page, '#discount-headline'), 'Wait, before you go...');
+  assert.equal(await text(page, '#stage-discount .up-price'), '$107 Today Only 47');
+  assert.match(await page.locator('#discount-clock').innerText(), /^(02:00|01:5\d)$/);
+  assert.equal(await text(page, '#discount-no'), 'No thanks, take me to my plan');
+  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 2 * 60000 + 2000; });
+  await page.waitForURL(url => url.pathname === '/payoff/app', { timeout: 4000 });
+  assert.equal(payments.length, 1, 'nothing was charged for the Interest Cutter');
+  await page.goto(base + '/payoff/upgrade?payment_intent=pi_3BrowserPay1');
+  await page.waitForURL(url => url.pathname === '/payoff/app');
+}));
+test('an Apple Pay order pays for the Interest Cutter in the pop-up form, at 47 after saying no to 107', async () => world(async ({ page, base, payments }) => {
+  await payThenOffer(page, base);
+  assert.equal(await text(page, '#offer-one-click'), 'PAY WITH APPLE PAY, GOOGLE PAY OR A CARD.', 'never claims one click for a wallet');
+  await page.locator('#offer-no').click();
+  await page.locator('#stage-discount:not([hidden])').waitFor();
+  await page.locator('#discount-yes').click();
+  await page.locator('#pay-sheet:not([hidden])').waitFor();
+  assert.equal(await text(page, '#pay-amount'), 'Today Only 47');
+  await page.locator('#pay-button:enabled').waitFor();
+  assert.equal(await page.locator('#pay-or').isHidden(), false, 'Apple Pay sits above the card form');
+  const form = payments.at(-1).params;
+  assert.equal(form.amount, 4700); assert.deepEqual(form.automatic_payment_methods, { enabled: true }); assert.equal(form.payment_method, undefined);
+  await page.locator('#pay-button').click();
+  await page.locator('#stage-done:not([hidden])').waitFor();
+  assert.equal(await page.locator('#pay-sheet').isHidden(), true);
+}, { wallet: 'apple_pay' }));
+test('inside Payoff, the locked Interest Cutter tab leads to the 147 page, with no clock, and buying it unlocks the tool', async () => world(async ({ page, base, payments }) => {
+  await payThenOffer(page, base);
+  await page.locator('#offer-no').click(); await page.locator('#stage-discount:not([hidden])').waitFor();
+  await page.locator('#discount-no').click(); await page.waitForURL(url => url.pathname === '/payoff/app');
+  await page.locator('#tabs button[data-tab="cutter"]').click();
+  await page.locator('#cutter-locked:not([hidden])').waitFor();
+  assert.equal(await text(page, '#cutter-buy'), 'Get the Interest Cutter, $147');
+  assert.equal(await page.locator('#cutter-buy').getAttribute('href'), '/payoff/upgrade?offer=regular');
+  await page.locator('#cutter-buy').click();
+  await page.locator('#stage-offer:not([hidden])').waitFor();
+  assert.equal(await text(page, '#stage-offer .up-price'), 'Today Only 147');
+  assert.equal(await page.locator('#offer-clock-row').isHidden(), true, 'the regular price has no clock');
+  assert.equal(await text(page, '#offer-one-click'), 'PAY WITH APPLE PAY, GOOGLE PAY OR A CARD.');
+  await page.locator('#offer-yes').click();
+  await page.locator('#pay-sheet:not([hidden])').waitFor();
+  assert.equal(payments.at(-1).params.amount, 14700); assert.equal(payments.at(-1).params.metadata.offer, 'regular');
+  assert.equal(payments.at(-1).params.payment_method, undefined, 'a later visit pays in the form, never with the card kept from the order');
+  await page.locator('#pay-button:enabled').waitFor();
+  await page.locator('#pay-button').click();
+  await page.locator('#stage-done:not([hidden])').waitFor();
+  await page.locator('#done-open').click();
+  await page.locator('#cutter-tool:not([hidden])').waitFor();
+}));
+test('the offer page shows the clock, the price and the YES button on the first screen of phones', async () => world(async ({ page, base }) => {
+  await payThenOffer(page, base);
+  for (const [width, height] of [[375, 667], [390, 664], [390, 844], [414, 736]]) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => document.fonts.ready);
+    const seen = await page.evaluate(() => Object.fromEntries(['#offer-headline', '#offer-clock-row', '.up-example', '.up-price', '#offer-yes']
+      .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
+    for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  }
 }));

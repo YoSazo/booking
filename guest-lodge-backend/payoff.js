@@ -24,13 +24,24 @@ const ITEMS = Object.freeze({
   cashflow: { name: 'Cash-flow calendar', cents: 2200 },
   reset: { name: 'Spending reset', cents: 900 },
 });
+// The Interest Cutter, sold after the first purchase: $107 on the page right
+// after paying, then $47 on the next, each only within WINDOW of that payment;
+// $147 inside Payoff at any time. Its own PaymentIntent, linked to the order
+// it belongs to through `parentOrder`, and recorded on that order as `cutter`.
+const CUTTER = Object.freeze({
+  product: 'marketel-payoff-cutter', version: 'payoff-cutter-v1', name: 'Interest Cutter',
+  prices: Object.freeze({ offer: 10700, discount: 4700, regular: 14700 }), windowMs: 30 * 60 * 1000,
+});
 const ROOT = path.join(__dirname, 'payoff-web');
-const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled'];
+const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
 const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
-const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS });
+const UPGRADE_OFFERS = ['offer', 'discount', 'regular'];
+const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS,
+  PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
@@ -172,14 +183,14 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     res.set('Content-Security-Policy', META_CSP);
     res.sendFile(path.join(ROOT, landing(req, res) === 'quiz' ? 'quiz.html' : 'index.html'));
   });
-  for (const [route, file] of [['/order', 'order.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
+  for (const [route, file] of [['/order', 'order.html'], ['/upgrade', 'upgrade.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
-      if (file === 'order.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
+      if (file === 'order.html' || file === 'upgrade.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
       else if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js', 'cutter-content.js', 'upgrade.js', 'upgrade.css']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
@@ -270,6 +281,77 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         '30-day money-back guarantee: to request a refund, reply to this email or contact support@bookmarketel.com with your order reference. Refund eligibility is set out in the terms:',
         `${origin}/payoff/terms`,
       ].join('\n') };
+  }
+
+  // Interest Cutter. A paid one is its own succeeded PaymentIntent at one of
+  // the listed prices, not refunded; its order points to it as `cutter`.
+  function paidCutter(intent) {
+    const metadata = intent?.metadata || {};
+    if (intent?.object !== 'payment_intent' || metadata.product !== CUTTER.product || metadata.offerVersion !== CUTTER.version
+      || intent.status !== 'succeeded' || intent.currency !== 'usd' || intent.amount_received !== CUTTER.prices[metadata.offer]) return null;
+    if (intent.latest_charge && typeof intent.latest_charge === 'object' && (intent.latest_charge.refunded || intent.latest_charge.amount_refunded > 0)) return null;
+    return { id: intent.id, parent: metadata.parentOrder, offer: metadata.offer, cents: intent.amount_received };
+  }
+  async function ownsCutter(parent) {
+    const id = parent?.metadata?.cutter;
+    if (!intentId(id)) return false;
+    try { return !!paidCutter(await stripe.paymentIntents.retrieve(id, { expand: ['latest_charge'] })); } catch { return false; }
+  }
+  const idOf = value => (typeof value === 'string' ? value : value?.id) || null;
+  async function finishCutter(intent, { req = null, webhook = false } = {}) {
+    const cutter = paidCutter(intent);
+    if (!cutter || !accessId(cutter.parent)) throw fail(402, 'This upgrade has not been paid. If you were charged, contact support@bookmarketel.com.');
+    const parent = await retrieve(cutter.parent);
+    const order = paidPurchase(parent);
+    if (!order) throw fail(409, 'We couldn’t find the order this upgrade belongs to. Contact support@bookmarketel.com.');
+    if (parent.metadata?.cutter !== cutter.id) {
+      const resource = parent.object === 'payment_intent' ? stripe.paymentIntents : stripe.checkout.sessions;
+      await resource.update(parent.id, { metadata: { cutter: cutter.id } });
+    }
+    const metadata = order.metadata || {}, visitor = visitorId(metadata.visitorId);
+    let firstTime = false;
+    if (order.livemode !== false && metadata.noTrack !== '1' && !isExcludedEmail(order.email || '')) {
+      try {
+        await prisma.inspectEvent.create({ data: { name: 'PayoffUpgradePaid', tool: 'payoff', visitorId: visitor, sourceId: `payoff-cutter-paid:${cutter.id}`, detail: cutter.offer } });
+        firstTime = true;
+      } catch (error) { if (error.code !== 'P2002') throw error; }
+    }
+    if (firstTime) {
+      // Its own event, so Meta keeps optimizing the ads for first purchases.
+      await sendCapi('InterestCutterPurchase', {
+        eventId: `payoff-cutter.${cutter.id}`, contentName: CUTTER.name,
+        hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
+        externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
+        email: order.email || '', fullName: order.name,
+        ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
+        sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
+        value: PRICE(cutter.cents),
+      });
+    }
+    if (order.email && mail) {
+      const sourceId = `payoff-cutter-mail:${cutter.id}`;
+      let claimed = false;
+      try { await prisma.inspectEvent.create({ data: { name: 'PayoffUpgradeEmailed', tool: 'payoff', sourceId, visitorId: visitor } }); claimed = true; }
+      catch (error) { if (error.code !== 'P2002') throw error; }
+      if (claimed) {
+        try {
+          await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: order.email, subject: 'Your Interest Cutter is ready',
+            text: [
+              'The Interest Cutter is now inside your Marketel Payoff, in its own tab at the top:', '',
+              accessUrl(order.id), '',
+              `Interest Cutter: $${(cutter.cents / 100).toFixed(2)} USD. One payment, no subscription.`,
+              `Upgrade reference: ${cutter.id}`, `Order reference: ${order.id}`, '',
+              'It’s covered by the same 30-day money-back guarantee as your order: reply to this email or contact support@bookmarketel.com with your reference. Refund eligibility is set out in the terms:',
+              `${origin}/payoff/terms`,
+            ].join('\n') });
+        } catch (error) {
+          await prisma.inspectEvent.delete({ where: { sourceId } }).catch(() => {});
+          console.error('Payoff upgrade email failed:', error.message);
+        }
+      }
+    }
+    return { paid: true, reference: cutter.id, value: PRICE(cutter.cents), access: accessToken(secret, order.id),
+      extras: [...order.ids.filter(id => id !== 'base'), 'cutter'] };
   }
   const api = express.Router();
   api.use(express.json({ limit: '8kb' }));
@@ -371,9 +453,14 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   // declined card, say) returns the same payment.
   api.post('/pay', guarded(async (req, res) => {
     const order = quote(req);
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, 'embedded-v1'])).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, 'embedded-v2'])).digest('hex');
+    // A card is kept for this visit only (on_session), so the Interest Cutter
+    // offer right after can charge it with one click. Wallets and other
+    // methods pay again on that page.
+    const customer = await stripe.customers.create({ email: order.email, metadata: { product: PRODUCT } }, { idempotencyKey: `payoff-customer:${fingerprint}` });
     const intent = await stripe.paymentIntents.create({
-      amount: order.total, currency: 'usd', automatic_payment_methods: { enabled: true },
+      amount: order.total, currency: 'usd', automatic_payment_methods: { enabled: true }, customer: customer.id,
+      payment_method_options: { card: { setup_future_usage: 'on_session' } },
       receipt_email: order.email, description: order.ids.map(id => ITEMS[id].name).join(' + '),
       metadata: { ...order.metadata, checkout: 'embedded', email: order.email.toLowerCase() },
     }, { idempotencyKey: `payoff-pay:${fingerprint}` });
@@ -392,7 +479,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         product_data: { name: ITEMS[id].name, description: DESCRIPTIONS[id] } } })),
       ...(coupon ? { discounts: [{ coupon }] } : {}),
       custom_text: { submit: { message: 'Your plan opens as soon as you pay, and we email you the link. One payment, no subscription. 30-day money-back guarantee: see our terms for refund eligibility.' } },
-      success_url: `${origin}/payoff/app?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/payoff/upgrade?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/payoff/order?cancelled=1`,
       metadata, payment_intent_data: { metadata },
     }, { idempotencyKey: `payoff:${fingerprint}` });
@@ -414,7 +501,86 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (object.object === 'payment_intent' && object.status !== 'succeeded') {
       throw fail(402, 'Your payment didn’t go through and you weren’t charged. Go back to checkout to try again.');
     }
-    res.json(await confirm(object, { req }));
+    const result = await confirm(object, { req });
+    // Whether the Interest Cutter offer can charge this order's card in one click.
+    res.json({ ...result, oneClick: await savedCard(object) !== null });
+  }));
+  // A card (not a wallet: Apple Pay can't be reused while the buyer is
+  // present) kept on this order's customer for this visit.
+  async function savedCard(parent) {
+    const customer = parent?.object === 'payment_intent' ? idOf(parent.customer) : null;
+    const methodId = parent?.object === 'payment_intent' ? idOf(parent.payment_method) : null;
+    if (!customer || !methodId) return null;
+    const method = await stripe.paymentMethods.retrieve(methodId).catch(() => null);
+    return method?.type === 'card' && !method.card?.wallet && idOf(method.customer) === customer ? method : null;
+  }
+  // The Interest Cutter offer. The order is the payment just made (the
+  // one-time prices hold for CUTTER.windowMs after it) or the buyer's access
+  // link (the regular price, any time). A card kept from that payment is
+  // charged in one click; anything else (Apple Pay, Google Pay, Klarna, bank,
+  // a hosted-checkout order) gets a client secret for a payment form.
+  async function upgradeOrder(req) {
+    const byLink = verifyAccess(secret, req.body?.access);
+    const id = byLink || intentId(req.body?.paymentIntent) || sessionId(req.body?.sessionId);
+    if (!id || id.startsWith('own_')) throw fail(400, 'Open this from your Payoff link.');
+    let parent;
+    try { parent = await retrieve(id); }
+    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
+    const order = paidPurchase(parent);
+    if (!order) throw fail(402, 'This order has not been paid yet.');
+    return { parent, order };
+  }
+  api.post('/upgrade', guarded(async (req, res) => {
+    if (!available()) throw fail(503, 'The upgrade is temporarily unavailable. Your plan is ready in Payoff.');
+    if (req.headers.origin && req.headers.origin !== origin && env.NODE_ENV !== 'test') throw fail(403, 'Open this on bookmarketel.com.');
+    rate(req, 'upgrade', 30);
+    const offer = req.body?.offer;
+    if (!Object.hasOwn(CUTTER.prices, offer)) throw fail(400, 'Unknown offer.');
+    const { parent, order } = await upgradeOrder(req);
+    if (offer !== 'regular' && now() - parent.created * 1000 > CUTTER.windowMs) throw fail(410, 'This one-time offer has ended. The Interest Cutter is still in its tab inside Payoff.');
+    if (await ownsCutter(parent)) throw fail(409, 'You already have the Interest Cutter. It’s in its tab inside Payoff.');
+    const cents = CUTTER.prices[offer];
+    const customer = parent.object === 'payment_intent' ? idOf(parent.customer) : null;
+    const metadata = { product: CUTTER.product, offerVersion: CUTTER.version, offer, parentOrder: order.id,
+      visitorId: order.metadata?.visitorId || '', noTrack: order.metadata?.noTrack || '', email: String(order.email || '').toLowerCase() };
+    const base = { amount: cents, currency: 'usd', description: CUTTER.name, metadata,
+      ...(order.email ? { receipt_email: order.email } : {}), ...(customer ? { customer } : {}) };
+    // The card is kept for the visit of the order only: the regular price,
+    // bought later from inside Payoff, always uses the payment form.
+    const saved = req.body?.method === 'form' || offer === 'regular' ? null : await savedCard(parent);
+    if (saved) {
+      try {
+        const intent = await stripe.paymentIntents.create({ ...base, payment_method: saved.id, payment_method_types: ['card'], confirm: true },
+          { idempotencyKey: `payoff-cutter:${order.id}:${offer}:saved` });
+        if (intent.status === 'succeeded') {
+          return res.json(await finishCutter(await stripe.paymentIntents.retrieve(intent.id, { expand: ['latest_charge'] }), { req }));
+        }
+        if (intent.status === 'requires_action' && intent.client_secret) return res.json({ next: 'action', id: intent.id, clientSecret: intent.client_secret });
+      } catch (error) {
+        if (error.type !== 'StripeCardError') throw error;
+        return res.json({ next: 'form', declined: error.message || 'Your card was declined.', ...(await upgradeForm(base, order, offer)) });
+      }
+    }
+    res.json({ next: 'form', ...(await upgradeForm(base, order, offer)) });
+  }));
+  async function upgradeForm(base, order, offer) {
+    const intent = await stripe.paymentIntents.create({ ...base, automatic_payment_methods: { enabled: true } },
+      { idempotencyKey: `payoff-cutter:${order.id}:${offer}:form` });
+    if (!intent.client_secret) throw fail(502, 'Payment could not start. Please try again.');
+    return { id: intent.id, clientSecret: intent.client_secret, amount: base.amount };
+  }
+  api.post('/upgrade/confirm', guarded(async (req, res) => {
+    if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Upgrade confirmation is temporarily unavailable.');
+    rate(req, 'upgrade-confirm', 60);
+    const id = intentId(req.body?.paymentIntent);
+    if (!id) throw fail(400, 'The upgrade reference is invalid.');
+    let intent;
+    try { intent = await stripe.paymentIntents.retrieve(id, { expand: ['latest_charge'] }); }
+    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Upgrade not found.'); throw error; }
+    if (intent.metadata?.product !== CUTTER.product) throw fail(404, 'Upgrade not found.');
+    if (intent.status === 'processing') return res.status(202).json({ processing: true, message: 'Your bank is still confirming the payment. The Interest Cutter unlocks as soon as it clears.' });
+    if (intent.status !== 'succeeded') throw fail(402, 'That payment didn’t go through and you weren’t charged.');
+    res.json(await finishCutter(intent, { req }));
   }));
   api.post('/access', guarded(async (req, res) => {
     rate(req, 'access', 120);
@@ -422,11 +588,12 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (!id) throw fail(403, 'This link is not valid. Use the link in your Payoff email, or ask for a new one.');
     // Which extras the order included comes from Stripe each time; if Stripe
     // can't answer, the app keeps what it last knew (extras: null).
-    if (id.startsWith('own_')) return res.json({ ok: true, extras: [...EXTRAS] });
+    if (id.startsWith('own_')) return res.json({ ok: true, extras: [...EXTRAS, 'cutter'] });
     let extras = null;
     try {
-      const order = stripe && paidPurchase(await retrieve(id));
-      if (order) extras = order.ids.filter(item => item !== 'base');
+      const object = stripe && await retrieve(id);
+      const order = object && paidPurchase(object);
+      if (order) extras = [...order.ids.filter(item => item !== 'base'), ...(await ownsCutter(object) ? ['cutter'] : [])];
     } catch (error) { console.error('Payoff access lookup failed:', error.type || error.message); }
     res.json({ ok: true, extras });
   }));
@@ -459,6 +626,11 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   return { handleStripeEvent: async (event, _req) => {
     if (event.type === 'payment_intent.succeeded') {
       const object = event.data?.object;
+      if (object?.metadata?.product === CUTTER.product) {
+        if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Upgrade confirmation is unavailable.');
+        await finishCutter(await stripe.paymentIntents.retrieve(object.id, { expand: ['latest_charge'] }), { webhook: true });
+        return true;
+      }
       if (object?.metadata?.product !== PRODUCT || object.metadata.checkout !== 'embedded') return false;
       if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
       await confirm(await retrieve(object.id), { retryMail: true, webhook: true });
@@ -472,4 +644,4 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return true;
   } };
 }
-module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER, VARIANTS, QUIZ_STEPS };
+module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER, VARIANTS, QUIZ_STEPS, CUTTER };

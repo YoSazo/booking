@@ -202,6 +202,40 @@ select { width: 100%; min-height: 52px; padding: 10px 12px; border: 1.5px solid 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
+/* Interest Cutter */
+.link { border: 0; background: none; padding: 0; color: var(--head); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.cutter-benefits { margin: 14px 0 18px; padding: 0; list-style: none; }
+.cutter-benefits li { position: relative; margin: 0 0 10px; padding-left: 28px; line-height: 1.4; }
+.cutter-benefits li::before { content: '✓'; position: absolute; left: 0; color: var(--green); font-weight: 800; }
+#cutter-buy { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.cutter-moves { margin: 12px 0; padding: 0; list-style: none; }
+.cutter-move { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.cutter-move .check { flex: 1 1 220px; margin: 0; }
+.cutter-move .money-input { flex: 0 0 140px; }
+.cutter-move .money-input input { min-height: 40px; }
+.cutter-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.cutter-result { margin-top: 10px; }
+.cutter-verdict { margin: 0 0 12px; padding: 14px 16px; border-radius: 16px; background: #fdf1f4; color: var(--head); font-size: 19px; font-weight: 800; text-align: center; }
+.cutter-verdict.win { background: #e8f5ee; color: var(--green); }
+.cutter-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.cutter-col { padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); text-align: center; }
+.cutter-col p { margin: 0; }
+.cutter-col-title { color: var(--muted); font-size: 14px; font-weight: 700; }
+.cutter-cost { margin: 6px 0 2px !important; font-size: 24px; font-weight: 800; }
+.cutter-date { margin-top: 6px !important; font-weight: 700; }
+.cutter-script { margin: 0 0 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+.cutter-script summary { padding: 14px 0; font-weight: 800; cursor: pointer; }
+.cutter-lines { margin: 8px 0 14px; padding-left: 22px; line-height: 1.5; }
+.cutter-lines li { margin-bottom: 8px; }
+.cutter-log-title { margin: 0 0 4px; font-weight: 700; }
+.cutter-log { margin: 0 0 12px; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.cutter-log-form { padding-bottom: 14px; }
+.cutter-promo.soon { border-color: #e8b04b; background: #fff8e6; }
+.cutter-promo .link { flex: none; font-size: 14px; }
+.cutter-promo-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: end; }
+.cutter-promo-form .field:first-child { grid-column: 1 / -1; }
+.cutter-promo-form .ghost { margin-bottom: 14px; }
+
 /* Computers: the date and "What if" stay in view on the left while the plans
    and schedule scroll on the right. Phones keep the single column. */
 @media (min-width: 1000px) {

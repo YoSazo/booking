@@ -1,0 +1,54 @@
+/* The Interest Cutter offer pages, on top of order.css: the same fonts,
+   badges and button, louder. */
+.progress { display: flex; justify-content: center; gap: 6px; margin: 0; padding: 8px 10px; background: #f4f4f4; list-style: none;
+  font: 600 12px/1.3 'Montserrat', sans-serif; color: #999; }
+.progress li::after { content: '→'; margin-left: 6px; color: #bbb; }
+.progress li:last-child::after { content: none; }
+.progress .done { color: #1e7d67; }
+.progress .now { color: #222; text-decoration: underline; }
+
+.upgrade { max-width: 480px; margin: 0 auto; padding: 8px 14px 24px; font-family: 'Open Sans', sans-serif; text-align: center; }
+.up-wait { margin: 40px 0 10px; font: 700 22px/1.3 'Montserrat', sans-serif; }
+.up-wait-banner { margin: 2px 0 6px; padding: 8px 10px; border-radius: 8px; background: #c30; color: #fff; font: 800 20px/1.2 'Montserrat', sans-serif; }
+.up-ready { margin: 0; color: #1e7d67; font: 700 15px/1.3 'Montserrat', sans-serif; }
+.upgrade .social-proof { margin: 2px 0 6px; }
+.up-gap { margin: 0 0 4px; font-size: 14.5px; line-height: 1.4; }
+.up-question { margin: 0 0 10px; font-size: 15px; font-style: italic; line-height: 1.45; }
+.up-name { margin: 2px 0 6px; color: #1e7d67; font: 800 21px/1.2 'Montserrat', sans-serif; }
+.up-lead { margin: 0 0 12px; font-size: 18px; font-weight: 700; line-height: 1.4; }
+.up-benefits { margin: 0 0 14px; padding: 0; list-style: none; text-align: left; }
+.up-benefits li { position: relative; margin: 0 0 8px; padding-left: 26px; font-size: 15px; line-height: 1.4; }
+.up-benefits li::before { content: '✓'; position: absolute; left: 0; color: #090; font-weight: 800; }
+
+.up-example { margin: 0 0 6px; padding: 6px 8px; border: 2px solid #1e7d67; border-radius: 10px; background: #f6fbf9; }
+.up-example-label { margin: 0 0 4px; color: #555; font-size: 12px; font-weight: 700; }
+.up-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.up-col { padding: 5px 4px; border-radius: 8px; background: #fff; box-shadow: 0 0 0 1px #e3e3e3; }
+.up-col.win { box-shadow: 0 0 0 2px #090; }
+.up-col p { margin: 0; }
+.up-col-title { color: #555; font-size: 11px; font-weight: 700; line-height: 1.25; }
+.up-col-cost { margin: 2px 0 1px !important; font: 800 15px/1.2 'Montserrat', sans-serif; }
+.up-col-date { font-size: 12px; font-weight: 700; }
+.up-saving { margin: 4px 0 0; color: #090; font: 800 16px/1.25 'Montserrat', sans-serif; }
+.up-note { margin: 0; color: #777; font-size: 10px; line-height: 1.3; }
+
+.up-price { margin: 2px 0 0; font: 700 20px/1.2 'Montserrat', sans-serif; }
+.up-price s { margin-right: 6px; color: #888; font-weight: 600; }
+.up-price .today { color: #090; font-size: 30px; }
+.up-save { margin-left: 4px; color: #c30; font-size: 15px; font-weight: 800; }
+.upgrade .up-yes { margin-top: 6px; text-decoration: none; }
+.upgrade .up-yes { font-size: 22px; line-height: 27px; }
+.up-guarantee { margin: 10px 0 4px; font-weight: 700; }
+.upgrade .safe { margin-top: 22px; }
+.up-clock { margin: 0 0 6px; font: 600 14px/1.3 'Montserrat', sans-serif; }
+.up-clock b { display: inline-block; min-width: 3.4em; margin-left: 4px; padding: 2px 8px; border-radius: 5px; background: #222; color: #fff; font-variant-numeric: tabular-nums; }
+.up-no { display: block; margin: 12px auto 0; padding: 8px; border: 0; background: none; color: #9a9a9a; font: 400 13px/1.4 'Open Sans', sans-serif;
+  text-decoration: underline; cursor: pointer; }
+
+/* The pop-up payment form, for Apple Pay, Google Pay, Klarna, bank and new cards. */
+.pay-sheet { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, .45); }
+.pay-card { width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; padding: 18px 16px 22px; border-radius: 14px 14px 0 0; background: #fff;
+  font-family: 'Montserrat', sans-serif; }
+.pay-card h2 { margin: 0 0 4px; font-size: 20px; text-align: center; }
+.pay-amount { margin: 0 0 12px; color: #090; font-size: 18px; font-weight: 800; text-align: center; }
+#pay-element { min-height: 1px; }
