@@ -211,6 +211,11 @@ const PAYOFF_BRANCHES = Object.freeze([
   // The story page the static ad opens, before the sales letter.
   { key: 'story', label: 'Story page (static ad)', hideWhenEmpty: true, steps: [
     ['Opened the story page', ['PayoffStory:viewed']],
+    ['Read a quarter (into the kitchen-table night)', ['PayoffStory:scroll25']],
+    ['Read half (into the $79,000 example)', ['PayoffStory:scroll50']],
+    ['Saw the first button', ['PayoffStory:button']],
+    ['Read three quarters (the comments)', ['PayoffStory:scroll75']],
+    ['Read to the end', ['PayoffStory:scroll100']],
     ['Tapped through to the sales letter', ['PayoffStory:tapped']],
   ] },
   { key: 'from', label: 'Where they came from', steps: [

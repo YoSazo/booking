@@ -42,7 +42,7 @@ const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-
 const UPGRADE_OFFERS = ['offer', 'discount', 'regular'];
 const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS,
   PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS,
-  PayoffStory: ['viewed', 'tapped'] });
+  PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;

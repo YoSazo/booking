@@ -615,7 +615,7 @@ test('the landing splits new visitors between the letter and the quiz, keeps eac
     assert.ok(isLetter(r.html)); assert.equal(r.cookie, '');
   });
 });
-test('the story page is served with the pixel-only policy and records only its two steps', async () => {
+test('the story page is served with the pixel-only policy and records only its own reading steps', async () => {
   const w = fixture();
   await serve(w, async ({ base, post }) => {
     const r = await fetch(base + '/payoff/hidden-payoff');
@@ -626,10 +626,14 @@ test('the story page is served with the pixel-only policy and records only its t
     assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow');
     for (const file of ['story.js', 'story.css']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
     assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'viewed', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'scroll50', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'button', visitorId: 'v_abcdefghijk' })).status, 200);
     assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'tapped', visitorId: 'v_abcdefghijk' })).status, 200);
     assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'shared', visitorId: 'v_abcdefghijk' })).status, 400);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'scroll60', visitorId: 'v_abcdefghijk' })).status, 400);
   });
-  assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]), [['PayoffStory', 'viewed'], ['PayoffStory', 'tapped']]);
+  assert.deepEqual([...w.rows.values()].map(row => [row.name, row.detail]),
+    [['PayoffStory', 'viewed'], ['PayoffStory', 'scroll50'], ['PayoffStory', 'button'], ['PayoffStory', 'tapped']]);
 });
 test('the landing version and quiz steps are recorded by name only, never with numbers', async () => {
   const w = fixture();

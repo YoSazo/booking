@@ -43,10 +43,26 @@ test('the story page reads as the article, counts the ad click once, and every b
   await settle(page, rows, ['PayoffLanded', 'PayoffFrom:ad', 'PayoffStory:viewed']);
   assert.deepEqual(named(rows).sort(), ['PayoffFrom:ad', 'PayoffLanded', 'PayoffStory:viewed']);
 
+  // Nothing about reading depth until they scroll; then each step once, in order.
+  assert.ok(!named(rows).some(name => /PayoffStory:(scroll|button)/.test(name)));
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.3));
+  await settle(page, rows, ['PayoffStory:scroll25']);
+  assert.ok(named(rows).includes('PayoffStory:scroll25'));
+  assert.ok(!named(rows).includes('PayoffStory:scroll50') && !named(rows).includes('PayoffStory:button'));
+  await page.locator('a.adv-cta').first().scrollIntoViewIfNeeded();
+  await settle(page, rows, ['PayoffStory:scroll50', 'PayoffStory:button']);
+  for (let y = 0; y < 30; y++) { await page.mouse.wheel(0, 1200); await page.waitForTimeout(30); }
+  await settle(page, rows, ['PayoffStory:scroll75', 'PayoffStory:scroll100']);
+  for (const step of ['scroll25', 'scroll50', 'button', 'scroll75', 'scroll100']) {
+    assert.equal(named(rows).filter(name => name === 'PayoffStory:' + step).length, 1, step);
+  }
+
   // A second look in the same visit is not a second reader.
   await page.reload();
-  await page.waitForTimeout(300);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(400);
   assert.equal(named(rows).filter(name => name === 'PayoffStory:viewed').length, 1);
+  assert.equal(named(rows).filter(name => name === 'PayoffStory:scroll100').length, 1);
 
   await page.locator('a.adv-cta').last().tap();
   await page.waitForURL(url => url.pathname === '/payoff' && url.searchParams.get('from') === 'story');

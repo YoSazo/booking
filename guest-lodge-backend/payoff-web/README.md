@@ -43,8 +43,10 @@ the sales letter at `/payoff?v=letter&from=story`, as the reference sends its
 readers to its sales page rather than straight to checkout.
 
 The story page counts the landing and the ad click (`PayoffLanded`,
-`PayoffFrom`), then `PayoffStory:viewed` once per visitor and
-`PayoffStory:tapped` on a button. The letter skips `PayoffFrom` for
+`PayoffFrom`), then `PayoffStory:viewed` once per visitor, how far down they
+read (`scroll25`, `scroll50`, `scroll75`, `scroll100`, each once), `button`
+when the first button is on screen (it sits after the $79,000 example, about
+59% down on a phone), and `PayoffStory:tapped` on a button. The letter skips `PayoffFrom` for
 `from=story`, so the source stays the ad. `/funnel` shows both steps as
 "Story page (static ad)". The $6,500 note and the $79,000 example are worked
 out with `engine.js` (the debts are listed on the page); change a figure only
