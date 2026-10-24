@@ -6,8 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER, CUTTER } = require('../payoff');
 
-function fixture({ failEmail = false, ready = true, production = false, clock = Date.now } = {}) {
-  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [], methods = new Map(), customers = [];
+function fixture({ failEmail = false, ready = true, production = false, clock = Date.now, failText = false } = {}) {
+  const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [], methods = new Map(), customers = [], texts = [];
   const world = { decline: false };
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
@@ -50,9 +50,10 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
   const app = express();
   const registration = registerPayoff(app, { prisma, stripe: ready ? stripe : null, mail, env,
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
+    text: async body => { if (failText) { failText = false; throw new Error('Twilio unavailable'); } texts.push(body); },
     isExcludedEmail: email => email === 'owner@example.test', now: clock });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
-  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments, methods, customers, world };
+  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments, methods, customers, world, texts };
 }
 async function serve(world, fn) {
   const server = world.app.listen(0, '127.0.0.1');
@@ -283,6 +284,41 @@ test('webhook fulfillment confirms even without a browser return; SMTP failure r
   assert.equal(w.emails.length, 1);
   assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffPaid').length, 1);
   assert.equal(await w.registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: { metadata: { product: 'trace' } } } }, {}), false);
+});
+test('each real sale texts the owner once; owner, no-track and sandbox orders never do; a failed text retries without blocking the buyer', async () => {
+  const w = fixture({ failText: true }); const s = paid(['cashflow'], { preorder: true }); w.sessions.set(s.id, s);
+  const event = { type: 'checkout.session.completed', data: { object: s } };
+  await serve(w, async ({ post }) => {
+    const first = await post('/api/payoff/confirm', { sessionId: s.id });
+    assert.equal(first.status, 200); assert.equal(first.body.paid, true, 'a Twilio outage never stops the buyer getting in');
+    assert.deepEqual(w.texts, []);
+    assert.equal((await post('/api/payoff/confirm', { sessionId: s.id })).status, 200);
+    assert.equal(await w.registration.handleStripeEvent(event, {}), true);
+  });
+  assert.deepEqual(w.texts, ['Payoff sale: $55.00 (Marketel Payoff + Cash-flow calendar).']);
+  for (const kind of ['no-track', 'owner', 'sandbox']) {
+    const quiet = fixture(), q = paid([]);
+    if (kind === 'no-track') q.metadata.noTrack = '1';
+    if (kind === 'owner') q.customer_details.email = 'owner@example.test';
+    if (kind === 'sandbox') q.livemode = false;
+    quiet.sessions.set(q.id, q);
+    await serve(quiet, async ({ post }) => assert.equal((await post('/api/payoff/confirm', { sessionId: q.id })).status, 200));
+    assert.deepEqual(quiet.texts, [], kind);
+  }
+});
+test('without a phone or Twilio sender the owner texter stays off; with one it texts that phone from the Front Desk sender', async () => {
+  const { ownerTexter } = require('../owner-text');
+  const sent = [], client = { messages: { create: async options => { sent.push(options); return { sid: 'SM1' }; } } };
+  const twilioEnv = { TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'secret', TWILIO_PHONE_NUMBER: '+15550000000' };
+  assert.equal(ownerTexter(twilioEnv, client), null);
+  assert.equal(ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '555-123-4567' }, client), null);
+  assert.equal(ownerTexter({ OWNER_ALERT_PHONE: '+15551234567' }, client), null);
+  await ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '+15551234567' }, client)('Payoff sale: $28.00 (Marketel Payoff).');
+  await ownerTexter({ ...twilioEnv, TWILIO_MESSAGING_SERVICE_SID: 'MG1', OWNER_ALERT_PHONE: '+15551234567' }, client)('hi');
+  assert.deepEqual(sent, [
+    { to: '+15551234567', body: 'Payoff sale: $28.00 (Marketel Payoff).', from: '+15550000000' },
+    { to: '+15551234567', body: 'hi', messagingServiceSid: 'MG1' },
+  ]);
 });
 test('existing signed webhook verifies the signature before invoking Payoff, and rejects tampering', async () => {
   const w = fixture(); const app = express();
@@ -717,6 +753,7 @@ test('the Interest Cutter charges the card kept from the order in one click, unl
     assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffUpgradePaid').length, 1);
     assert.deepEqual(w.capi.filter(e => e.name === 'InterestCutterPurchase').map(e => [e.value, e.eventId]), [[107, `payoff-cutter.${r.body.reference}`]]);
     assert.equal(w.capi.filter(e => e.name === 'Purchase').length, 1, 'only the first purchase is a Purchase');
+    assert.deepEqual(w.texts.slice(-1), ['Payoff upsell: $107.00 (Interest Cutter).']);
     const access = await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) });
     assert.deepEqual(access.body.extras, ['cutter']);
     // One per order.

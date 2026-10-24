@@ -119,7 +119,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, env = process.env, now = Date.now, quizShare, random = Math.random }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env, now = Date.now, quizShare, random = Math.random }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -219,6 +219,19 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     sourceUrl: attribution.sourceUrl || `${origin}/payoff`, fbp: attribution.fbp || '', fbc: attribution.fbc || '',
   });
 
+  // One text to the owner's phone per sale. A failed text frees its claim so
+  // the next confirmation or webhook retries it; it never blocks fulfillment.
+  async function textOwner(sourceId, visitor, body) {
+    if (typeof text !== 'function') return;
+    try { await prisma.inspectEvent.create({ data: { name: 'PayoffSaleTexted', tool: 'payoff', sourceId, visitorId: visitor } }); }
+    catch (error) { if (error.code !== 'P2002') console.error('Payoff sale text claim failed:', error.message); return; }
+    try { await text(body); }
+    catch (error) {
+      await prisma.inspectEvent.delete({ where: { sourceId } }).catch(() => {});
+      console.error('Payoff sale text failed:', error.message);
+    }
+  }
+
   async function confirm(object, { retryMail = false, req = null, webhook = false } = {}) {
     const order = paidPurchase(object);
     if (!order) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
@@ -238,6 +251,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
         value: PRICE(order.totalCents),
       });
+      await textOwner(`payoff-sale-text:${order.id}`, visitor,
+        `Payoff sale: $${(order.totalCents / 100).toFixed(2)} (${ids.map(id => ITEMS[id].name).join(' + ')}).`);
     }
     let emailSent = false;
     if (email && mail) {
@@ -329,6 +344,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
         value: PRICE(cutter.cents),
       });
+      await textOwner(`payoff-cutter-text:${cutter.id}`, visitor, `Payoff upsell: $${(cutter.cents / 100).toFixed(2)} (${CUTTER.name}).`);
     }
     if (order.email && mail) {
       const sourceId = `payoff-cutter-mail:${cutter.id}`;
