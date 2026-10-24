@@ -306,18 +306,26 @@ test('each real sale texts the owner once; owner, no-track and sandbox orders ne
     assert.deepEqual(quiet.texts, [], kind);
   }
 });
-test('without a phone or Twilio sender the owner texter stays off; with one it texts that phone from the Front Desk sender', async () => {
-  const { ownerTexter } = require('../owner-text');
-  const sent = [], client = { messages: { create: async options => { sent.push(options); return { sid: 'SM1' }; } } };
+test('the owner texter uses OWNER_ALERT_PHONE, else the owner\'s verified Front Desk phone, and stays off without Twilio or a phone', async () => {
+  const { ownerTexter, OWNER_HOTEL_ID } = require('../owner-text');
+  const sent = [], lookups = [], client = { messages: { create: async options => { sent.push(options); return { sid: 'SM1' }; } } };
+  let saved = { phoneE164: '+15557654321' };
+  const prisma = { frontDeskAssistantRecipient: { findFirst: async args => { lookups.push(args); return saved; } } };
   const twilioEnv = { TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'secret', TWILIO_PHONE_NUMBER: '+15550000000' };
-  assert.equal(ownerTexter(twilioEnv, client), null);
-  assert.equal(ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '555-123-4567' }, client), null);
-  assert.equal(ownerTexter({ OWNER_ALERT_PHONE: '+15551234567' }, client), null);
-  await ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '+15551234567' }, client)('Payoff sale: $28.00 (Marketel Payoff).');
-  await ownerTexter({ ...twilioEnv, TWILIO_MESSAGING_SERVICE_SID: 'MG1', OWNER_ALERT_PHONE: '+15551234567' }, client)('hi');
+  assert.equal(ownerTexter(twilioEnv, { client }), null, 'no phone source');
+  assert.equal(ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '555-123-4567' }, { client }), null, 'not a +1… number');
+  assert.equal(ownerTexter({ OWNER_ALERT_PHONE: '+15551234567' }, { client, prisma }), null, 'no Twilio sender');
+  await ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '+15551234567' }, { client, prisma })('Payoff sale: $28.00 (Marketel Payoff).');
+  assert.equal(lookups.length, 0, 'a set phone needs no lookup');
+  const fromFrontDesk = ownerTexter({ ...twilioEnv, TWILIO_MESSAGING_SERVICE_SID: 'MG1' }, { client, prisma });
+  await fromFrontDesk('hi');
+  assert.equal(lookups[0].where.hotelId, OWNER_HOTEL_ID);
+  assert.deepEqual(lookups[0].where.consentAt, { not: null }, 'only a phone that agreed to these texts');
+  saved = null;
+  await assert.rejects(fromFrontDesk('lost'), /No owner phone/);
   assert.deepEqual(sent, [
     { to: '+15551234567', body: 'Payoff sale: $28.00 (Marketel Payoff).', from: '+15550000000' },
-    { to: '+15551234567', body: 'hi', messagingServiceSid: 'MG1' },
+    { to: '+15557654321', body: 'hi', messagingServiceSid: 'MG1' },
   ]);
 });
 test('existing signed webhook verifies the signature before invoking Payoff, and rejects tampering', async () => {

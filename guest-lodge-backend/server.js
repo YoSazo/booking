@@ -18879,7 +18879,7 @@ const payoffRegistration = require('./payoff').registerPayoff(app, {
     queueCapi: queueMarketelCAPI,
     capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
     isExcludedEmail: email => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(normalizeExcludedEmail(email)),
-    text: require('./owner-text').ownerTexter(), // Each sale texts OWNER_ALERT_PHONE.
+    text: require('./owner-text').ownerTexter(process.env, { prisma }), // Each sale texts the owner's phone.
 });
 // Trace owns its fulfillment; the existing verified webhook dispatches its
 // checkout events without changing Claims' or Inspect's payment handlers.
