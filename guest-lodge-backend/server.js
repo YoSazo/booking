@@ -18871,6 +18871,17 @@ app.delete('/api/crm/bookings/:id', crmAuth, async (req, res) => {
 const inspectStripe = process.env.STRIPE_INSPECT_SECRET_KEY
     ? require('stripe')(process.env.STRIPE_INSPECT_SECRET_KEY)
     : marketelStripe;
+const ownerText = require('./owner-text').ownerTexter(process.env, { prisma });
+// One test text through the same path a sale uses.
+app.post('/api/admin/owner-text/test', adminAuth, async (req, res) => {
+    if (!ownerText) return res.status(503).json({ success: false, message: 'Twilio or the owner phone is not configured.' });
+    try {
+        await ownerText('Test from Marketel: you will get a text like this whenever someone buys Payoff.');
+        res.json({ success: true });
+    } catch (e) {
+        res.status(502).json({ success: false, message: e.message });
+    }
+});
 const payoffRegistration = require('./payoff').registerPayoff(app, {
     quizShare: 0, // Sales letter for all landing traffic, including prior quiz visitors.
     prisma,
@@ -18879,7 +18890,7 @@ const payoffRegistration = require('./payoff').registerPayoff(app, {
     queueCapi: queueMarketelCAPI,
     capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
     isExcludedEmail: email => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(normalizeExcludedEmail(email)),
-    text: require('./owner-text').ownerTexter(process.env, { prisma }), // Each sale texts the owner's phone.
+    text: ownerText, // Each sale texts the owner's phone.
 });
 // Trace owns its fulfillment; the existing verified webhook dispatches its
 // checkout events without changing Claims' or Inspect's payment handlers.
