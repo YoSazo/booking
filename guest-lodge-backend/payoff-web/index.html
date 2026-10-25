@@ -8,10 +8,10 @@
   <title>Marketel Payoff — Your debt payoff plan, without the spreadsheet</title>
   <meta name="description" content="See the month you could be debt-free. Marketel Payoff compares payoff plans on your phone. One payment, no subscription.">
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/style.css?v=25">
-  <script src="/payoff/content.js?v=22" defer></script>
-  <script src="/payoff/checkout.js?v=24" defer></script>
-  <script src="/payoff/page.js?v=24" defer></script>
+  <link rel="stylesheet" href="/payoff/style.css?v=26">
+  <script src="/payoff/content.js?v=23" defer></script>
+  <script src="/payoff/checkout.js?v=25" defer></script>
+  <script src="/payoff/page.js?v=25" defer></script>
   <script src="/payoff/purchase-notices.js?v=2" defer></script>
 </head>
 <body data-page="sales" data-variant="letter">
@@ -143,7 +143,16 @@
     </section>
   </main>
   <footer><img src="/marketel.svg" width="120" height="28" alt="Marketel"><p>Marketel Payoff</p><p>Educational planning software. Projections are not financial advice, lender statements or guaranteed outcomes.</p><p class="legal-links"><a href="/payoff/terms">Terms &amp; Conditions</a> | <a href="/payoff/privacy">Privacy Policy</a></p><p>Copyright 2026 Marketel. All Rights Reserved. · <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></p></footer>
-  <template id="offer-template"><div class="offer sales-offer"><p class="offer-reg"><s data-offer-anchor>(Reg. price $375)</s></p><p class="offer-was" hidden><s data-was></s></p><p class="offer-today"><strong data-price>Today: $33 (91% off)</strong><span data-off></span></p><a class="cta" href="/payoff/order">Get My Debt-Free Date</a></div></template>
+  <template id="offer-template">
+    <div class="offer sales-offer offer-clear">
+      <p class="offer-reg"><s data-offer-anchor>(Reg. price $375)</s></p>
+      <p class="offer-today"><span class="offer-was" hidden><s data-was></s></span><strong class="offer-price" data-price>Just <span data-price-amount>33.11</span></strong></p>
+      <p class="offer-payment">USD · One-time payment. No monthly fees.</p>
+      <p class="offer-saving" data-off hidden></p>
+      <a class="cta" href="/payoff/order">Get My Debt-Free Date</a>
+      <p class="offer-terms-line">Opens right after you pay.</p>
+    </div>
+  </template>
   <noscript><p class="noscript-note">This page uses JavaScript for its content. <a href="/payoff/order">Get Payoff</a>.</p></noscript>
 </body>
 </html>

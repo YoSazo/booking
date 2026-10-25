@@ -6,9 +6,9 @@
   <title>Marketel Payoff Checkout</title>
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=9">
-  <script src="/payoff/checkout.js?v=24" defer></script>
-  <script src="/payoff/order.js?v=6" defer></script>
+  <link rel="stylesheet" href="/payoff/order.css?v=10">
+  <script src="/payoff/checkout.js?v=25" defer></script>
+  <script src="/payoff/order.js?v=7" defer></script>
 </head>
 <body data-page="order">
   <header class="reserve" id="reserve">
@@ -24,8 +24,12 @@
         <p class="summary-label"><img src="/payoff/assets/cart-icon-59bb789d7c.webp" width="24" height="20" alt=""> Order Summary</p>
         <img class="glance-image" src="/payoff/assets/payoff-devices-80eded1499.webp" width="1280" height="720" decoding="async" fetchpriority="high" alt="Marketel Payoff on a desktop, laptop, tablet and phone, showing a debt-free date">
         <p class="social-proof"><span class="stars" aria-hidden="true">★★★★★</span> <span>10,000+ sold</span> <span class="avatars" aria-hidden="true"><img src="/payoff/assets/avatar-01-874e564a67.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-02-2209fc25e7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-04-5d31c567b7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-05-81fe59d790.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-06-6574065c85.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-07-883c4b0955.webp" width="72" height="72" decoding="async" alt=""></span></p>
-        <p class="glance-price"><em>Your Debt-Free Date &amp; Payoff Plan</em> (Valued at $375 -&gt; Today Only <span class="today" id="glance-price">33</span>)</p>
+        <p class="glance-name">Your Debt-Free Date &amp; Payoff Plan</p>
+        <p class="glance-value">Valued at $375</p>
+        <p class="glance-price"><s id="glance-was" hidden>$33.11</s> Just <span class="today" id="glance-price">33.11</span></p>
+        <p class="glance-payment">USD · One-time payment. No monthly fees.</p>
         <p class="glance-gift" id="glance-gift" hidden>Includes your FREE $5 gift</p>
+        <img class="glance-guarantee" src="/payoff/assets/guarantee-30-day-compact-0ad1ee8089.webp" width="800" height="294" decoding="async" alt="30-day 100% money back guarantee">
         <div class="safe" role="group" aria-label="Guaranteed safe checkout">
           <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
           <div class="safe-badges">
@@ -35,7 +39,6 @@
             <div class="safe-cards" aria-label="Visa, Mastercard, American Express and Discover"><img src="/payoff/assets/payment-visa.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-discover.svg" width="36" height="24" alt=""></div>
           </div>
         </div>
-        <img class="glance-guarantee" src="/payoff/assets/guarantee-30-day-2ba0eb796b.webp" width="440" height="336" decoding="async" alt="30-day 100% money back guarantee">
       </section>
       <form class="order" id="order-form" novalidate>
         <div class="form-body">
@@ -54,7 +57,7 @@
             <section class="product-detail">
               <div class="grid head"><span>Total Payment</span><span class="c">Quantity</span><span class="r">Price</span></div>
               <div class="divider"></div>
-              <div class="grid product"><div class="product-name"><input type="radio" checked tabindex="-1" aria-label="Marketel Payoff"><div><strong>Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</strong></div></div><span class="c">1</span><span class="r price">$33.00</span></div>
+              <div class="grid product"><div class="product-name"><input type="radio" checked tabindex="-1" aria-label="Marketel Payoff"><div><strong>Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</strong></div></div><span class="c">1</span><span class="r price">$33.11</span></div>
             </section>
             <div class="bumps">
               <section class="bump">
@@ -74,9 +77,9 @@
               <div class="separator">Order summary</div>
               <div class="grid head"><span>Item</span><span class="c">Quantity</span><span class="r">Amount</span></div>
               <div class="divider"></div>
-              <div id="summary-rows"><div class="grid line"><span class="name">Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</span><span class="c">1</span><span class="r price">$ 33.00</span></div></div>
+              <div id="summary-rows"><div class="grid line"><span class="name">Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</span><span class="c">1</span><span class="r price">$ 33.11</span></div></div>
               <div class="divider"></div>
-              <div class="order-total"><strong>Order Total</strong><output class="price" id="order-total" aria-live="polite">$33.00</output></div>
+              <div class="order-total"><strong>Order Total</strong><output class="price" id="order-total" aria-live="polite">$33.11</output></div>
             </section>
             <button class="complete" id="buy-button" type="submit" disabled><svg class="cart" viewBox="0 0 24 22" width="25" height="22" aria-hidden="true"><path d="M0 1.5C0 .7.7 0 1.5 0h2.3c.7 0 1.3.5 1.5 1.2L5.6 3H22c1 0 1.7.9 1.4 1.9l-2 7.5c-.2.7-.8 1.1-1.5 1.1H8l.4 2h11.1a1.5 1.5 0 0 1 0 3H7.2c-.7 0-1.3-.5-1.5-1.2L2.7 3H1.5C.7 3 0 2.3 0 1.5z"/><circle cx="9" cy="20" r="2"/><circle cx="19" cy="20" r="2"/></svg><span class="buy-text"><span id="buy-label">Get My Debt-Free Date</span><small>Opens right after you pay</small></span></button>
             <p class="secure">* 100% Secure &amp; Safe Payments *</p>
@@ -85,7 +88,7 @@
           </div>
         </div>
       </form>
-      <img class="seal" src="/payoff/assets/guarantee-30-day-2ba0eb796b.webp" width="440" height="336" loading="lazy" decoding="async" alt="30-day 100% money back guarantee">
+      <img class="seal seal-compact" src="/payoff/assets/guarantee-30-day-compact-0ad1ee8089.webp" width="800" height="294" loading="lazy" decoding="async" alt="30-day 100% money back guarantee">
       <div class="text guarantee"><p>30-day money-back guarantee. </p><p>One-time payment. No monthly fees.</p></div>
       <div class="safe" role="group" aria-label="Guaranteed safe checkout">
         <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
@@ -99,7 +102,7 @@
       <div class="logos" aria-label="Visa, Mastercard, American Express, Discover and Klarna"><img src="/payoff/assets/payment-visa.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-discover.svg" width="48" height="32" alt=""><img src="/payoff/assets/payment-klarna.svg" width="48" height="32" alt=""></div>
     </main>
     <aside class="column grey">
-      <div class="text"><p><strong>Here's what happens when you order today:</strong></p><p><br></p><p><strong>✅ Payoff opens on your phone the moment you pay.</strong></p><p><br></p><p><strong>✅ Enter your balances, interest rates and minimum payments.</strong></p><p><br></p><p><strong>✅ See your exact Debt-Free Date and fastest plan in seconds.</strong></p><p><br></p><p><strong>✅ Follow your month-by-month plan and watch your balances shrink.</strong></p><p><br></p><p><strong><s>Total Value: <u>$375</u></s></strong></p><p><strong><u id="only-today">Only $33 Today!</u></strong><br><strong><u id="percent-off">(91% off)</u></strong></p></div>
+      <div class="text"><p><strong>Here's what happens when you order today:</strong></p><p><br></p><p><strong>✅ Payoff opens on your phone the moment you pay.</strong></p><p><br></p><p><strong>✅ Enter your balances, interest rates and minimum payments.</strong></p><p><br></p><p><strong>✅ See your exact Debt-Free Date and fastest plan in seconds.</strong></p><p><br></p><p><strong>✅ Follow your month-by-month plan and watch your balances shrink.</strong></p><p><br></p><p><strong><s>Total Value: <u>$375</u></s></strong></p><p><strong><u id="only-today">Only $33.11 Today!</u></strong><br><strong><u id="percent-off">(91% off)</u></strong></p></div>
       <img class="proof" src="/payoff/assets/comment-amanda-5fe641f7e2.webp" width="748" height="469" loading="lazy" decoding="async" alt="Facebook comment from Amanda: I bought this about a month ago and absolutely love it. I've already paid off two medical bills.">
       <img class="proof" src="/payoff/assets/comment-nicole-58896e3927.webp" width="748" height="677" loading="lazy" decoding="async" alt="Facebook comment from Nicole: I typed in all my balances and it immediately showed me my payoff date and the plan that makes the most sense for me.">
       <img class="proof" src="/payoff/assets/comment-megan-070b24c8d2.webp" width="748" height="471" loading="lazy" decoding="async" alt="Facebook comment from Megan: I just put in my balances and payments and it showed me exactly what to do. I already paid off one smaller card.">

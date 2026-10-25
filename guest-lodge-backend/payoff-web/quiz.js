@@ -13,6 +13,7 @@
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const now = new Date(), start = { year: now.getFullYear(), month: now.getMonth() };
   const money = cents => '$' + Math.round(cents / 100).toLocaleString('en-US');
+  const priceMoney = cents => '$' + (cents / 100).toFixed(2).replace('.00', '');
   const monthName = date => `${MONTHS[date.month]} ${date.year}`;
   const duration = months => {
     const years = Math.floor(months / 12), rest = months % 12;
@@ -384,7 +385,7 @@
     const offer = el('div', 'sales-offer'); offer.dataset.wording = 'today';
     const reg = el('p', 'offer-reg'); const s = el('s', '', '(Reg. price $375)'); s.dataset.offerAnchor = ''; reg.append(s);
     const was = el('p', 'offer-was'); was.hidden = true; const wasPrice = el('s'); wasPrice.dataset.was = ''; was.append(wasPrice);
-    const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
+    const today = el('p', 'offer-today'); const price = el('strong', '', 'Today: $33.11 (91% off)'); price.dataset.price = ''; const off = el('span'); off.dataset.off = ''; today.append(price, off);
     const saved = el('p', 'offer-saved'); saved.id = 'offer-saved'; saved.hidden = true;
     const worth = el('p', 'worth'); worth.id = 'worth'; worth.dataset.savedCents = String(savedCents); worth.hidden = true;
     offer.append(reg, was, today, worth, saved);
@@ -447,14 +448,14 @@
     // On the plan: the price they'll pay, and why.
     const price = document.querySelector('.plan [data-price]'), saved = $('offer-saved');
     if (!price) return;
-    const discounted = state.kind === 'earned' || state.kind === 'checkout', cost = discounted ? 3300 - (deal?.discountCents || 500) : 3300;
+    const discounted = state.kind === 'earned' || state.kind === 'checkout', cost = discounted ? 3311 - (deal?.discountCents || 500) : 3311;
     window.PAYOFF_PAINT_PRICE(price.closest('.sales-offer'), cost);
-    // "It costs $375 $33 $28, once": the earlier prices crossed out, as in the price block.
+    // "It costs $375 $33.11 $28.11, once": the earlier prices crossed out, as in the price block.
     const worth = $('worth'), savedCents = Number(worth?.dataset.savedCents) || 0;
     if (worth) {
       worth.hidden = savedCents < cost * 10;
       worth.replaceChildren(`Your plan could save you ${money(savedCents)} in interest. It costs `, el('s', '', '$375'), ' ',
-        ...(cost < 3300 ? [el('s', '', money(3300)), ' '] : []), el('b', '', money(cost)), ', once.');
+        ...(cost < 3311 ? [el('s', '', priceMoney(3311)), ' '] : []), el('b', '', priceMoney(cost)), ', once.');
     }
     saved.hidden = !discounted;
     if (discounted) saved.textContent = state.kind === 'earned'

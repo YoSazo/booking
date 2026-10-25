@@ -1,7 +1,7 @@
 'use strict';
 // Price lines as in the reference letter, worded three ways down the page.
 // With the extra $5, the sale price is crossed out too and the $5 is named.
-window.PAYOFF_PRICE_LINES = (cents, base = 3300, regular = 37500) => {
+window.PAYOFF_PRICE_LINES = (cents, base = 3311, regular = 37500) => {
   const dollars = value => '$' + (value / 100).toFixed(2).replace('.00', '');
   const extra = base - cents, extraOff = Math.round(extra / base * 100), off = Math.floor((1 - cents / regular) * 100);
   if (extra > 0) return {
@@ -17,11 +17,17 @@ window.PAYOFF_PRICE_LINES = (cents, base = 3300, regular = 37500) => {
 };
 window.PAYOFF_PAINT_PRICE = (box, cents) => {
   const lines = window.PAYOFF_PRICE_LINES(cents)[box.dataset.wording || 'today'];
+  const amount = box.querySelector('[data-price-amount]');
   const was = box.querySelector('[data-was]');
-  if (was) { was.textContent = lines.was; was.parentElement.hidden = !lines.was; }
-  box.querySelector('[data-price]').textContent = lines.line;
+  if (was) { was.textContent = amount ? lines.was.replace(/^[^:]+: /, '') : lines.was; was.parentElement.hidden = !lines.was; }
+  if (amount) amount.textContent = (cents / 100).toFixed(2).replace('.00', '');
+  else box.querySelector('[data-price]').textContent = lines.line;
   const note = box.querySelector('[data-off]');
-  if (note) note.textContent = lines.note;
+  if (note) {
+    const saved = Math.max(0, 3311 - cents) / 100;
+    note.textContent = amount ? (saved ? 'Your $' + saved.toFixed(2).replace('.00', '') + ' gift is applied.' : '') : lines.note;
+    note.hidden = !!amount && !saved;
+  }
 };
 (() => {
   const form = document.getElementById('order-form');
@@ -94,7 +100,7 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     // Once per visitor, however many times they come back to this page.
     let first = true;
     try { first = sessionStorage.getItem('payoff.cartSent') !== visitor; sessionStorage.setItem('payoff.cartSent', visitor || ''); } catch { /* Send it. */ }
-    if (first) pixel('AddToCart', { value: 33 }, visitor ? `payoff-cart.${visitor}` : undefined);
+    if (first) pixel('AddToCart', { value: 33.11 }, visitor ? `payoff-cart.${visitor}` : undefined);
     // The order page's own form (order.js) reports through the same helpers.
     window.PayoffTrack = { event, pixel, attribution, visitor, headers };
     return;
@@ -112,7 +118,7 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
   // The price blocks show the free $5 gift whenever this visitor has it. Only
   // looks: the gift's clock starts at checkout, and it never ends.
   let salesActive = false;
-  const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => window.PAYOFF_PAINT_PRICE(box, active ? 2800 : 3300)));
+  const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => window.PAYOFF_PAINT_PRICE(box, active ? 2811 : 3311)));
   window.PayoffTrack = { event, pixel, attribution, visitor, headers, paintOffers: () => paintSalesOffer(salesActive) };
   const refreshSalesOffer = () => fetch('/api/payoff/config?offer=preview', { headers }).then(response => {
     if (!response.ok) throw new Error('Unavailable');

@@ -2,7 +2,7 @@
 
 Public page: https://bookmarketel.com/payoff. The tool: https://bookmarketel.com/payoff/app.
 
-$33 USD once at the current sale price (previous regular price $375), no subscription. The tool opens straight after payment and the
+$33.11 USD once at the current sale price (previous regular price $375), no subscription. The tool opens straight after payment and the
 buyer gets an email with their link.
 
 ## The tool
@@ -69,7 +69,7 @@ than it saves." Each step puts a bit of that belief in or strengthens it:
 - **Before any extra money.** "Keep paying what you pay now, in the right
   order, and you're out X sooner."
 - **The plan.** It says their answer back ("You told us: … Your plan: …") and
-  puts the saving next to the price ("could save you $7,144 … It costs $28,
+  puts the saving next to the price ("could save you $7,144 … It costs $28.11,
   once").
 - **Taps that reward.** A ✓ pops on the chosen answer. The debt-free year and
   the "sooner" and "less interest" figures count up. Confetti on the plan.
@@ -102,10 +102,10 @@ on purchases per visitor of each version.
 page (The Last Wish's), in this order:
 1. The first screen, before any field: a green header "Your Debt-Free Date &
    Payoff Plan / Is Reserved For: MM : SS", the device picture, "(Valued at
-   $375 -> Today Only $28)" with "Includes your FREE $5 gift", and a trust box
-   (guarantee seal, 30-day money-back guarantee, "Secure checkout, powered by
-   Stripe", card logos). A browser test keeps all of it on the first screen of
-   phones from 375x667 to 414x736.
+   $375)", a large green "Just 28.11", a smaller crossed-out $33.11, USD and
+   one-time-payment wording, the free $5 gift, a compact 30-day guarantee and
+   the secure-checkout box. Price remains visible on small phones; the
+   reassurance and form follow without squeezing the copy to fit.
 2. One white card: "Contact Details" (labeled name and email), "Payment
    Information" (wallet buttons, OR, Stripe's card fields), the product line,
    the two extras, the order summary and the two-line button "Get My Debt-Free
@@ -140,8 +140,8 @@ The payment happens on the page:
 
 ## Free $5 gift and the reservation clock
 
-Every order page visitor gets a free $5 gift on the $33 plan ("Free gift: $5
-off" in the summary, $28 total). Optional extras remain $22 and $9. A signed,
+Every order page visitor gets a free $5 gift on the $33.11 plan ("Free gift: $5
+off" in the summary, $28.11 total). Optional extras remain $22 and $9. A signed,
 HttpOnly cookie anchors the gift's clock across reloads.
 
 The "Is Reserved For" clock counts down from 05:00 and carries on through
@@ -165,12 +165,19 @@ on `/funnel`. Next test, only if many visitors reach the card fields and do not
 pay: move Tara's comment from the grey column to right under the button. On the hosted fallback, Stripe applies
 the fixed-amount coupon `marketel-payoff-checkout-5-v1`.
 
-The sales page's price blocks copy the reference letter: "(Reg. price $375)"
-crossed out, then one bold line worded three ways (`Today:`, `Sale Price:`,
-`SALE PRICE:`), then the orange pill button. They preview offer eligibility without starting
-the timer. While the extra $5 applies, the sale price is crossed out too:
-"~~(Reg. price $375)~~ / ~~Today: $33~~ / Today: $28 ($5 off · 15% off)". The
-letter has no bar or clock; the reservation clock is on the order page only.
+The sales page repeats the same clear price block: a small crossed-out regular
+price and $33.11, a large green "Just 28.11", explicit USD / one-time-payment
+wording, the applied $5 gift, a wide orange button and the compact 30-day
+money-back banner. The amount comes from the existing offer lookup; previewing
+it does not start the checkout clock. If the lookup fails, it shows $33.11
+and checkout can still apply its server-issued gift.
+
+New payments carry offerVersion payoff-v2 and a $33.11 base price ($28.11
+after the $5 gift). Earlier payoff-v1 and preorder receipts are verified at
+their original $33/$28 amounts, so existing access and delayed confirmations
+still work. Stripe idempotency fingerprints include the quoted total.
+The letter has no bar or clock; the reservation clock stays on the order page.
+
 Stripe
 offers the payment methods enabled in the Dashboard (Cash App Pay, Klarna,
 Afterpay and others when the buyer is eligible). An unpaid delayed payment

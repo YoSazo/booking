@@ -1,7 +1,7 @@
 // Testimonials and founder content confirmed genuine by the owner.
 window.PAYOFF_CONTENT = {
   product: 'Marketel Payoff',
-  priceCents: 3300,
+  priceCents: 3311,
   regularPriceCents: 37500,
   currency: 'USD',
   purchaseNotices: [

@@ -67,7 +67,7 @@ async function serve(world, fn) {
 }
 const order = (extra = {}) => ({ email: 'buyer@example.test', attempt: '01234567-0123-4123-8123-0123456789ab', amount: 1, success_url: 'https://attacker.test', ...extra });
 // An order today is Payoff alone; an earlier preorder may carry the extras.
-const paid = (addons = [], { preorder = addons.length > 0 } = {}) => ({ id: 'cs_test_validOrder123456', mode: 'payment', status: 'complete', payment_status: 'paid', currency: 'usd', amount_total: 3300 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0),
+const paid = (addons = [], { preorder = addons.length > 0 } = {}) => ({ id: 'cs_test_validOrder123456', mode: 'payment', status: 'complete', payment_status: 'paid', currency: 'usd', amount_total: (preorder ? 3300 : 3311) + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0),
   livemode: true, metadata: { product: preorder ? PREORDER.product : PRODUCT, offerVersion: preorder ? PREORDER.version : VERSION, addons: JSON.stringify(addons), visitorId: 'v_abcdefghijk' }, customer_details: { email: 'buyer@example.test' } });
 const SECRET = 'payoff-test-secret';
 
@@ -145,13 +145,13 @@ test('the terms carry the disclaimer, the privacy policy is Payoff\'s own, and e
 test('checkout charges server prices for Payoff and any extras, opens the tool on return, and keeps idempotency', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
-    for (const [addons, total] of [[[], 3300], [['cashflow'], 5500], [['reset'], 4200], [['cashflow', 'reset'], 6400]]) {
+    for (const [addons, total] of [[[], 3311], [['cashflow'], 5511], [['reset'], 4211], [['cashflow', 'reset'], 6411]]) {
       const reply = await post('/api/payoff/checkout', order({ addons }));
       assert.equal(reply.status, 200); assert.equal(reply.body.value, total / 100);
       const { params, options } = w.creates.at(-1);
       assert.equal(params.mode, 'payment'); assert.equal(params.payment_method_types, undefined, 'Stripe Dashboard controls the eligible payment methods');
       assert.equal(params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), total);
-      assert.equal(params.line_items[0].price_data.unit_amount, 3300);
+      assert.equal(params.line_items[0].price_data.unit_amount, 3311);
       assert.match(params.custom_text.submit.message, /opens as soon as you pay/);
       assert.doesNotMatch(JSON.stringify(params), /preorder|not yet available|in development/i);
       assert.equal(params.success_url, 'https://bookmarketel.com/payoff/upgrade?session_id={CHECKOUT_SESSION_ID}');
@@ -185,14 +185,14 @@ test('only correctly paid Payoff orders and earlier preorders count, never anoth
   assert.deepEqual(paidOrder(paid(['reset'])), ['base', 'reset']);
   assert.deepEqual(paidOrder(paid([], { preorder: true })), ['base']);
   assert.deepEqual(paidOrder(paid(['cashflow', 'reset'], { preorder: false })), ['base', 'cashflow', 'reset']);
-  assert.equal(paidOrder({ ...paid(['reset'], { preorder: false }), amount_total: 3300 }), null);
+  assert.equal(paidOrder({ ...paid(['reset'], { preorder: false }), amount_total: 3311 }), null);
   for (const change of [{ payment_status: 'unpaid' }, { status: 'open' }, { amount_total: 1 }, { currency: 'eur' }, { mode: 'subscription' }, { metadata: { product: 'trace' } }]) assert.equal(paidOrder({ ...paid([]), ...change }), null);
 });
 test('a paid order opens the tool: confirmation returns a signed link and sends one email with it', async () => {
   const w = fixture(); const session = paid(); w.sessions.set(session.id, session);
   await serve(w, async ({ post }) => {
     for (let i = 0; i < 3; i++) {
-      const r = await post('/api/payoff/confirm', { sessionId: session.id }); assert.equal(r.status, 200); assert.equal(r.body.paid, true); assert.equal(r.body.totalCents, 3300); assert.equal(r.body.email, undefined);
+      const r = await post('/api/payoff/confirm', { sessionId: session.id }); assert.equal(r.status, 200); assert.equal(r.body.paid, true); assert.equal(r.body.totalCents, 3311); assert.equal(r.body.email, undefined);
       assert.equal(verifyAccess(SECRET, r.body.access), session.id);
     }
   });
@@ -207,11 +207,11 @@ test('an order with extras, new or preordered, opens them too and the email says
     const w = fixture(); const session = paid(['cashflow', 'reset'], { preorder }); w.sessions.set(session.id, session);
     await serve(w, async ({ post }) => {
       const r = await post('/api/payoff/confirm', { sessionId: session.id });
-      assert.equal(r.status, 200); assert.equal(r.body.totalCents, 6400); assert.equal(verifyAccess(SECRET, r.body.access), session.id);
+      assert.equal(r.status, 200); assert.equal(r.body.totalCents, preorder ? 6400 : 6411); assert.equal(verifyAccess(SECRET, r.body.access), session.id);
       assert.deepEqual(r.body.extras, ['cashflow', 'reset']);
       assert.deepEqual((await post('/api/payoff/access', { token: r.body.access })).body, { ok: true, extras: ['cashflow', 'reset'] });
     });
-    assert.equal(w.emails.length, 1); assert.match(w.emails[0].text, /\$64\.00/);
+    assert.equal(w.emails.length, 1); assert.ok(w.emails[0].text.includes(preorder ? '$64.00' : '$64.11'));
     assert.match(w.emails[0].text, /cash-flow calendar and spending reset are inside Payoff/);
     assert.doesNotMatch(w.emails[0].text, /in development/);
   }
@@ -315,7 +315,7 @@ test('the owner texter uses OWNER_ALERT_PHONE, else the owner\'s verified Front 
   assert.equal(ownerTexter(twilioEnv, { client }), null, 'no phone source');
   assert.equal(ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '555-123-4567' }, { client }), null, 'not a +1… number');
   assert.equal(ownerTexter({ OWNER_ALERT_PHONE: '+15551234567' }, { client, prisma }), null, 'no Twilio sender');
-  await ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '+15551234567' }, { client, prisma })('Payoff sale: $28.00 (Marketel Payoff).');
+  await ownerTexter({ ...twilioEnv, OWNER_ALERT_PHONE: '+15551234567' }, { client, prisma })('Payoff sale: $28.11 (Marketel Payoff).');
   assert.equal(lookups.length, 0, 'a set phone needs no lookup');
   const fromFrontDesk = ownerTexter({ ...twilioEnv, TWILIO_MESSAGING_SERVICE_SID: 'MG1' }, { client, prisma });
   await fromFrontDesk('hi');
@@ -324,7 +324,7 @@ test('the owner texter uses OWNER_ALERT_PHONE, else the owner\'s verified Front 
   saved = null;
   await assert.rejects(fromFrontDesk('lost'), /No owner phone/);
   assert.deepEqual(sent, [
-    { to: '+15551234567', body: 'Payoff sale: $28.00 (Marketel Payoff).', from: '+15550000000' },
+    { to: '+15551234567', body: 'Payoff sale: $28.11 (Marketel Payoff).', from: '+15550000000' },
     { to: '+15557654321', body: 'hi', messagingServiceSid: 'MG1' },
   ]);
 });
@@ -373,9 +373,9 @@ test('Meta hears AddToCart on the order page, InitiateCheckout at Stripe and Pur
     await post('/api/payoff/confirm', { sessionId: session.id });
   });
   assert.deepEqual(w.capi.map(event => [event.name, event.eventId, event.value]), [
-    ['AddToCart', 'payoff-cart.v_abcdefghijk', 33],
-    ['InitiateCheckout', 'payoff-checkout.v_abcdefghijk', 42],
-    ['Purchase', 'payoff-purchase.cs_test_validOrder123456', 42],
+    ['AddToCart', 'payoff-cart.v_abcdefghijk', 33.11],
+    ['InitiateCheckout', 'payoff-checkout.v_abcdefghijk', 42.11],
+    ['Purchase', 'payoff-purchase.cs_test_validOrder123456', 42.11],
   ]);
   for (const event of w.capi) { assert.equal(event.fbp, attribution.fbp); assert.equal(event.fbc, attribution.fbc); assert.equal(event.product, 'marketel-payoff'); }
   assert.equal(w.capi[2].email, 'buyer@example.test');
@@ -402,7 +402,7 @@ test('the free $5 gift survives reload and restart, discounts only the base, ful
     const response = await fetch(base + '/api/payoff/config?offer=1');
     const cookie = response.headers.get('set-cookie').split(';')[0];
     const first = await response.json();
-    assert.equal(first.offer.basePriceCents, 2800);
+    assert.equal(first.offer.basePriceCents, 2811);
     assert.equal(first.offer.expiresAt, time + 5 * 60000);
     assert.equal(first.offer.loopMs, 5 * 60000);
     assert.match(response.headers.get('set-cookie'), /HttpOnly/);
@@ -413,32 +413,32 @@ test('the free $5 gift survives reload and restart, discounts only the base, ful
       const restored = await (await fetch(restarted + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
       assert.equal(restored.offer.expiresAt, first.offer.expiresAt);
     });
-    const body = order({ addons: ['cashflow', 'reset'], useCheckoutOffer: true, expectedTotalCents: 5900 });
-    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59);
-    assert.deepEqual(w.creates[0].params.line_items.map(item => item.price_data.unit_amount), [3300, 2200, 900]);
+    const body = order({ addons: ['cashflow', 'reset'], useCheckoutOffer: true, expectedTotalCents: 5911 });
+    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59.11);
+    assert.deepEqual(w.creates[0].params.line_items.map(item => item.price_data.unit_amount), [3311, 2200, 900]);
     assert.deepEqual(w.creates[0].params.discounts, [{ coupon: 'marketel-payoff-checkout-5-v1' }]);
     await post('/api/payoff/checkout', body, { cookie });
     assert.equal(w.creates[0].options.idempotencyKey, w.creates[1].options.idempotencyKey);
     const purchase = paid(['cashflow', 'reset'], { preorder: false });
-    purchase.metadata = { ...w.creates[0].params.metadata }; purchase.amount_total = 5900;
+    purchase.metadata = { ...w.creates[0].params.metadata }; purchase.amount_total = 5911;
     w.sessions.set(purchase.id, purchase);
     const confirmed = await post('/api/payoff/confirm', { sessionId: purchase.id });
-    assert.equal(confirmed.status, 200); assert.equal(confirmed.body.totalCents, 5900);
+    assert.equal(confirmed.status, 200); assert.equal(confirmed.body.totalCents, 5911);
     assert.deepEqual(confirmed.body.extras, ['cashflow', 'reset']);
     assert.match(w.emails[0].text, /Free gift: −\$5\.00/);
-    assert.match(w.emails[0].text, /Total paid: \$59\.00/);
-    assert.equal(w.capi.find(event => event.name === 'Purchase').value, 59);
+    assert.match(w.emails[0].text, /Total paid: \$59\.11/);
+    assert.equal(w.capi.find(event => event.name === 'Purchase').value, 59.11);
     // 28 minutes in: the clock has started over five times and the gift remains.
     time += 26 * 60000;
     const looped = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
-    assert.equal(looped.offer.discountCents, 500); assert.equal(looped.offer.basePriceCents, 2800);
+    assert.equal(looped.offer.discountCents, 500); assert.equal(looped.offer.basePriceCents, 2811);
     assert.equal(looped.offer.expiresAt, first.offer.expiresAt + 25 * 60000);
     // Exactly at a boundary the next five minutes begin.
     time = looped.offer.expiresAt;
     assert.equal((await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json()).offer.expiresAt, time + 5 * 60000);
-    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59);
+    assert.equal((await post('/api/payoff/checkout', body, { cookie })).body.value, 59.11);
     time += 3 * 24 * 60 * 60000 + 1234;
-    assert.equal((await post('/api/payoff/pay', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie })).status, 200, 'days later the $28 total is still accepted');
+    assert.equal((await post('/api/payoff/pay', order({ useCheckoutOffer: true, expectedTotalCents: 2811 }), { cookie })).status, 200, 'days later the $28.11 total is still accepted');
   });
 });
 
@@ -458,10 +458,10 @@ test('forged offers and unrecognized discounted payments cannot grant a discount
     const cookie = 'payoff_checkout_offer=forged';
     const config = await (await fetch(base + '/api/payoff/config?offer=1', { headers: { cookie } })).json();
     assert.equal(config.offer, undefined);
-    assert.equal((await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie })).status, 409);
+    assert.equal((await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2811 }), { cookie })).status, 409);
     assert.equal(w.creates.length, 0);
   });
-  const receipt = paid(); receipt.amount_total = 2800;
+  const receipt = paid(); receipt.amount_total = 2811;
   assert.equal(paidOrder(receipt), null);
   receipt.metadata.checkoutDiscountVersion = 'payoff-checkout-5-v1'; receipt.metadata.checkoutDiscountCents = '500';
   assert.deepEqual(paidOrder(receipt), ['base']);
@@ -481,7 +481,7 @@ for (const missing of [false, true]) test('checkout coupon is validated before o
   await serve(w, async ({ base, post }) => {
     const response = await fetch(base + '/api/payoff/config?offer=1');
     const cookie = response.headers.get('set-cookie').split(';')[0];
-    const result = await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2800 }), { cookie });
+    const result = await post('/api/payoff/checkout', order({ useCheckoutOffer: true, expectedTotalCents: 2811 }), { cookie });
     assert.equal(result.status, missing ? 200 : 503);
     assert.equal(w.creates.length, missing ? 1 : 0);
     assert.equal(created, missing ? 1 : 0);
@@ -526,15 +526,15 @@ test('the landing previews the free gift without issuing or restarting its clock
 // The order page's own payment form: a PaymentIntent per order, never a session.
 const intent = (addons = [], extra = {}) => ({ object: 'payment_intent', id: 'pi_3PaidOrder123456', status: 'succeeded', currency: 'usd', livemode: true,
   latest_charge: { billing_details: { name: 'Test Buyer' } },
-  amount_received: 3300 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0), receipt_email: 'Buyer@Example.test',
+  amount_received: 3311 + (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0), receipt_email: 'Buyer@Example.test',
   metadata: { product: PRODUCT, offerVersion: VERSION, checkout: 'embedded', addons: JSON.stringify(addons), visitorId: 'v_abcdefghijk', email: 'buyer@example.test' }, ...extra });
 test('the order page form creates a payment at server prices, keeps retries on one payment, and tells Meta once per visitor', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
-    const r = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6400 }));
-    assert.equal(r.status, 200); assert.equal(r.body.value, 64); assert.equal(r.body.clientSecret, 'pi_test_created_secret_x');
+    const r = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6411 }));
+    assert.equal(r.status, 200); assert.equal(r.body.value, 64.11); assert.equal(r.body.clientSecret, 'pi_test_created_secret_x');
     const { params, options } = w.payments[0];
-    assert.equal(params.amount, 6400); assert.equal(params.currency, 'usd'); assert.deepEqual(params.automatic_payment_methods, { enabled: true });
+    assert.equal(params.amount, 6411); assert.equal(params.currency, 'usd'); assert.deepEqual(params.automatic_payment_methods, { enabled: true });
     assert.equal(params.receipt_email, 'Buyer@Example.test');
     // A customer for the order, and the card kept for this visit only (the Interest Cutter's one click).
     assert.equal(params.customer, 'cus_test1'); assert.equal(w.customers[0].params.email, 'Buyer@Example.test');
@@ -543,11 +543,11 @@ test('the order page form creates a payment at server prices, keeps retries on o
     assert.equal(params.metadata.checkout, 'embedded'); assert.equal(params.metadata.email, 'buyer@example.test');
     assert.equal(params.metadata.addons, '["cashflow","reset"]'); assert.equal(params.metadata.product, PRODUCT);
     assert.ok(!('amount' in order()) || params.amount !== 1);
-    await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6400 }));
+    await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset', 'cashflow'], visitorId: 'v_abcdefghijk', expectedTotalCents: 6411 }));
     assert.equal(w.payments[1].options.idempotencyKey, options.idempotencyKey);
-    const changed = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset'], visitorId: 'v_abcdefghijk', expectedTotalCents: 4200 }));
+    const changed = await post('/api/payoff/pay', order({ email: 'Buyer@Example.test', addons: ['reset'], visitorId: 'v_abcdefghijk', expectedTotalCents: 4211 }));
     assert.equal(changed.status, 200); assert.notEqual(w.payments[2].options.idempotencyKey, options.idempotencyKey);
-    assert.equal((await post('/api/payoff/pay', order({ addons: ['reset'], expectedTotalCents: 3300 }))).status, 409);
+    assert.equal((await post('/api/payoff/pay', order({ addons: ['reset'], expectedTotalCents: 3311 }))).status, 409);
     assert.equal((await post('/api/payoff/pay', order({ email: 'nope' }))).status, 400);
     assert.equal((await post('/api/payoff/pay', order({ addons: ['other'] }))).status, 400);
     const checkouts = w.capi.filter(event => event.name === 'InitiateCheckout');
@@ -562,7 +562,7 @@ test('a paid order-page payment opens the tool, emails once, counts once, and fi
   const w = fixture(); const pi = intent(['cashflow']); w.intents.set(pi.id, pi);
   await serve(w, async ({ post }) => {
     const r = await post('/api/payoff/confirm', { paymentIntent: pi.id });
-    assert.equal(r.status, 200); assert.deepEqual(r.body.extras, ['cashflow']); assert.equal(r.body.totalCents, 5500); assert.equal(r.body.emailSent, true);
+    assert.equal(r.status, 200); assert.deepEqual(r.body.extras, ['cashflow']); assert.equal(r.body.totalCents, 5511); assert.equal(r.body.emailSent, true);
     assert.equal(verifyAccess(SECRET, r.body.access), pi.id);
     await post('/api/payoff/confirm', { paymentIntent: pi.id });
     assert.equal(w.emails.length, 1); assert.equal(w.emails[0].to, 'Buyer@Example.test');
@@ -598,7 +598,7 @@ test('an order-page payment that is processing, failed, altered or from hosted C
   assert.equal(w.emails.length, 0); assert.equal(w.rows.size, 0);
   assert.equal(paidIntent({ ...intent(), currency: 'eur' }), null);
   assert.equal(paidIntent({ ...intent(), metadata: { ...intent().metadata, checkoutDiscountCents: '900', checkoutDiscountVersion: 'payoff-checkout-5-v1' }, amount_received: 2400 }), null);
-  assert.deepEqual(paidIntent({ ...intent(), metadata: { ...intent().metadata, checkoutDiscountCents: '500', checkoutDiscountVersion: 'payoff-checkout-5-v1' }, amount_received: 2800 }), ['base']);
+  assert.deepEqual(paidIntent({ ...intent(), metadata: { ...intent().metadata, checkoutDiscountCents: '500', checkoutDiscountVersion: 'payoff-checkout-5-v1' }, amount_received: 2811 }), ['base']);
 });
 test('the webhook fulfills order-page payments and leaves hosted sessions\' payments to their session', async () => {
   const w = fixture(); const pi = intent(['reset']); w.intents.set(pi.id, pi);
@@ -722,7 +722,7 @@ test('the quiz earns the $5 only by finishing within 10 minutes; its looping clo
     const denied = await call('/api/payoff/config?offer=1', null, late.cookie);
     assert.equal(denied.body.offer, undefined); assert.equal(denied.cookie, '');
     assert.equal((await call('/api/payoff/config?offer=preview', null, late.cookie)).body.checkoutOffer.discountCents, 0);
-    assert.equal((await call('/api/payoff/checkout', { ...order(), useCheckoutOffer: true, expectedTotalCents: 3300 }, late.cookie)).body.value, 33);
+    assert.equal((await call('/api/payoff/checkout', { ...order(), useCheckoutOffer: true, expectedTotalCents: 3311 }, late.cookie)).body.value, 33.11);
     // A forged quiz cookie counts as no quiz; the letter's visitors get the offer as before.
     assert.ok((await call('/api/payoff/config?offer=1', null, late.cookie.replace(/\.[^.]+$/, '.' + 'A'.repeat(43)))).body.offer);
     assert.ok((await call('/api/payoff/config?offer=1')).body.offer);
@@ -843,5 +843,42 @@ test('the payment_intent.succeeded webhook finishes an Interest Cutter paid in a
     assert.equal(w.emails.filter(m => m.subject === 'Your Interest Cutter is ready').length, 1);
     assert.equal(w.capi.filter(e => e.name === 'InterestCutterPurchase').length, 1);
     assert.equal(w.intents.get(parent.id).metadata.cutter, made.id);
+  });
+});
+
+test('the .11 price verifies new receipts exactly and preserves v1 payments and preorders at their original amounts', async () => {
+  for (const addons of [[], ['cashflow'], ['reset'], ['cashflow', 'reset']]) {
+    const extras = (addons.includes('cashflow') ? 2200 : 0) + (addons.includes('reset') ? 900 : 0);
+    for (const discounted of [false, true]) {
+      const gift = discounted ? { checkoutDiscountVersion: 'payoff-checkout-5-v1', checkoutDiscountCents: '500' } : {};
+      const current = paid(addons, { preorder: false });
+      current.metadata = { ...current.metadata, ...gift };
+      current.amount_total = 3311 + extras - (discounted ? 500 : 0);
+      assert.deepEqual(paidOrder(current), ['base', ...addons]);
+      assert.equal(paidOrder({ ...current, amount_total: current.amount_total - 11 }), null);
+      const legacy = { ...current, metadata: { ...current.metadata, offerVersion: 'payoff-v1' }, amount_total: 3300 + extras - (discounted ? 500 : 0) };
+      assert.deepEqual(paidOrder(legacy), ['base', ...addons]);
+      const oldIntent = intent(addons, { metadata: { ...legacy.metadata, checkout: 'embedded' }, amount_received: legacy.amount_total });
+      assert.deepEqual(paidIntent(oldIntent), ['base', ...addons]);
+      const newIntent = intent(addons, { metadata: { ...current.metadata, checkout: 'embedded' }, amount_received: current.amount_total });
+      assert.deepEqual(paidIntent(newIntent), ['base', ...addons]);
+      assert.equal(paidIntent({ ...newIntent, amount_received: legacy.amount_total }), null);
+      if (!discounted) assert.deepEqual(paidOrder(paid(addons, { preorder: true })), ['base', ...addons]);
+    }
+  }
+  const w = fixture();
+  const legacy = paid([], { preorder: false });
+  legacy.metadata.offerVersion = 'payoff-v1';
+  legacy.amount_total = 2800;
+  Object.assign(legacy.metadata, { checkoutDiscountVersion: 'payoff-checkout-5-v1', checkoutDiscountCents: '500' });
+  w.sessions.set(legacy.id, legacy);
+  await serve(w, async ({ post }) => {
+    const result = await post('/api/payoff/confirm', { sessionId: legacy.id });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.totalCents, 2800);
+    assert.ok(w.emails[0].text.includes('Marketel Payoff: $33.00'));
+    assert.ok(w.emails[0].text.includes('Total paid: $28.00 USD'));
+    assert.ok(!w.emails[0].text.includes('$33.11'));
+    assert.equal((await post('/api/payoff/access', { token: result.body.access })).body.ok, true);
   });
 });

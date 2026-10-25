@@ -50,7 +50,7 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.deepEqual(paragraphs,await page.evaluate(()=>window.PAYOFF_CONTENT.founder.paragraphs));
  const assets=page.locator('img[src^="/payoff/assets/"]');
  // The FAQ goes straight to its button, as in the reference, so the product shot appears once.
- assert.equal(await assets.count(),18);
+ assert.equal(await assets.count(),26);
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');
@@ -58,13 +58,13 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.equal(await page.locator('.preview-note').count(),0);
  assert.deepEqual(errors,[]);
 }));
-test('the order starts at $33 with both extras unchecked; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
+test('the order starts at $33.11 with both extras unchecked; local preview cannot submit payments or store contact information',async()=>world(async({page,base,requests,errors})=>{
  await page.locator('a.cta').first().click();await page.waitForURL(base+'/payoff/order');
  assert.equal(await page.locator('#preorder-consent').count(),0);
  assert.equal(await page.locator('.bump').count(),2);
  assert.equal(await page.locator('#cashflow').isChecked(),false);assert.equal(await page.locator('#reset').isChecked(),false);
- assert.equal(await page.locator('#order-total').innerText(),'$33.00');
- await page.locator('#cashflow').check();assert.equal(await page.locator('#order-total').innerText(),'$55.00');
+ assert.equal(await page.locator('#order-total').innerText(),'$33.11');
+ await page.locator('#cashflow').check();assert.equal(await page.locator('#order-total').innerText(),'$55.11');
  await page.locator('#cashflow').uncheck();
  await page.locator('#email').fill('preview@example.test');await page.locator('#email').press('Enter');
  await page.waitForTimeout(160);assert.equal(page.url(),base+'/payoff/order');assert.ok(await page.locator('#buy-button').isDisabled());

@@ -26,8 +26,8 @@
     if (entry.caption) figure.append(element('figcaption', '', entry.caption));
     return figure;
   }
-  // Price blocks as in the reference letter: the crossed-out regular price and
-  // one bold line, worded three ways down the page.
+  // Every offer gives the final price its own line, with the same compact
+  // guarantee directly beneath the action.
   const wordings = ['today', 'sale', 'caps'];
   [...document.querySelectorAll('.offer-slot')].forEach((slot, index) => {
     const template = document.querySelector('#offer-template');
@@ -37,9 +37,14 @@
     box.dataset.wording = wording;
     box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
     window.PAYOFF_PAINT_PRICE(box, content.priceCents);
-    // As in the reference: the terms right under the first and the last button.
-    if (slot.dataset.placement === 'hero') box.append(element('p', 'offer-terms-line', 'One-time purchase. No monthly fees.\n30-day money-back guarantee.'));
-    if (slot.dataset.placement === 'faq') box.append(element('p', 'offer-terms-line', 'Opens right after you pay. One-time charge.\n100% money-back guarantee for 30 days.'));
+    const guarantee = new Image();
+    guarantee.src = '/payoff/assets/guarantee-30-day-compact-0ad1ee8089.webp';
+    guarantee.width = 800; guarantee.height = 294;
+    guarantee.alt = '30-day money-back guarantee';
+    guarantee.className = 'offer-guarantee';
+    guarantee.loading = slot.dataset.placement === 'hero' ? 'eager' : 'lazy';
+    guarantee.decoding = 'async';
+    box.append(guarantee);
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });

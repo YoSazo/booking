@@ -45,7 +45,7 @@ const ACCOUNT = '51AbCdEfGhIjKlMnO';
 
 async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null, embedded = true, outcomes = [], wallet = null } = {}) {
   const app = express(), creates = [], payments = [], emails = [], rows = new Map(), updates = new Map();
-  const paid = { id: 'cs_test_browserOrder123', mode: 'payment', status: 'complete', payment_status: unpaid ? 'unpaid' : 'paid', currency: 'usd', amount_total: 3300, livemode: false,
+  const paid = { id: 'cs_test_browserOrder123', mode: 'payment', status: 'complete', payment_status: unpaid ? 'unpaid' : 'paid', currency: 'usd', amount_total: 3311, livemode: false,
     metadata: { product: PRODUCT, offerVersion: VERSION, addons: '[]' }, customer_details: { email: 'buyer@example.test' } };
   const prisma = { inspectEvent: {
     upsert: async () => ({}),
@@ -122,7 +122,9 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
   assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ 10,000+ sold');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
-  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), 'Your Debt-Free Date & Payoff Plan (Valued at $375 -> Today Only 28)');
+  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$33.11 Just 28.11');
+  assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
+  assert.equal(await page.locator('.glance-value').innerText(), 'Valued at $375');
   assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
   assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
   assert.equal(await page.locator('.glance-guarantee').getAttribute('alt'), '30-day 100% money back guarantee');
@@ -136,7 +138,7 @@ test('the order page follows the reference: reservation, product, price and safe
   for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This is a one-time offer, and you will never see this price again\.$/);
   assert.deepEqual(await page.locator('.bump-price').allInnerTexts(), ['Regular price: $79 Today only $22!', 'Regular price: $49 Today only $9!']);
   assert.equal(await page.locator('.bump-price s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
-  assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.00/);
+  assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.11/);
   assert.equal(await page.locator('.bump').count(), 2);
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   assert.deepEqual(await page.locator('.bump-headline').allInnerTexts(), ['Plan Around Payday', 'Get A Fresh Start']);
@@ -151,8 +153,8 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal(await page.locator('.buy-text small').innerText(), 'OPENS RIGHT AFTER YOU PAY');
   assert.equal(await page.locator('.secure').innerText(), '* 100% Secure & Safe Payments *');
   assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off\s+-\$ 5\.00/);
-  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
-  assert.equal(await page.locator('#only-today').innerText(), 'Only $28 Today!');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
+  assert.equal(await page.locator('#only-today').innerText(), 'Only $28.11 Today!');
   assert.equal(await page.locator('#percent-off').innerText(), '(92% off)');
   assert.equal(await page.locator('.logos img').count(), 5);
   assert.match(await page.locator('.guarantee').innerText(), /30-day money-back guarantee\.\s+One-time payment\. No monthly fees\./);
@@ -171,14 +173,14 @@ test('the order page follows the reference: reservation, product, price and safe
 }));
 test('Stripe\'s fields charge the extras picked: the amount follows the boxes, one payment per order, then the tool opens', async () => world(async ({ page, base, payments, emails, stripeLog }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
-  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'elements'), [['elements', 'payment', 2800, 'usd'], ['elements', 'payment', 2800, 'usd']]);
+  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'elements'), [['elements', 'payment', 2811, 'usd'], ['elements', 'payment', 2811, 'usd']]);
   const created = (await stripeLog()).filter(entry => entry[0] === 'create');
   assert.deepEqual(created.map(entry => entry[1]), ['payment', 'expressCheckout']);
   assert.deepEqual(created[0][2], { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
   assert.equal(await page.locator('#or').isHidden(), false, 'a wallet is available, so OR shows');
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
-  assert.equal(await page.locator('#order-total').innerText(), '$59.00');
-  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5000, 5000, 5900, 5900]);
+  assert.equal(await page.locator('#order-total').innerText(), '$59.11');
+  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5011, 5011, 5911, 5911]);
   await page.locator('#buy-button').click();
   assert.equal(payments.length, 0, 'nothing is created without a name and email');
   assert.equal(await page.locator('#checkout-status').innerText(), 'Please enter your full name.');
@@ -187,7 +189,7 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   await skipOffers(page);
   await page.locator('#debts:not([hidden])').waitFor();
   assert.equal(payments.length, 1);
-  assert.equal(payments[0].params.amount, 5900); assert.equal(payments[0].params.metadata.addons, '["cashflow","reset"]');
+  assert.equal(payments[0].params.amount, 5911); assert.equal(payments[0].params.metadata.addons, '["cashflow","reset"]');
   assert.equal(payments[0].params.receipt_email, 'buyer@example.test');
   const confirm = (await stripeLog()).find(entry => entry[0] === 'confirm');
   assert.deepEqual(confirm[3], { billing_details: { name: 'Test Buyer', email: 'buyer@example.test' } });
@@ -195,7 +197,7 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.equal(await page.isVisible('#tabs'), true);
   assert.ok(await page.evaluate(() => localStorage.getItem('payoff.access')));
   assert.equal(new URL(page.url()).search, '');
-  assert.equal(emails.length, 1); assert.match(emails[0].text, /Total paid: \$59\.00/);
+  assert.equal(emails.length, 1); assert.match(emails[0].text, /Total paid: \$59\.11/);
 }));
 test('a declined card says why, keeps the same payment for the retry, and stays on the page', async () => world(async ({ page, base, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
@@ -228,7 +230,7 @@ test('when Stripe\'s fields can\'t be used, the button opens Stripe\'s hosted ch
   await page.locator('#buy-button').click();
   await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(payments.length, 0); assert.equal(creates.length, 1);
-  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 5500);
+  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 5511);
   assert.equal(creates[0].params.customer_email, 'buyer@example.test');
 }, { embedded: false }));
 test('hosted checkout failure is retryable; the pick survives a return; cancelling says nothing was charged', async () => world(async ({ page, base, creates }) => {
@@ -302,8 +304,8 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
   const tracked = calls.filter(args => args[0] === 'track');
   assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again (never the offer page or the tool)');
   assert.deepEqual(tracked.filter(args => args[1] !== 'PageView').map(args => [args[1], args[2].value, args[3]?.eventID]), [
-    ['AddToCart', 33, `payoff-cart.${visitor}`],
-    ['InitiateCheckout', 37, `payoff-checkout.${visitor}`],
+    ['AddToCart', 33.11, `payoff-cart.${visitor}`],
+    ['InitiateCheckout', 37.11, `payoff-checkout.${visitor}`],
   ], 'AddToCart once per visitor, then InitiateCheckout');
   // The server gets the click ids, so its copies match the same person.
   const viewed = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('PayoffOrderViewed'));
@@ -334,22 +336,22 @@ const reserveClock = async page => `${await page.locator('#reserve-minutes').inn
 test('the free gift survives reload; the reservation clock carries on through a reload, stays at 00:00, and the next load after that starts a new 05:00', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
-  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   await page.locator('#cashflow').check();
-  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   // Two minutes in, a reload carries on instead of starting over.
   await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.now() + 2 * 60000 + 30000)));
   await page.reload(); await ready(page);
   assert.match(await reserveClock(page), /^(02:30|02:2\d)$/, 'a reload carries on');
   assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
-  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   // At 00:00 it stays there, and the total and extras do not change.
   await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000; });
   await page.waitForTimeout(1300);
   assert.equal(await reserveClock(page), '00:00');
   await page.waitForTimeout(1100);
   assert.equal(await reserveClock(page), '00:00', 'it stays at 00:00');
-  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   assert.equal(await page.locator('#cashflow').isChecked(), true);
   assert.equal(await page.locator('#glance-gift').isHidden(), false);
   // The next load after 00:00 starts a new five minutes.
@@ -359,10 +361,10 @@ test('the free gift survives reload; the reservation clock carries on through a 
   advanceTime(31 * 60000);
   await page.reload(); await ready(page);
   assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
-  assert.equal(await page.locator('#order-total').innerText(), '$50.00');
-  assert.equal(await page.locator('#only-today').innerText(), 'Only $28 Today!');
+  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
+  assert.equal(await page.locator('#only-today').innerText(), 'Only $28.11 Today!');
 }));
-for (const delayedTimer of [false, true]) test('days later the buyer still pays $28: the reservation never ends the gift (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, payments, advanceTime }) => {
+for (const delayedTimer of [false, true]) test('days later the buyer still pays $28.11: the reservation never ends the gift (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, payments, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
   advanceTime(3 * 24 * 60 * 60000);
@@ -372,72 +374,75 @@ for (const delayedTimer of [false, true]) test('days later the buyer still pays 
   });
   else await page.locator('#buy-button').click();
   await page.waitForURL(url => url.pathname === '/payoff/upgrade');
-  assert.equal(payments.at(-1).params.amount, 2800);
+  assert.equal(payments.at(-1).params.amount, 2811);
 }));
-// The first screen answers what, held, price and safety before any field.
-test('the order page\'s first screen shows the reservation, product, price, safe checkout and guarantee, on phones', async () => world(async ({ page, base }) => {
+// Price and refund reassurance stay prominent together above the fields.
+test('the order page puts its large final price and compact guarantee together on phones', async () => world(async ({ page, base }) => {
   for (const [width, height] of [[375, 667], [390, 664], [390, 844], [414, 736]]) {
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff/order'); await ready(page);
     await page.evaluate(() => document.fonts.ready);
-    const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.summary-label', '.glance-image', '.glance-price', '#glance-gift', '.glance .safe']
+    assert.ok(await page.locator('.glance-price').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 36));
+    const positions = await page.evaluate(() => ['.glance-price', '.glance-guarantee', '.glance .safe', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top));
+    assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+    const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.summary-label', '.glance-image', '.glance-price']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
 }));
 
-// The first screen is the hook: with the three-line price (the tallest it
-// gets), the button, the guarantee, the stars and who uses it fit without
-// scrolling on small phones and inside Facebook's browser.
-test('the letter\'s first screen fits everything needed to tap the button, on small phones', async () => world(async ({ page, base }) => {
+// Legible pricing takes priority over squeezing every proof element into a
+// small first screen. The action stays reachable and its guarantee adjacent.
+test('the letter keeps its large final price and action visible on small phones', async () => world(async ({ page, base }) => {
   for (const [width, height] of [[375, 548], [360, 640], [390, 664], [414, 640]]) {
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff');
     await page.locator('.hero .offer-was:not([hidden])').waitFor();
     await page.evaluate(() => document.fonts.ready);
-    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .offer-terms-line', '.hero .rating-stars', '.hero .rating-label']
+    assert.ok(await page.locator('.hero [data-price]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 36), 'the final price is larger than body text');
+    assert.equal(await page.locator('.hero .offer-guarantee').getAttribute('alt'), '30-day money-back guarantee');
+    assert.ok(await page.evaluate(() => document.querySelector('.hero .offer-guarantee').getBoundingClientRect().top - document.querySelector('.hero .cta').getBoundingClientRect().bottom <= 60), 'refund reassurance stays beside the action');
+    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
-    assert.ok(await page.locator('.hero .cta').evaluate(el => el.getBoundingClientRect().height >= 44), 'the button keeps a 44px tap target');
+    assert.ok(await page.locator('.hero .cta').evaluate(el => el.getBoundingClientRect().height >= 56), 'the button keeps a large tap target');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
 }));
 test('sales offer blocks show the free gift price without starting its clock, the letter has no bar, and the gift never ends', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Just 28.11")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
-  // Worded three ways down the page, as in the reference letter.
-  // With the extra $5, the sale price is crossed out too.
-  assert.deepEqual(await page.locator('.sales-offer').evaluateAll(boxes => boxes.slice(0, 3).map(box => box.innerText.replace(/\s+/g, ' ').trim())), [
-    '(Reg. price $375) Today: $33 Today: $28 ($5 off · 15% off) Get My Debt-Free Date One-time purchase. No monthly fees. 30-day money-back guarantee.',
-    '(Reg. price $375) Sale Price: $33 Sale Price: $28 ($5 off · 15% off) Get My Debt-Free Date',
-    "(Reg. price $375) SALE PRICE: $33 SALE PRICE: $28 That's an extra $5 (15%) off. Get My Debt-Free Date"]);
+  for (const offer of await page.locator('.sales-offer').allInnerTexts()) {
+    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Just 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date Opens right after you pay.');
+  }
+  assert.equal(await page.locator('.offer-guarantee[alt="30-day money-back guarantee"]').count(), 8);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
   assert.equal(await page.locator('#offer-bar').count(), 0, 'the letter has no bar; the clock is on the order page');
   assert.equal((await page.context().cookies()).filter(c => c.name === 'payoff_checkout_offer').length, 0);
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
-  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Just 28.11")').first().waitFor();
   advanceTime(31 * 60000);
   const previewDone = page.waitForResponse(r => r.url().includes('offer=preview'));
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
   await previewDone;
   await page.waitForTimeout(100);
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $28 ($5 off · 15% off)');
-  assert.equal(await page.locator('.sales-offer .offer-was').first().isHidden(), false, 'the crossed-out $33 stays');
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Just 28.11');
+  assert.equal(await page.locator('.sales-offer .offer-was').first().isHidden(), false, 'the crossed-out $33.11 stays');
   assert.match((await page.locator('footer').innerText()).replace(/\s+/g, ' '), /Terms & Conditions \| Privacy Policy Copyright 2026 Marketel\. All Rights Reserved\./);
 }));
 test('sales offers retain the regular price and usable checkout when the offer lookup fails', async () => world(async ({ page, base }) => {
   await page.route('**/api/payoff/config?offer=preview', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer .cta').first().waitFor();
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Today: $33 (91% off)');
+  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Just 33.11');
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
-  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
 }));
 
 // The Interest Cutter, offered right after paying.

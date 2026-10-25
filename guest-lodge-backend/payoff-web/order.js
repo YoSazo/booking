@@ -18,7 +18,7 @@
   const money = cents => (cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
   const selected = () => EXTRAS.filter(extra => $(extra.id).checked);
   const priceOf = extra => config?.addOns?.[extra.id] ?? extra.cents;
-  const base = () => config?.priceCents || 3300;
+  const base = () => config?.priceCents || 3311;
   const discount = () => (offer && offer.discountCents > 0 ? offer.discountCents : 0);
   const total = () => base() - discount() + selected().reduce((sum, extra) => sum + priceOf(extra), 0);
   // The "reserved for" clock: five minutes, carried through reloads; at 00:00
@@ -66,6 +66,8 @@
     const price = base() - off;
     // No $ on the price they pay, as on the reference order pages.
     $('glance-price').textContent = (price / 100).toFixed(2).replace('.00', '');
+    $('glance-was').textContent = money(base()).replace('.00', '');
+    $('glance-was').hidden = !off;
     $('glance-gift').hidden = !off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;

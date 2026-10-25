@@ -10,17 +10,19 @@ const { sanitizeInspectAttribution, inspectPublishableKey } = require('./inspect
 const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount, QUIZ, issueQuiz, readQuiz, quizCookie } = require('./payoff-offer');
 
 const PRODUCT = 'marketel-payoff';
-const VERSION = 'payoff-v1';
+// v2 records the $33.11 base price; v1 receipts retain their $33/$28 amounts.
+const VERSION = 'payoff-v2';
+const LEGACY_VERSION = 'payoff-v1';
 // Paid preorders from before the tool existed open it too, with their extras.
 const PREORDER = Object.freeze({ product: 'marketel-payoff-preorder', version: 'payoff-preorder-v1' });
 const EXTRAS = Object.freeze(['cashflow', 'reset']);
 const DESCRIPTIONS = Object.freeze({
-  base: 'Regular price was $375. Sale price $33. Your debt payoff plan opens right after payment. 30-day money-back guarantee.',
+  base: 'Regular price was $375. Sale price $33.11. Your debt payoff plan opens right after payment. 30-day money-back guarantee.',
   cashflow: 'Income, bills and debt payments on one calendar, with your projected balance up to 18 months ahead. Opens inside Payoff.',
   reset: 'A spending reset you set up and track day by day. Opens inside Payoff.',
 });
 const ITEMS = Object.freeze({
-  base: { name: 'Marketel Payoff', cents: 3300 },
+  base: { name: 'Marketel Payoff', cents: 3311 },
   cashflow: { name: 'Cash-flow calendar', cents: 2200 },
   reset: { name: 'Spending reset', cents: 900 },
 });
@@ -67,16 +69,24 @@ function basket(addons) {
   return ['base', ...['cashflow', 'reset'].filter(id => addons.includes(id))];
 }
 const isPayoff = metadata => metadata?.product === PRODUCT || metadata?.product === PREORDER.product;
+// Existing receipts and payments still in flight keep the price they bought.
+const paidBasePrice = metadata => {
+  if (metadata?.product === PRODUCT && metadata.offerVersion === VERSION) return ITEMS.base.cents;
+  if ((metadata?.product === PRODUCT && metadata.offerVersion === LEGACY_VERSION)
+    || (metadata?.product === PREORDER.product && metadata.offerVersion === PREORDER.version)) return 3300;
+  return null;
+};
+const paidTotal = (ids, base) => ids.reduce((sum, id) => sum + (id === 'base' ? base : ITEMS[id].cents), 0);
 function paidOrder(session) {
-  const current = session?.metadata?.product === PRODUCT && session.metadata.offerVersion === VERSION;
+  const base = paidBasePrice(session?.metadata);
   const preorder = session?.metadata?.product === PREORDER.product && session.metadata.offerVersion === PREORDER.version;
-  if (!(current || preorder) || session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid'
+  if (base === null || session.mode !== 'payment' || session.status !== 'complete' || session.payment_status !== 'paid'
     || session.currency !== 'usd') return null;
   let ids;
   try { ids = basket(JSON.parse(session.metadata.addons)); } catch { return null; }
   const discount = orderDiscount(session);
   if (discount === null || (preorder && discount)) return null;
-  if (session.amount_total !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount) return null;
+  if (session.amount_total !== paidTotal(ids, base) - discount) return null;
   return ids;
 }
 // A payment made in the order page's own form. A hosted session's
@@ -84,12 +94,13 @@ function paidOrder(session) {
 // is only ever counted through its session.
 function paidIntent(intent) {
   const metadata = intent?.metadata || {};
-  if (intent?.object !== 'payment_intent' || metadata.product !== PRODUCT || metadata.offerVersion !== VERSION || metadata.checkout !== 'embedded'
+  const base = paidBasePrice(metadata);
+  if (intent?.object !== 'payment_intent' || metadata.product !== PRODUCT || base === null || metadata.checkout !== 'embedded'
     || intent.status !== 'succeeded' || intent.currency !== 'usd') return null;
   let ids;
   try { ids = basket(JSON.parse(metadata.addons)); } catch { return null; }
   const discount = orderDiscount(intent);
-  if (discount === null || intent.amount_received !== ids.reduce((sum, id) => sum + ITEMS[id].cents, 0) - discount) return null;
+  if (discount === null || intent.amount_received !== paidTotal(ids, base) - discount) return null;
   return ids;
 }
 // One shape for either kind of paid order.
@@ -268,7 +279,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       if (claimed) {
         try {
           await mail.sendMail(accessMail(email, order.id, [
-            ...ids.map(id => `${ITEMS[id].name}: $${(ITEMS[id].cents / 100).toFixed(2)}`),
+            ...ids.map(id => `${ITEMS[id].name}: $${((id === 'base' ? paidBasePrice(order.metadata) : ITEMS[id].cents) / 100).toFixed(2)}`),
             ...(orderDiscount(order) ? ['Free gift: −$5.00'] : []),
             `Total paid: $${(order.totalCents / 100).toFixed(2)} USD. One payment, no subscription.`,
             `Order reference: ${order.id}`,
@@ -471,7 +482,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   // declined card, say) returns the same payment.
   api.post('/pay', guarded(async (req, res) => {
     const order = quote(req);
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, 'embedded-v2'])).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, order.total, 'embedded-v2'])).digest('hex');
     // A card is kept for this visit only (on_session), so the Interest Cutter
     // offer right after can charge it with one click. Wallets and other
     // methods pay again on that page.
@@ -490,7 +501,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   api.post('/checkout', guarded(async (req, res) => {
     const { ids, attempt, email, metadata, discount, total, ...order } = quote(req);
     const coupon = discount ? await checkoutCoupon() : null;
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon, 'dashboard-methods-v1'])).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, ids, email, metadata.fbp, metadata.fbc, discount, coupon, total, 'dashboard-methods-v1'])).digest('hex');
     const session = await stripe.checkout.sessions.create({
       mode: 'payment', submit_type: 'pay', customer_email: email,
       line_items: ids.map(id => ({ quantity: 1, price_data: { currency: 'usd', unit_amount: ITEMS[id].cents,

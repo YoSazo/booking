@@ -92,13 +92,13 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   const planned = E.plan(CARDS, { extra: 10000, start }), fastest = planned.plans.find(plan => plan.key === planned.fastest);
   await page.locator('.impact span', { hasText: money(minimums.totalInterest - fastest.totalInterest) + ' less interest' }).waitFor();
   await page.locator('.go', { hasText: 'Build my plan' }).click();
-  await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28 ($5 off · 15% off)")').waitFor();
-  assert.equal(await page.locator('.plan .offer-was').innerText(), 'Today: $33');
+  await page.locator('.plan .sales-offer [data-price]:has-text("Today: $28.11 ($5 off · 15% off)")').waitFor();
+  assert.equal(await page.locator('.plan .offer-was').innerText(), 'Today: $33.11');
   assert.match(await page.locator('.plan .q').innerText(), /sooner\.$/);
   assert.equal(await page.locator('.locked .blurred').count(), 3);
   assert.equal((await page.locator('.told').innerText()).replace(/\s+/g, ' ').trim(), 'You told us: “I don’t know which card to pay first.” Your plan: The exact order, and what to pay on each card every month.');
-  assert.equal(await page.locator('#worth').innerText(), `Your plan could save you ${money(minimums.totalInterest - fastest.totalInterest)} in interest. It costs $375 $33 $28, once.`);
-  assert.deepEqual(await page.locator('#worth s').allInnerTexts(), ['$375', '$33'], 'the earlier prices are crossed out');
+  assert.equal(await page.locator('#worth').innerText(), `Your plan could save you ${money(minimums.totalInterest - fastest.totalInterest)} in interest. It costs $375 $33.11 $28.11, once.`);
+  assert.deepEqual(await page.locator('#worth s').allInnerTexts(), ['$375', '$33.11'], 'the earlier prices are crossed out');
   // Finishing in time earns the $5; its looping clock starts at checkout.
   assert.equal((await page.locator('#offer-bar').innerText()).replace(/\s+/g, ' ').trim(), '🎉 You unlocked an extra $5 off! It’s reserved for you at checkout.');
   assert.equal(await page.locator('#offer-saved').innerText(), 'Your extra $5 is reserved for you when you open checkout.');
@@ -108,7 +108,7 @@ test('the quiz opens on the ad\'s hook and walks to the real date on minimums, t
   await page.waitForURL(url => url.pathname === '/payoff/order');
   await page.locator('#buy-button:enabled').waitFor();
   assert.match(`${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`, /^(05:00|04:5\d)$/, 'the clock starts at checkout');
-  assert.equal(await page.locator('#order-total').innerText(), '$28.00');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   const handed = await page.evaluate(() => JSON.parse(localStorage.getItem('payoff.v1')));
   assert.deepEqual(handed, { debts: CARDS, extra: 10000, plan: null, seen: true });
 
@@ -160,7 +160,7 @@ test('cards whose minimums never cover the interest are told so, and a plan stil
   assert.match(await page.locator('.impact').innerText(), /Paid off for good/);
 }));
 
-test('taking longer than 10 minutes means no extra $5: the bar goes, the plan and checkout show $33', async () => world(async ({ page, base, advanceTime }) => {
+test('taking longer than 10 minutes means no extra $5: the bar goes, the plan and checkout show $33.11', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
   await page.locator('.choice', { hasText: '1' }).first().click();
   await page.locator('#deal-clock:not([hidden])').waitFor();
@@ -175,11 +175,11 @@ test('taking longer than 10 minutes means no extra $5: the bar goes, the plan an
   await page.locator('#offer-bar[hidden]').waitFor({ state: 'attached' });
   await page.waitForTimeout(300);
   assert.equal(await page.locator('#offer-bar').isHidden(), true);
-  assert.equal(await page.locator('.plan [data-price]').innerText(), 'Today: $33 (91% off)');
+  assert.equal(await page.locator('.plan [data-price]').innerText(), 'Today: $33.11 (91% off)');
   assert.equal(await page.locator('#offer-saved').isHidden(), true);
   await page.locator('a.go').click(); await page.waitForURL(url => url.pathname === '/payoff/order');
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#glance-gift').isHidden(), true, 'no free gift line');
-  assert.equal(await page.locator('#glance-price').innerText(), '33');
-  assert.equal(await page.locator('#order-total').innerText(), '$33.00');
+  assert.equal(await page.locator('#glance-price').innerText(), '33.11');
+  assert.equal(await page.locator('#order-total').innerText(), '$33.11');
 }));
