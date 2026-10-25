@@ -2,7 +2,7 @@
    Open Sans for page copy, Montserrat inside the form. */
 @font-face { font-family: 'Montserrat'; src: url('/payoff/assets/font-montserrat-06b16db7a9.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: 'Open Sans'; src: url('/payoff/assets/font-opensans-d8e4fe0452.woff2') format('woff2'); font-weight: 300 800; font-display: swap; }
-@font-face { font-family: 'Payoff Price'; src: url('/payoff/assets/font-opensans-price-bolditalic-83ff4ae04f.woff2') format('woff2'); font-style: italic; font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Payoff Price'; src: url('/payoff/assets/font-opensanspriceitalic-83ff4ae04f.woff2') format('woff2'); font-style: italic; font-weight: 700; font-display: swap; }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }

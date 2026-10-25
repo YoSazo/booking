@@ -106,10 +106,11 @@ test('Payoff pages and assets are published without exposing source documents or
     assert.match(orderPage.headers.get('permissions-policy'), /payment=\(self "https:\/\/js\.stripe\.com"/);
     assert.doesNotMatch((await fetch(base + '/payoff')).headers.get('content-security-policy'), /stripe/);
     for (const file of ['order.js', 'order.css']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
-    const font = fs.readdirSync(path.join(__dirname, '../payoff-web/assets')).find(name => /^font-.*\.woff2$/.test(name));
-    const fontResponse = await fetch(base + '/payoff/assets/' + font);
-    assert.equal(fontResponse.status, 200); assert.match(fontResponse.headers.get('content-type'), /font\/woff2/);
-    assert.equal(fontResponse.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    for (const font of fs.readdirSync(path.join(__dirname, '../payoff-web/assets')).filter(name => /^font-.*\.woff2$/.test(name))) {
+      const fontResponse = await fetch(base + '/payoff/assets/' + font);
+      assert.equal(fontResponse.status, 200, font); assert.match(fontResponse.headers.get('content-type'), /font\/woff2/);
+      assert.equal(fontResponse.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    }
   });
 });
 test('the terms carry the disclaimer, the privacy policy is Payoff\'s own, and every page states the same 30-day guarantee', async () => {
