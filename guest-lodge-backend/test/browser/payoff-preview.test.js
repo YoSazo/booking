@@ -29,10 +29,9 @@ test('local composition has eight offers, fourteen images and reference-style ra
  assert.equal(await page.locator('.faq h2').innerText(),'Frequently Asked Questions');
  assert.equal(await page.locator('.faq-list details').count(),11);
  assert.equal(await page.locator('.rating-stars').innerText(),'★★★★★');
- assert.equal(await page.locator('.rating-label strong').innerText(),'Join 10,000+ people');
- assert.match(await page.locator('.rating-label').innerText(),/using Marketel Payoff to turn their balances into a clear plan for paying off debt\./);
- // The stars scale with the phone's height (24–46px) so the first screen fits.
- const stars=parseFloat(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize));assert.ok(stars>=24&&stars<=46,String(stars));
+ assert.equal(await page.locator('.rating-label').innerText(),'10,000+ sold');
+ assert.equal(await page.locator('.hero-social-proof .avatars img').count(),6);
+ const stars=parseFloat(await page.locator('.rating-stars').evaluate(el=>getComputedStyle(el).fontSize));assert.ok(stars>=19&&stars<=24,String(stars));
  assert.equal(await page.locator('.proof-slot,.owner-placeholder,.policy-slot').count(),0);
  assert.doesNotMatch(await page.locator('body').innerText(),/your testimonial|refund-policy slot|customer feedback will appear/i);
  assert.equal(await page.locator('.proof-image img').evaluateAll(imgs=>new Set(imgs.map(img=>img.src)).size),14);
@@ -49,8 +48,8 @@ test('local composition keeps the full extracted biography and all supplied imag
  assert.equal(paragraphs[7],'I’d be honored to help you too.');
  assert.deepEqual(paragraphs,await page.evaluate(()=>window.PAYOFF_CONTENT.founder.paragraphs));
  const assets=page.locator('img[src^="/payoff/assets/"]');
- // The FAQ goes straight to its button, as in the reference, so the product shot appears once.
- assert.equal(await assets.count(),26);
+ // Includes the six checkout avatars now reused in the compact hero row.
+ assert.equal(await assets.count(),32);
  await assets.evaluateAll(imgs=>Promise.all(imgs.map(img=>{img.loading='eager';return img.decode();})));
  assert.ok(await assets.evaluateAll(imgs=>imgs.every(img=>img.complete&&img.naturalWidth>0)));
  await page.goto(base+'/payoff/order');

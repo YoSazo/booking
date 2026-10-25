@@ -392,20 +392,24 @@ test('the order page puts its large final price and compact guarantee together o
   }
 }));
 
-// Legible pricing takes priority over squeezing every proof element into a
-// small first screen. The action stays reachable and its guarantee adjacent.
-test('the letter keeps its large final price and action visible on small phones', async () => world(async ({ page, base }) => {
-  for (const [width, height] of [[375, 548], [360, 640], [390, 664], [414, 640]]) {
+// Include reduced viewport heights to account for in-app browser controls.
+test('small phones show the price, action, checkout proof row and start of Amanda’s review without scrolling', async () => world(async ({ page, base }) => {
+  for (const [width, height] of [[320, 568], [375, 548], [360, 640], [390, 600], [390, 664], [390, 844], [414, 640]]) {
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff');
     await page.locator('.hero .offer-was:not([hidden])').waitFor();
     await page.evaluate(() => document.fonts.ready);
     assert.ok(await page.locator('.hero [data-price]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 32), 'the final price is larger than body text');
     assert.equal(await page.locator('.hero .offer-guarantee').getAttribute('alt'), '30-day money-back guarantee');
-    assert.ok(await page.evaluate(() => document.querySelector('.hero .offer-guarantee').getBoundingClientRect().top - document.querySelector('.hero .cta').getBoundingClientRect().bottom <= 60), 'refund reassurance stays beside the action');
-    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta']
+    assert.match(await page.locator('.hero .offer-terms-line').innerText(), /30-day money-back guarantee/);
+    assert.equal(await page.locator('.hero .rating-label').innerText(), '10,000+ sold');
+    assert.equal(await page.locator('.hero .avatars img').count(), 6);
+    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .hero-social-proof']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    const review = await page.locator('.hero [data-proof=early] img').first().evaluate(el => ({ top: el.getBoundingClientRect().top, alt: el.alt }));
+    assert.equal(review.alt, 'Testimonial from Amanda');
+    assert.ok(review.top + 80 <= height, `${width}x${height}: at least 80px of Amanda's review is visible (starts at ${review.top})`);
     assert.ok(await page.locator('.hero .cta').evaluate(el => el.getBoundingClientRect().height >= 56), 'the button keeps a large tap target');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
@@ -414,8 +418,9 @@ test('sales offer blocks show the free gift price without starting its clock, th
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer [data-price]:has-text("Only 28.11")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
-  for (const offer of await page.locator('.sales-offer').allInnerTexts()) {
-    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Only 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date Opens right after you pay.');
+  for (const [index, offer] of (await page.locator('.sales-offer').allInnerTexts()).entries()) {
+    const assurance = index === 0 ? 'Instant access · 30-day money-back guarantee.' : 'Opens right after you pay.';
+    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Only 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date ' + assurance);
   }
   assert.equal(await page.locator('.offer-guarantee[alt="30-day money-back guarantee"]').count(), 8);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');

@@ -106,6 +106,38 @@
 .hero .sales-offer.offer-clear{margin-top:24px;margin-bottom:0}
 .rose-band .sales-offer.offer-clear{padding:26px 16px}
 .nowrap{white-space:nowrap}
+/* The first screen leads from the offer straight into customer proof. */
+.hero .hero-price-reference{display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;gap:6px 10px}
+.hero .hero-price-reference .offer-was{font-size:14px}
+.hero .hero-social-proof{display:flex;justify-content:center;align-items:center;gap:8px;font-family:'Open Sans',sans-serif}
+.hero .hero-social-proof .rating-stars{margin:0;color:#00b67a;font:22px/1 system-ui,sans-serif;letter-spacing:1px;white-space:nowrap}
+.hero .hero-social-proof .rating-label{margin:0;font-size:15px;line-height:1.3;white-space:nowrap}
+.hero .hero-social-proof .avatars{display:inline-flex;flex-shrink:0}
+.hero .hero-social-proof .avatars img{display:block;flex-shrink:0;width:24px;height:24px;margin-left:-7px;border:2px solid #fff;border-radius:50%;object-fit:cover}
+.hero .hero-social-proof .avatars img:first-child{margin-left:0}
+.hero [data-proof=early]{margin-top:12px}
+.hero .hero-guarantee .offer-guarantee{display:block;width:min(100%,260px);height:auto;margin:20px auto 0}
+.hero-details{max-width:680px;margin:24px auto 0}
+.hero-details .strong-line{margin:16px 0 0}
+@media(max-width:759px){
+  .hero .wrap{padding-top:clamp(12px,2.4vh,20px);padding-top:clamp(12px,2.4svh,20px)}
+  .hero h1{font-size:clamp(24px,3.9vh,30px);font-size:clamp(24px,3.9svh,30px);margin-bottom:12px}
+  .hero .lead{font-size:17px;line-height:1.3;margin-bottom:0}
+  .hero .sales-offer.offer-clear{margin-top:14px}
+  .hero .offer-today{gap:0;margin-top:8px}
+  .hero .offer-payment{margin-top:6px}
+  .hero .sales-offer.offer-clear [data-off]{margin-top:4px}
+  .hero .sales-offer.offer-clear .cta{margin-top:14px}
+  .hero .offer-terms-line{margin-top:7px;font-size:12px;line-height:1.35}
+  .hero .rating-slot{max-width:100%;margin:14px auto 0}
+}
+@media(max-width:359px){
+  .hero .sales-offer.offer-clear .cta{padding-left:12px;padding-right:12px}
+  .hero .hero-social-proof{gap:6px}
+  .hero .hero-social-proof .rating-stars{font-size:19px;letter-spacing:0}
+  .hero .hero-social-proof .rating-label{font-size:13px}
+  .hero .hero-social-proof .avatars img{width:20px;height:20px;margin-left:-7px}
+}
 /* The FAQ, as in the reference: a grey band, white rows with the question in
    bold and a chevron, and warm answers that open underneath. */
 @font-face{font-family:'Open Sans';src:url('/payoff/assets/font-opensans-d8e4fe0452.woff2') format('woff2');font-weight:300 800;font-display:swap}

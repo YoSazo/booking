@@ -12,6 +12,7 @@ window.PAYOFF_CONTENT = {
   rating: {
     stars: 5,
     label: 'Join 10,000+ people',
+    shortLabel: '10,000+ sold',
     description: 'using Marketel Payoff to turn their balances into a clear plan for paying off debt.',
   },
   proof: {

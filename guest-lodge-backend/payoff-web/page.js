@@ -26,8 +26,8 @@
     if (entry.caption) figure.append(element('figcaption', '', entry.caption));
     return figure;
   }
-  // Every offer gives the final price its own line, with the same compact
-  // guarantee directly beneath the action.
+  // Keep the first review close to the hero action. Later offers use the
+  // compact guarantee directly beneath their action.
   const wordings = ['today', 'sale', 'caps'];
   [...document.querySelectorAll('.offer-slot')].forEach((slot, index) => {
     const template = document.querySelector('#offer-template');
@@ -37,6 +37,12 @@
     box.dataset.wording = wording;
     box.querySelector('[data-offer-anchor]').textContent = `(Reg. price ${money(content.regularPriceCents).replace('.00', '')})`;
     window.PAYOFF_PAINT_PRICE(box, content.priceCents);
+    if (slot.dataset.placement === 'hero') {
+      const references = element('div', 'hero-price-reference');
+      box.querySelector('.offer-reg').before(references);
+      references.append(box.querySelector('.offer-reg'), box.querySelector('.offer-was'));
+      box.querySelector('.offer-terms-line').textContent = 'Instant access · 30-day money-back guarantee.';
+    }
     const guarantee = new Image();
     guarantee.src = '/payoff/assets/guarantee-30-day-compact-0ad1ee8089.webp';
     guarantee.width = 800; guarantee.height = 294;
@@ -44,20 +50,29 @@
     guarantee.className = 'offer-guarantee';
     guarantee.loading = slot.dataset.placement === 'hero' ? 'eager' : 'lazy';
     guarantee.decoding = 'async';
-    box.append(guarantee);
+    const heroGuarantee = slot.dataset.placement === 'hero' && document.querySelector('[data-hero-guarantee]');
+    (heroGuarantee || box).append(guarantee);
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });
   const rating = document.querySelector('.rating-slot');
   if (rating) {
     if (content.rating && Number.isFinite(content.rating.stars) && content.rating.stars >= 0 && content.rating.stars <= 5 && content.rating.label) {
-      const stars = element('div', 'rating-stars', '★'.repeat(Math.round(content.rating.stars)));
-      stars.setAttribute('aria-hidden', 'true');
-      const label = element('p', 'rating-label');
-      label.append(element('strong', '', content.rating.label));
-      if (content.rating.description) label.append(document.createTextNode(' '+content.rating.description));
-      rating.append(stars, label);
-      rating.setAttribute('aria-label', content.rating.stars+' out of 5. '+content.rating.label+(content.rating.description ? ' '+content.rating.description : ''));
+      const compact = document.querySelector('#hero-social-template');
+      if (compact) {
+        rating.append(compact.content.cloneNode(true));
+        rating.querySelector('.rating-stars').textContent = '★'.repeat(Math.round(content.rating.stars));
+        rating.querySelector('.rating-label').textContent = content.rating.shortLabel || content.rating.label;
+        rating.setAttribute('aria-label', content.rating.stars + ' out of 5. ' + (content.rating.shortLabel || content.rating.label));
+      } else {
+        const stars = element('div', 'rating-stars', '★'.repeat(Math.round(content.rating.stars)));
+        stars.setAttribute('aria-hidden', 'true');
+        const label = element('p', 'rating-label');
+        label.append(element('strong', '', content.rating.label));
+        if (content.rating.description) label.append(document.createTextNode(' '+content.rating.description));
+        rating.append(stars, label);
+        rating.setAttribute('aria-label', content.rating.stars+' out of 5. '+content.rating.label+(content.rating.description ? ' '+content.rating.description : ''));
+      }
     } else rating.remove();
   }
   for (const slot of document.querySelectorAll('[data-proof]')) {
