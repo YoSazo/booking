@@ -93,9 +93,11 @@
    stay smaller; the button and compact guarantee form one clear offer. */
 .sales-offer.offer-clear{margin:28px auto 36px;padding:0}
 .offer-clear .offer-reg{color:#666;font-size:13px;line-height:1.4}
-.offer-clear .offer-today{display:flex;justify-content:center;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:12px}
+@font-face{font-family:'Payoff Price';src:url('/payoff/assets/font-opensans-price-bolditalic-83ff4ae04f.woff2') format('woff2');font-style:italic;font-weight:700;font-display:swap}
+.offer-clear .offer-today{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:12px}
 .offer-clear .offer-was{margin:0;color:#666;font-size:17px;line-height:1.4}
-.offer-clear .offer-price{color:#008a00;font-size:clamp(36px,10vw,46px);font-weight:800;line-height:1.1;white-space:nowrap}
+.offer-clear .offer-price{display:block;color:#42b94e;font:italic 700 32px/1.25 'Payoff Price','Open Sans',sans-serif;white-space:nowrap}
+.offer-clear .offer-price>span{display:block}
 .offer-clear .offer-payment{margin-top:10px;color:#333;font-size:14px;line-height:1.5}
 .sales-offer.offer-clear [data-off]{display:block;margin-top:6px;color:#555;font-size:13px;line-height:1.45;font-weight:400}
 .sales-offer.offer-clear .cta{display:flex;width:100%;max-width:380px;min-height:58px;margin:22px auto 0;padding:15px 20px;font-size:20px;line-height:1.3}

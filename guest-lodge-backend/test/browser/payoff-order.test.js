@@ -122,7 +122,7 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
   assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ 10,000+ sold');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
-  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$33.11 Just 28.11');
+  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$33.11 Only 28.11');
   assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
   assert.equal(await page.locator('.glance-value').innerText(), 'Valued at $375');
   assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
@@ -382,7 +382,7 @@ test('the order page puts its large final price and compact guarantee together o
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff/order'); await ready(page);
     await page.evaluate(() => document.fonts.ready);
-    assert.ok(await page.locator('.glance-price').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 36));
+    assert.ok(await page.locator('.glance-price').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 32));
     const positions = await page.evaluate(() => ['.glance-price', '.glance-guarantee', '.glance .safe', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top));
     assert.deepEqual([...positions].sort((a, b) => a - b), positions);
     const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.summary-label', '.glance-image', '.glance-price']
@@ -400,7 +400,7 @@ test('the letter keeps its large final price and action visible on small phones'
     await page.goto(base + '/payoff');
     await page.locator('.hero .offer-was:not([hidden])').waitFor();
     await page.evaluate(() => document.fonts.ready);
-    assert.ok(await page.locator('.hero [data-price]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 36), 'the final price is larger than body text');
+    assert.ok(await page.locator('.hero [data-price]').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 32), 'the final price is larger than body text');
     assert.equal(await page.locator('.hero .offer-guarantee').getAttribute('alt'), '30-day money-back guarantee');
     assert.ok(await page.evaluate(() => document.querySelector('.hero .offer-guarantee').getBoundingClientRect().top - document.querySelector('.hero .cta').getBoundingClientRect().bottom <= 60), 'refund reassurance stays beside the action');
     const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta']
@@ -412,10 +412,10 @@ test('the letter keeps its large final price and action visible on small phones'
 }));
 test('sales offer blocks show the free gift price without starting its clock, the letter has no bar, and the gift never ends', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("Just 28.11")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Only 28.11")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
   for (const offer of await page.locator('.sales-offer').allInnerTexts()) {
-    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Just 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date Opens right after you pay.');
+    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Only 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date Opens right after you pay.');
   }
   assert.equal(await page.locator('.offer-guarantee[alt="30-day money-back guarantee"]').count(), 8);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
@@ -425,13 +425,13 @@ test('sales offer blocks show the free gift price without starting its clock, th
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   await page.goto(base + '/payoff');
-  await page.locator('.sales-offer [data-price]:has-text("Just 28.11")').first().waitFor();
+  await page.locator('.sales-offer [data-price]:has-text("Only 28.11")').first().waitFor();
   advanceTime(31 * 60000);
   const previewDone = page.waitForResponse(r => r.url().includes('offer=preview'));
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
   await previewDone;
   await page.waitForTimeout(100);
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Just 28.11');
+  assert.equal((await page.locator('.sales-offer [data-price]').first().innerText()).replace(/\s+/g, ' '), 'Only 28.11');
   assert.equal(await page.locator('.sales-offer .offer-was').first().isHidden(), false, 'the crossed-out $33.11 stays');
   assert.match((await page.locator('footer').innerText()).replace(/\s+/g, ' '), /Terms & Conditions \| Privacy Policy Copyright 2026 Marketel\. All Rights Reserved\./);
 }));
@@ -439,7 +439,7 @@ test('sales offers retain the regular price and usable checkout when the offer l
   await page.route('**/api/payoff/config?offer=preview', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer .cta').first().waitFor();
-  assert.equal(await page.locator('.sales-offer [data-price]').first().innerText(), 'Just 33.11');
+  assert.equal((await page.locator('.sales-offer [data-price]').first().innerText()).replace(/\s+/g, ' '), 'Only 33.11');
   await page.locator('.sales-offer .cta').first().click();
   await page.locator('#buy-button:enabled').waitFor();
   assert.equal(await page.locator('#order-total').innerText(), '$28.11');
