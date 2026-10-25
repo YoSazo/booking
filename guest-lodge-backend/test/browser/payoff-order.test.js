@@ -125,7 +125,7 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$33.11 Only 28.11');
   assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
   assert.equal(await page.locator('.glance-value').innerText(), 'Valued at $375');
-  assert.equal(await page.locator('#glance-gift').innerText(), 'Includes your FREE $5 gift');
+  assert.equal(await page.locator('#glance-gift').count(), 0);
   assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
   assert.equal(await page.locator('.glance-guarantee').getAttribute('alt'), '30-day 100% money back guarantee');
   assert.deepEqual(await page.locator('.section-head').allInnerTexts(), ['---- Contact Details ----', '---- Payment Information ----']);
@@ -152,7 +152,7 @@ test('the order page follows the reference: reservation, product, price and safe
   assert.equal(await page.locator('#buy-label').innerText(), 'Get My Debt-Free Date');
   assert.equal(await page.locator('.buy-text small').innerText(), 'OPENS RIGHT AFTER YOU PAY');
   assert.equal(await page.locator('.secure').innerText(), '* 100% Secure & Safe Payments *');
-  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off\s+-\$ 5\.00/);
+  assert.match(await page.locator('#summary-rows').innerText(), /Discount\s+-\$ 5\.00/);
   assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   assert.equal(await page.locator('#only-today').innerText(), 'Only $28.11 Today!');
   assert.equal(await page.locator('#percent-off').innerText(), '(92% off)');
@@ -333,7 +333,7 @@ test("Meta's pixel never loads for the owner, over http, or in the tool", async 
 });
 
 const reserveClock = async page => `${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`;
-test('the free gift survives reload; the reservation clock carries on through a reload, stays at 00:00, and the next load after that starts a new 05:00', async () => world(async ({ page, base, advanceTime }) => {
+test('the discount survives reload; the reservation clock carries on through a reload, stays at 00:00, and the next load after that starts a new 05:00', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
   assert.equal(await page.locator('#order-total').innerText(), '$28.11');
@@ -343,7 +343,7 @@ test('the free gift survives reload; the reservation clock carries on through a 
   await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.now() + 2 * 60000 + 30000)));
   await page.reload(); await ready(page);
   assert.match(await reserveClock(page), /^(02:30|02:2\d)$/, 'a reload carries on');
-  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
+  assert.match(await page.locator('#summary-rows').innerText(), /Discount/);
   assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   // At 00:00 it stays there, and the total and extras do not change.
   await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000; });
@@ -353,14 +353,14 @@ test('the free gift survives reload; the reservation clock carries on through a 
   assert.equal(await reserveClock(page), '00:00', 'it stays at 00:00');
   assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   assert.equal(await page.locator('#cashflow').isChecked(), true);
-  assert.equal(await page.locator('#glance-gift').isHidden(), false);
+  assert.equal(await page.locator('#glance-gift').count(), 0);
   // The next load after 00:00 starts a new five minutes.
   await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.parse('2026-01-01T00:00:00Z'))));
   await page.reload(); await ready(page);
   assert.match(await reserveClock(page), /^(05:00|04:5\d)$/, 'a new five minutes');
   advanceTime(31 * 60000);
   await page.reload(); await ready(page);
-  assert.match(await page.locator('#summary-rows').innerText(), /Free gift: \$5 off/);
+  assert.match(await page.locator('#summary-rows').innerText(), /Discount/);
   assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   assert.equal(await page.locator('#only-today').innerText(), 'Only $28.11 Today!');
 }));
@@ -420,13 +420,13 @@ test('small phones show the price, action, checkout proof row and start of Amand
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
 }));
-test('sales offer blocks show the free gift price without starting its clock, the letter has no bar, and the gift never ends', async () => world(async ({ page, base, advanceTime }) => {
+test('sales offer blocks show the discounted price without gift wording or a reservation timer', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff');
   await page.locator('.sales-offer [data-price]:has-text("Only 28.11")').first().waitFor();
   assert.equal(await page.locator('.sales-offer').count(), 8);
   for (const [index, offer] of (await page.locator('.sales-offer').allInnerTexts()).entries()) {
     const assurance = index === 0 ? 'Instant access · 30-day money-back guarantee.' : 'Opens right after you pay.';
-    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Only 28.11 USD · One-time payment. No monthly fees. Your $5 gift is applied. Get My Debt-Free Date ' + assurance);
+    assert.equal(offer.replace(/\s+/g, ' ').trim(), '(Reg. price $375) $33.11 Only 28.11 USD · One-time payment. No monthly fees. Get My Debt-Free Date ' + assurance);
   }
   assert.equal(await page.locator('.offer-guarantee[alt="30-day money-back guarantee"]').count(), 8);
   assert.equal(await page.locator('.sales-offer .offer-was s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');

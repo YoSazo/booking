@@ -280,7 +280,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
         try {
           await mail.sendMail(accessMail(email, order.id, [
             ...ids.map(id => `${ITEMS[id].name}: $${((id === 'base' ? paidBasePrice(order.metadata) : ITEMS[id].cents) / 100).toFixed(2)}`),
-            ...(orderDiscount(order) ? ['Free gift: −$5.00'] : []),
+            ...(orderDiscount(order) ? ['Discount: −$5.00'] : []),
             `Total paid: $${(order.totalCents / 100).toFixed(2)} USD. One payment, no subscription.`,
             `Order reference: ${order.id}`,
             ...(ids.length > 1 ? ['', `Your ${ids.slice(1).map(id => ITEMS[id].name.toLowerCase()).join(' and ')} ${ids.length > 2 ? 'are' : 'is'} inside Payoff, in the tabs at the top.`] : []),

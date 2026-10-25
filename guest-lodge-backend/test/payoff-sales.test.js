@@ -426,7 +426,7 @@ test('the free $5 gift survives reload and restart, discounts only the base, ful
     const confirmed = await post('/api/payoff/confirm', { sessionId: purchase.id });
     assert.equal(confirmed.status, 200); assert.equal(confirmed.body.totalCents, 5911);
     assert.deepEqual(confirmed.body.extras, ['cashflow', 'reset']);
-    assert.match(w.emails[0].text, /Free gift: −\$5\.00/);
+    assert.match(w.emails[0].text, /Discount: −\$5\.00/);
     assert.match(w.emails[0].text, /Total paid: \$59\.11/);
     assert.equal(w.capi.find(event => event.name === 'Purchase').value, 59.11);
     // 28 minutes in: the clock has started over five times and the gift remains.

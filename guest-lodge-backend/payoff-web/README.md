@@ -138,17 +138,19 @@ The payment happens on the page:
 - Without it, or if Stripe’s fields can’t load, the button opens Stripe's
   hosted page (`/api/payoff/checkout`) instead.
 
-## Free $5 gift and the reservation clock
+## Checkout discount and the reservation clock
 
-Every order page visitor gets a free $5 gift on the $33.11 plan ("Free gift: $5
-off" in the summary, $28.11 total). Optional extras remain $22 and $9. A signed,
-HttpOnly cookie anchors the gift's clock across reloads.
+Every order page visitor gets the $33.11 plan with an automatic $5 discount
+("Discount" in the summary, $28.11 total). Optional extras remain $22 and $9.
+A signed, HttpOnly cookie anchors the checkout offer across reloads. At the
+owner's request on October 25, the gift wording was removed from the sales page,
+checkout and receipts; the discount and amount charged remain unchanged.
 
 The "Is Reserved For" clock counts down from 05:00 and carries on through
 reloads (`payoff.reserveEnd` in the browser). At 00:00 it stays at 00:00; the
-next page load after that starts a new 05:00. Neither the order nor the gift
+next page load after that starts a new 05:00. Neither the order nor the discount
 ever ends: the server always honours the $5, whatever the clock shows (its own
-gift clock repeats every five minutes; cookies from the old 30-minute offer
+offer clock repeats every five minutes; cookies from the old 30-minute offer
 join that loop). This is a deliberate owner decision (October 20, 2026) and a
 knowing exception to the real-deadline rule in `docs/wedges/FRAMEWORK.md`; do
 not "fix" it back to an expiring offer without the owner.

@@ -24,9 +24,8 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
   else box.querySelector('[data-price]').textContent = lines.line;
   const note = box.querySelector('[data-off]');
   if (note) {
-    const saved = Math.max(0, 3311 - cents) / 100;
-    note.textContent = amount ? (saved ? 'Your $' + saved.toFixed(2).replace('.00', '') + ' gift is applied.' : '') : lines.note;
-    note.hidden = !!amount && !saved;
+    note.textContent = amount ? '' : lines.note;
+    note.hidden = !!amount;
   }
 };
 (() => {
@@ -115,8 +114,8 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     try { first = sessionStorage.getItem('payoff.variantSent') !== visitor; sessionStorage.setItem('payoff.variantSent', visitor || ''); } catch { /* Send it. */ }
     if (first) event('PayoffVariant', variant);
   }
-  // The price blocks show the free $5 gift whenever this visitor has it. Only
-  // looks: the gift's clock starts at checkout, and it never ends.
+  // Show the same discounted price here and at checkout. Viewing the sales
+  // page does not issue or restart the checkout reservation.
   let salesActive = false;
   const paintSalesOffer = active => (salesActive = active, document.querySelectorAll('.sales-offer').forEach(box => window.PAYOFF_PAINT_PRICE(box, active ? 2811 : 3311)));
   window.PayoffTrack = { event, pixel, attribution, visitor, headers, paintOffers: () => paintSalesOffer(salesActive) };

@@ -60,7 +60,7 @@
   function paint() {
     const off = discount();
     $('summary-rows').replaceChildren(row(NAME, '1', base()), ...selected().map(extra => row(extra.name, '1', priceOf(extra))),
-      ...(off ? [row('Free gift: $5 off', '', -off)] : []));
+      ...(off ? [row('Discount', '', -off)] : []));
     $('order-total').textContent = money(total());
     paintClock();
     const price = base() - off;
@@ -68,7 +68,6 @@
     $('glance-price').textContent = (price / 100).toFixed(2).replace('.00', '');
     $('glance-was').textContent = money(base()).replace('.00', '');
     $('glance-was').hidden = !off;
-    $('glance-gift').hidden = !off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;
     const amount = total();
