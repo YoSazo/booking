@@ -404,9 +404,15 @@ test('small phones show the price, action, checkout proof row and start of Amand
     assert.match(await page.locator('.hero .offer-terms-line').innerText(), /30-day money-back guarantee/);
     assert.equal(await page.locator('.hero .rating-label').innerText(), '10,000+ sold');
     assert.equal(await page.locator('.hero .avatars img').count(), 6);
-    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .hero-social-proof']
+    const seen = await page.evaluate(() => Object.fromEntries(['.hero h1', '.hero [data-price]', '.hero .cta', '.hero .offer-guarantee', '.hero .hero-social-proof']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    assert.ok(await page.evaluate(() => {
+      const action = document.querySelector('.hero .cta').getBoundingClientRect();
+      const badge = document.querySelector('.hero .offer-guarantee').getBoundingClientRect();
+      const proof = document.querySelector('.hero .hero-social-proof').getBoundingClientRect();
+      return action.bottom <= badge.top && badge.bottom <= proof.top;
+    }), 'the compact badge stays between the button and the customer proof row');
     const review = await page.locator('.hero [data-proof=early] img').first().evaluate(el => ({ top: el.getBoundingClientRect().top, alt: el.alt }));
     assert.equal(review.alt, 'Testimonial from Amanda');
     assert.ok(review.top + 80 <= height, `${width}x${height}: at least 80px of Amanda's review is visible (starts at ${review.top})`);

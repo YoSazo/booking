@@ -26,8 +26,8 @@
     if (entry.caption) figure.append(element('figcaption', '', entry.caption));
     return figure;
   }
-  // Keep the first review close to the hero action. Later offers use the
-  // compact guarantee directly beneath their action.
+  // Keep the badge and first review close to the hero action. Later offers
+  // use the full-size compact guarantee directly beneath their action.
   const wordings = ['today', 'sale', 'caps'];
   [...document.querySelectorAll('.offer-slot')].forEach((slot, index) => {
     const template = document.querySelector('#offer-template');
@@ -50,8 +50,11 @@
     guarantee.className = 'offer-guarantee';
     guarantee.loading = slot.dataset.placement === 'hero' ? 'eager' : 'lazy';
     guarantee.decoding = 'async';
-    const heroGuarantee = slot.dataset.placement === 'hero' && document.querySelector('[data-hero-guarantee]');
-    (heroGuarantee || box).append(guarantee);
+    if (slot.dataset.placement === 'hero') {
+      const assurance = element('div', 'hero-assurance');
+      box.append(assurance);
+      assurance.append(guarantee, box.querySelector('.offer-terms-line'));
+    } else box.append(guarantee);
     const cta = slot.querySelector('.cta');
     cta.dataset.placement = slot.dataset.placement;
   });
