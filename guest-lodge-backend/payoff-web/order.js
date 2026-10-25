@@ -6,6 +6,8 @@
 // button opens Stripe's hosted page instead.
 (() => {
   const track = window.PayoffTrack || { event() {}, pixel() {}, attribution: {}, visitor: null, headers: { 'Content-Type': 'application/json' } };
+  // Each step toward paying, once per visitor, for the funnel (measure.js).
+  const mark = detail => !!window.PayoffMeasure?.mark(detail);
   const $ = id => document.getElementById(id);
   const form = $('order-form'), button = $('buy-button'), label = $('buy-label'), status = $('checkout-status');
   const NAME = 'Marketel Payoff - Your Debt-Free Date & Payoff Plan (Reg. $375)';
@@ -92,6 +94,7 @@
   }
 
   function useHosted() {
+    mark('hosted');
     hosted = true;
     $('payment-element').hidden = true; $('express-checkout').hidden = true; $('or').hidden = true;
     setButton();
@@ -114,7 +117,13 @@
       const options = { mode: 'payment', amount: quoted, currency: 'usd', paymentMethodOptions: { card: { setup_future_usage: 'on_session' } } };
       cardElements = stripe.elements(options);
       const card = cardElements.create('payment', { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
-      card.on('ready', () => { formReady = true; setButton(); });
+      card.on('ready', () => { formReady = true; setButton(); mark('stripe-ready'); });
+      // Which way they chose to pay, and how far into the card details they got.
+      card.on('change', ({ empty, complete, value }) => {
+        if (value?.type === 'us_bank_account') mark('method-bank');
+        else if (value?.type === 'klarna') mark('method-klarna');
+        else if (!empty) { mark('card-start'); if (complete) mark('card-done'); }
+      });
       card.on('loaderror', useHosted);
       card.mount('#payment-element');
       // Apple Pay and Google Pay sit where the reference has its PayPal buttons.
@@ -125,8 +134,9 @@
         const methods = Object.keys(availablePaymentMethods || {}).filter(method => availablePaymentMethods[method]);
         $('express-checkout').dataset.methods = methods.join(' ');
         $('or').hidden = !methods.length;
+        if (methods.length) mark('wallet-shown');
       });
-      express.on('click', event => { if (!busy) event.resolve({ emailRequired: true }); });
+      express.on('click', event => { mark('wallet-tap'); if (!busy) event.resolve({ emailRequired: true }); });
       express.on('confirm', payWithWallet);
       express.mount('#express-checkout');
       setTimeout(() => { if (!formReady) useHosted(); }, 20000);
@@ -138,8 +148,8 @@
     const name = $('name').value.trim(), email = $('email').value.trim();
     $('name').classList.toggle('invalid', !name);
     $('email').classList.toggle('invalid', !validEmail(email));
-    if (!name) { status.textContent = 'Please enter your full name.'; $('name').focus(); return null; }
-    if (!validEmail(email)) { status.textContent = 'Please enter a valid email address.'; $('email').focus(); return null; }
+    if (!name) { mark('missing-name'); status.textContent = 'Please enter your full name.'; $('name').focus(); return null; }
+    if (!validEmail(email)) { mark('missing-email'); status.textContent = 'Please enter a valid email address.'; $('email').focus(); return null; }
     return { name, email };
   }
   const orderBody = email => ({ email, addons: selected().map(extra => extra.id), attempt, visitorId: track.visitor,
@@ -169,6 +179,7 @@
   function failed(error) {
     if (error?.code === 'payment_intent_unexpected_state' && error.payment_intent?.status === 'succeeded') return paid(error.payment_intent);
     track.event('PayoffCheckoutFailed');
+    mark(error?.type === 'card_error' ? 'declined' : 'error');
     status.textContent = error?.message || 'Your payment didn’t go through. Please try again.';
     busy = false; setButton(); paint();
   }
@@ -198,7 +209,7 @@
       }
       // Stripe shows what's missing beside its own fields.
       const { error: incomplete } = await cardElements.submit();
-      if (incomplete) { busy = false; setButton(); paint(); return; }
+      if (incomplete) { mark('card-incomplete'); busy = false; setButton(); paint(); return; }
       const { clientSecret } = await createPayment(who.email);
       const { error, paymentIntent } = await stripe.confirmPayment({ elements: cardElements, clientSecret, redirect: 'if_required',
         confirmParams: { return_url: RETURN_URL, payment_method_data: { billing_details: { name: who.name, email: who.email } } } });
@@ -226,10 +237,17 @@
 
   form.addEventListener('change', event => {
     if (!EXTRAS.some(extra => extra.id === event.target.id)) return;
+    if (event.target.checked) mark('addon-' + event.target.id);
     try { sessionStorage.setItem('payoff.addons', JSON.stringify(selected().map(extra => extra.id))); } catch { /* Optional. */ }
     paint();
   });
   for (const id of ['name', 'email']) $(id).addEventListener('input', () => $(id).classList.remove('invalid'));
+  // Filled in, not what was typed. A valid email is the first step of paying,
+  // sent to Meta as StartedPaying (the server sends its copy with the same id).
+  $('name').addEventListener('change', () => { if ($('name').value.trim()) mark('name'); });
+  $('email').addEventListener('change', () => {
+    if (validEmail($('email').value.trim()) && mark('email')) track.pixel('StartedPaying', { value: 33.11 }, track.visitor ? `payoff-started.${track.visitor}` : undefined, true);
+  });
   if (new URLSearchParams(location.search).has('cancelled')) {
     status.textContent = 'Checkout was canceled and you were not charged. You can try again any time.';
     track.event('PayoffCheckoutCancelled');

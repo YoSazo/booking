@@ -48,8 +48,8 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
   // AddToCart: every "Get My Debt-Free Date" button leads there.
   const PIXEL_ID = '1545780930244672';
   const pixelOn = !excluded && location.protocol === 'https:' && !navigator.webdriver;
-  const pixel = (name, data = {}, eventID) => {
-    try { if (pixelOn && window.fbq) window.fbq('track', name, { content_name: 'Marketel Payoff', currency: 'USD', ...data }, eventID ? { eventID } : undefined); } catch { /* never break the page */ }
+  const pixel = (name, data = {}, eventID, custom = false) => {
+    try { if (pixelOn && window.fbq) window.fbq(custom ? 'trackCustom' : 'track', name, { content_name: 'Marketel Payoff', currency: 'USD', ...data }, eventID ? { eventID } : undefined); } catch { /* never break the page */ }
   };
   if (pixelOn) {
     /* eslint-disable */
@@ -92,7 +92,7 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
 
   const event = (name, detail = null) => {
     if (!excluded) fetch('/api/payoff/event', { method: 'POST', headers, keepalive: true,
-      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrderViewed' ? { attribution } : {}) }) }).catch(() => {});
+      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrderViewed' || (name === 'PayoffOrder' && detail === 'email') ? { attribution } : {}) }) }).catch(() => {});
   };
   event(form ? 'PayoffOrderViewed' : 'PayoffLanded');
   if (form) {

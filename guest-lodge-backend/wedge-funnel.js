@@ -218,6 +218,70 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Read to the end', ['PayoffStory:scroll100']],
     ['Tapped through to the sales letter', ['PayoffStory:tapped']],
   ] },
+  // measure.js: the sales letter section by section, then the order page step by step.
+  // Each card shows only for ranges where its page sent these events, never as zeros before.
+  { key: 'letter', label: 'Sales letter: how far they read', shownBy: 'PayoffLetter', steps: [
+    ['Opened the sales letter', ['PayoffVariant:letter']],
+    ['Reached “where’s the finish line?”', ['PayoffLetter:problem']],
+    ['Reached the worked example', ['PayoffLetter:example']],
+    ['Reached “less figuring it out”', ['PayoffLetter:mechanism']],
+    ['Reached the customer reviews', ['PayoffLetter:proof']],
+    ['Reached Lauren’s story', ['PayoffLetter:founder']],
+    ['Reached what’s included', ['PayoffLetter:included']],
+    ['Reached the FAQ', ['PayoffLetter:faq']],
+    ['Read to the end', ['PayoffLetter:end']],
+  ] },
+  { key: 'letter-taps', label: 'Sales letter: what they tapped', shownBy: 'PayoffLetter', steps: [
+    ['The first button (under the headline)', ['PayoffLetter:tap-hero']],
+    ['The button after “finish line”', ['PayoffLetter:tap-problem']],
+    ['The button after the worked example', ['PayoffLetter:tap-example']],
+    ['The button after “less figuring it out”', ['PayoffLetter:tap-mechanism']],
+    ['The button after the reviews', ['PayoffLetter:tap-proof']],
+    ['The button after Lauren’s story', ['PayoffLetter:tap-founder']],
+    ['The button after what’s included', ['PayoffLetter:tap-included']],
+    ['The button after the FAQ', ['PayoffLetter:tap-faq']],
+    ['Opened a FAQ answer', ['PayoffLetter:faq-open']],
+    ['Opened “see how this was worked out”', ['PayoffLetter:math-open']],
+  ] },
+  { key: 'order-steps', label: 'Order page: how far they got', shownBy: 'PayoffOrder', steps: [
+    ['Viewed the order page', ['PayoffOrderViewed']],
+    ['Scrolled to the form', ['PayoffOrder:saw-form']],
+    ['Typed their name', ['PayoffOrder:name']],
+    ['Typed a valid email (Meta: StartedPaying)', ['PayoffOrder:email']],
+    ['Started card details', ['PayoffOrder:card-start']],
+    ['Finished card details', ['PayoffOrder:card-done']],
+    ['Scrolled to the extras', ['PayoffOrder:saw-addons']],
+    ['Scrolled to the button', ['PayoffOrder:saw-button']],
+    ['Tapped Complete Order', ['PayoffCheckoutTapped']],
+    ['Paid', ['PayoffPaid']],
+  ] },
+  { key: 'order-other', label: 'Order page: everything else', shownBy: 'PayoffOrder', steps: [
+    ['Payment form loaded', ['PayoffOrder:stripe-ready']],
+    ['Form didn’t load: sent to Stripe’s page', ['PayoffOrder:hosted']],
+    ['Apple Pay or Google Pay offered', ['PayoffOrder:wallet-shown']],
+    ['Tapped Apple Pay or Google Pay', ['PayoffOrder:wallet-tap']],
+    ['Picked bank account', ['PayoffOrder:method-bank']],
+    ['Picked Klarna', ['PayoffOrder:method-klarna']],
+    ['Added the Cash-flow calendar', ['PayoffOrder:addon-cashflow']],
+    ['Added the Spending reset', ['PayoffOrder:addon-reset']],
+    ['Tapped with no name', ['PayoffOrder:missing-name']],
+    ['Tapped with no valid email', ['PayoffOrder:missing-email']],
+    ['Tapped with card details unfinished', ['PayoffOrder:card-incomplete']],
+    ['Card declined', ['PayoffOrder:declined']],
+    ['Other payment error', ['PayoffOrder:error']],
+  ] },
+  // Ten seconds on screen is a real reader, not a bounce.
+  { key: 'time', label: 'Time on screen', hideWhenEmpty: true, steps: [
+    ['Story page: 10 seconds or more', ['PayoffStory:time10']],
+    ['Story page: 1 minute or more', ['PayoffStory:time60']],
+    ['Story page: 3 minutes or more', ['PayoffStory:time180']],
+    ['Sales letter: 10 seconds or more', ['PayoffLetter:time10']],
+    ['Sales letter: 1 minute or more', ['PayoffLetter:time60']],
+    ['Sales letter: 3 minutes or more', ['PayoffLetter:time180']],
+    ['Order page: 10 seconds or more', ['PayoffOrder:time10']],
+    ['Order page: 1 minute or more', ['PayoffOrder:time60']],
+    ['Order page: 3 minutes or more', ['PayoffOrder:time180']],
+  ] },
   { key: 'from', label: 'Where they came from', steps: [
     ['Clicked the ad (Meta click id)', ['PayoffFrom:ad']],
     ['From Facebook or Instagram, no click id', ['PayoffFrom:social']],
@@ -238,10 +302,10 @@ const PAYOFF_BRANCHES = Object.freeze([
   ] },
 ]);
 const DEFINITIONS = Object.freeze({
-  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page',
+  payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
     PayoffUpgradeDeclined: 'Said no to an Interest Cutter offer', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
-      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory']),
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
       steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },
@@ -298,7 +362,7 @@ function buildWedgeFunnel(events, definition = DEFINITIONS.report) {
   });
   // Rows and cards about a feature a wedge does not use stay off the page until someone has used it.
   const shown = steps.filter(row => !(row.hideWhenEmpty && !row.people && !(row.children || []).some(child => child.people)));
-  const branches = BRANCH_LIST.map(branch => ({ key: branch.key, label: branch.label, hideWhenEmpty: !!branch.hideWhenEmpty,
+  const branches = BRANCH_LIST.filter(branch => !branch.shownBy || events.some(event => event.name === branch.shownBy)).map(branch => ({ key: branch.key, label: branch.label, hideWhenEmpty: !!branch.hideWhenEmpty,
     steps: branch.steps.map(([label, names]) => ({ label, people: people(events, names) })) }))
     .filter(branch => !(branch.hideWhenEmpty && branch.steps.every(step => !step.people)));
   const starts = events.filter(event => event.name === 'SimStarted' || event.name === 'OfferLanded');

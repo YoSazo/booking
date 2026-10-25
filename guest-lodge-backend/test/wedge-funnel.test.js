@@ -364,6 +364,32 @@ test('Payoff counts checkout, purchases, delivery and sources separately', () =>
   for (const name of ['PayoffPaid', 'PayoffConfirmationEmailed']) assert.equal(definition.visitorEvents.has(name), false);
 });
 
+test('Payoff shows how far each visitor read the sales letter, how far they got on the order page, and how long each page was on screen', () => {
+  const { definitionFor, buildWedgeFunnel } = require('../wedge-funnel');
+  const definition = definitionFor('payoff');
+  const events = [
+    ev('PayoffLanded', 'v_a'), ev('PayoffVariant', 'v_a', { detail: 'letter' }), ev('PayoffLetter', 'v_a', { detail: 'problem' }), ev('PayoffLetter', 'v_a', { detail: 'example' }),
+    ev('PayoffLetter', 'v_a', { detail: 'tap-example' }), ev('PayoffLetter', 'v_a', { detail: 'time10' }),
+    ev('PayoffOrderViewed', 'v_a'), ev('PayoffOrder', 'v_a', { detail: 'saw-form' }), ev('PayoffOrder', 'v_a', { detail: 'email' }), ev('PayoffOrder', 'v_a', { detail: 'declined' }),
+    ev('PayoffLanded', 'v_b'), ev('PayoffVariant', 'v_b', { detail: 'letter' }), ev('PayoffLetter', 'v_b', { detail: 'problem' }), ev('PayoffLetter', 'v_b', { detail: 'time10' }),
+    ev('PayoffStory', 'v_b', { detail: 'time10' }), ev('PayoffStory', 'v_b', { detail: 'time60' }),
+  ];
+  const funnel = buildWedgeFunnel(events, definition);
+  const card = key => Object.fromEntries(funnel.branches.find(b => b.key === key).steps.map(step => [step.label, step.people]));
+  const letter = card('letter');
+  assert.equal(letter['Opened the sales letter'], 2); assert.equal(letter['Reached “where’s the finish line?”'], 2);
+  assert.equal(letter['Reached the worked example'], 1); assert.equal(letter['Read to the end'], 0);
+  assert.equal(card('letter-taps')['The button after the worked example'], 1);
+  const order = card('order-steps');
+  assert.equal(order['Viewed the order page'], 1); assert.equal(order['Scrolled to the form'], 1); assert.equal(order['Typed a valid email (Meta: StartedPaying)'], 1); assert.equal(order['Paid'], 0);
+  assert.equal(card('order-other')['Card declined'], 1);
+  const time = card('time');
+  assert.equal(time['Sales letter: 10 seconds or more'], 2); assert.equal(time['Story page: 1 minute or more'], 1); assert.equal(time['Order page: 10 seconds or more'], 0);
+  for (const name of ['PayoffLetter', 'PayoffOrder']) assert.equal(definition.visitorEvents.has(name), true);
+  assert.equal(definition.labels.PayoffOrder, 'Order page');
+  const bare = buildWedgeFunnel([ev('PayoffLanded', 'v_x')], definition).branches.map(b => b.key);
+  for (const key of ['letter', 'letter-taps', 'order-steps', 'order-other', 'time']) assert.equal(bare.includes(key), false, `${key} hidden until someone reaches it`);
+});
 test('Payoff compares the sales letter and the quiz on each version\'s own visitors, and shows how far quiz visitors got', () => {
   const definition = require('../wedge-funnel').definitionFor('payoff');
   const events = [

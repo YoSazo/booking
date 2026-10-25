@@ -36,15 +36,21 @@ const CUTTER = Object.freeze({
 });
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
-  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory'];
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
 const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
 const UPGRADE_OFFERS = ['offer', 'discount', 'regular'];
+// measure.js: seconds on screen, and the sales letter's sections in page order.
+const ON_SCREEN = ['time10', 'time60', 'time180'];
+const LETTER_SECTIONS = ['problem', 'example', 'mechanism', 'proof', 'founder', 'included', 'faq'];
 const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS,
   PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS,
-  PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped'] });
+  PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
+  PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
+  PayoffOrder: [...ON_SCREEN, 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'name', 'email',
+    'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
@@ -203,7 +209,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js', 'cutter-content.js', 'upgrade.js', 'upgrade.css', 'story.js', 'story.css']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js', 'cutter-content.js', 'upgrade.js', 'upgrade.css', 'story.js', 'story.css', 'measure.js']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {
@@ -443,6 +449,12 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     // Date" button leads there); the browser pixel sends the same event id.
     if (req.body.name === 'PayoffOrderViewed' && visitor) {
       await sendCapi('AddToCart', { eventId: `payoff-cart.${visitor}`, value: PRICE(ITEMS.base.cents),
+        ...visitorCapi(visitor, sanitizeInspectAttribution(req.body.attribution, req) || {}, req) });
+    }
+    // Typing a valid email on the order page is the first step of paying:
+    // a custom event Meta can learn from, without the email itself.
+    if (req.body.name === 'PayoffOrder' && detail === 'email' && visitor) {
+      await sendCapi('StartedPaying', { eventId: `payoff-started.${visitor}`, value: PRICE(ITEMS.base.cents),
         ...visitorCapi(visitor, sanitizeInspectAttribution(req.body.attribution, req) || {}, req) });
     }
     res.json({ success: true });

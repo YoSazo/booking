@@ -24,6 +24,7 @@ window.Stripe = function (key) {
         create(type, options) {
           const handlers = {};
           log('create', type, options);
+          window.__stripeHandlers = { ...window.__stripeHandlers, [type]: handlers };
           return { on(name, fn) { handlers[name] = fn; }, mount(selector) {
             const box = document.createElement('div'); box.className = 'fake-' + type; box.textContent = type === 'payment' ? 'Card number' : 'Pay';
             document.querySelector(selector).append(box);
@@ -100,7 +101,7 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
     const stripeCalls = [];
     await page.exposeBinding('__stripeRecord', (_source, args) => stripeCalls.push(args));
     const stripeLog = async () => { await page.waitForTimeout(50).catch(() => {}); return stripeCalls; };
-    await fn({ page, base, creates, payments, emails, stripeLog, advanceTime: ms => { clockOffset += ms; } }); assert.deepEqual(errors, []);
+    await fn({ page, base, creates, payments, emails, stripeLog, rows, advanceTime: ms => { clockOffset += ms; } }); assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 const ready = page => page.locator('#buy-button:enabled').waitFor();
@@ -211,6 +212,31 @@ test('a declined card says why, keeps the same payment for the retry, and stays 
   await page.waitForURL(url => url.pathname === '/payoff/upgrade');
   assert.equal(payments.length, 1, 'the retry confirms the same payment');
 }, { outcomes: ['decline'] }));
+test('the order page records how far each visitor gets toward paying, by step name only, once each', async () => world(async ({ page, base, rows }) => {
+  const steps = () => [...rows.values()].filter(row => row.name === 'PayoffOrder').map(row => row.detail);
+  const until = async want => { for (let i = 0; i < 40 && !want.every(step => steps().includes(step)); i++) await page.waitForTimeout(50); };
+  await page.goto(base + '/payoff/order');
+  await ready(page);
+  await until(['stripe-ready', 'wallet-shown']);
+  assert.ok(!steps().includes('saw-button'), 'the button is below the first screen on phones');
+  await page.locator('#buy-button').click();
+  await until(['missing-name']);
+  await page.locator('#order-form').scrollIntoViewIfNeeded();
+  await page.locator('#name').fill('Test Buyer'); await page.locator('#name').dispatchEvent('change');
+  await page.locator('#email').fill('not-an-email'); await page.locator('#email').dispatchEvent('change');
+  await page.waitForTimeout(150);
+  assert.ok(!steps().includes('email'), 'only a valid email counts');
+  await page.locator('#email').fill('buyer@example.test'); await page.locator('#email').dispatchEvent('change');
+  await page.evaluate(() => { const change = window.__stripeHandlers.payment.change; change({ empty: false, complete: false, value: { type: 'card' } }); change({ empty: false, complete: true, value: { type: 'card' } }); change({ empty: true, complete: false, value: { type: 'klarna' } }); });
+  await page.locator('#cashflow').check();
+  await page.locator('#buy-button').scrollIntoViewIfNeeded();
+  await page.locator('#buy-button').click();
+  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'addon-cashflow', 'saw-addons', 'saw-button', 'declined']);
+  await page.locator('#email').dispatchEvent('change');
+  await page.waitForTimeout(150);
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'declined', 'email', 'method-klarna', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
+}, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
@@ -307,6 +333,11 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
     ['AddToCart', 33.11, `payoff-cart.${visitor}`],
     ['InitiateCheckout', 37.11, `payoff-checkout.${visitor}`],
   ], 'AddToCart once per visitor, then InitiateCheckout');
+  assert.deepEqual(calls.filter(args => args[0] === 'trackCustom').map(args => [args[1], args[2].value, args[3]?.eventID]),
+    [['StartedPaying', 33.11, `payoff-started.${visitor}`]], 'a valid email is the first step of paying');
+  const started = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('"detail":"email"'));
+  assert.match(JSON.parse(started.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);
+  assert.ok(!started.body.includes('buyer@example.test'), 'never the email itself');
   // The server gets the click ids, so its copies match the same person.
   const viewed = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('PayoffOrderViewed'));
   assert.match(JSON.parse(viewed.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);

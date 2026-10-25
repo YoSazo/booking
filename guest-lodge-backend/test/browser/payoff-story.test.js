@@ -81,3 +81,37 @@ test('a visitor who reaches the letter without the story page is still asked whe
   assert.ok(named(rows).includes('PayoffFrom:direct'));
   assert.ok(!named(rows).some(name => name.startsWith('PayoffStory')));
 }));
+
+test('the story page and the sales letter count time on screen, each letter section reached, and the buttons and answers tapped, once per visitor', async () => world(async ({ page, base, rows }) => {
+  // A second of the on-screen clock passes every 10 ms here.
+  await page.addInitScript(() => { const every = window.setInterval; window.setInterval = (fn, ms, ...rest) => every(fn, ms === 1000 ? 10 : ms, ...rest); });
+  await page.goto(base + '/payoff/hidden-payoff?fbclid=IwAR0story');
+  await settle(page, rows, ['PayoffStory:time10', 'PayoffStory:time60', 'PayoffStory:time180']);
+  for (const step of ['time10', 'time60', 'time180']) assert.equal(named(rows).filter(name => name === 'PayoffStory:' + step).length, 1, step);
+
+  await page.locator('a.adv-cta').first().tap();
+  await page.waitForURL(url => url.pathname === '/payoff');
+  await settle(page, rows, ['PayoffVariant:letter', 'PayoffLetter:time10']);
+  assert.ok(!named(rows).some(name => /PayoffLetter:(problem|example|end)/.test(name)), 'the first screen reaches no section yet');
+  await page.locator('[data-section="example"]').evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 100));
+  await settle(page, rows, ['PayoffLetter:problem', 'PayoffLetter:example']);
+  assert.ok(!named(rows).includes('PayoffLetter:faq') && !named(rows).includes('PayoffLetter:end'));
+  await page.locator('.calculation-details summary').click();
+  // A fling to the bottom still counts every section on the way.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await settle(page, rows, ['PayoffLetter:faq']);
+  for (let y = 0; y < 20 && !named(rows).includes('PayoffLetter:end'); y++) { await page.mouse.wheel(0, 3000); await page.waitForTimeout(50); }
+  const sections = ['problem', 'example', 'mechanism', 'proof', 'founder', 'included', 'faq', 'end'];
+  await settle(page, rows, sections.map(step => 'PayoffLetter:' + step));
+  await page.locator('[data-section="faq"] details summary').first().click();
+  await settle(page, rows, ['PayoffLetter:math-open', 'PayoffLetter:faq-open']);
+  await page.reload();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(300);
+  for (const step of [...sections, 'math-open', 'faq-open', 'time10']) assert.equal(named(rows).filter(name => name === 'PayoffLetter:' + step).length, 1, step);
+
+  await page.locator('[data-placement="faq"] .cta').tap();
+  await page.waitForURL(url => url.pathname === '/payoff/order');
+  await settle(page, rows, ['PayoffLetter:tap-faq', 'PayoffOrderViewed']);
+  assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffLetter:tap-')), ['PayoffLetter:tap-faq'], 'the button they used, by its section');
+}));
