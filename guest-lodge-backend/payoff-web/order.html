@@ -7,10 +7,10 @@
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensanspriceitalic-83ff4ae04f.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=12">
+  <link rel="stylesheet" href="/payoff/order.css?v=13">
   <script src="/payoff/checkout.js?v=27" defer></script>
   <script src="/payoff/measure.js?v=1" defer></script>
-  <script src="/payoff/order.js?v=9" defer></script>
+  <script src="/payoff/order.js?v=10" defer></script>
 </head>
 <body data-page="order">
   <header class="reserve" id="reserve">
@@ -46,9 +46,11 @@
           <h2 class="section-head"><span aria-hidden="true">----</span> Contact Details <span aria-hidden="true">----</span></h2>
           <section class="info">
             <label class="field" for="name">Full Name:</label>
-            <input class="input" type="text" id="name" name="name" placeholder="Full Name" autocomplete="name" maxlength="100">
+            <input class="input" type="text" id="name" name="name" placeholder="Full Name" autocomplete="name" maxlength="100" aria-describedby="name-error">
+            <p class="field-error" id="name-error" hidden>Enter your full name to continue.</p>
             <label class="field" for="email">Email Address:</label>
-            <input class="input" type="email" id="email" name="email" placeholder="Email Address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254">
+            <input class="input" type="email" id="email" name="email" placeholder="Email Address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" aria-describedby="email-error">
+            <p class="field-error" id="email-error" hidden>Enter a valid email to continue.</p>
           </section>
           <h2 class="section-head"><span aria-hidden="true">----</span> Payment Information <span aria-hidden="true">----</span></h2>
           <div class="form-payment">

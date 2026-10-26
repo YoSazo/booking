@@ -28,6 +28,10 @@ img { max-width: 100%; }
   background: #f4f4f4; color: #000; font: 400 14px/24px 'Montserrat', sans-serif; -webkit-appearance: none; appearance: none; }
 .input:focus { outline: none; border-color: #9ca3af; }
 .input.invalid { border-color: #c30; }
+/* What's missing, under the field itself (as on the booking checkout). */
+.field-error { margin: 0; color: #dc2626; font-size: 12px; font-weight: 500; line-height: 1.3; animation: field-shake 0.5s ease; }
+.field-error[hidden] { display: none; }
+@keyframes field-shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
 .form-payment { padding: 0 0 10px; }
 #payment-element + .product-detail { margin-top: 22px; }
 
@@ -59,7 +63,7 @@ img { max-width: 100%; }
 .bump-image { display: block; width: 100%; height: auto; }
 /* The reference arrow is an animated image: on 270ms, off 230ms, on 70ms. */
 @keyframes bump-arrow { 0% { opacity: 1; } 47.37% { opacity: 0; } 87.72% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .arrow { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .arrow, .field-error { animation: none; } }
 
 .separator { display: flex; align-items: center; margin: 10px 0; padding: 1px 0; font-size: 13px; text-align: center; }
 .separator::before, .separator::after { content: ''; flex: 1 1 0%; height: 1px; border-bottom: 1px solid #cfd7df; }

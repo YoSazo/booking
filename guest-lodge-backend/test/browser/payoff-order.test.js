@@ -184,7 +184,23 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5011, 5011, 5911, 5911]);
   await page.locator('#buy-button').click();
   assert.equal(payments.length, 0, 'nothing is created without a name and email');
-  assert.equal(await page.locator('#checkout-status').innerText(), 'Please enter your full name.');
+  // What's missing shows under each field, the page brings the fields into view, and each message clears once filled in.
+  assert.equal(await page.locator('#name-error').innerText(), 'Enter your full name to continue.');
+  assert.equal(await page.locator('#email-error').innerText(), 'Enter a valid email to continue.');
+  assert.equal(await page.locator('#checkout-status').innerText(), 'Add your name and email above to continue.');
+  const nameOnScreen = () => page.evaluate(() => { const box = document.getElementById('name').getBoundingClientRect(); return box.top >= 0 && box.bottom <= innerHeight; });
+  for (let i = 0; i < 40 && !(await nameOnScreen()); i++) await page.waitForTimeout(50);
+  assert.equal(await nameOnScreen(), true, 'the page scrolls the fields into view');
+  assert.ok(!['name', 'email'].includes(await page.evaluate(() => document.activeElement?.id || '')), 'no text field is focused, so the keyboard stays closed');
+  assert.equal(await page.locator('#name').getAttribute('aria-invalid'), 'true');
+  await page.locator('#name').fill('Test Buyer');
+  assert.equal(await page.locator('#name-error').isHidden(), true);
+  assert.equal(await page.locator('#email-error').isVisible(), true);
+  await page.locator('#email').fill('buyer@');
+  assert.equal(await page.locator('#email-error').isVisible(), true, 'not until the email is valid');
+  await page.locator('#email').fill('buyer@example.test');
+  assert.equal(await page.locator('#email-error').isHidden(), true);
+  assert.equal(await page.locator('#checkout-status').innerText(), '');
   await fillBuyer(page);
   await page.locator('#buy-button').click();
   await skipOffers(page);
@@ -234,7 +250,7 @@ test('the order page records how far each visitor gets toward paying, by step na
   await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'addon-cashflow', 'saw-addons', 'saw-button', 'declined']);
   await page.locator('#email').dispatchEvent('change');
   await page.waitForTimeout(150);
-  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'declined', 'email', 'method-klarna', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
   assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
 }, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {

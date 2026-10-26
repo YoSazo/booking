@@ -144,13 +144,26 @@
   }
 
   const validEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const fieldOk = { name: value => !!value.trim(), email: value => validEmail(value.trim()) };
+  // As on the booking checkout: each missing field says so right under it, and
+  // the page scrolls them into view without opening the keyboard. The button
+  // sits far below the fields on phones, so a message there would go unseen.
+  function flagField(id, wrong) {
+    $(id).classList.toggle('invalid', wrong);
+    $(id).setAttribute('aria-invalid', String(wrong));
+    const note = $(id + '-error');
+    if (wrong && !note.hidden) { note.style.animation = 'none'; void note.offsetWidth; note.style.animation = ''; }
+    note.hidden = !wrong;
+  }
   function buyer() {
     const name = $('name').value.trim(), email = $('email').value.trim();
-    $('name').classList.toggle('invalid', !name);
-    $('email').classList.toggle('invalid', !validEmail(email));
-    if (!name) { mark('missing-name'); status.textContent = 'Please enter your full name.'; $('name').focus(); return null; }
-    if (!validEmail(email)) { mark('missing-email'); status.textContent = 'Please enter a valid email address.'; $('email').focus(); return null; }
-    return { name, email };
+    const missing = Object.keys(fieldOk).filter(id => !fieldOk[id]($(id).value));
+    for (const id of Object.keys(fieldOk)) flagField(id, missing.includes(id));
+    if (!missing.length) return { name, email };
+    for (const id of missing) mark('missing-' + id);
+    status.textContent = missing.length > 1 ? 'Add your name and email above to continue.' : missing[0] === 'name' ? 'Add your full name above to continue.' : 'Add a valid email above to continue.';
+    $(missing[0]).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return null;
   }
   const orderBody = email => ({ email, addons: selected().map(extra => extra.id), attempt, visitorId: track.visitor,
     attribution: track.attribution, useCheckoutOffer: discount() > 0, expectedTotalCents: total() });
@@ -241,7 +254,12 @@
     try { sessionStorage.setItem('payoff.addons', JSON.stringify(selected().map(extra => extra.id))); } catch { /* Optional. */ }
     paint();
   });
-  for (const id of ['name', 'email']) $(id).addEventListener('input', () => $(id).classList.remove('invalid'));
+  // A message goes as soon as its field is filled in properly.
+  for (const id of Object.keys(fieldOk)) $(id).addEventListener('input', () => {
+    if (!fieldOk[id]($(id).value)) return;
+    flagField(id, false);
+    if (status.textContent.startsWith('Add ') && Object.keys(fieldOk).every(other => fieldOk[other]($(other).value))) status.textContent = '';
+  });
   // Filled in, not what was typed. A valid email is the first step of paying,
   // sent to Meta as StartedPaying (the server sends its copy with the same id).
   $('name').addEventListener('change', () => { if ($('name').value.trim()) mark('name'); });
