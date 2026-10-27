@@ -262,6 +262,7 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Form didn’t load: sent to Stripe’s page', ['PayoffOrder:hosted']],
     ['Apple Pay or Google Pay offered', ['PayoffOrder:wallet-shown']],
     ['Tapped Apple Pay or Google Pay', ['PayoffOrder:wallet-tap']],
+    ['Tapped “Pay by card” at the top', ['PayoffOrder:top-card']],
     ['Picked bank account', ['PayoffOrder:method-bank']],
     ['Picked Klarna', ['PayoffOrder:method-klarna']],
     ['Added the Cash-flow calendar', ['PayoffOrder:addon-cashflow']],

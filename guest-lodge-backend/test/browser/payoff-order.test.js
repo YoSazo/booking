@@ -116,19 +116,21 @@ const skipOffers = async page => {
 };
 const fillBuyer = async page => { await page.locator('#name').fill('Test Buyer'); await page.locator('#email').fill('buyer@example.test'); };
 
-test('the order page follows the reference: reservation, product, price and safe checkout first, then the labeled form, extras, summary, guarantee and proof', async () => world(async ({ page, base }) => {
+test('the order page: one first screen with the product and price, why today, both ways to pay and the refund, then the labeled form, extras, summary, guarantee and proof', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
-  assert.deepEqual([await page.locator('.reserve-name').innerText(), await page.locator('.reserve-lead').innerText()], ['Your Debt-Free Date & Payoff Plan', 'Is Reserved For:']);
-  assert.match(`${await page.locator('#reserve-minutes').innerText()}:${await page.locator('#reserve-seconds').innerText()}`, /^(05:00|04:5\d)$/);
-  assert.equal(await page.locator('.summary-label').innerText(), 'Order Summary');
+  assert.match((await page.locator('.reserve-line').innerText()).replace(/\s+/g, ' '), /^Your plan is reserved for (05:00|04:5\d)$/);
+  assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
+  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$375 28.11 · one time', 'the $375 anchor, and no $ on the price they pay');
+  assert.equal(await page.locator('.glance-price s').evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
   assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ 10,000+ sold');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
-  assert.equal((await page.locator('.glance-price').innerText()).replace(/\s+/g, ' '), '$33.11 Only 28.11');
-  assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
-  assert.equal(await page.locator('.glance-value').innerText(), 'Valued at $375');
+  assert.equal((await page.locator('.why').innerText()).replace(/\s+/g, ' '),
+    'Every month in the wrong order costs you. On $20,000 of card debt at 24%, about $400 a month goes to interest. Payoff shows the order that cuts it fastest. If it doesn’t…');
+  assert.equal(await page.locator('#to-card').innerText(), 'Pay by card ↓');
+  assert.equal((await page.locator('.refund').innerText()).replace(/\s+/g, ' ').trim(), '✓ No sooner debt-free date? Full refund. Email us within 30 days and you get every cent back. No questions.');
+  assert.match(await page.locator('.glance-quote').innerText(), /^“It told me what to focus on first, what to pay each month, and when I should be done\.” ★★★★★ Amanda$/);
   assert.equal(await page.locator('#glance-gift').count(), 0);
   assert.deepEqual(await page.locator('.glance .safe-badges > img').evaluateAll(imgs => imgs.map(img => img.alt)), ['AES-256bit encryption', 'SSL certified', 'Powered by Stripe, secure site']);
-  assert.equal(await page.locator('.glance-guarantee').getAttribute('alt'), '30-day 100% money back guarantee');
   assert.deepEqual(await page.locator('.section-head').allInnerTexts(), ['---- Contact Details ----', '---- Payment Information ----']);
   assert.deepEqual(await page.locator('.info label').allInnerTexts(), ['Full Name:', 'Email Address:']);
   assert.deepEqual(await page.locator('.info input').evaluateAll(inputs => inputs.map(input => input.placeholder)), ['Full Name', 'Email Address']);
@@ -178,7 +180,9 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   const created = (await stripeLog()).filter(entry => entry[0] === 'create');
   assert.deepEqual(created.map(entry => entry[1]), ['payment', 'expressCheckout']);
   assert.deepEqual(created[0][2], { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
-  assert.equal(await page.locator('#or').isHidden(), false, 'a wallet is available, so OR shows');
+  assert.equal(await page.locator('#express-checkout').isHidden(), false, 'a wallet is available, so it shows');
+  assert.ok(await page.evaluate(() => ['#express-checkout', '#to-card', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top).every((top, i, all) => !i || top > all[i - 1])),
+    'the wallet sits on the first screen, above "Pay by card" and the form');
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
   assert.equal(await page.locator('#order-total').innerText(), '$59.11');
   assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5011, 5011, 5911, 5911]);
@@ -266,7 +270,7 @@ test('a payment Stripe reports as not paid sends the buyer back to checkout and 
 test('when Stripe\'s fields can\'t be used, the button opens Stripe\'s hosted checkout with the extras picked', async () => world(async ({ page, base, creates, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.equal(await page.locator('#payment-element').isHidden(), true);
-  assert.equal(await page.locator('#or').isHidden(), true);
+  assert.equal(await page.locator('#express-checkout').isHidden(), true);
   await fillBuyer(page);
   await page.locator('#cashflow').check();
   await page.locator('#buy-button').click();
@@ -455,21 +459,40 @@ for (const delayedTimer of [false, true]) test('days later the buyer still pays 
   await page.waitForURL(url => url.pathname === '/payoff/upgrade');
   assert.equal(payments.at(-1).params.amount, 2811);
 }));
-// Price and refund reassurance stay prominent together above the fields.
-test('the order page puts its large final price and compact guarantee together on phones', async () => world(async ({ page, base }) => {
-  for (const [width, height] of [[375, 667], [390, 664], [390, 844], [414, 736]]) {
+// Most visitors decide within ten seconds, so the first screen carries the
+// price, both ways to pay and the refund promise, on in-app browser heights too.
+test('on every phone the first screen shows the price, both ways to pay and the refund, with the arrow from "If it doesn’t…" to the refund', async () => world(async ({ page, base }) => {
+  for (const [width, height] of [[375, 548], [360, 640], [390, 664], [412, 760], [428, 746], [375, 667], [390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.goto(base + '/payoff/order'); await ready(page);
+    await page.locator('#express-checkout[data-methods]').waitFor({ state: 'attached' });
     await page.evaluate(() => document.fonts.ready);
-    assert.ok(await page.locator('.glance-price').evaluate(el => parseFloat(getComputedStyle(el).fontSize) >= 32));
-    const positions = await page.evaluate(() => ['.glance-price', '.glance-guarantee', '.glance .safe', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top));
-    assert.deepEqual([...positions].sort((a, b) => a - b), positions);
-    const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.summary-label', '.glance-image', '.glance-price']
+    await page.waitForTimeout(100);
+    const seen = await page.evaluate(() => Object.fromEntries(['#reserve-clock', '.glance-price', '.why', '#express-checkout', '#to-card', '.refund']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
+    const arrow = await page.evaluate(() => {
+      const glance = document.querySelector('.glance').getBoundingClientRect(), path = document.getElementById('why-path').getBBox();
+      const from = document.getElementById('why-if').getBoundingClientRect(), to = document.getElementById('refund-head').getClientRects()[0];
+      return { shown: !document.getElementById('why-arrow').hasAttribute('hidden'), starts: Math.abs(glance.top + path.y - (from.top + from.height / 2)),
+        ends: Math.abs(glance.top + path.y + path.height - (to.top + to.height / 2)), clear: glance.left + path.x > from.right,
+        lane: glance.left + path.x + path.width > document.getElementById('to-card').getBoundingClientRect().right };
+    });
+    assert.ok(arrow.shown && arrow.starts < 2 && arrow.ends < 2 && arrow.clear && arrow.lane, `${width}x${height}: ${JSON.stringify(arrow)}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
 }));
+test('"Pay by card" at the top brings up the form and counts as starting to pay', async () => world(async ({ page, base, rows }) => {
+  const steps = () => [...rows.values()].filter(row => row.name === 'PayoffOrder').map(row => row.detail);
+  await page.goto(base + '/payoff/order'); await ready(page);
+  assert.ok(!steps().includes('cart'));
+  await page.locator('#to-card').click();
+  for (let i = 0; i < 40 && !(steps().includes('top-card') && steps().includes('cart')); i++) await page.waitForTimeout(50);
+  assert.ok(steps().includes('top-card') && steps().includes('cart'), 'Meta’s AddToCart, with the tap on /funnel');
+  const formTop = () => page.evaluate(() => Math.abs(document.getElementById('order-form').getBoundingClientRect().top));
+  for (let i = 0; i < 40 && await formTop() >= 30; i++) await page.waitForTimeout(50);
+  assert.ok(await formTop() < 30, 'the form is at the top of the screen');
+}, { userAgent: PHONE_UA }));
 
 // Include reduced viewport heights to account for in-app browser controls.
 test('small phones show the price, action, checkout proof row and start of Amanda’s review without scrolling', async () => world(async ({ page, base }) => {

@@ -7,30 +7,35 @@
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensanspriceitalic-83ff4ae04f.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=13">
+  <link rel="stylesheet" href="/payoff/order.css?v=14">
   <script src="/payoff/checkout.js?v=28" defer></script>
   <script src="/payoff/measure.js?v=3" defer></script>
-  <script src="/payoff/order.js?v=11" defer></script>
+  <script src="/payoff/order.js?v=12" defer></script>
 </head>
 <body data-page="order">
   <header class="reserve" id="reserve">
-    <p class="reserve-name">Your Debt-Free Date &amp; Payoff Plan</p>
-    <p class="reserve-lead">Is Reserved For:</p>
-    <div class="reserve-clock" id="reserve-clock" role="timer" aria-live="off" aria-label="Time your order is reserved for">
-      <span class="unit"><b id="reserve-minutes">05</b><small>Minutes</small></span><span class="colon" aria-hidden="true">:</span><span class="unit"><b id="reserve-seconds">00</b><small>Seconds</small></span>
-    </div>
+    <p class="reserve-line">Your plan is reserved for <span class="reserve-clock" id="reserve-clock" role="timer" aria-live="off" aria-label="Time your order is reserved for"><span id="reserve-minutes">05</span>:<span id="reserve-seconds">00</span></span></p>
   </header>
   <div class="row">
     <main class="column">
       <section class="glance">
-        <p class="summary-label"><img src="/payoff/assets/cart-icon-59bb789d7c.webp" width="24" height="20" alt=""> Order Summary</p>
-        <img class="glance-image" src="/payoff/assets/payoff-devices-80eded1499.webp" width="1280" height="720" decoding="async" fetchpriority="high" alt="Marketel Payoff on a desktop, laptop, tablet and phone, showing a debt-free date">
+        <div class="glance-row">
+          <img class="glance-image" src="/payoff/assets/payoff-devices-80eded1499.webp" width="1280" height="720" decoding="async" fetchpriority="high" alt="Marketel Payoff on a desktop, laptop, tablet and phone, showing a debt-free date">
+          <div>
+            <p class="glance-name">Your Debt-Free Date &amp; Payoff Plan</p>
+            <p class="glance-price"><s>$375</s> <strong class="today" id="glance-price">33.11</strong> <span>· one time</span></p>
+          </div>
+        </div>
         <p class="social-proof"><span class="stars" aria-hidden="true">★★★★★</span> <span>10,000+ sold</span> <span class="avatars" aria-hidden="true"><img src="/payoff/assets/avatar-01-874e564a67.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-02-2209fc25e7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-04-5d31c567b7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-05-81fe59d790.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-06-6574065c85.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-07-883c4b0955.webp" width="72" height="72" decoding="async" alt=""></span></p>
-        <p class="glance-name">Your Debt-Free Date &amp; Payoff Plan</p>
-        <p class="glance-value">Valued at $375</p>
-        <p class="glance-price"><s id="glance-was" hidden>$33.11</s><strong class="glance-price-current">Only <span class="today" id="glance-price">33.11</span></strong></p>
-        <p class="glance-payment">USD · One-time payment. No monthly fees.</p>
-        <img class="glance-guarantee" src="/payoff/assets/guarantee-30-day-compact-0ad1ee8089.webp" width="800" height="294" decoding="async" alt="30-day 100% money back guarantee">
+        <div class="why">
+          <p class="why-head">Every month in the wrong order costs you.</p>
+          <p>On $20,000 of card debt at 24%, about $400 a month goes to interest. Payoff shows the order that cuts it fastest. <span class="why-if" id="why-if">If it doesn’t…</span></p>
+        </div>
+        <div id="express-checkout"></div>
+        <a class="to-card" id="to-card" href="#order-form">Pay by card ↓</a>
+        <p class="refund"><span class="refund-mark" aria-hidden="true">✓</span><span><b id="refund-head">No sooner debt-free date? Full refund.</b> Email us within 30 days and you get every cent back. No questions.</span></p>
+        <p class="glance-quote">“It told me what to focus on first, what to pay each month, and when I should be done.” <span class="stars" aria-hidden="true">★★★★★</span> Amanda</p>
+        <svg class="why-arrow" id="why-arrow" aria-hidden="true" hidden><defs><marker id="why-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z"/></marker></defs><path id="why-path" marker-end="url(#why-head)"/></svg>
         <div class="safe" role="group" aria-label="Guaranteed safe checkout">
           <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
           <div class="safe-badges">
@@ -54,8 +59,6 @@
           </section>
           <h2 class="section-head"><span aria-hidden="true">----</span> Payment Information <span aria-hidden="true">----</span></h2>
           <div class="form-payment">
-            <div id="express-checkout"></div>
-            <div class="or" id="or" hidden><hr><p>OR</p></div>
             <div id="payment-element"></div>
             <section class="product-detail">
               <div class="grid head"><span>Total Payment</span><span class="c">Quantity</span><span class="r">Price</span></div>

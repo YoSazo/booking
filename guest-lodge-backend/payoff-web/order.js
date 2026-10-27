@@ -70,8 +70,6 @@
     const price = base() - off;
     // No $ on the price they pay, as on the reference order pages.
     $('glance-price').textContent = (price / 100).toFixed(2).replace('.00', '');
-    $('glance-was').textContent = money(base()).replace('.00', '');
-    $('glance-was').hidden = !off;
     $('only-today').textContent = `Only ${money(price).replace('.00', '')} Today!`;
     $('percent-off').textContent = `(${Math.floor((1 - price / REGULAR_CENTS) * 100)}% off)`;
     const amount = total();
@@ -98,7 +96,7 @@
   function useHosted() {
     mark('hosted');
     hosted = true;
-    $('payment-element').hidden = true; $('express-checkout').hidden = true; $('or').hidden = true;
+    $('payment-element').hidden = true; $('express-checkout').hidden = true;
     setButton();
   }
   // Stripe.js loads only when the server can take payments in this form.
@@ -128,14 +126,15 @@
       });
       card.on('loaderror', useHosted);
       card.mount('#payment-element');
-      // Apple Pay and Google Pay sit where the reference has its PayPal buttons.
+      // Apple Pay and Google Pay on the first screen, above "Pay by card", when
+      // this phone has one.
       expressElements = stripe.elements(options);
-      const express = expressElements.create('expressCheckout', { buttonHeight: 44, layout: { maxColumns: 1, overflow: 'never' },
+      const express = expressElements.create('expressCheckout', { buttonHeight: 48, layout: { maxColumns: 1, overflow: 'never' },
         paymentMethods: { applePay: 'auto', googlePay: 'auto', link: 'never', paypal: 'never', amazonPay: 'never' } });
       express.on('ready', ({ availablePaymentMethods }) => {
         const methods = Object.keys(availablePaymentMethods || {}).filter(method => availablePaymentMethods[method]);
         $('express-checkout').dataset.methods = methods.join(' ');
-        $('or').hidden = !methods.length;
+        $('express-checkout').hidden = !methods.length;
         if (methods.length) mark('wallet-shown');
       });
       express.on('click', event => { mark('wallet-tap'); cart(); if (!busy) event.resolve({ emailRequired: true }); });
@@ -144,6 +143,32 @@
       setTimeout(() => { if (!formReady) useHosted(); }, 20000);
     } catch { useHosted(); }
   }
+
+  // "Pay by card ↓" at the top is starting to pay (Meta's AddToCart); it
+  // brings up the form.
+  $('to-card').addEventListener('click', event => {
+    event.preventDefault();
+    mark('top-card'); cart();
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  // The arrow from "If it doesn't…" around both ways to pay to the refund
+  // promise, drawn to fit this screen: out to the lane on the right, down and
+  // back in, with the same rounded turn at each corner.
+  function drawArrow() {
+    const svg = $('why-arrow'), box = svg.parentElement.getBoundingClientRect();
+    const from = $('why-if').getBoundingClientRect(), to = $('refund-head').getClientRects()[0];
+    if (!to || !from.width) return svg.toggleAttribute('hidden', true);
+    const r = 12, lane = box.width - 16, refund = $('refund-head').closest('.refund').getBoundingClientRect();
+    const x1 = from.right - box.left + 6, y1 = from.top - box.top + from.height / 2;
+    const x2 = refund.right - box.left + 7, y2 = to.top - box.top + to.height / 2;
+    svg.setAttribute('width', box.width); svg.setAttribute('height', box.height);
+    $('why-path').setAttribute('d', `M ${x1} ${y1} H ${lane - r} A ${r} ${r} 0 0 1 ${lane} ${y1 + r} V ${y2 - r} A ${r} ${r} 0 0 1 ${lane - r} ${y2} H ${x2}`);
+    svg.toggleAttribute('hidden', false);
+  }
+  if ('ResizeObserver' in window) new ResizeObserver(drawArrow).observe($('why-arrow').parentElement);
+  else addEventListener('resize', drawArrow);
+  document.fonts?.ready.then(drawArrow);
+  drawArrow();
 
   const validEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const fieldOk = { name: value => !!value.trim(), email: value => validEmail(value.trim()) };

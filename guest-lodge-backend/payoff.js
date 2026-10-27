@@ -49,7 +49,7 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
   PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS,
   PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
-  PayoffOrder: [...ON_SCREEN, 'cart', 'form20', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'name', 'email',
+  PayoffOrder: [...ON_SCREEN, 'cart', 'form20', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'top-card', 'name', 'email',
     'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
