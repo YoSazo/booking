@@ -150,7 +150,7 @@ test('the order page: one first screen with the product and price, why today, bo
   assert.equal((await page.locator('.social-proof').innerText()).replace(/\s+/g, ' ').trim(), '★★★★★ 10,000+ sold');
   assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
   assert.equal((await page.locator('.why').innerText()).replace(/\s+/g, ' '),
-    'Every month in the wrong order costs you. On $20,000 of card debt at 24%, about $400 a month goes to interest. Payoff shows the order that cuts it fastest. If it doesn’t…');
+    'Your minimum shrinks every month. That’s the trap. Pay less, owe longer: the “Minimum Payment Warning” box on your statement shows how many years. Payoff keeps your payment the same and points it in the right order, so you’re out years sooner. If it doesn’t…');
   assert.equal(await page.locator('#to-card').innerText(), 'Pay by card ↓');
   assert.equal((await page.locator('.refund').innerText()).replace(/\s+/g, ' ').trim(), '✓ No sooner debt-free date? Full refund. Email us within 30 days and you get every cent back. No questions.');
   assert.match(await page.locator('.glance-quote').innerText(), /^“It told me what to focus on first, what to pay each month, and when I should be done\.” ★★★★★ Amanda$/);

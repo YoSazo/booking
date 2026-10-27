@@ -37,6 +37,7 @@ test('the Coach’s plan summary is the buyer’s debts in words, without raw ce
   assert.match(INSTRUCTIONS, /under 60 words/);
   assert.match(INSTRUCTIONS, /never say avalanche, snowball, strategy, upfront, minimize, optimize, allocate or APR/);
   assert.match(INSTRUCTIONS, /quote its compared_with_their_plan/);
+  assert.match(INSTRUCTIONS, /"Minimum Payment Warning" box/, 'it can explain the box on their own statement');
   assert.equal(callTool({ name: 'run_plan', arguments: '{nope' }, plan, start).error, 'Arguments were not valid JSON.');
   assert.equal(callTool({ name: 'other', arguments: '{}' }, plan, start).error, 'Unknown tool.');
   assert.deepEqual(cleanPlan({ debts: 'x', extra: -5, plan: 'nonsense' }), { debts: [], extra: 0, chosen: null });
