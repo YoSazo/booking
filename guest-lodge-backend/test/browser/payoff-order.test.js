@@ -377,6 +377,21 @@ test("20 seconds on the order page is Meta's AddToCart, once per visitor, with t
   assert.deepEqual(calls.filter(args => args[1] === 'AddToCart').map(args => [args[2].value, args[3]?.eventID]), [[33.11, `payoff-cart.${visitor}`]]);
   assert.equal(steps().filter(step => step === 'cart').length, 1);
 }, { userAgent: PHONE_UA }));
+test('20 seconds with the form in the middle of the screen is its own /funnel step, never sent to Meta', async () => world(async ({ page, base, rows }) => {
+  const calls = [];
+  await overHttps(page, base, calls);
+  // A second of the on-screen clock passes every 10 ms here.
+  await page.addInitScript(() => { const every = window.setInterval; window.setInterval = (fn, ms, ...rest) => every(fn, ms === 1000 ? 10 : ms, ...rest); });
+  const steps = () => [...rows.values()].filter(row => row.name === 'PayoffOrder').map(row => row.detail);
+  const until = async step => { for (let i = 0; i < 80 && !steps().includes(step); i++) await page.waitForTimeout(25); };
+  await page.goto('https://payoff.test/payoff/order');
+  await until('time60');
+  assert.ok(steps().includes('cart') && !steps().includes('form20'), 'a minute at the top of the page is not time at the form');
+  await page.evaluate(() => { const form = document.getElementById('order-form'); scrollTo(0, form.offsetTop + 200 - innerHeight / 2); });
+  await until('form20');
+  assert.equal(steps().filter(step => step === 'form20').length, 1);
+  assert.deepEqual(calls.filter(args => args[0] === 'track' || args[0] === 'trackCustom').map(args => args[1]), ['PageView', 'AddToCart'], 'nothing new goes to Meta');
+}, { userAgent: PHONE_UA }));
 test("Meta's pixel never loads for the owner, over http, or in the tool", async () => {
   for (const setup of ['owner', 'http', 'tool']) await world(async ({ page, base }) => {
     const facebook = [];

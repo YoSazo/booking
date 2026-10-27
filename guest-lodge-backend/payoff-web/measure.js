@@ -31,14 +31,20 @@
   window.PayoffMeasure = { mark, cart };
 
   // Seconds on screen, counted only while the tab is showing: ten seconds is a
-  // real reader, not a bounce.
-  let seconds = 0;
+  // real reader, not a bounce. On the order page, the seconds the form
+  // (contact details through the button) holds the middle of the screen are
+  // counted too, for /funnel only: is 20 seconds there a better sign of a buyer
+  // than 20 seconds anywhere? Not sent to Meta.
+  const form = page === 'order' && document.getElementById('order-form');
+  const atForm = () => { const box = form.getBoundingClientRect(); return box.top < innerHeight / 2 && box.bottom > innerHeight / 2; };
+  let seconds = 0, formSeconds = 0;
   const clock = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
     seconds += 1;
     if ([10, 60, 180].includes(seconds)) mark('time' + seconds);
     if (seconds === 20) cart();
-    if (seconds >= 180) clearInterval(clock);
+    if (form && atForm() && ++formSeconds === 20) mark('form20');
+    if (seconds >= 180 && (!form || formSeconds >= 20)) clearInterval(clock);
   }, 1000);
   if (page === 'story') return; // story.js records its own reading steps.
 

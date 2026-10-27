@@ -686,7 +686,7 @@ test('the letter and order pages record their steps by name only, and a valid em
   const attribution = { fbp: 'fb.1.1700000000000.123456789', fbc: 'fb.1.1700000000000.AbCdEf' };
   await serve(w, async ({ post }) => {
     for (const [name, detail] of [['PayoffLetter', 'example'], ['PayoffLetter', 'end'], ['PayoffLetter', 'tap-faq'], ['PayoffLetter', 'math-open'], ['PayoffLetter', 'time60'],
-      ['PayoffOrder', 'saw-form'], ['PayoffOrder', 'card-start'], ['PayoffOrder', 'declined'], ['PayoffStory', 'time10']]) {
+      ['PayoffOrder', 'saw-form'], ['PayoffOrder', 'form20'], ['PayoffOrder', 'card-start'], ['PayoffOrder', 'declined'], ['PayoffStory', 'time10']]) {
       assert.equal((await post('/api/payoff/event', { name, detail, visitorId: 'v_abcdefghijk' })).status, 200, `${name}:${detail}`);
     }
     for (const [name, detail] of [['PayoffLetter', 'tap-sticky'], ['PayoffLetter', 'time30'], ['PayoffOrder', 'buyer@example.test'], ['PayoffOrder', null], ['PayoffOrder', 'scroll50']]) {
@@ -698,7 +698,7 @@ test('the letter and order pages record their steps by name only, and a valid em
   assert.deepEqual(w.capi.map(event => [event.name, event.eventId, event.value, event.fbp, event.fbc]),
     [['StartedPaying', 'payoff-started.v_abcdefghijk', 33.11, attribution.fbp, attribution.fbc]]);
   assert.equal(w.capi[0].email, undefined, 'never the email itself');
-  assert.equal([...w.rows.values()].length, 10);
+  assert.equal([...w.rows.values()].length, 11);
 });
 test('the landing version and quiz steps are recorded by name only, never with numbers', async () => {
   const w = fixture();

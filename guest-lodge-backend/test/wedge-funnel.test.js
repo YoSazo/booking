@@ -381,7 +381,7 @@ test('Payoff shows how far each visitor read the sales letter, how far they got 
   assert.equal(letter['Reached the worked example'], 1); assert.equal(letter['Read to the end'], 0);
   assert.equal(card('letter-taps')['The button after the worked example'], 1);
   const order = card('order-steps');
-  assert.equal(order['Viewed the order page'], 1); assert.equal(order['Stayed 20 seconds or started paying (Meta: AddToCart)'], 0); assert.equal(order['Scrolled to the form'], 1); assert.equal(order['Typed a valid email (Meta: StartedPaying)'], 1); assert.equal(order['Paid'], 0);
+  assert.equal(order['Viewed the order page'], 1); assert.equal(order['Stayed 20 seconds or started paying (Meta: AddToCart)'], 0); assert.equal(order['Stayed 20 seconds at the form (for comparison, not sent to Meta)'], 0);assert.equal(order['Scrolled to the form'], 1); assert.equal(order['Typed a valid email (Meta: StartedPaying)'], 1); assert.equal(order['Paid'], 0);
   assert.equal(card('order-other')['Card declined'], 1);
   const time = card('time');
   assert.equal(time['Sales letter: 10 seconds or more'], 2); assert.equal(time['Story page: 1 minute or more'], 1); assert.equal(time['Order page: 10 seconds or more'], 0);
