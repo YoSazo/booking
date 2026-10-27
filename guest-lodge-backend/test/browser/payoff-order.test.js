@@ -25,7 +25,7 @@ window.Stripe = function (key) {
           const handlers = {};
           log('create', type, options);
           window.__stripeHandlers = { ...window.__stripeHandlers, [type]: handlers };
-          return { on(name, fn) { handlers[name] = fn; }, mount(selector) {
+          return { on(name, fn) { handlers[name] = fn; }, update(next) { log('element-update', type, next); }, mount(selector) {
             const box = document.createElement('div'); box.className = 'fake-' + type; box.textContent = type === 'payment' ? 'Card number' : 'Pay';
             document.querySelector(selector).append(box);
             setTimeout(() => handlers.ready && handlers.ready(type === 'expressCheckout' ? { availablePaymentMethods: { applePay: true, googlePay: false } } : {}), 30);
@@ -194,7 +194,8 @@ test('Stripe\'s fields charge Payoff alone, one payment per order, then the tool
   assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'elements'), [['elements', 'payment', 2811, 'usd'], ['elements', 'payment', 2811, 'usd']]);
   const created = (await stripeLog()).filter(entry => entry[0] === 'create');
   assert.deepEqual(created.map(entry => entry[1]), ['payment', 'expressCheckout']);
-  assert.deepEqual(created[0][2], { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
+  assert.deepEqual(created[0][2], { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], fields: { billingDetails: { name: 'never', email: 'never' } } }, 'Link stays on in the card form');
+  assert.equal(created[1][2].paymentMethods.link, 'never', 'but no Link button above it');
   assert.equal(await page.locator('#express-checkout').isHidden(), false, 'a wallet is available, so it shows');
   assert.ok(await page.evaluate(() => ['#express-checkout', '#to-card', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top).every((top, i, all) => !i || top > all[i - 1])),
     'the wallet sits on the first screen, above "Pay by card" and the form');
@@ -226,6 +227,8 @@ test('Stripe\'s fields charge Payoff alone, one payment per order, then the tool
   assert.equal(payments.length, 1);
   assert.equal(payments[0].params.amount, 2811); assert.equal(payments[0].params.metadata.addons, '[]');
   assert.equal(payments[0].params.receipt_email, 'buyer@example.test');
+  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'element-update').at(-1), ['element-update', 'payment', { defaultValues: { billingDetails: { email: 'buyer@example.test' } } }],
+    'the typed email goes to the card form, so Link can recognise a buyer it has not seen on this device');
   const confirm = (await stripeLog()).find(entry => entry[0] === 'confirm');
   assert.deepEqual(confirm[3], { billing_details: { name: 'Test Buyer', email: 'buyer@example.test' } });
   assert.equal(confirm[2], base + '/payoff/upgrade');
@@ -261,13 +264,13 @@ test('the order page records how far each visitor gets toward paying, by step na
   await page.waitForTimeout(150);
   assert.ok(!steps().includes('email'), 'only a valid email counts');
   await page.locator('#email').fill('buyer@example.test'); await page.locator('#email').dispatchEvent('change');
-  await page.evaluate(() => { const change = window.__stripeHandlers.payment.change; change({ empty: false, complete: false, value: { type: 'card' } }); change({ empty: false, complete: true, value: { type: 'card' } }); change({ empty: true, complete: false, value: { type: 'klarna' } }); });
+  await page.evaluate(() => { const change = window.__stripeHandlers.payment.change; change({ empty: false, complete: false, value: { type: 'card' } }); change({ empty: false, complete: true, value: { type: 'card' } }); change({ empty: true, complete: false, value: { type: 'klarna' } }); change({ empty: false, complete: false, value: { type: 'link' } }); });
   await page.locator('#buy-button').scrollIntoViewIfNeeded();
   await page.locator('#buy-button').click();
-  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'saw-button', 'declined']);
+  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'method-link', 'saw-button', 'declined']);
   await page.locator('#email').dispatchEvent('change');
   await page.waitForTimeout(150);
-  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'method-link', 'missing-email', 'missing-name', 'name', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
   assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
 }, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {

@@ -16,7 +16,7 @@
   const REGULAR_CENTS = 37500;
   const RETURN_URL = location.origin + '/payoff/upgrade';
   let config = null, offer = null, attempt = null;
-  let stripe = null, cardElements = null, expressElements = null, formReady = false, hosted = false, busy = false, payment = null, quoted = null, shown = null;
+  let stripe = null, cardElements = null, cardField = null, expressElements = null, formReady = false, hosted = false, busy = false, payment = null, quoted = null, shown = null;
 
   const money = cents => (cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
   const base = () => config?.priceCents || 3311;
@@ -111,12 +111,16 @@
       // Must match the PaymentIntent from /api/payoff/pay: cards are kept for this visit only.
       const options = { mode: 'payment', amount: quoted, currency: 'usd', paymentMethodOptions: { card: { setup_future_usage: 'on_session' } } };
       cardElements = stripe.elements(options);
-      const card = cardElements.create('payment', { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], wallets: { link: 'never' }, fields: { billingDetails: { name: 'never', email: 'never' } } });
+      // Link stays on here: a buyer Link already knows pays with their saved
+      // card and a code instead of typing it. Facebook's in-app browser forgets
+      // Link's device, so the email typed above is handed over too (below).
+      const card = cardField = cardElements.create('payment', { layout: 'tabs', paymentMethodOrder: ['card', 'us_bank_account', 'klarna'], fields: { billingDetails: { name: 'never', email: 'never' } } });
       card.on('ready', () => { formReady = true; setButton(); mark('stripe-ready'); });
       // Which way they chose to pay, and how far into the card details they got.
       card.on('change', ({ empty, complete, value }) => {
         if (value?.type === 'us_bank_account') mark('method-bank');
         else if (value?.type === 'klarna') mark('method-klarna');
+        else if (value?.type === 'link') mark('method-link');
         else if (!empty) { mark('card-start'); if (complete) mark('card-done'); }
       });
       card.on('loaderror', useHosted);
@@ -282,6 +286,8 @@
   $('name').addEventListener('change', () => { if ($('name').value.trim()) mark('name'); });
   $('email').addEventListener('change', () => {
     if (!validEmail($('email').value.trim())) return;
+    // So Link can recognise a buyer by email where it doesn't know the device.
+    try { cardField?.update({ defaultValues: { billingDetails: { email: $('email').value.trim() } } }); } catch { /* Optional. */ }
     cart();
     if (mark('email')) track.pixel('StartedPaying', { value: 33.11 }, track.visitor ? `payoff-started.${track.visitor}` : undefined, true);
   });

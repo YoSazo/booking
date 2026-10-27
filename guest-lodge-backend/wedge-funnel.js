@@ -264,6 +264,7 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Tapped “Pay by card” at the top', ['PayoffOrder:top-card']],
     ['Picked bank account', ['PayoffOrder:method-bank']],
     ['Picked Klarna', ['PayoffOrder:method-klarna']],
+    ['Paid with Link (a saved card)', ['PayoffOrder:method-link']],
     ['Tapped with no name', ['PayoffOrder:missing-name']],
     ['Tapped with no valid email', ['PayoffOrder:missing-email']],
     ['Tapped with card details unfinished', ['PayoffOrder:card-incomplete']],

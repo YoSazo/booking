@@ -52,7 +52,7 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
   PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
   PayoffOrder: [...ON_SCREEN, 'cart', 'form20', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'top-card', 'name', 'email',
-    'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'],
+    'card-start', 'card-done', 'method-bank', 'method-klarna', 'method-link', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'],
   // The Coach tab inside Payoff: opened, agreed to send their numbers, asked, tapped to start it.
   PayoffCoach: ['opened', 'consent', 'asked', 'start-month', 'start-year', 'manage'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
