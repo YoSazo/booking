@@ -1,13 +1,14 @@
 'use strict';
 // Marketel Payoff, the tool a buyer opens after paying. Their numbers live in
-// this browser only (localStorage); the server only ever sees the access link,
-// the Stripe session id after payment, or an email asking for the link again.
+// this browser only (localStorage); the server sees the access link, the Stripe
+// ids after a payment, an email asking for the link again, and, once the buyer
+// has agreed, their debts with each question to the Coach (kept by no one).
 (() => {
   const E = window.PayoffEngine;
   const $ = id => document.getElementById(id);
   const DATA = 'payoff.v1', ACCESS = 'payoff.access', EXTRAS = 'payoff.extras', TAB = 'payoff.tab';
   const CASHFLOW = 'payoff.cashflow.v1', RESET = 'payoff.reset.v1';
-  const EXTRA_NAMES = { cashflow: 'cash-flow calendar', reset: 'spending reset', cutter: 'Interest Cutter' };
+  const EXTRA_NAMES = { cashflow: 'cash-flow calendar', reset: 'spending reset', coach: 'Payoff Coach' };
   const CUTTER = 'payoff.cutter.v1';
   const store = {
     get: key => { try { return localStorage.getItem(key); } catch { return null; } },
@@ -283,8 +284,8 @@
     }
   }
 
-  // Tabs: Plan, the extras this order includes, and the Interest Cutter,
-  // which shows its locked preview to anyone who doesn't own it yet.
+  // Tabs: Plan, the extras this order includes, and the Coach (tab key
+  // "cutter"), which anyone can open: three questions are free.
   function syncTabs() {
     const inTool = ['debts', 'result', 'cashflow', 'reset', 'cutter'].includes(view);
     $('tabs').hidden = !inTool;
@@ -299,6 +300,7 @@
     extras = list.filter(id => EXTRA_NAMES[id]);
     store.set(EXTRAS, JSON.stringify(extras));
     syncTabs();
+    if (view === 'cutter') renderCutter();
   }
   function openTab(name) {
     if (!['plan', 'cutter'].includes(name) && !owns(name)) name = 'plan';
@@ -309,7 +311,7 @@
       cfMonth = 0; cfPicked = null;
       renderCashflow(); show('cashflow');
     } else if (name === 'reset') { resetPicked = null; renderReset(); show('reset'); }
-    else if (name === 'cutter') { renderCutter(); show('cutter'); }
+    else if (name === 'cutter') { renderCutter(); show('cutter'); if (!coachOpened) { coachOpened = true; trackCoach('opened'); } }
     else if (state.debts.length && state.seen) { renderResult(); show('result'); }
     else { renderDebts(); show('debts'); }
   }
@@ -717,8 +719,9 @@
     button.disabled = false; button.textContent = 'Email me my link';
   });
 
-  // Interest Cutter: a lower rate against the plan as it is, call scripts with
-  // notes, and a tracker for when each 0% promo ends. All on this phone.
+  // The Coach's lower-rate tools (they were the Interest Cutter): a lower rate
+  // against the plan as it is, call scripts with notes, and a tracker for when
+  // each 0% promo ends. All on this phone.
   const C = window.PAYOFF_CUTTER || null;
   const make = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -738,19 +741,102 @@
   let openScript = null;
 
   function renderCutter() {
-    const owned = owns('cutter');
+    const owned = owns('coach');
     $('cutter-locked').hidden = owned;
     $('cutter-tool').hidden = !owned;
-    if (!owned) {
-      $('cutter-locked-title').textContent = C?.locked.title || 'Interest Cutter';
-      $('cutter-locked-lead').textContent = C?.locked.lead || '';
-      $('cutter-locked-benefits').replaceChildren(...(C?.offer.benefits || []).map(text => make('li', '', text)));
-      $('cutter-buy').textContent = C?.locked.yes || 'Get the Interest Cutter';
-      $('cutter-locked-fine').textContent = 'One-time payment. No subscription. Covered by the same 30-day money-back guarantee.';
-      return;
-    }
+    renderCoach();
+    if (!owned) return;
     $('cutter-disclaimer').textContent = C?.disclaimer || '';
     renderCutterCompare(); renderScripts(); renderPromos();
+  }
+
+  // Payoff Coach: questions about this plan. The buyer agrees once that each
+  // question carries their debts to the server and on to OpenAI, which keep
+  // nothing; the conversation itself stays on this phone. Three are free.
+  const COACH_KEY = 'payoff.coach.v1';
+  let coach = { agreed: false, turns: [], freeLeft: 3 }, asking = false, coachOpened = false;
+  try {
+    const saved = JSON.parse(store.get(COACH_KEY) || 'null');
+    if (saved && typeof saved === 'object') coach = { agreed: saved.agreed === true,
+      turns: (Array.isArray(saved.turns) ? saved.turns : []).filter(turn => ['user', 'assistant'].includes(turn?.role) && typeof turn.text === 'string').slice(-40),
+      freeLeft: Number.isInteger(saved.freeLeft) ? Math.max(0, Math.min(3, saved.freeLeft)) : 3 };
+  } catch { /* Start fresh. */ }
+  const saveCoach = () => store.set(COACH_KEY, JSON.stringify(coach));
+  // The Coach's steps for /funnel: names only, never numbers or questions.
+  function trackCoach(detail) {
+    let visitor = null, off = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent);
+    try { visitor = sessionStorage.getItem('payoff.visitor'); off = off || localStorage.getItem('marketel.noTrack') === '1'; } catch { /* Untracked. */ }
+    if (!off) fetch('/api/payoff/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ name: 'PayoffCoach', detail, visitorId: visitor }) }).catch(() => {});
+  }
+  function renderCoach() {
+    $('coach-consent').hidden = coach.agreed;
+    $('coach-chat').hidden = !coach.agreed;
+    $('coach-turns').replaceChildren(...coach.turns.map(turn => make('li', turn.role, turn.text)), ...(asking ? [make('li', 'assistant thinking', 'Working it out…')] : []));
+    $('coach-ideas').hidden = coach.turns.length > 0;
+    const out = !owns('coach') && coach.freeLeft <= 0;
+    $('coach-free').textContent = owns('coach') ? '' : out ? 'You’ve used your 3 free questions. Start the Coach below to keep asking.'
+      : `${coach.freeLeft} free question${coach.freeLeft === 1 ? '' : 's'} left.`;
+    $('coach-question').disabled = out || asking; $('coach-send').disabled = out || asking;
+  }
+  async function askCoach(text) {
+    const question = String(text || '').trim().slice(0, 600);
+    if (!question || asking) return;
+    if (!state.debts.length) { toast('Add your debts in Plan first, so the Coach can use your numbers.'); return; }
+    // Only real answers travel back as context; a failed turn never does.
+    const history = coach.turns.filter(turn => !turn.error).slice(-6).map(turn => ({ role: turn.role, text: turn.text }));
+    coach.turns.push({ role: 'user', text: question });
+    asking = true; $('coach-question').value = '';
+    saveCoach(); renderCoach();
+    trackCoach('asked');
+    let turn;
+    try {
+      const reply = await post('/api/payoff/coach/ask', { access, question, history, plan: { debts: state.debts, extra: state.extra, plan: state.plan } });
+      if (reply.status === 402) { coach.freeLeft = 0; turn = { text: reply.body.message || 'You’ve used your free questions.', error: true }; }
+      else if (!reply.ok || !reply.body.answer) turn = { text: reply.body.message || 'The Coach couldn’t answer just now. Please try again.', error: true };
+      else {
+        turn = { text: reply.body.answer };
+        if (Number.isInteger(reply.body.freeLeft)) coach.freeLeft = reply.body.freeLeft;
+      }
+    } catch { turn = { text: 'The Coach couldn’t answer just now. Check your connection and try again.', error: true }; }
+    asking = false;
+    coach.turns.push({ role: 'assistant', ...turn });
+    saveCoach(); renderCoach();
+    $('coach-turns').lastElementChild?.scrollIntoView({ block: 'nearest' });
+  }
+  // Starting the Coach from here always goes through Stripe's checkout.
+  async function startCoach(plan) {
+    trackCoach('start-' + plan);
+    const buttons = document.querySelectorAll('[data-coach-plan]');
+    $('coach-start-status').textContent = '';
+    for (const button of buttons) button.disabled = true;
+    try {
+      const reply = await post('/api/payoff/coach/subscribe', { access, plan });
+      if (reply.status === 409) { refreshExtras(); return; }
+      if (!reply.ok || !reply.body.url) throw new Error(reply.body.message || 'Checkout could not open. Please try again.');
+      return location.assign(reply.body.url);
+    } catch (error) { $('coach-start-status').textContent = error.message; }
+    finally { for (const button of buttons) button.disabled = false; }
+  }
+  async function manageCoach() {
+    trackCoach('manage');
+    $('coach-manage-status').textContent = '';
+    try {
+      const reply = await post('/api/payoff/coach/manage', { access });
+      if (!reply.ok || !reply.body.url) throw new Error(reply.body.message || 'That didn’t open. Please try again.');
+      location.assign(reply.body.url);
+    } catch (error) { $('coach-manage-status').textContent = error.message; }
+  }
+  // Back from Stripe's checkout for the Coach.
+  async function coachReturn(params) {
+    openTab('cutter');
+    if (params.get('coach') !== 'done') return toast('No charge. The Coach is here whenever you want it.');
+    try {
+      const reply = await post('/api/payoff/coach/confirm', { sessionId: params.get('coach_session') });
+      if (!reply.ok) throw new Error(reply.body.message || 'We couldn’t confirm the Coach yet. If you were charged, it opens shortly.');
+      setExtras(reply.body.extras);
+      toast('Your Payoff Coach is on. Ask away.');
+    } catch (error) { toast(error.message); }
   }
   const movesOn = debt => cut.moves[debt.id]?.on ?? debt.type === 'card';
   function cutterScenario() {
@@ -948,8 +1034,19 @@
   });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('cf-sheet').hidden) closeCfSheet(); });
 
+  $('coach-agree').addEventListener('click', () => { coach.agreed = true; saveCoach(); trackCoach('consent'); renderCoach(); $('coach-question').focus(); });
+  $('coach-form').addEventListener('submit', event => { event.preventDefault(); askCoach($('coach-question').value); });
+  $('coach-question').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); askCoach($('coach-question').value); } });
+  for (const idea of document.querySelectorAll('#coach-ideas button')) idea.addEventListener('click', () => askCoach(idea.textContent));
+  for (const button of document.querySelectorAll('[data-coach-plan]')) button.addEventListener('click', () => startCoach(button.dataset.coachPlan));
+  $('coach-manage').addEventListener('click', manageCoach);
+
   const params = new URLSearchParams(location.search);
   if (params.get('access')) openFromLink(params.get('access'));
+  else if (params.get('coach')) {
+    history.replaceState(null, '', '/payoff/app');
+    if (canUse()) { enter(); coachReturn(params); } else show('gate');
+  }
   else if (params.get('session_id') || params.get('payment_intent')) openAfterPayment(paymentReference());
   else if (canUse()) { enter(); refreshExtras(); }
   else show('gate');

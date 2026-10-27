@@ -1,48 +1,8 @@
 'use strict';
-// The Interest Cutter's words: the offer pages, the locked preview and the
-// call scripts. DRAFT for Lauren to review and edit before launch. Scripts
-// help people ask; they never promise what a card company will say.
+// The call scripts in the Coach's lower-rate tools (they were the Interest
+// Cutter), and the note under them. DRAFT for Lauren to review and edit.
+// Scripts help people ask; they never promise what a card company will say.
 window.PAYOFF_CUTTER = {
-  name: 'Interest Cutter',
-  prices: { regular: 14700, offer: 10700, discount: 4700 },
-  offer: {
-    progress: ['Order complete', 'Optional upgrade', 'Open your plan'],
-    headline: 'WAIT! Your plan isn’t complete yet...',
-    ready: 'Your Payoff plan is ready',
-    gap: 'It shows you the fastest order to pay off your debt. But it can’t lower your interest rates. And that’s where most of your money is going.',
-    question: 'The next question almost everyone has after seeing their date is: “Can I get the interest itself lowered?”',
-    built: 'So we built the Interest Cutter.',
-    benefits: [
-      'Word-for-word call scripts to ask your card companies for a lower rate, a late-fee refund, or their hardship program',
-      'See if a 0% balance transfer or a consolidation loan would actually save you money, after fees, before you switch',
-      'Never miss when a 0% promo ends',
-    ],
-    // Worked out with PayoffEngine.compareLowerRate: $65,000 across five cards
-    // and three loans, $1,350 a month, the two highest-rate cards moved to an
-    // 18-month 0% card (3% fee, $20,000 limit, 24.99% after).
-    example: {
-      label: 'Example: $65,000 of debt, $1,350 a month',
-      current: { title: 'Plan as it is', interest: '$54,228 interest', date: 'Debt-free 2034' },
-      option: { title: 'With a 0% transfer on two cards', interest: '$31,518 interest + fees', date: 'Debt-free 2032' },
-      saving: 'Saves $22,710 after fees',
-      note: 'An example, not your numbers. Inside Payoff, the Interest Cutter runs your own debts.',
-    },
-    yes: 'YES! Add the Interest Cutter to my plan',
-    oneClick: 'One click. No card to re-enter.',
-    guarantee: 'Covered by the same 30-day money-back guarantee.',
-    no: 'No thanks, I’ll keep paying full interest',
-  },
-  discount: {
-    headline: 'I get it. Money’s tight right now.',
-    lead: 'That’s exactly why you’re paying off debt. So here’s the Interest Cutter for less than half: one lowered rate could save you more than it costs.',
-    yes: 'YES! Add it for 47',
-    no: 'No thanks, take me to my plan',
-  },
-  locked: {
-    title: 'Interest Cutter',
-    lead: 'Your plan picks the order. This checks whether you can lower the rate itself.',
-    yes: 'Get the Interest Cutter, $147',
-  },
   disclaimer: 'Scripts are suggestions for your own calls. Card companies decide whether to lower a rate, refund a fee or offer a hardship program, and nothing here guarantees they will. Comparisons are estimates from the numbers you enter, before any credit check, and not financial advice.',
   scripts: [
     {

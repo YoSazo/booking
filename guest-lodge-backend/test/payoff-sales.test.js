@@ -4,11 +4,12 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
-const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER, CUTTER } = require('../payoff');
+const { registerPayoff, basket, paidOrder, paidIntent, verifyAccess, accessToken, PRODUCT, VERSION, PREORDER } = require('../payoff');
 
-function fixture({ failEmail = false, ready = true, production = false, clock = Date.now, failText = false } = {}) {
+function fixture({ failEmail = false, ready = true, production = false, clock = Date.now, failText = false, coach = true } = {}) {
   const rows = new Map(), creates = [], emails = [], sessions = new Map(), capi = [], intents = new Map(), payments = [], methods = new Map(), customers = [], texts = [];
-  const world = { decline: false };
+  const subscriptions = new Map(), subscribes = [], prices = new Map(), coachCalls = [], portals = [];
+  const world = { decline: false, subscriptionStatus: 'active', coachFail: false, coachTool: false };
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
     create: async ({ data }) => {
@@ -44,16 +45,41 @@ function fixture({ failEmail = false, ready = true, production = false, clock = 
     update: async (id, { metadata }) => { const i = intents.get(id); i.metadata = { ...i.metadata, ...metadata }; return i; },
     retrieve: async id => { if (!intents.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return intents.get(id); },
     search: async ({ query }) => ({ data: [...intents.values()].filter(i => query.includes(`metadata['email']:'${i.metadata.email}'`) && i.status === 'succeeded') }),
-  } };
+  }, prices: {
+    list: async ({ lookup_keys }) => ({ data: [...prices.values()].filter(price => lookup_keys.includes(price.lookup_key)) }),
+    create: async (params, options) => { const price = { id: 'price_' + params.lookup_key, ...params, options }; prices.set(price.id, price); return price; },
+  }, products: {
+    retrieve: async () => { throw Object.assign(new Error('missing'), { code: 'resource_missing' }); },
+    create: async params => ({ id: params.id }),
+  }, subscriptions: {
+    create: async (params, options) => {
+      subscribes.push({ params, options });
+      if (world.decline) throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' });
+      const made = { object: 'subscription', id: 'sub_test' + String(subscribes.length).padStart(8, '0'), status: world.subscriptionStatus, customer: params.customer, metadata: { ...params.metadata } };
+      subscriptions.set(made.id, made); return made;
+    },
+    retrieve: async id => { if (!subscriptions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return subscriptions.get(id); },
+    cancel: async id => { const made = subscriptions.get(id); made.status = 'canceled'; return made; },
+  }, billingPortal: { sessions: {
+    create: async params => { portals.push(params); return { url: 'https://billing.stripe.com/p/session/test_portal' }; },
+  } } };
+  // The Coach's model: asks the engine once when coachTool is set, then answers.
+  const coachClient = { responses: { create: async params => {
+    coachCalls.push(params);
+    if (world.coachFail) throw Object.assign(new Error('OpenAI down'), { status: 503 });
+    const toolOutput = params.input.find(item => item.type === 'function_call_output');
+    if (world.coachTool && !toolOutput) return { output: [{ type: 'function_call', call_id: 'call_1', name: 'run_plan', arguments: JSON.stringify({ strategy: 'current', extra_monthly: 150, one_time: 0 }) }] };
+    return { output: [{ type: 'message' }], output_text: toolOutput ? `With $150 extra: ${JSON.parse(toolOutput.output).debt_free}.` : 'Pay the highest rate first.' };
+  } } };
   const mail = { sendMail: async message => { if (failEmail) { failEmail = false; throw new Error('SMTP unavailable'); } emails.push(message); } };
   const env = production ? { STRIPE_MARKETEL_SECRET_KEY: 'sk_test_no_live_charges', NODE_ENV: 'production' } : { NODE_ENV: 'test' };
   const app = express();
   const registration = registerPayoff(app, { prisma, stripe: ready ? stripe : null, mail, env,
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; }, capiConfigured: true,
     text: async body => { if (failText) { failText = false; throw new Error('Twilio unavailable'); } texts.push(body); },
-    isExcludedEmail: email => email === 'owner@example.test', now: clock });
+    isExcludedEmail: email => email === 'owner@example.test', now: clock, coachClient: coach ? coachClient : null });
   app.get('/claims', (_req, res) => res.send('Existing Claims page'));
-  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments, methods, customers, world, texts };
+  return { app, registration, rows, creates, emails, sessions, prisma, stripe, mail, capi, intents, payments, methods, customers, world, texts, subscriptions, subscribes, prices, coachCalls, portals };
 }
 async function serve(world, fn) {
   const server = world.app.listen(0, '127.0.0.1');
@@ -217,13 +243,13 @@ test('an order with extras, new or preordered, opens them too and the email says
     assert.doesNotMatch(w.emails[0].text, /in development/);
   }
 });
-test('access tells the tool which extras the order has; owners get both; Stripe trouble keeps what the tool knew', async () => {
+test('access tells the tool which extras the order has; owners get the Coach and all it includes; Stripe trouble keeps what the tool knew', async () => {
   const w = fixture(); const session = paid(); w.sessions.set(session.id, session);
   await serve(w, async ({ post }) => {
     const { body } = await post('/api/payoff/confirm', { sessionId: session.id });
     assert.deepEqual(body.extras, []);
     assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: [] });
-    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, 'own_0123456789abcdef01234567') })).body, { ok: true, extras: ['cashflow', 'reset', 'cutter'] });
+    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, 'own_0123456789abcdef01234567') })).body, { ok: true, extras: ['coach', 'cashflow', 'reset'] });
     w.stripe.checkout.sessions.retrieve = async () => { throw new Error('Stripe down'); };
     assert.deepEqual((await post('/api/payoff/access', { token: body.access })).body, { ok: true, extras: null });
   });
@@ -750,120 +776,179 @@ test('the quiz earns the $5 only by finishing within 10 minutes; its looping clo
   });
 });
 
-// Interest Cutter: the offer right after paying, and at the regular price from Payoff.
-function cutterWorld({ wallet = null, time = Date.parse('2026-10-21T18:00:00Z') } = {}) {
+// The Coach: the one upsell, a subscription, offered right after paying and from inside Payoff.
+function coachWorld({ wallet = null, time = Date.parse('2026-10-27T18:00:00Z'), coach = true } = {}) {
   let now = time;
-  const w = fixture({ clock: () => now });
+  const w = fixture({ clock: () => now, coach });
   const parent = intent([], { customer: 'cus_buyer', payment_method: 'pm_buyer', created: Math.floor(time / 1000) });
   w.intents.set(parent.id, parent);
   w.methods.set('pm_buyer', { id: 'pm_buyer', type: 'card', customer: 'cus_buyer', card: { wallet: wallet ? { type: wallet } : null } });
   return { w, parent, advance: ms => { now += ms; } };
 }
+const coachMetadata = (parent, plan) => ({ product: 'marketel-payoff-coach', offerVersion: 'payoff-coach-v1', plan, parentOrder: parent.id,
+  visitorId: 'v_abcdefghijk', noTrack: '', email: 'buyer@example.test' });
 
-test('the Interest Cutter charges the card kept from the order in one click, unlocks its tab, emails a receipt and tells Meta its own event', async () => {
-  const { w, parent } = cutterWorld();
+test('the Coach starts in one tap on the card kept from the order, is recorded on the order, opens everything it includes, and emails, texts and tells Meta once', async () => {
+  const { w, parent } = coachWorld();
   await serve(w, async ({ post }) => {
     const confirmed = await post('/api/payoff/confirm', { paymentIntent: parent.id });
-    assert.equal(confirmed.status, 200); assert.equal(confirmed.body.oneClick, true, 'a plain card can be charged again');
-    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
-    assert.equal(r.status, 200); assert.equal(r.body.paid, true); assert.equal(r.body.value, 107);
-    assert.deepEqual(r.body.extras, ['cutter']);
-    const { params, options } = w.payments.at(-1);
-    assert.equal(params.amount, CUTTER.prices.offer); assert.equal(params.amount, 10700);
-    assert.equal(params.customer, 'cus_buyer'); assert.equal(params.payment_method, 'pm_buyer');
-    assert.equal(params.confirm, true); assert.deepEqual(params.payment_method_types, ['card']);
-    assert.equal(params.off_session, undefined, 'the buyer is right there; never an unattended charge');
-    assert.deepEqual({ ...params.metadata }, { product: 'marketel-payoff-cutter', offerVersion: 'payoff-cutter-v1', offer: 'offer', parentOrder: parent.id,
-      visitorId: 'v_abcdefghijk', noTrack: '', email: 'buyer@example.test' });
-    assert.equal(options.idempotencyKey, `payoff-cutter:${parent.id}:offer:saved`);
-    assert.equal(w.intents.get(parent.id).metadata.cutter, r.body.reference, 'the order records its Interest Cutter');
-    assert.equal(w.emails.at(-1).subject, 'Your Interest Cutter is ready');
-    assert.match(w.emails.at(-1).text, /Interest Cutter: \$107\.00 USD/); assert.match(w.emails.at(-1).text, /30-day money-back guarantee/);
-    assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffUpgradePaid').length, 1);
-    assert.deepEqual(w.capi.filter(e => e.name === 'InterestCutterPurchase').map(e => [e.value, e.eventId]), [[107, `payoff-cutter.${r.body.reference}`]]);
+    assert.equal(confirmed.body.oneClick, true, 'a plain card can start it in one tap');
+    const r = await post('/api/payoff/coach/subscribe', { paymentIntent: parent.id, plan: 'month' });
+    assert.equal(r.status, 200); assert.equal(r.body.paid, true); assert.equal(r.body.plan, 'month'); assert.equal(r.body.value, 9);
+    assert.deepEqual(r.body.extras, ['coach', 'cashflow', 'reset']);
+    const { params, options } = w.subscribes.at(-1);
+    assert.deepEqual({ customer: params.customer, default_payment_method: params.default_payment_method, items: params.items, payment_behavior: params.payment_behavior },
+      { customer: 'cus_buyer', default_payment_method: 'pm_buyer', items: [{ price: 'price_payoff-coach-month-v1' }], payment_behavior: 'allow_incomplete' });
+    assert.equal(params.off_session, undefined, 'the buyer is right there; never an unattended first charge');
+    assert.deepEqual(params.metadata, coachMetadata(parent, 'month'));
+    assert.equal(options.idempotencyKey, `payoff-coach:${parent.id}:month:saved`);
+    // Both prices exist once, at their amounts.
+    assert.deepEqual([...w.prices.values()].map(p => [p.lookup_key, p.unit_amount, p.recurring.interval, p.currency]),
+      [['payoff-coach-month-v1', 900, 'month', 'usd'], ['payoff-coach-year-v1', 6700, 'year', 'usd']]);
+    assert.equal(w.intents.get(parent.id).metadata.coach, r.body.reference, 'the order records its Coach');
+    const mail = w.emails.at(-1);
+    assert.equal(mail.subject, 'Your Payoff Coach is on');
+    assert.match(mail.text, /Payoff Coach: \$9 a month until you cancel\. It renews automatically each month\./);
+    assert.match(mail.text, /Cancel any time: in Payoff, open the Coach tab and tap “Manage or cancel”/);
+    assert.equal([...w.rows.values()].filter(row => row.name === 'PayoffCoachPaid').length, 1);
+    assert.deepEqual(w.capi.filter(e => e.name === 'CoachSubscribe').map(e => [e.value, e.eventId]), [[9, `payoff-coach.${r.body.reference}`]]);
     assert.equal(w.capi.filter(e => e.name === 'Purchase').length, 1, 'only the first purchase is a Purchase');
-    assert.deepEqual(w.texts.slice(-1), ['Payoff upsell: $107.00 (Interest Cutter).']);
-    const access = await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) });
-    assert.deepEqual(access.body.extras, ['cutter']);
-    // One per order.
-    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'discount' })).status, 409);
-    // A refund takes it away again.
-    w.intents.get(r.body.reference).latest_charge = { refunded: true, amount_refunded: 10700 };
+    assert.deepEqual(w.texts.slice(-1), ['Payoff Coach started: $9 a month.']);
+    assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) })).body.extras, ['coach', 'cashflow', 'reset']);
+    // One per order, and a cancelled Coach closes again.
+    assert.equal((await post('/api/payoff/coach/subscribe', { paymentIntent: parent.id, plan: 'year' })).status, 409);
+    w.subscriptions.get(r.body.reference).status = 'canceled';
     assert.deepEqual((await post('/api/payoff/access', { token: accessToken(SECRET, parent.id) })).body.extras, []);
   });
 });
 
-test('the one-time prices end 30 minutes after the order; the regular price works any time from the access link', async () => {
-  const { w, parent, advance } = cutterWorld();
-  await serve(w, async ({ post }) => {
-    advance(31 * 60000);
-    for (const offer of ['offer', 'discount']) assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer })).status, 410, offer);
-    assert.equal((await post('/api/payoff/upgrade', { access: accessToken(SECRET, parent.id), offer: 'offer' })).status, 410, 'the link never unlocks a one-time price');
-    const regular = await post('/api/payoff/upgrade', { access: accessToken(SECRET, parent.id), offer: 'regular' });
-    assert.equal(regular.status, 200); assert.equal(w.payments.at(-1).params.amount, 14700);
-    assert.equal(regular.body.next, 'form', 'a later visit never reuses the card kept from the order');
-    assert.equal(w.payments.at(-1).params.payment_method, undefined);
-    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'free' })).status, 400);
-    assert.equal((await post('/api/payoff/upgrade', { access: 'forged.token', offer: 'regular' })).status, 400);
-    assert.equal((await post('/api/payoff/upgrade', { access: accessToken(SECRET, 'own_0123456789abcdef01234567'), offer: 'regular' })).status, 400);
-    assert.equal((await post('/api/payoff/upgrade', { paymentIntent: 'pi_3MissingOrder1234', offer: 'regular' })).status, 404);
+test('after 30 minutes, from the access link, with a wallet, or when the card needs another step, the Coach opens Stripe’s checkout instead', async () => {
+  const fresh = coachWorld();
+  await serve(fresh.w, async ({ post }) => {
+    const link = await post('/api/payoff/coach/subscribe', { access: accessToken(SECRET, fresh.parent.id), plan: 'year' });
+    assert.equal(link.body.next, 'checkout', 'a later visit never reuses the card kept from the order');
+    assert.equal(fresh.w.subscribes.length, 0);
+    const { params } = fresh.w.creates.at(-1);
+    assert.equal(params.mode, 'subscription'); assert.deepEqual(params.line_items, [{ price: 'price_payoff-coach-year-v1', quantity: 1 }]);
+    assert.equal(params.customer, 'cus_buyer');
+    assert.deepEqual(params.metadata, coachMetadata(fresh.parent, 'year')); assert.deepEqual(params.subscription_data.metadata, coachMetadata(fresh.parent, 'year'));
+    assert.equal(params.success_url, 'https://bookmarketel.com/payoff/app?coach=done&coach_session={CHECKOUT_SESSION_ID}');
+    assert.match(params.custom_text.submit.message, /\$67 a year until you cancel/);
+    fresh.advance(31 * 60000);
+    assert.equal((await post('/api/payoff/coach/subscribe', { paymentIntent: fresh.parent.id, plan: 'month' })).body.next, 'checkout');
+    assert.equal(fresh.w.subscribes.length, 0, 'the one tap ends 30 minutes after the order');
+    for (const [body, status] of [[{ paymentIntent: fresh.parent.id, plan: 'week' }, 400], [{ access: 'forged.token', plan: 'month' }, 400],
+      [{ access: accessToken(SECRET, 'own_0123456789abcdef01234567'), plan: 'month' }, 400], [{ paymentIntent: 'pi_3MissingOrder1234', plan: 'month' }, 404]]) {
+      assert.equal((await post('/api/payoff/coach/subscribe', body)).status, status, JSON.stringify(body));
+    }
+  });
+  for (const wallet of ['apple_pay', 'google_pay']) {
+    const { w, parent } = coachWorld({ wallet });
+    await serve(w, async ({ post }) => {
+      assert.equal((await post('/api/payoff/confirm', { paymentIntent: parent.id })).body.oneClick, false);
+      assert.equal((await post('/api/payoff/coach/subscribe', { paymentIntent: parent.id, plan: 'month' })).body.next, 'checkout', wallet);
+      assert.equal(w.subscribes.length, 0, wallet);
+    });
+  }
+  const declined = coachWorld();
+  await serve(declined.w, async ({ post }) => {
+    declined.w.world.decline = true;
+    const r = await post('/api/payoff/coach/subscribe', { paymentIntent: declined.parent.id, plan: 'month' });
+    assert.equal(r.body.next, 'checkout'); assert.match(r.body.declined, /Finish on the secure checkout/);
+    declined.w.world.decline = false; declined.w.world.subscriptionStatus = 'incomplete';
+    const action = await post('/api/payoff/coach/subscribe', { paymentIntent: declined.parent.id, plan: 'year' });
+    assert.equal(action.body.next, 'checkout');
+    assert.equal([...declined.w.subscriptions.values()].at(-1).status, 'canceled', 'an unfinished one is never left running');
   });
 });
 
-for (const wallet of ['apple_pay', 'google_pay']) test(`a ${wallet} order pays for the Interest Cutter in a payment form, never with the saved wallet`, async () => {
-  const { w, parent } = cutterWorld({ wallet });
+test('back from Stripe’s checkout the Coach starts once; an unfinished or foreign checkout never opens it; the webhook starts it if the browser didn’t, and counts renewals', async () => {
+  const { w, parent } = coachWorld();
   await serve(w, async ({ post }) => {
-    assert.equal((await post('/api/payoff/confirm', { paymentIntent: parent.id })).body.oneClick, false);
-    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'discount' });
-    assert.equal(r.status, 200); assert.equal(r.body.next, 'form'); assert.equal(r.body.amount, 4700); assert.ok(r.body.clientSecret);
-    const { params, options } = w.payments.at(-1);
-    assert.equal(params.payment_method, undefined); assert.equal(params.confirm, undefined);
-    assert.deepEqual(params.automatic_payment_methods, { enabled: true }); assert.equal(params.customer, 'cus_buyer');
-    assert.equal(options.idempotencyKey, `payoff-cutter:${parent.id}:discount:form`);
-    // Paid in the form: confirming it unlocks the tab.
-    const made = w.intents.get(r.body.id);
-    Object.assign(made, { status: 'processing' });
-    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 202);
-    Object.assign(made, { status: 'succeeded', amount_received: 4700, livemode: true, latest_charge: { refunded: false, amount_refunded: 0 } });
-    const done = await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id });
-    assert.equal(done.status, 200); assert.deepEqual(done.body.extras, ['cutter']);
-    assert.equal(w.intents.get(parent.id).metadata.cutter, made.id);
+    w.subscriptions.set('sub_testHosted0001', { object: 'subscription', id: 'sub_testHosted0001', status: 'active', customer: 'cus_buyer', metadata: coachMetadata(parent, 'year') });
+    const done = { id: 'cs_test_coachDone12345', mode: 'subscription', status: 'complete', subscription: 'sub_testHosted0001', metadata: coachMetadata(parent, 'year') };
+    w.sessions.set(done.id, done);
+    const r = await post('/api/payoff/coach/confirm', { sessionId: done.id });
+    assert.equal(r.status, 200); assert.equal(r.body.value, 67); assert.deepEqual(r.body.extras, ['coach', 'cashflow', 'reset']);
+    assert.equal(w.intents.get(parent.id).metadata.coach, 'sub_testHosted0001');
+    await post('/api/payoff/coach/confirm', { sessionId: done.id });
+    assert.equal(w.emails.filter(m => m.subject === 'Your Payoff Coach is on').length, 1, 'once, however often it is confirmed');
+    assert.equal(w.capi.filter(e => e.name === 'CoachSubscribe').length, 1);
+    w.sessions.set('cs_test_coachOpen123456', { ...done, id: 'cs_test_coachOpen123456', status: 'open', subscription: null });
+    assert.equal((await post('/api/payoff/coach/confirm', { sessionId: 'cs_test_coachOpen123456' })).status, 402);
+    w.sessions.set('cs_test_otherProduct1234', { ...done, id: 'cs_test_otherProduct1234', metadata: { product: 'marketel-inspect' } });
+    assert.equal((await post('/api/payoff/coach/confirm', { sessionId: 'cs_test_otherProduct1234' })).status, 404);
+  });
+  // The webhook: the first invoice starts it, later ones are renewals, other products' invoices are not ours.
+  const hook = coachWorld();
+  hook.w.subscriptions.set('sub_testWebhook0001', { object: 'subscription', id: 'sub_testWebhook0001', status: 'active', customer: 'cus_buyer', metadata: coachMetadata(hook.parent, 'month') });
+  const invoice = (id, reason, metadata = coachMetadata(hook.parent, 'month')) => ({ type: 'invoice.paid', data: { object: { id, billing_reason: reason, amount_paid: 900,
+    parent: { subscription_details: { subscription: 'sub_testWebhook0001', metadata } } } } });
+  assert.equal(await hook.w.registration.handleStripeEvent(invoice('in_first', 'subscription_create'), {}), true);
+  assert.equal(await hook.w.registration.handleStripeEvent(invoice('in_first', 'subscription_create'), {}), true);
+  assert.equal(hook.w.intents.get(hook.parent.id).metadata.coach, 'sub_testWebhook0001');
+  assert.equal(hook.w.emails.filter(m => m.subject === 'Your Payoff Coach is on').length, 1);
+  assert.equal(await hook.w.registration.handleStripeEvent(invoice('in_second', 'subscription_cycle'), {}), true);
+  assert.equal(await hook.w.registration.handleStripeEvent(invoice('in_second', 'subscription_cycle'), {}), true);
+  assert.equal([...hook.w.rows.values()].filter(row => row.name === 'PayoffCoachRenewed').length, 1);
+  assert.deepEqual(hook.w.texts.filter(t => t.startsWith('Payoff Coach renewed')), ['Payoff Coach renewed: $9.00.']);
+  let looked = 0; const retrieve = hook.w.stripe.subscriptions.retrieve;
+  hook.w.stripe.subscriptions.retrieve = async id => { looked += 1; return retrieve(id); };
+  assert.equal(await hook.w.registration.handleStripeEvent(invoice('in_inspect', 'subscription_cycle', { product: 'marketel-inspect' }), {}), false);
+  assert.equal(looked, 0, 'another product’s invoice is left to its own handler without a Stripe call');
+});
+
+test('Coach questions: three free on each order, then only with the Coach; numbers come from the engine; nothing is stored; a failed answer gives the question back', async () => {
+  const { w, parent } = coachWorld();
+  const access = accessToken(SECRET, parent.id);
+  const plan = { debts: [{ id: 'a', name: 'Chase', type: 'card', balance: 520000, apr: 24.99, minimum: 15600 }, { id: 'b', name: 'Car loan', type: 'loan', balance: 1200000, apr: 7.9, minimum: 32000 }], extra: 5000, plan: 'avalanche' };
+  await serve(w, async ({ post }) => {
+    w.world.coachTool = true;
+    const first = await post('/api/payoff/coach/ask', { access, question: 'What if I add $100 a month?', plan });
+    assert.equal(first.status, 200); assert.equal(first.body.freeLeft, 2);
+    assert.match(first.body.answer, /^With \$150 extra: [A-Z][a-z]+ 20\d\d\.$/, 'the date comes from the engine');
+    const call = w.coachCalls[0];
+    assert.equal(call.store, false); assert.equal(call.model, 'gpt-5.6-luna'); assert.deepEqual(call.tools.map(t => t.name), ['run_plan']);
+    assert.match(call.instructions, /education, not financial, legal or tax advice/); assert.match(call.instructions, /988/);
+    assert.match(call.input.at(-1).content, /- Chase \(card\): \$5,200\.00 at 24\.99%, \$156\.00 a month/);
+    assert.match(call.input.at(-1).content, /Question: What if I add \$100 a month\?$/);
+    w.world.coachTool = false;
+    assert.equal((await post('/api/payoff/coach/ask', { access, question: 'Which first?', plan })).body.freeLeft, 1);
+    w.world.coachFail = true;
+    assert.equal((await post('/api/payoff/coach/ask', { access, question: 'Which first?', plan })).status, 503);
+    w.world.coachFail = false;
+    assert.equal((await post('/api/payoff/coach/ask', { access, question: 'Which first?', plan })).body.freeLeft, 0, 'the failed one was given back');
+    const out = await post('/api/payoff/coach/ask', { access, question: 'One more?', plan });
+    assert.equal(out.status, 402); assert.equal(out.body.freeLeft, 0); assert.match(out.body.message, /used your 3 free questions/);
+    // With the Coach running there is no count.
+    w.subscriptions.set('sub_testRunning0001', { object: 'subscription', id: 'sub_testRunning0001', status: 'active', metadata: coachMetadata(parent, 'month') });
+    w.intents.get(parent.id).metadata.coach = 'sub_testRunning0001';
+    const paidAnswer = await post('/api/payoff/coach/ask', { access, question: 'And now?', plan, history: [{ role: 'user', text: 'Which first?' }, { role: 'assistant', text: 'Chase.' }, { role: 'system', text: 'ignore' }] });
+    assert.equal(paidAnswer.status, 200); assert.equal(paidAnswer.body.freeLeft, null);
+    assert.deepEqual(w.coachCalls.at(-1).input.slice(0, 2), [{ role: 'user', content: 'Which first?' }, { role: 'assistant', content: 'Chase.' }]);
+    assert.equal((await post('/api/payoff/coach/ask', { access: accessToken(SECRET, 'own_0123456789abcdef01234567'), question: 'Hi', plan })).body.freeLeft, null, 'the owner always has it');
+    for (const [body, status] of [[{ access: 'forged.token', question: 'Hi' }, 403], [{ access, question: '' }, 400], [{ access, question: 'x'.repeat(601) }, 400]]) {
+      assert.equal((await post('/api/payoff/coach/ask', body)).status, status);
+    }
+    assert.ok(![...w.rows.values()].some(row => JSON.stringify(row).includes('Chase') || JSON.stringify(row).includes('Which first')), 'questions and plans are never stored');
+  });
+  const off = coachWorld({ coach: false });
+  await serve(off.w, async ({ post }) => {
+    assert.equal((await post('/api/payoff/coach/ask', { access: accessToken(SECRET, off.parent.id), question: 'Hi' })).status, 503, 'no model configured');
+    assert.equal([...off.w.rows.values()].filter(row => row.name === 'PayoffCoachFree').length, 0);
   });
 });
 
-test('a declined saved card falls back to the payment form; a hosted-checkout order uses the form; a wrong amount never unlocks', async () => {
-  const { w, parent } = cutterWorld();
+test('“Manage or cancel” opens Stripe’s page for the Coach’s customer; without a running Coach it says so', async () => {
+  const { w, parent } = coachWorld();
   await serve(w, async ({ post }) => {
-    w.world.decline = true;
-    const declined = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
-    assert.equal(declined.status, 200); assert.equal(declined.body.next, 'form'); assert.equal(declined.body.declined, 'Your card was declined.');
-    w.world.decline = false;
-    // A hosted-checkout order has no card kept on the page.
-    const session = { ...paid([], { preorder: false }), created: Math.floor(Date.parse('2026-10-21T18:00:00Z') / 1000) };
-    w.sessions.set(session.id, session);
-    const hosted = await post('/api/payoff/upgrade', { sessionId: session.id, offer: 'offer' });
-    assert.equal(hosted.body.next, 'form'); assert.equal(w.payments.at(-1).params.customer, undefined);
-    const made = w.intents.get(hosted.body.id);
-    Object.assign(made, { status: 'succeeded', amount_received: 999, latest_charge: {} });
-    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 402, 'not one of the listed prices');
-    Object.assign(made, { amount_received: 10700 });
-    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: made.id })).status, 200);
-    assert.equal(w.sessions.get(session.id).metadata.cutter, made.id, 'a hosted order records it on its session');
-    assert.equal((await post('/api/payoff/upgrade/confirm', { paymentIntent: parent.id })).status, 404, 'an order is not an upgrade');
-  });
-});
-
-test('the payment_intent.succeeded webhook finishes an Interest Cutter paid in a form, once', async () => {
-  const { w, parent } = cutterWorld({ wallet: 'apple_pay' });
-  await serve(w, async ({ post }) => {
-    const r = await post('/api/payoff/upgrade', { paymentIntent: parent.id, offer: 'offer' });
-    const made = Object.assign(w.intents.get(r.body.id), { status: 'succeeded', amount_received: 10700, livemode: true, latest_charge: { refunded: false } });
-    const event = { type: 'payment_intent.succeeded', data: { object: { id: made.id, metadata: made.metadata } } };
-    assert.equal(await w.registration.handleStripeEvent(event, {}), true);
-    assert.equal(await w.registration.handleStripeEvent(event, {}), true);
-    assert.equal(w.emails.filter(m => m.subject === 'Your Interest Cutter is ready').length, 1);
-    assert.equal(w.capi.filter(e => e.name === 'InterestCutterPurchase').length, 1);
-    assert.equal(w.intents.get(parent.id).metadata.cutter, made.id);
+    const access = accessToken(SECRET, parent.id);
+    assert.equal((await post('/api/payoff/coach/manage', { access })).status, 404);
+    await post('/api/payoff/coach/subscribe', { paymentIntent: parent.id, plan: 'month' });
+    const r = await post('/api/payoff/coach/manage', { access });
+    assert.equal(r.status, 200); assert.equal(r.body.url, 'https://billing.stripe.com/p/session/test_portal');
+    assert.deepEqual(w.portals.at(-1), { customer: 'cus_buyer', return_url: 'https://bookmarketel.com/payoff/app' });
+    assert.equal((await post('/api/payoff/coach/manage', { access: accessToken(SECRET, 'own_0123456789abcdef01234567') })).status, 403);
   });
 });
 

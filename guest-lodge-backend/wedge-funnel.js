@@ -252,7 +252,6 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Typed a valid email (Meta: StartedPaying)', ['PayoffOrder:email']],
     ['Started card details', ['PayoffOrder:card-start']],
     ['Finished card details', ['PayoffOrder:card-done']],
-    ['Scrolled to the extras', ['PayoffOrder:saw-addons']],
     ['Scrolled to the button', ['PayoffOrder:saw-button']],
     ['Tapped Complete Order', ['PayoffCheckoutTapped']],
     ['Paid', ['PayoffPaid']],
@@ -265,8 +264,6 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Tapped “Pay by card” at the top', ['PayoffOrder:top-card']],
     ['Picked bank account', ['PayoffOrder:method-bank']],
     ['Picked Klarna', ['PayoffOrder:method-klarna']],
-    ['Added the Cash-flow calendar', ['PayoffOrder:addon-cashflow']],
-    ['Added the Spending reset', ['PayoffOrder:addon-reset']],
     ['Tapped with no name', ['PayoffOrder:missing-name']],
     ['Tapped with no valid email', ['PayoffOrder:missing-email']],
     ['Tapped with card details unfinished', ['PayoffOrder:card-incomplete']],
@@ -291,7 +288,22 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['No referrer: typed, QR, or bookmark', ['PayoffFrom:direct']],
     ['From another site', ['PayoffFrom:other']],
   ] },
-  // The Interest Cutter, sold after the first purchase: each price on its own page.
+  // The Payoff Coach, the one upsell since the Interest Cutter: offered right
+  // after paying, and in its own tab inside Payoff (three questions free).
+  { key: 'coach', label: 'Payoff Coach', hideWhenEmpty: true, steps: [
+    ['Saw the Coach offer after paying', ['PayoffUpgradeViewed:coach']],
+    ['Tapped Yes: yearly', ['PayoffUpgradeAccepted:year']],
+    ['Tapped Yes: monthly', ['PayoffUpgradeAccepted:month']],
+    ['Said no thanks', ['PayoffUpgradeDeclined:coach']],
+    ['Opened the Coach tab', ['PayoffCoach:opened']],
+    ['Agreed to send their numbers', ['PayoffCoach:consent']],
+    ['Asked the Coach a question', ['PayoffCoach:asked']],
+    ['Tapped start in the Coach tab', ['PayoffCoach:start-year', 'PayoffCoach:start-month']],
+    ['Started the Coach: yearly', ['PayoffCoachPaid:year']],
+    ['Started the Coach: monthly', ['PayoffCoachPaid:month']],
+    ['Renewed the Coach', ['PayoffCoachRenewed']],
+  ] },
+  // The Interest Cutter, the upsell before the Coach: each price on its own page.
   { key: 'cutter', label: 'Interest Cutter after purchase', hideWhenEmpty: true, steps: [
     ['Saw the 107 offer', ['PayoffUpgradeViewed:offer']],
     ['Tapped YES at 107', ['PayoffUpgradeAccepted:offer']],
@@ -306,9 +318,10 @@ const PAYOFF_BRANCHES = Object.freeze([
 ]);
 const DEFINITIONS = Object.freeze({
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
-    PayoffUpgradeDeclined: 'Said no to an Interest Cutter offer', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed' }),
+    PayoffUpgradeDeclined: 'Said no to an upsell', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed', PayoffCoach: 'Coach tab',
+    PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
-      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder']),
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
       steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },

@@ -2,12 +2,14 @@
 
 // Payoff is sold once and opens straight after payment. Stripe is the durable
 // order ledger; no financial inputs or payment details are stored here. The
-// buyer's numbers stay in their browser (payoff-web/app.js).
+// buyer's numbers stay in their browser (payoff-web/app.js), and reach the
+// server only with a question to the Coach, which keeps nothing.
 const express = require('express');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { sanitizeInspectAttribution, inspectPublishableKey } = require('./inspect');
 const { OFFER, issueOffer, readOffer, offerCookie, orderDiscount, QUIZ, issueQuiz, readQuiz, quizCookie } = require('./payoff-offer');
+const { COACH, askCoach, cleanPlan } = require('./payoff-coach');
 
 const PRODUCT = 'marketel-payoff';
 // v2 records the $33.11 base price; v1 receipts retain their $33/$28 amounts.
@@ -26,22 +28,22 @@ const ITEMS = Object.freeze({
   cashflow: { name: 'Cash-flow calendar', cents: 2200 },
   reset: { name: 'Spending reset', cents: 900 },
 });
-// The Interest Cutter, sold after the first purchase: $107 on the page right
-// after paying, then $47 on the next, each only within WINDOW of that payment;
-// $147 inside Payoff at any time. Its own PaymentIntent, linked to the order
-// it belongs to through `parentOrder`, and recorded on that order as `cutter`.
-const CUTTER = Object.freeze({
-  product: 'marketel-payoff-cutter', version: 'payoff-cutter-v1', name: 'Interest Cutter',
-  prices: Object.freeze({ offer: 10700, discount: 4700, regular: 14700 }), windowMs: 30 * 60 * 1000,
-});
+// The Coach is the one upsell: a subscription (COACH in payoff-coach.js) on the
+// order's Stripe customer, linked to the order through `parentOrder` and
+// recorded on it as `coach`. Right after paying, a card kept from the order
+// starts it in one tap for COACH_WINDOW_MS; otherwise Stripe's checkout.
+const COACH_WINDOW_MS = 30 * 60 * 1000;
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
-  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder'];
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
 const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
-const UPGRADE_OFFERS = ['offer', 'discount', 'regular'];
+// 'offer', 'discount' and 'regular' were the Interest Cutter's pages; they
+// stay so older rows still read. The Coach's page is 'coach', its plans
+// 'month' and 'year'.
+const UPGRADE_OFFERS = ['offer', 'discount', 'regular', 'coach', 'month', 'year'];
 // measure.js: seconds on screen, and the sales letter's sections in page order.
 const ON_SCREEN = ['time10', 'time60', 'time180'];
 const LETTER_SECTIONS = ['problem', 'example', 'mechanism', 'proof', 'founder', 'included', 'faq'];
@@ -50,7 +52,9 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
   PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
   PayoffOrder: [...ON_SCREEN, 'cart', 'form20', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'top-card', 'name', 'email',
-    'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'] });
+    'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'],
+  // The Coach tab inside Payoff: opened, agreed to send their numbers, asked, tapped to start it.
+  PayoffCoach: ['opened', 'consent', 'asked', 'start-month', 'start-year', 'manage'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
@@ -136,7 +140,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env, now = Date.now, quizShare, random = Math.random }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env, now = Date.now, quizShare, random = Math.random, coachClient = null }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -317,79 +321,109 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       ].join('\n') };
   }
 
-  // Interest Cutter. A paid one is its own succeeded PaymentIntent at one of
-  // the listed prices, not refunded; its order points to it as `cutter`.
-  function paidCutter(intent) {
-    const metadata = intent?.metadata || {};
-    if (intent?.object !== 'payment_intent' || metadata.product !== CUTTER.product || metadata.offerVersion !== CUTTER.version
-      || intent.status !== 'succeeded' || intent.currency !== 'usd' || intent.amount_received !== CUTTER.prices[metadata.offer]) return null;
-    if (intent.latest_charge && typeof intent.latest_charge === 'object' && (intent.latest_charge.refunded || intent.latest_charge.amount_refunded > 0)) return null;
-    return { id: intent.id, parent: metadata.parentOrder, offer: metadata.offer, cents: intent.amount_received };
-  }
-  async function ownsCutter(parent) {
-    const id = parent?.metadata?.cutter;
-    if (!intentId(id)) return false;
-    try { return !!paidCutter(await stripe.paymentIntents.retrieve(id, { expand: ['latest_charge'] })); } catch { return false; }
-  }
   const idOf = value => (typeof value === 'string' ? value : value?.id) || null;
-  async function finishCutter(intent, { req = null, webhook = false } = {}) {
-    const cutter = paidCutter(intent);
-    if (!cutter || !accessId(cutter.parent)) throw fail(402, 'This upgrade has not been paid. If you were charged, contact support@bookmarketel.com.');
-    const parent = await retrieve(cutter.parent);
+  // The Coach's two prices, found by lookup key and created once if missing.
+  let coachPricesPromise;
+  function coachPrices() {
+    if (!coachPricesPromise) coachPricesPromise = (async () => {
+      const plans = Object.entries(COACH.plans);
+      const found = await stripe.prices.list({ lookup_keys: plans.map(([, info]) => info.lookup), active: true, limit: 10 });
+      const byKey = new Map((found.data || []).map(price => [price.lookup_key, price]));
+      const product = plans.every(([, info]) => byKey.has(info.lookup)) ? null : await coachProduct();
+      const prices = {};
+      for (const [plan, info] of plans) {
+        const price = byKey.get(info.lookup) || await stripe.prices.create({ product, currency: 'usd', unit_amount: info.cents,
+          recurring: { interval: info.interval }, lookup_key: info.lookup, nickname: `${COACH.name}, ${info.label}` }, { idempotencyKey: `payoff-coach-price:${info.lookup}` });
+        if (price.unit_amount !== info.cents || price.currency !== 'usd' || price.recurring?.interval !== info.interval) throw fail(503, 'The Coach is temporarily unavailable. Your plan is ready in Payoff.');
+        prices[plan] = price.id;
+      }
+      return prices;
+    })().catch(error => { coachPricesPromise = null; throw error; });
+    return coachPricesPromise;
+  }
+  async function coachProduct() {
+    try { return (await stripe.products.retrieve(COACH.product)).id; }
+    catch (error) { if (error.code !== 'resource_missing') throw error; }
+    return (await stripe.products.create({ id: COACH.product, name: COACH.name,
+      description: 'Ask anything about your Payoff plan, with lower-rate tools, call scripts, the cash-flow calendar and the spending reset.' },
+    { idempotencyKey: `payoff-coach-product:${COACH.version}` })).id;
+  }
+  // A Coach subscription that has started: ours, on a listed plan, for a paid order.
+  function startedCoach(subscription) {
+    const metadata = subscription?.metadata || {};
+    if (subscription?.object !== 'subscription' || metadata.product !== COACH.product || metadata.offerVersion !== COACH.version
+      || !Object.hasOwn(COACH.plans, metadata.plan) || !accessId(metadata.parentOrder) || !COACH.active.includes(subscription.status)) return null;
+    return { id: subscription.id, parent: metadata.parentOrder, plan: metadata.plan, cents: COACH.plans[metadata.plan].cents };
+  }
+  // The Coach a paid order has, if it is still running: the order records it as `coach`.
+  async function coachOf(parent) {
+    const id = parent?.metadata?.coach;
+    if (typeof id !== 'string' || !/^sub_[A-Za-z0-9]{8,200}$/.test(id)) return null;
+    const subscription = await stripe.subscriptions.retrieve(id).catch(() => null);
+    return startedCoach(subscription) && subscription.metadata.parentOrder === parent.id ? subscription : null;
+  }
+  // What the order opens: its extras, and with the Coach everything it includes.
+  const extrasFor = (order, coach) => [...new Set([...order.ids.filter(id => id !== 'base'), ...(coach ? ['coach', ...EXTRAS] : [])])];
+  async function finishCoach(subscription, { req = null, webhook = false } = {}) {
+    const coach = startedCoach(subscription);
+    if (!coach) throw fail(402, 'The Coach hasn’t started. If you were charged, contact support@bookmarketel.com.');
+    const parent = await retrieve(coach.parent);
     const order = paidPurchase(parent);
-    if (!order) throw fail(409, 'We couldn’t find the order this upgrade belongs to. Contact support@bookmarketel.com.');
-    if (parent.metadata?.cutter !== cutter.id) {
+    if (!order) throw fail(409, 'We couldn’t find the order the Coach belongs to. Contact support@bookmarketel.com.');
+    if (parent.metadata?.coach !== coach.id) {
       const resource = parent.object === 'payment_intent' ? stripe.paymentIntents : stripe.checkout.sessions;
-      await resource.update(parent.id, { metadata: { cutter: cutter.id } });
+      await resource.update(parent.id, { metadata: { coach: coach.id } });
     }
-    const metadata = order.metadata || {}, visitor = visitorId(metadata.visitorId);
+    const metadata = order.metadata || {}, visitor = visitorId(metadata.visitorId), plan = COACH.plans[coach.plan];
     let firstTime = false;
     if (order.livemode !== false && metadata.noTrack !== '1' && !isExcludedEmail(order.email || '')) {
       try {
-        await prisma.inspectEvent.create({ data: { name: 'PayoffUpgradePaid', tool: 'payoff', visitorId: visitor, sourceId: `payoff-cutter-paid:${cutter.id}`, detail: cutter.offer } });
+        await prisma.inspectEvent.create({ data: { name: 'PayoffCoachPaid', tool: 'payoff', visitorId: visitor, sourceId: `payoff-coach-paid:${coach.id}`, detail: coach.plan } });
         firstTime = true;
       } catch (error) { if (error.code !== 'P2002') throw error; }
     }
     if (firstTime) {
       // Its own event, so Meta keeps optimizing the ads for first purchases.
-      await sendCapi('InterestCutterPurchase', {
-        eventId: `payoff-cutter.${cutter.id}`, contentName: CUTTER.name,
+      await sendCapi('CoachSubscribe', {
+        eventId: `payoff-coach.${coach.id}`, contentName: COACH.name,
         hotelId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
         externalId: visitor ? `payoff-visitor:${visitor}` : `payoff-session:${order.id}`,
         email: order.email || '', fullName: order.name,
         ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
         sourceUrl: metadata.sourceUrl || `${origin}/payoff`, fbp: metadata.fbp || '', fbc: metadata.fbc || '',
-        value: PRICE(cutter.cents),
+        value: PRICE(coach.cents),
       });
-      await textOwner(`payoff-cutter-text:${cutter.id}`, visitor, `Payoff upsell: $${(cutter.cents / 100).toFixed(2)} (${CUTTER.name}).`);
+      await textOwner(`payoff-coach-text:${coach.id}`, visitor, `Payoff Coach started: ${plan.label}.`);
     }
     if (order.email && mail) {
-      const sourceId = `payoff-cutter-mail:${cutter.id}`;
+      const sourceId = `payoff-coach-mail:${coach.id}`;
       let claimed = false;
-      try { await prisma.inspectEvent.create({ data: { name: 'PayoffUpgradeEmailed', tool: 'payoff', sourceId, visitorId: visitor } }); claimed = true; }
+      try { await prisma.inspectEvent.create({ data: { name: 'PayoffCoachEmailed', tool: 'payoff', sourceId, visitorId: visitor } }); claimed = true; }
       catch (error) { if (error.code !== 'P2002') throw error; }
       if (claimed) {
         try {
-          await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: order.email, subject: 'Your Interest Cutter is ready',
+          await mail.sendMail({ from: '"Marketel" <support@bookmarketel.com>', to: order.email, subject: 'Your Payoff Coach is on',
             text: [
-              'The Interest Cutter is now inside your Marketel Payoff, in its own tab at the top:', '',
+              'Your Payoff Coach is ready in the Coach tab at the top of Payoff:', '',
               accessUrl(order.id), '',
-              `Interest Cutter: $${(cutter.cents / 100).toFixed(2)} USD. One payment, no subscription.`,
-              `Upgrade reference: ${cutter.id}`, `Order reference: ${order.id}`, '',
-              'It’s covered by the same 30-day money-back guarantee as your order: reply to this email or contact support@bookmarketel.com with your reference. Refund eligibility is set out in the terms:',
+              `Payoff Coach: ${plan.label} until you cancel. It renews automatically each ${plan.interval}.`,
+              'Cancel any time: in Payoff, open the Coach tab and tap “Manage or cancel”, or reply to this email. It stays on until the end of the time you’ve paid for.',
+              `Subscription reference: ${coach.id}`, `Order reference: ${order.id}`, '',
+              'Your first payment is covered by the same 30-day money-back guarantee as your order. Terms:',
               `${origin}/payoff/terms`,
             ].join('\n') });
         } catch (error) {
           await prisma.inspectEvent.delete({ where: { sourceId } }).catch(() => {});
-          console.error('Payoff upgrade email failed:', error.message);
+          console.error('Payoff coach email failed:', error.message);
         }
       }
     }
-    return { paid: true, reference: cutter.id, value: PRICE(cutter.cents), access: accessToken(secret, order.id),
-      extras: [...order.ids.filter(id => id !== 'base'), 'cutter'] };
+    return { paid: true, reference: coach.id, plan: coach.plan, value: PRICE(coach.cents), access: accessToken(secret, order.id), extras: extrasFor(order, true) };
   }
   const api = express.Router();
-  api.use(express.json({ limit: '8kb' }));
+  // A Coach question carries the buyer's plan and the last few turns.
+  const smallBody = express.json({ limit: '8kb' }), coachBody = express.json({ limit: '48kb' });
+  api.use((req, res, next) => (req.path === '/coach/ask' ? coachBody : smallBody)(req, res, next));
   api.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   api.get('/config', (req, res) => {
     const config = { available: available(), priceCents: ITEMS.base.cents, addOns: { cashflow: 2200, reset: 900 } };
@@ -496,9 +530,9 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
   api.post('/pay', guarded(async (req, res) => {
     const order = quote(req);
     const fingerprint = crypto.createHash('sha256').update(JSON.stringify([order.attempt, order.ids, order.email, order.metadata.fbp, order.metadata.fbc, order.discount, order.total, 'embedded-v2'])).digest('hex');
-    // A card is kept for this visit only (on_session), so the Interest Cutter
-    // offer right after can charge it with one click. Wallets and other
-    // methods pay again on that page.
+    // A card is kept for this visit only (on_session), so the Coach offer
+    // right after can start in one tap. Wallets and other methods go through
+    // Stripe's checkout on that page.
     const customer = await stripe.customers.create({ email: order.email, metadata: { product: PRODUCT } }, { idempotencyKey: `payoff-customer:${fingerprint}` });
     const intent = await stripe.paymentIntents.create({
       amount: order.total, currency: 'usd', automatic_payment_methods: { enabled: true }, customer: customer.id,
@@ -544,7 +578,7 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
       throw fail(402, 'Your payment didn’t go through and you weren’t charged. Go back to checkout to try again.');
     }
     const result = await confirm(object, { req });
-    // Whether the Interest Cutter offer can charge this order's card in one click.
+    // Whether the Coach can start on this order's card in one tap.
     res.json({ ...result, oneClick: await savedCard(object) !== null });
   }));
   // A card (not a wallet: Apple Pay can't be reused while the buyer is
@@ -556,11 +590,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     const method = await stripe.paymentMethods.retrieve(methodId).catch(() => null);
     return method?.type === 'card' && !method.card?.wallet && idOf(method.customer) === customer ? method : null;
   }
-  // The Interest Cutter offer. The order is the payment just made (the
-  // one-time prices hold for CUTTER.windowMs after it) or the buyer's access
-  // link (the regular price, any time). A card kept from that payment is
-  // charged in one click; anything else (Apple Pay, Google Pay, Klarna, bank,
-  // a hosted-checkout order) gets a client secret for a payment form.
+  // The order behind a Coach request: the payment just made, or the buyer's
+  // access link (from inside Payoff, any time).
   async function upgradeOrder(req) {
     const byLink = verifyAccess(secret, req.body?.access);
     const id = byLink || intentId(req.body?.paymentIntent) || sessionId(req.body?.sessionId);
@@ -570,59 +601,109 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
     const order = paidPurchase(parent);
     if (!order) throw fail(402, 'This order has not been paid yet.');
-    return { parent, order };
+    return { parent, order, byLink: !!byLink };
   }
-  api.post('/upgrade', guarded(async (req, res) => {
-    if (!available()) throw fail(503, 'The upgrade is temporarily unavailable. Your plan is ready in Payoff.');
+  // Starting the Coach. Right after paying, a card kept from the order starts
+  // it in one tap; if that card needs another step or is declined, and from
+  // inside Payoff, Stripe's checkout takes the payment (Apple Pay, Google Pay
+  // or any card) and returns to Payoff.
+  api.post('/coach/subscribe', guarded(async (req, res) => {
+    if (!available()) throw fail(503, 'The Coach is temporarily unavailable. Your plan is ready in Payoff.');
     if (req.headers.origin && req.headers.origin !== origin && env.NODE_ENV !== 'test') throw fail(403, 'Open this on bookmarketel.com.');
-    rate(req, 'upgrade', 30);
-    const offer = req.body?.offer;
-    if (!Object.hasOwn(CUTTER.prices, offer)) throw fail(400, 'Unknown offer.');
-    const { parent, order } = await upgradeOrder(req);
-    if (offer !== 'regular' && now() - parent.created * 1000 > CUTTER.windowMs) throw fail(410, 'This one-time offer has ended. The Interest Cutter is still in its tab inside Payoff.');
-    if (await ownsCutter(parent)) throw fail(409, 'You already have the Interest Cutter. It’s in its tab inside Payoff.');
-    const cents = CUTTER.prices[offer];
-    const customer = parent.object === 'payment_intent' ? idOf(parent.customer) : null;
-    const metadata = { product: CUTTER.product, offerVersion: CUTTER.version, offer, parentOrder: order.id,
+    rate(req, 'coach-subscribe', 30);
+    const plan = req.body?.plan;
+    if (!Object.hasOwn(COACH.plans, plan)) throw fail(400, 'Choose monthly or yearly.');
+    const { parent, order, byLink } = await upgradeOrder(req);
+    if (await coachOf(parent)) throw fail(409, 'You already have the Coach. It’s in the Coach tab inside Payoff.');
+    const prices = await coachPrices();
+    const metadata = { product: COACH.product, offerVersion: COACH.version, plan, parentOrder: order.id,
       visitorId: order.metadata?.visitorId || '', noTrack: order.metadata?.noTrack || '', email: String(order.email || '').toLowerCase() };
-    const base = { amount: cents, currency: 'usd', description: CUTTER.name, metadata,
-      ...(order.email ? { receipt_email: order.email } : {}), ...(customer ? { customer } : {}) };
-    // The card is kept for the visit of the order only: the regular price,
-    // bought later from inside Payoff, always uses the payment form.
-    const saved = req.body?.method === 'form' || offer === 'regular' ? null : await savedCard(parent);
+    const customer = idOf(parent.customer);
+    const saved = !byLink && req.body?.method !== 'checkout' && now() - parent.created * 1000 <= COACH_WINDOW_MS ? await savedCard(parent) : null;
+    let declined = null;
     if (saved) {
+      let subscription = null;
       try {
-        const intent = await stripe.paymentIntents.create({ ...base, payment_method: saved.id, payment_method_types: ['card'], confirm: true },
-          { idempotencyKey: `payoff-cutter:${order.id}:${offer}:saved` });
-        if (intent.status === 'succeeded') {
-          return res.json(await finishCutter(await stripe.paymentIntents.retrieve(intent.id, { expand: ['latest_charge'] }), { req }));
-        }
-        if (intent.status === 'requires_action' && intent.client_secret) return res.json({ next: 'action', id: intent.id, clientSecret: intent.client_secret });
+        subscription = await stripe.subscriptions.create({ customer, items: [{ price: prices[plan] }], default_payment_method: saved.id,
+          payment_behavior: 'allow_incomplete', payment_settings: { save_default_payment_method: 'on_subscription' }, metadata },
+        { idempotencyKey: `payoff-coach:${order.id}:${plan}:saved` });
       } catch (error) {
         if (error.type !== 'StripeCardError') throw error;
-        return res.json({ next: 'form', declined: error.message || 'Your card was declined.', ...(await upgradeForm(base, order, offer)) });
       }
+      if (subscription?.status === 'active') return res.json(await finishCoach(subscription, { req }));
+      // A card that needs another step, or was declined: nothing is left running.
+      if (subscription && subscription.status !== 'incomplete_expired') await stripe.subscriptions.cancel(subscription.id).catch(() => {});
+      declined = 'Your card needs another step. Finish on the secure checkout, or use Apple Pay, Google Pay or another card.';
     }
-    res.json({ next: 'form', ...(await upgradeForm(base, order, offer)) });
+    const attempt = typeof req.body?.attempt === 'string' && /^[a-f0-9-]{16,64}$/.test(req.body.attempt) ? req.body.attempt : crypto.randomUUID();
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription', line_items: [{ price: prices[plan], quantity: 1 }],
+      ...(customer ? { customer } : order.email ? { customer_email: order.email } : {}),
+      metadata, subscription_data: { metadata },
+      custom_text: { submit: { message: `Payoff Coach: ${COACH.plans[plan].label} until you cancel. Cancel any time in Payoff’s Coach tab.` } },
+      success_url: `${origin}/payoff/app?coach=done&coach_session={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/payoff/app?coach=cancelled`,
+    }, { idempotencyKey: `payoff-coach-checkout:${order.id}:${plan}:${attempt}` });
+    if (!session.url || !session.url.startsWith('https://checkout.stripe.com/')) throw fail(502, 'Checkout could not open. Please try again.');
+    res.json({ next: 'checkout', url: session.url, ...(declined ? { declined } : {}) });
   }));
-  async function upgradeForm(base, order, offer) {
-    const intent = await stripe.paymentIntents.create({ ...base, automatic_payment_methods: { enabled: true } },
-      { idempotencyKey: `payoff-cutter:${order.id}:${offer}:form` });
-    if (!intent.client_secret) throw fail(502, 'Payment could not start. Please try again.');
-    return { id: intent.id, clientSecret: intent.client_secret, amount: base.amount };
-  }
-  api.post('/upgrade/confirm', guarded(async (req, res) => {
-    if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Upgrade confirmation is temporarily unavailable.');
-    rate(req, 'upgrade-confirm', 60);
-    const id = intentId(req.body?.paymentIntent);
-    if (!id) throw fail(400, 'The upgrade reference is invalid.');
-    let intent;
-    try { intent = await stripe.paymentIntents.retrieve(id, { expand: ['latest_charge'] }); }
-    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Upgrade not found.'); throw error; }
-    if (intent.metadata?.product !== CUTTER.product) throw fail(404, 'Upgrade not found.');
-    if (intent.status === 'processing') return res.status(202).json({ processing: true, message: 'Your bank is still confirming the payment. The Interest Cutter unlocks as soon as it clears.' });
-    if (intent.status !== 'succeeded') throw fail(402, 'That payment didn’t go through and you weren’t charged.');
-    res.json(await finishCutter(intent, { req }));
+  // Back from Stripe's checkout: the Coach starts once its subscription has.
+  api.post('/coach/confirm', guarded(async (req, res) => {
+    if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Coach confirmation is temporarily unavailable.');
+    rate(req, 'coach-confirm', 60);
+    const id = sessionId(req.body?.sessionId);
+    if (!id) throw fail(400, 'The checkout reference is invalid.');
+    let session;
+    try { session = await stripe.checkout.sessions.retrieve(id); }
+    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Checkout not found.'); throw error; }
+    if (session.mode !== 'subscription' || session.metadata?.product !== COACH.product) throw fail(404, 'Checkout not found.');
+    if (session.status !== 'complete' || !session.subscription) throw fail(402, 'The checkout wasn’t finished, and you weren’t charged.');
+    res.json(await finishCoach(await stripe.subscriptions.retrieve(idOf(session.subscription)), { req }));
+  }));
+  // Stripe's page for changing the plan, the card, or cancelling.
+  api.post('/coach/manage', guarded(async (req, res) => {
+    rate(req, 'coach-manage', 20);
+    const id = verifyAccess(secret, req.body?.access);
+    if (!id || id.startsWith('own_')) throw fail(403, 'Open this from your Payoff link.');
+    const coach = await coachOf(await retrieve(id).catch(() => null));
+    if (!coach) throw fail(404, 'There’s no Coach on this order. If you were charged, contact support@bookmarketel.com.');
+    const session = await stripe.billingPortal.sessions.create({ customer: idOf(coach.customer), return_url: `${origin}/payoff/app` }).catch(error => {
+      console.error('Payoff coach portal unavailable:', error.code || error.type || 'unknown');
+      throw fail(503, 'Managing the Coach is unavailable right now. Email support@bookmarketel.com and we’ll change or cancel it for you.');
+    });
+    res.json({ url: session.url });
+  }));
+  // A question to the Coach. Three are free on each order; after that the
+  // Coach must be running. Nothing about the question or plan is stored.
+  api.post('/coach/ask', guarded(async (req, res) => {
+    rate(req, 'coach-ask', 60);
+    const id = verifyAccess(secret, req.body?.access);
+    if (!id) throw fail(403, 'Open the Coach from your Payoff link.');
+    rate({ ip: `order:${id}` }, 'coach-order', 40);
+    const question = String(req.body?.question || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim();
+    if (!question || question.length > 600) throw fail(400, 'Ask a question of up to 600 characters.');
+    if (!env.OPENAI_API_KEY && !coachClient) throw fail(503, 'The Coach can’t answer right now. Please try again later.');
+    let subscribed = id.startsWith('own_');
+    if (!subscribed) {
+      let parent;
+      try { parent = await retrieve(id); } catch { throw fail(503, 'The Coach can’t answer right now. Please try again.'); }
+      if (!paidPurchase(parent)) throw fail(402, 'This order has not been paid.');
+      subscribed = !!(await coachOf(parent));
+    }
+    let free = 0;
+    for (let n = 1; !subscribed && !free && n <= COACH.freeQuestions; n++) {
+      try { await prisma.inspectEvent.create({ data: { name: 'PayoffCoachFree', tool: 'payoff', sourceId: `payoff-coach-free:${id}:${n}`, detail: String(n) } }); free = n; }
+      catch (error) { if (error.code !== 'P2002') throw error; }
+    }
+    if (!subscribed && !free) return res.status(402).json({ message: `You’ve used your ${COACH.freeQuestions} free questions. Start the Coach to keep asking.`, freeLeft: 0 });
+    let answer;
+    try { answer = await askCoach({ env, question, plan: cleanPlan(req.body?.plan), history: req.body?.history, who: id, client: coachClient }); }
+    catch (error) {
+      if (free) await prisma.inspectEvent.delete({ where: { sourceId: `payoff-coach-free:${id}:${free}` } }).catch(() => {});
+      console.error('Payoff coach answer failed:', error.status || error.name || 'unknown');
+      throw fail(503, 'The Coach couldn’t answer just now. Please try again.');
+    }
+    res.json({ answer, freeLeft: subscribed ? null : COACH.freeQuestions - free });
   }));
   api.post('/access', guarded(async (req, res) => {
     rate(req, 'access', 120);
@@ -630,12 +711,12 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (!id) throw fail(403, 'This link is not valid. Use the link in your Payoff email, or ask for a new one.');
     // Which extras the order included comes from Stripe each time; if Stripe
     // can't answer, the app keeps what it last knew (extras: null).
-    if (id.startsWith('own_')) return res.json({ ok: true, extras: [...EXTRAS, 'cutter'] });
+    if (id.startsWith('own_')) return res.json({ ok: true, extras: ['coach', ...EXTRAS] });
     let extras = null;
     try {
       const object = stripe && await retrieve(id);
       const order = object && paidPurchase(object);
-      if (order) extras = [...order.ids.filter(item => item !== 'base'), ...(await ownsCutter(object) ? ['cutter'] : [])];
+      if (order) extras = extrasFor(order, await coachOf(object));
     } catch (error) { console.error('Payoff access lookup failed:', error.type || error.message); }
     res.json({ ok: true, extras });
   }));
@@ -665,14 +746,37 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     res.status(error.forBuyer ? error.status : 503).json({ message: error.forBuyer ? error.message : 'We could not complete that request. Please try again.' });
   });
   app.use('/api/payoff', api);
+  // The Coach's subscription events: its first payment starts it (if the
+  // buyer's browser didn't), each later one is a renewal. Everything else
+  // about it (cancelling, a failed renewal) is read from Stripe when used.
+  async function coachEvent(event) {
+    const object = event.data?.object || {};
+    let subscriptionId = null;
+    if (event.type.startsWith('customer.subscription.')) subscriptionId = object.metadata?.product === COACH.product ? object.id : null;
+    else if (event.type === 'checkout.session.completed') subscriptionId = object.metadata?.product === COACH.product ? idOf(object.subscription) : null;
+    else if (event.type === 'invoice.paid') {
+      // The invoice carries its subscription's metadata, so other products' invoices end here.
+      const details = object.parent?.subscription_details || object.subscription_details || {};
+      subscriptionId = details.metadata?.product === COACH.product ? idOf(details.subscription || object.subscription) : null;
+    }
+    if (!subscriptionId) return false;
+    if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Coach confirmation is unavailable.');
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (subscription.metadata?.product !== COACH.product) return false;
+    if (event.type === 'checkout.session.completed' || (event.type === 'invoice.paid' && object.billing_reason === 'subscription_create')) {
+      if (startedCoach(subscription)) await finishCoach(subscription, { webhook: true });
+    } else if (event.type === 'invoice.paid' && object.amount_paid > 0 && subscription.metadata.noTrack !== '1' && !isExcludedEmail(subscription.metadata.email || '')) {
+      const visitor = visitorId(subscription.metadata.visitorId);
+      try { await prisma.inspectEvent.create({ data: { name: 'PayoffCoachRenewed', tool: 'payoff', visitorId: visitor, sourceId: `payoff-coach-renewal:${object.id}`, detail: subscription.metadata.plan } }); }
+      catch (error) { if (error.code !== 'P2002') throw error; return true; }
+      await textOwner(`payoff-coach-renewal-text:${object.id}`, visitor, `Payoff Coach renewed: $${(object.amount_paid / 100).toFixed(2)}.`);
+    }
+    return true;
+  }
   return { handleStripeEvent: async (event, _req) => {
+    if (await coachEvent(event)) return true;
     if (event.type === 'payment_intent.succeeded') {
       const object = event.data?.object;
-      if (object?.metadata?.product === CUTTER.product) {
-        if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Upgrade confirmation is unavailable.');
-        await finishCutter(await stripe.paymentIntents.retrieve(object.id, { expand: ['latest_charge'] }), { webhook: true });
-        return true;
-      }
       if (object?.metadata?.product !== PRODUCT || object.metadata.checkout !== 'embedded') return false;
       if (!stripe || !prisma?.inspectEvent || !mail) throw fail(503, 'Order confirmation is unavailable.');
       await confirm(await retrieve(object.id), { retryMail: true, webhook: true });
@@ -686,4 +790,4 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     return true;
   } };
 }
-module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER, VARIANTS, QUIZ_STEPS, CUTTER };
+module.exports = { registerPayoff, paidOrder, paidIntent, basket, verifyAccess, accessToken, ITEMS, VERSION, PRODUCT, PREORDER, VARIANTS, QUIZ_STEPS, COACH };

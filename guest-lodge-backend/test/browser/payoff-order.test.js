@@ -46,6 +46,7 @@ const ACCOUNT = '51AbCdEfGhIjKlMnO';
 
 async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null, embedded = true, outcomes = [], wallet = null } = {}) {
   const app = express(), creates = [], payments = [], emails = [], rows = new Map(), updates = new Map();
+  const subscribes = [], subscriptions = new Map(), coachAsks = [];
   const paid = { id: 'cs_test_browserOrder123', mode: 'payment', status: 'complete', payment_status: unpaid ? 'unpaid' : 'paid', currency: 'usd', amount_total: 3311, livemode: false,
     metadata: { product: PRODUCT, offerVersion: VERSION, addons: '[]' }, customer_details: { email: 'buyer@example.test' } };
   const prisma = { inspectEvent: {
@@ -60,7 +61,16 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
       if (rejectFirst) { rejectFirst = false; throw new Error('Stripe unavailable'); }
       return { url: 'https://checkout.stripe.com/c/pay/cs_test_browser' };
     },
-    retrieve: async () => ({ ...paid, metadata: { ...paid.metadata, ...updates.get(paid.id) } }),
+    retrieve: async id => {
+      // Stripe's checkout for the Coach, finished: its subscription has started.
+      if (id.startsWith('cs_test_coach')) {
+        const made = creates.filter(create => create.params.mode === 'subscription').at(-1);
+        const subscription = { object: 'subscription', id: 'sub_browserHosted01', status: 'active', customer: 'cus_browser1', metadata: made.params.subscription_data.metadata };
+        subscriptions.set(subscription.id, subscription);
+        return { id, mode: 'subscription', status: 'complete', subscription: subscription.id, metadata: made.params.metadata };
+      }
+      return { ...paid, metadata: { ...paid.metadata, ...updates.get(paid.id) } };
+    },
     update: async (id, { metadata }) => { updates.set(id, { ...updates.get(id), ...metadata }); return paid; },
   } }, customers: {
     create: async () => ({ id: 'cus_browser1' }),
@@ -84,10 +94,26 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
         livemode: false, receipt_email: made.params.receipt_email, metadata: { ...made.params.metadata, ...updates.get(id) }, created: made.created,
         customer: made.params.customer, payment_method: made.params.payment_method || 'pm_browser_card', latest_charge: { refunded: false, amount_refunded: 0 } };
     },
-  } };
+  }, prices: {
+    list: async () => ({ data: [] }),
+    create: async params => ({ id: 'price_' + params.lookup_key, ...params }),
+  }, products: {
+    retrieve: async () => { throw Object.assign(new Error('missing'), { code: 'resource_missing' }); },
+    create: async params => ({ id: params.id }),
+  }, subscriptions: {
+    create: async params => {
+      subscribes.push(params);
+      const made = { object: 'subscription', id: 'sub_browserCoach' + String(subscribes.length).padStart(2, '0'), status: 'active', customer: params.customer, metadata: params.metadata };
+      subscriptions.set(made.id, made); return made;
+    },
+    retrieve: async id => { if (!subscriptions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return subscriptions.get(id); },
+    cancel: async id => subscriptions.get(id),
+  }, billingPortal: { sessions: { create: async () => ({ url: 'https://billing.stripe.com/p/session/browser' }) } } };
+  // The Coach's model, answering in order.
+  const coachClient = { responses: { create: async params => { coachAsks.push(params); return { output: [{ type: 'message' }], output_text: `Answer ${coachAsks.length}: put any extra on your highest rate first.` }; } } };
   let clockOffset = 0;
   const env = { NODE_ENV: 'test', ...(embedded ? { STRIPE_INSPECT_SECRET_KEY: `sk_test_${ACCOUNT}xyz`, STRIPE_INSPECT_PUBLISHABLE_KEY: `pk_test_${ACCOUNT}abc` } : {}) };
-  registerPayoff(app, { now: () => Date.now() + clockOffset, stripe, prisma, mail: { sendMail: async m => emails.push(m) }, env });
+  registerPayoff(app, { now: () => Date.now() + clockOffset, stripe, prisma, mail: { sendMail: async m => emails.push(m) }, env, coachClient });
   app.use(express.static(path.resolve(__dirname, '../../public')));
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -96,27 +122,26 @@ async function world(fn, { rejectFirst = false, unpaid = false, userAgent = null
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...(userAgent ? { userAgent } : {}) });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://checkout.stripe.com/**', route => route.fulfill({ body: 'Stripe checkout fixture' }));
+    await page.route('https://billing.stripe.com/**', route => route.fulfill({ body: 'Stripe billing portal fixture' }));
     await page.route('https://js.stripe.com/v3/', route => route.fulfill({ body: FAKE_STRIPE, headers: { 'content-type': 'application/javascript' } }));
     if (outcomes.length) await page.addInitScript(list => { window.__stripeOutcomes = list; }, outcomes);
     const stripeCalls = [];
     await page.exposeBinding('__stripeRecord', (_source, args) => stripeCalls.push(args));
     const stripeLog = async () => { await page.waitForTimeout(50).catch(() => {}); return stripeCalls; };
-    await fn({ page, base, creates, payments, emails, stripeLog, rows, advanceTime: ms => { clockOffset += ms; } }); assert.deepEqual(errors, []);
+    await fn({ page, base, creates, payments, emails, stripeLog, rows, subscribes, coachAsks, advanceTime: ms => { clockOffset += ms; } }); assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
 const ready = page => page.locator('#buy-button:enabled').waitFor();
-// After paying, the Interest Cutter offer comes first; saying no twice opens Payoff.
+// After paying, the Coach offer comes first; "No thanks" opens Payoff.
 const skipOffers = async page => {
   await page.waitForURL(url => url.pathname === '/payoff/upgrade');
   await page.locator('#stage-offer:not([hidden])').waitFor();
   await page.locator('#offer-no').click();
-  await page.locator('#stage-discount:not([hidden])').waitFor();
-  await page.locator('#discount-no').click();
   await page.waitForURL(url => url.pathname === '/payoff/app');
 };
 const fillBuyer = async page => { await page.locator('#name').fill('Test Buyer'); await page.locator('#email').fill('buyer@example.test'); };
 
-test('the order page: one first screen with the product and price, why today, both ways to pay and the refund, then the labeled form, extras, summary, guarantee and proof', async () => world(async ({ page, base }) => {
+test('the order page: one first screen with the product and price, why today, both ways to pay and the refund, then the labeled form, summary, guarantee and proof, with no extras', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.match((await page.locator('.reserve-line').innerText()).replace(/\s+/g, ' '), /^Your plan is reserved for (05:00|04:5\d)$/);
   assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
@@ -134,24 +159,14 @@ test('the order page: one first screen with the product and price, why today, bo
   assert.deepEqual(await page.locator('.section-head').allInnerTexts(), ['---- Contact Details ----', '---- Payment Information ----']);
   assert.deepEqual(await page.locator('.info label').allInnerTexts(), ['Full Name:', 'Email Address:']);
   assert.deepEqual(await page.locator('.info input').evaluateAll(inputs => inputs.map(input => input.placeholder)), ['Full Name', 'Email Address']);
-  // Payment comes before the extras, as in the reference.
-  const order = await page.evaluate(() => ['#payment-element', '.product', '.bumps', '#order-summary', '#buy-button']
+  const order = await page.evaluate(() => ['#payment-element', '.product', '#order-summary', '#buy-button']
     .map(sel => document.querySelector(sel).getBoundingClientRect().top));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
-  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This is a one-time offer, and you will never see this price again\.$/);
-  assert.deepEqual(await page.locator('.bump-price').allInnerTexts(), ['Regular price: $79 Today only $22!', 'Regular price: $49 Today only $9!']);
-  assert.equal(await page.locator('.bump-price s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
+  assert.equal(await page.locator('.bump, #cashflow, #reset').count(), 0, 'the extras are part of the Coach, offered after paying');
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.11/);
-  assert.equal(await page.locator('.bump').count(), 2);
-  assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
-  assert.deepEqual(await page.locator('.bump-headline').allInnerTexts(), ['Plan Around Payday', 'Get A Fresh Start']);
-  const look = await page.evaluate(() => {
-    const css = selector => getComputedStyle(document.querySelector(selector));
-    return { arrow: css('.arrow').animationName, headline: css('.bump-headline').color, oto: [css('.oto').color, css('.oto').textDecorationLine],
-      bump: [css('.bump').backgroundColor, css('.bump').borderStyle], button: css('#buy-button').backgroundColor, font: css('.order').fontFamily };
-  });
-  assert.deepEqual(look, { arrow: 'bump-arrow', headline: 'rgb(0, 153, 0)', oto: ['rgb(204, 51, 0)', 'underline'],
-    bump: ['rgb(251, 248, 227)', 'dashed'], button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
+  const look = await page.evaluate(() => ({ button: getComputedStyle(document.getElementById('buy-button')).backgroundColor, font: getComputedStyle(document.querySelector('.order')).fontFamily }));
+  assert.deepEqual(look, { button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
+  assert.equal(await page.locator('.saved-note').innerText(), 'Stripe keeps your card for this visit, so you can add the optional Payoff Coach on the next page with one tap.');
   assert.equal(await page.locator('#buy-label').innerText(), 'Get My Debt-Free Date');
   assert.equal(await page.locator('.buy-text small').innerText(), 'OPENS RIGHT AFTER YOU PAY');
   assert.equal(await page.locator('.secure').innerText(), '* 100% Secure & Safe Payments *');
@@ -174,7 +189,7 @@ test('the order page: one first screen with the product and price, why today, bo
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, String(width));
   }
 }));
-test('Stripe\'s fields charge the extras picked: the amount follows the boxes, one payment per order, then the tool opens', async () => world(async ({ page, base, payments, emails, stripeLog }) => {
+test('Stripe\'s fields charge Payoff alone, one payment per order, then the tool opens', async () => world(async ({ page, base, payments, emails, stripeLog }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'elements'), [['elements', 'payment', 2811, 'usd'], ['elements', 'payment', 2811, 'usd']]);
   const created = (await stripeLog()).filter(entry => entry[0] === 'create');
@@ -183,9 +198,8 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.equal(await page.locator('#express-checkout').isHidden(), false, 'a wallet is available, so it shows');
   assert.ok(await page.evaluate(() => ['#express-checkout', '#to-card', '#order-form'].map(sel => document.querySelector(sel).getBoundingClientRect().top).every((top, i, all) => !i || top > all[i - 1])),
     'the wallet sits on the first screen, above "Pay by card" and the form');
-  await page.locator('#cashflow').check(); await page.locator('#reset').check();
-  assert.equal(await page.locator('#order-total').innerText(), '$59.11');
-  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5011, 5011, 5911, 5911]);
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
+  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update'), [], 'the amount never changes on the page');
   await page.locator('#buy-button').click();
   assert.equal(payments.length, 0, 'nothing is created without a name and email');
   // What's missing shows under each field, the page brings the fields into view, and each message clears once filled in.
@@ -210,7 +224,7 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   await skipOffers(page);
   await page.locator('#debts:not([hidden])').waitFor();
   assert.equal(payments.length, 1);
-  assert.equal(payments[0].params.amount, 5911); assert.equal(payments[0].params.metadata.addons, '["cashflow","reset"]');
+  assert.equal(payments[0].params.amount, 2811); assert.equal(payments[0].params.metadata.addons, '[]');
   assert.equal(payments[0].params.receipt_email, 'buyer@example.test');
   const confirm = (await stripeLog()).find(entry => entry[0] === 'confirm');
   assert.deepEqual(confirm[3], { billing_details: { name: 'Test Buyer', email: 'buyer@example.test' } });
@@ -218,7 +232,7 @@ test('Stripe\'s fields charge the extras picked: the amount follows the boxes, o
   assert.equal(await page.isVisible('#tabs'), true);
   assert.ok(await page.evaluate(() => localStorage.getItem('payoff.access')));
   assert.equal(new URL(page.url()).search, '');
-  assert.equal(emails.length, 1); assert.match(emails[0].text, /Total paid: \$59\.11/);
+  assert.equal(emails.length, 1); assert.match(emails[0].text, /Total paid: \$28\.11/);
 }));
 test('a declined card says why, keeps the same payment for the retry, and stays on the page', async () => world(async ({ page, base, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
@@ -248,13 +262,12 @@ test('the order page records how far each visitor gets toward paying, by step na
   assert.ok(!steps().includes('email'), 'only a valid email counts');
   await page.locator('#email').fill('buyer@example.test'); await page.locator('#email').dispatchEvent('change');
   await page.evaluate(() => { const change = window.__stripeHandlers.payment.change; change({ empty: false, complete: false, value: { type: 'card' } }); change({ empty: false, complete: true, value: { type: 'card' } }); change({ empty: true, complete: false, value: { type: 'klarna' } }); });
-  await page.locator('#cashflow').check();
   await page.locator('#buy-button').scrollIntoViewIfNeeded();
   await page.locator('#buy-button').click();
-  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'addon-cashflow', 'saw-addons', 'saw-button', 'declined']);
+  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'saw-button', 'declined']);
   await page.locator('#email').dispatchEvent('change');
   await page.waitForTimeout(150);
-  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
   assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
 }, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {
@@ -267,29 +280,28 @@ test('a payment Stripe reports as not paid sends the buyer back to checkout and 
   assert.equal(await page.evaluate(() => localStorage.getItem('payoff.access')), null);
   assert.equal(emails.length, 0);
 }, { unpaid: true }));
-test('when Stripe\'s fields can\'t be used, the button opens Stripe\'s hosted checkout with the extras picked', async () => world(async ({ page, base, creates, payments }) => {
+test('when Stripe\'s fields can\'t be used, the button opens Stripe\'s hosted checkout for Payoff', async () => world(async ({ page, base, creates, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.equal(await page.locator('#payment-element').isHidden(), true);
   assert.equal(await page.locator('#express-checkout').isHidden(), true);
   await fillBuyer(page);
-  await page.locator('#cashflow').check();
   await page.locator('#buy-button').click();
   await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(payments.length, 0); assert.equal(creates.length, 1);
-  assert.equal(creates[0].params.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), 5511);
+  assert.deepEqual(creates[0].params.line_items.map(item => item.price_data.unit_amount), [3311]);
+  assert.equal(creates[0].params.discounts.length, 1, 'with the $5 off');
   assert.equal(creates[0].params.customer_email, 'buyer@example.test');
 }, { embedded: false }));
-test('hosted checkout failure is retryable; the pick survives a return; cancelling says nothing was charged', async () => world(async ({ page, base, creates }) => {
+test('hosted checkout failure is retryable; the total survives a return; cancelling says nothing was charged', async () => world(async ({ page, base, creates }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
   await page.locator('#buy-button').click();
   await page.locator('#checkout-status:has-text("try again")').waitFor();
   assert.equal(await page.locator('#buy-button').isEnabled(), true);
-  await page.locator('#cashflow').check();
   await page.locator('#buy-button').click(); await page.waitForURL('https://checkout.stripe.com/**');
   assert.equal(creates.length, 2);
   await page.goto(base + '/payoff/order'); await ready(page);
-  assert.equal(await page.locator('#cashflow').isChecked(), true, 'the pick survives a return from Stripe');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   await page.goto(base + '/payoff/order?cancelled=1'); await ready(page);
   assert.match(await page.locator('#checkout-status').innerText(), /not charged/);
   assert.equal(creates.length, 2);
@@ -344,7 +356,6 @@ test("Meta's pixel: PageView on each page, AddToCart once on starting to pay (no
   await page.locator('#buy-button:enabled').waitFor();
   assert.ok(!calls.some(args => args[1] === 'AddToCart'), 'reaching the order page alone is not an AddToCart');
   await fillBuyer(page);
-  await page.locator('#reset').check();
   await page.locator('#buy-button').click();
   await page.waitForURL('https://payoff.test/payoff/upgrade**');
   await page.locator('#stage-offer:not([hidden])').waitFor();
@@ -352,7 +363,7 @@ test("Meta's pixel: PageView on each page, AddToCart once on starting to pay (no
   assert.equal(tracked.filter(args => args[1] === 'PageView').length, 3, 'sales page, order page, order page again (never the offer page or the tool)');
   assert.deepEqual(tracked.filter(args => args[1] !== 'PageView').map(args => [args[1], args[2].value, args[3]?.eventID]), [
     ['AddToCart', 33.11, `payoff-cart.${visitor}`],
-    ['InitiateCheckout', 37.11, `payoff-checkout.${visitor}`],
+    ['InitiateCheckout', 28.11, `payoff-checkout.${visitor}`],
   ], 'AddToCart once per visitor, then InitiateCheckout');
   assert.deepEqual(calls.filter(args => args[0] === 'trackCustom').map(args => [args[1], args[2].value, args[3]?.eventID]),
     [['StartedPaying', 33.11, `payoff-started.${visitor}`]], 'a valid email is the first step of paying');
@@ -419,23 +430,19 @@ const reserveClock = async page => `${await page.locator('#reserve-minutes').inn
 test('the discount survives reload; the reservation clock carries on through a reload, stays at 00:00, and the next load after that starts a new 05:00', async () => world(async ({ page, base, advanceTime }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.match(await reserveClock(page), /^(05:00|04:5\d)$/);
-  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
-  await page.locator('#cashflow').check();
-  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
   // Two minutes in, a reload carries on instead of starting over.
   await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.now() + 2 * 60000 + 30000)));
   await page.reload(); await ready(page);
   assert.match(await reserveClock(page), /^(02:30|02:2\d)$/, 'a reload carries on');
   assert.match(await page.locator('#summary-rows').innerText(), /Discount/);
-  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
-  // At 00:00 it stays there, and the total and extras do not change.
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
+  // At 00:00 it stays there, and the total does not change.
   await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 3 * 60000; });
   await page.waitForTimeout(1300);
   assert.equal(await reserveClock(page), '00:00');
   await page.waitForTimeout(1100);
   assert.equal(await reserveClock(page), '00:00', 'it stays at 00:00');
-  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
-  assert.equal(await page.locator('#cashflow').isChecked(), true);
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   assert.equal(await page.locator('#glance-gift').count(), 0);
   // The next load after 00:00 starts a new five minutes.
   await page.evaluate(() => localStorage.setItem('payoff.reserveEnd', String(Date.parse('2026-01-01T00:00:00Z'))));
@@ -444,7 +451,7 @@ test('the discount survives reload; the reservation clock carries on through a r
   advanceTime(31 * 60000);
   await page.reload(); await ready(page);
   assert.match(await page.locator('#summary-rows').innerText(), /Discount/);
-  assert.equal(await page.locator('#order-total').innerText(), '$50.11');
+  assert.equal(await page.locator('#order-total').innerText(), '$28.11');
   assert.equal(await page.locator('#only-today').innerText(), 'Only $28.11 Today!');
 }));
 for (const delayedTimer of [false, true]) test('days later the buyer still pays $28.11: the reservation never ends the gift (delayed timer: '+delayedTimer+')', async () => world(async ({ page, base, payments, advanceTime }) => {
@@ -558,7 +565,7 @@ test('sales offers retain the regular price and usable checkout when the offer l
   assert.equal(await page.locator('#order-total').innerText(), '$28.11');
 }));
 
-// The Interest Cutter, offered right after paying.
+// The Payoff Coach, offered right after paying and in its tab inside Payoff.
 const payThenOffer = async (page, base) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
@@ -567,108 +574,102 @@ const payThenOffer = async (page, base) => {
   await page.locator('#stage-offer:not([hidden])').waitFor();
 };
 const text = async (page, selector) => (await page.locator(selector).innerText()).replace(/\s+/g, ' ').trim();
-test('after paying, YES on the 107 offer charges the card from the order in one click, and Payoff opens on the Interest Cutter tab', async () => world(async ({ page, base, payments, emails }) => {
+test('after paying, the Coach starts in one tap on the card from the order (yearly first, monthly on a tap), and Payoff opens on the Coach tab with its tools', async () => world(async ({ page, base, payments, emails, subscribes }) => {
   await payThenOffer(page, base);
-  assert.equal(await text(page, '#offer-headline'), 'WAIT! Your plan isn’t complete yet...');
-  assert.equal(await text(page, '#stage-offer .up-price'), '$147 Today Only 107 Save 40');
-  assert.equal(await page.locator('#stage-offer .up-price s').evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
-  assert.equal(await page.locator('#offer-price').evaluate(el => getComputedStyle(el).color), 'rgb(0, 153, 0)', 'the price they pay is green, with no $');
-  assert.match(await page.locator('#offer-clock').innerText(), /^(02:00|01:5\d)$/);
-  assert.equal(await text(page, '#offer-one-click'), 'ONE CLICK. NO CARD TO RE-ENTER.');
-  assert.equal(await text(page, '#offer-no'), 'No thanks, I’ll keep paying full interest');
-  assert.equal(await page.locator('#offer-no').evaluate(el => getComputedStyle(el).color), 'rgb(154, 154, 154)', 'the no is muted');
-  assert.equal(await page.locator('.social-proof .avatars img').count(), 6);
-  assert.match(await text(page, '.up-example'), /Example: \$65,000 of debt, \$1,350 a month .*Saves \$22,710 after fees .*An example, not your numbers/);
-  // Real buyers' emails, right under the button, with results qualified.
-  assert.deepEqual(await page.locator('.up-proof img').evaluateAll(imgs => imgs.map(img => img.alt.split(':')[0])), ['Email from Melissa', 'Email from Sarah']);
-  assert.match(await text(page, '.up-proof .up-note'), /^Individual results vary\./);
-  const below = await page.evaluate(() => document.querySelector('.up-proof').getBoundingClientRect().top >= document.querySelector('#offer-yes').getBoundingClientRect().bottom);
-  assert.equal(below, true, 'the testimonials follow the YES button, which stays on the first screen');
+  assert.equal(await text(page, '.up-ready'), 'Your Payoff plan is ready ✓');
+  assert.equal(await text(page, '#stage-offer .up-name'), 'Payoff Coach');
+  assert.match(await text(page, '.up-qa'), /^“I’m getting a \$2,400 tax refund\. Where should it go\?” .*7 months sooner.*\$2,720 less interest.*Not your numbers\.$/);
+  assert.equal(await page.locator('[data-plan="year"]').getAttribute('aria-checked'), 'true');
+  assert.equal(await text(page, '#offer-terms'), '$67 today, then $67 every year until you cancel. Cancel any time in Payoff’s Coach tab. Your first payment is covered by the 30-day money-back guarantee.');
+  assert.equal(await text(page, '#offer-one-click'), 'ONE TAP. NO CARD TO RE-ENTER.');
+  assert.equal(await page.locator('[role="timer"]').count(), 0, 'no clock: the price never changes');
+  await page.locator('[data-plan="month"]').click();
+  assert.match(await text(page, '#offer-terms'), /^\$9 today, then \$9 every month until you cancel\./);
   await page.locator('#offer-yes').click();
   await page.locator('#stage-done:not([hidden])').waitFor();
-  const charge = payments.at(-1).params;
-  assert.equal(charge.amount, 10700); assert.equal(charge.payment_method, 'pm_browser_card'); assert.equal(charge.customer, 'cus_browser1');
-  assert.equal(charge.confirm, true); assert.equal(charge.metadata.parentOrder, 'pi_3BrowserPay1'); assert.equal(charge.metadata.offer, 'offer');
-  assert.equal(payments[0].params.customer, 'cus_browser1');
-  assert.deepEqual(payments[0].params.payment_method_options, { card: { setup_future_usage: 'on_session' } });
-  assert.ok(emails.some(mail => mail.subject === 'Your Interest Cutter is ready'));
+  assert.equal(subscribes.length, 1);
+  assert.deepEqual({ customer: subscribes[0].customer, method: subscribes[0].default_payment_method, price: subscribes[0].items[0].price, plan: subscribes[0].metadata.plan, parent: subscribes[0].metadata.parentOrder },
+    { customer: 'cus_browser1', method: 'pm_browser_card', price: 'price_payoff-coach-month-v1', plan: 'month', parent: 'pi_3BrowserPay1' });
+  assert.equal(payments.length, 1, 'the Coach is a subscription, not another payment');
+  assert.ok(emails.some(mail => mail.subject === 'Your Payoff Coach is on'));
   await page.locator('#done-open').click();
   await page.waitForURL(url => url.pathname === '/payoff/app');
   await page.locator('#cutter:not([hidden])').waitFor();
-  assert.equal(await page.locator('#cutter-tool').isHidden(), false, 'the tool, not the locked preview');
+  assert.equal(await page.locator('#tabs button[data-tab="cutter"]').innerText(), 'Coach');
   assert.equal(await page.locator('#tabs button[data-tab="cutter"]').getAttribute('aria-current'), 'page');
-  // The tool: its comparison waits for debts, the three scripts, and the promo tracker.
-  assert.equal(await page.locator('#cutter-needs-debts').isHidden(), false);
+  await page.locator('#cutter-tool:not([hidden])').waitFor();
+  assert.equal(await page.locator('#cutter-locked').isHidden(), true, 'its tools, not the start buttons');
+  for (const tab of ['cashflow', 'reset']) assert.equal(await page.locator(`#tabs button[data-tab="${tab}"]`).isHidden(), false, `${tab} is included`);
   assert.deepEqual(await page.locator('.cutter-script summary').allInnerTexts(), ['Ask for a lower interest rate', 'Ask for a late fee to be refunded', 'Ask about a hardship program']);
-  await page.locator('#cutter-promo-name').fill('Citi transfer card');
-  await page.locator('#cutter-promo-end').fill('2028-04-01');
-  await page.locator('#cutter-promo-rate').fill('24.99');
-  await page.locator('#cutter-promo-form button[type="submit"]').click();
-  assert.match(await text(page, '#cutter-promos'), /^Citi transfer card Ends Apr 1, 2028 · then 24\.99% \d+ days left Remove$/);
-  assert.match(await text(page, '#cutter-disclaimer'), /nothing here guarantees they will/);
+  await page.locator('#coach-manage').click();
+  await page.waitForURL('https://billing.stripe.com/**');
 }));
-test('the 107 offer moves to the 47 discount when its clock ends; the discount ends the same way, Payoff opens, and the offer never comes back', async () => world(async ({ page, base, payments }) => {
+test('with Apple Pay, the Coach starts on Stripe’s checkout, which returns to the Coach tab with it on', async () => world(async ({ page, base, creates, subscribes }) => {
   await payThenOffer(page, base);
-  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 2 * 60000 + 2000; });
-  await page.locator('#stage-discount:not([hidden])').waitFor({ timeout: 4000 });
-  assert.equal(await text(page, '#discount-headline'), 'I get it. Money’s tight right now.');
-  assert.match(await text(page, '#discount-lead'), /^That’s exactly why you’re paying off debt\..*one lowered rate could save you more than it costs\.$/);
-  assert.equal(await text(page, '#stage-discount .up-price'), '$107 Today Only 47');
-  assert.match(await page.locator('#discount-clock').innerText(), /^(02:00|01:5\d)$/);
-  assert.equal(await text(page, '#discount-no'), 'No thanks, take me to my plan');
-  await page.evaluate(() => { const original = Date.now; Date.now = () => original() + 2 * 60000 + 2000; });
-  await page.waitForURL(url => url.pathname === '/payoff/app', { timeout: 4000 });
-  assert.equal(payments.length, 1, 'nothing was charged for the Interest Cutter');
+  assert.equal(await text(page, '#offer-one-click'), 'PAY WITH APPLE PAY, GOOGLE PAY OR A CARD.', 'never claims one tap for a wallet');
+  await page.locator('#offer-yes').click();
+  await page.waitForURL('https://checkout.stripe.com/**');
+  assert.equal(subscribes.length, 0);
+  const coach = creates.at(-1).params;
+  assert.equal(coach.mode, 'subscription'); assert.deepEqual(coach.line_items, [{ price: 'price_payoff-coach-year-v1', quantity: 1 }]);
+  assert.equal(coach.customer, 'cus_browser1');
+  await page.goto(base + '/payoff/app?coach=done&coach_session=cs_test_coachDone1');
+  await page.locator('#cutter-tool:not([hidden])').waitFor();
+  assert.equal(new URL(page.url()).search, '');
+  assert.match(await page.locator('#toast').innerText(), /Your Payoff Coach is on/);
+}, { wallet: 'apple_pay' }));
+test('“No thanks” opens Payoff, and the offer never comes back', async () => world(async ({ page, base, subscribes }) => {
+  await payThenOffer(page, base);
+  assert.equal(await text(page, '#offer-no'), 'No thanks, take me to my plan');
+  await page.locator('#offer-no').click();
+  await page.waitForURL(url => url.pathname === '/payoff/app');
   await page.goto(base + '/payoff/upgrade?payment_intent=pi_3BrowserPay1');
   await page.waitForURL(url => url.pathname === '/payoff/app');
+  assert.equal(subscribes.length, 0);
 }));
-test('an Apple Pay order pays for the Interest Cutter in the pop-up form, at 47 after saying no to 107', async () => world(async ({ page, base, payments }) => {
-  await payThenOffer(page, base);
-  assert.equal(await text(page, '#offer-one-click'), 'PAY WITH APPLE PAY, GOOGLE PAY OR A CARD.', 'never claims one click for a wallet');
-  await page.locator('#offer-no').click();
-  await page.locator('#stage-discount:not([hidden])').waitFor();
-  await page.locator('#discount-yes').click();
-  await page.locator('#pay-sheet:not([hidden])').waitFor();
-  assert.equal(await text(page, '#pay-amount'), 'Today Only 47');
-  await page.locator('#pay-button:enabled').waitFor();
-  assert.equal(await page.locator('#pay-or').isHidden(), false, 'Apple Pay sits above the card form');
-  const form = payments.at(-1).params;
-  assert.equal(form.amount, 4700); assert.deepEqual(form.automatic_payment_methods, { enabled: true }); assert.equal(form.payment_method, undefined);
-  await page.locator('#pay-button').click();
-  await page.locator('#stage-done:not([hidden])').waitFor();
-  assert.equal(await page.locator('#pay-sheet').isHidden(), true);
-}, { wallet: 'apple_pay' }));
-test('inside Payoff, the locked Interest Cutter tab leads to the 147 page, with no clock, and buying it unlocks the tool', async () => world(async ({ page, base, payments }) => {
-  await payThenOffer(page, base);
-  await page.locator('#offer-no').click(); await page.locator('#stage-discount:not([hidden])').waitFor();
-  await page.locator('#discount-no').click(); await page.waitForURL(url => url.pathname === '/payoff/app');
-  await page.locator('#tabs button[data-tab="cutter"]').click();
-  await page.locator('#cutter-locked:not([hidden])').waitFor();
-  assert.equal(await text(page, '#cutter-buy'), 'Get the Interest Cutter, $147');
-  assert.equal(await page.locator('#cutter-buy').getAttribute('href'), '/payoff/upgrade?offer=regular');
-  await page.locator('#cutter-buy').click();
-  await page.locator('#stage-offer:not([hidden])').waitFor();
-  assert.equal(await text(page, '#stage-offer .up-price'), 'Today Only 147');
-  assert.equal(await page.locator('#offer-clock-row').isHidden(), true, 'the regular price has no clock');
-  assert.equal(await text(page, '#offer-one-click'), 'PAY WITH APPLE PAY, GOOGLE PAY OR A CARD.');
-  await page.locator('#offer-yes').click();
-  await page.locator('#pay-sheet:not([hidden])').waitFor();
-  assert.equal(payments.at(-1).params.amount, 14700); assert.equal(payments.at(-1).params.metadata.offer, 'regular');
-  assert.equal(payments.at(-1).params.payment_method, undefined, 'a later visit pays in the form, never with the card kept from the order');
-  await page.locator('#pay-button:enabled').waitFor();
-  await page.locator('#pay-button').click();
-  await page.locator('#stage-done:not([hidden])').waitFor();
-  await page.locator('#done-open').click();
-  await page.locator('#cutter-tool:not([hidden])').waitFor();
-}));
-test('the offer page shows the clock, the price and the YES button on the first screen of phones', async () => world(async ({ page, base }) => {
+test('the offer page shows the example, both plans and the YES button on the first screen of phones', async () => world(async ({ page, base }) => {
   await payThenOffer(page, base);
   for (const [width, height] of [[375, 667], [390, 664], [390, 844], [414, 736]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
-    const seen = await page.evaluate(() => Object.fromEntries(['#offer-headline', '#offer-clock-row', '.up-example', '.up-price', '#offer-yes']
+    const seen = await page.evaluate(() => Object.fromEntries(['.up-name', '.up-qa', '.up-plans', '#offer-yes']
       .map(sel => [sel, Math.round(document.querySelector(sel).getBoundingClientRect().bottom)])));
     for (const [sel, bottom] of Object.entries(seen)) assert.ok(bottom <= height, `${width}x${height}: ${sel} ends at ${bottom}`);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
+}));
+test('in Payoff, the Coach tab asks once before sending any numbers, answers three free questions with the plan, keeps the conversation on the phone, then offers the Coach on Stripe’s checkout', async () => world(async ({ page, base, coachAsks, creates, rows }) => {
+  await payThenOffer(page, base);
+  await page.locator('#offer-no').click(); await page.waitForURL(url => url.pathname === '/payoff/app');
+  // Debts, as the Plan tab keeps them on this phone.
+  await page.evaluate(() => localStorage.setItem('payoff.v1', JSON.stringify({ debts: [{ id: 'a', name: 'Chase', type: 'card', balance: 520000, apr: 24.99, minimum: 15600 }], extra: 5000, plan: null, seen: true })));
+  await page.reload();
+  await page.locator('#tabs button[data-tab="cutter"]').click();
+  await page.locator('#coach-consent:not([hidden])').waitFor();
+  assert.match(await text(page, '#coach-consent'), /sends your debts \(names, balances, rates and payments\) and your question to OpenAI, our AI provider\. We don’t keep them\./);
+  assert.equal(await page.locator('#coach-chat').isHidden(), true, 'nothing can be sent before agreeing');
+  assert.equal(await page.locator('#cutter-locked').isHidden(), false, 'the start buttons show without the Coach');
+  assert.equal(await page.locator('#cutter-tool').isHidden(), true);
+  await page.locator('#coach-agree').click();
+  assert.equal(await text(page, '#coach-free'), '3 free questions left.');
+  const answers = () => page.locator('#coach-turns li.assistant').count();
+  const waitFor = async n => { for (let i = 0; i < 60 && await answers() < n; i++) await page.waitForTimeout(50); };
+  await page.locator('#coach-ideas button').first().click();
+  await waitFor(1);
+  assert.deepEqual(await page.locator('#coach-turns li').allInnerTexts(), ['Where should a $1,000 tax refund go?', 'Answer 1: put any extra on your highest rate first.']);
+  assert.equal(await text(page, '#coach-free'), '2 free questions left.');
+  assert.match(coachAsks[0].input.at(-1).content, /- Chase \(card\): \$5,200\.00 at 24\.99%, \$156\.00 a month/);
+  for (const [n, question] of [[2, 'What about $50 more?'], [3, 'And a car loan?']]) {
+    await page.locator('#coach-question').fill(question); await page.locator('#coach-send').click(); await waitFor(n);
+  }
+  assert.deepEqual(coachAsks[1].input.slice(0, 2), [{ role: 'user', content: 'Where should a $1,000 tax refund go?' }, { role: 'assistant', content: 'Answer 1: put any extra on your highest rate first.' }], 'follow-ups carry the conversation');
+  assert.equal(await text(page, '#coach-free'), 'You’ve used your 3 free questions. Start the Coach below to keep asking.');
+  assert.equal(await page.locator('#coach-question').isDisabled(), true);
+  assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('Chase') || JSON.stringify(row).includes('refund')), 'no question or number is stored');
+  await page.reload();
+  await page.locator('#tabs button[data-tab="cutter"]').click();
+  assert.equal(await page.locator('#coach-turns li').count(), 6, 'the conversation is kept on this phone');
+  await page.locator('[data-coach-plan="year"]').click();
+  await page.waitForURL('https://checkout.stripe.com/**');
+  assert.equal(creates.at(-1).params.mode, 'subscription'); assert.equal(creates.at(-1).params.line_items[0].price, 'price_payoff-coach-year-v1');
 }));

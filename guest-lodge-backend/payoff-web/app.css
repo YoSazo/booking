@@ -25,6 +25,7 @@ button, a, input, summary { touch-action: manipulation; }
 :focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
 h1 { color: var(--head); font-size: 28px; line-height: 1.2; margin: 6px 0 10px; }
 h2 { color: var(--head); font-size: 21px; line-height: 1.25; margin: 30px 0 8px; }
+h3 { color: var(--head); font-size: 17px; line-height: 1.3; margin: 22px 0 6px; }
 p { margin: 0 0 12px; }
 .muted { color: var(--muted); }
 .small { font-size: 15px; }
@@ -263,3 +264,20 @@ select { width: 100%; min-height: 52px; padding: 10px 12px; border: 1.5px solid 
 }
 .today-card .sheet-row > button { flex: 1; }
 .today-card .ghost[aria-pressed="true"] { background: #f6c9c3; border-color: #f6c9c3; color: #8f2318; }
+
+/* Payoff Coach: one consent note, then a chat about this plan. */
+.coach-consent { margin: 14px 0 0; padding: 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); line-height: 1.45; }
+.coach-consent p { margin: 0; }
+.coach-turns { margin: 14px 0 0; padding: 0; list-style: none; }
+.coach-turns li { max-width: 88%; margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-line; }
+.coach-turns .user { margin-left: auto; border-bottom-right-radius: 4px; background: var(--head); color: #fff; }
+.coach-turns .assistant { border-bottom-left-radius: 4px; background: var(--card); box-shadow: 0 0 0 1.5px var(--line); }
+.coach-turns .thinking { color: var(--muted); font-style: italic; }
+.coach-ideas { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.coach-ideas button { min-height: 40px; padding: 8px 12px; border: 1.5px solid #e8c6d2; border-radius: 999px; background: var(--card); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.coach-ask { display: flex; gap: 8px; align-items: flex-end; margin: 12px 0 0; }
+.coach-ask textarea { flex: 1; min-height: 48px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); font: inherit; resize: vertical; }
+.coach-ask button { flex: none; min-height: 48px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--orange); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.coach-ask button:disabled { opacity: .6; cursor: default; }
+.coach-start { margin: 18px 0 0; }
+.coach-plans .big, .coach-plans .ghost { margin-top: 10px; }

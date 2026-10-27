@@ -6,14 +6,13 @@
   <title>Marketel Payoff: one more thing for your plan</title>
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=10">
-  <link rel="stylesheet" href="/payoff/upgrade.css?v=5">
-  <script src="/payoff/cutter-content.js?v=2" defer></script>
-  <script src="/payoff/upgrade.js?v=2" defer></script>
+  <link rel="stylesheet" href="/payoff/order.css?v=15">
+  <link rel="stylesheet" href="/payoff/upgrade.css?v=6">
+  <script src="/payoff/upgrade.js?v=3" defer></script>
 </head>
 <body data-page="upgrade">
   <ol class="progress" aria-label="Your order">
-    <li class="done">✓ Order complete</li><li class="now">Optional upgrade</li><li>Open your plan</li>
+    <li class="done">✓ Order complete</li><li class="now">Optional: Payoff Coach</li><li>Open your plan</li>
   </ol>
 
   <main class="upgrade" id="stage-wait">
@@ -22,33 +21,35 @@
   </main>
 
   <main class="upgrade" id="stage-offer" hidden>
-    <p class="up-wait-banner" id="offer-headline"></p>
-    <p class="up-clock" id="offer-clock-row">This offer ends in <b id="offer-clock" role="timer" aria-live="off">02:00</b></p>
-    <p class="up-ready"><span id="offer-ready"></span> ✓</p>
-    <p class="social-proof"><span class="stars" aria-hidden="true">★★★★★</span> <span>10,000+ sold</span> <span class="avatars" aria-hidden="true"><img src="/payoff/assets/avatar-01-874e564a67.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-02-2209fc25e7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-04-5d31c567b7.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-05-81fe59d790.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-06-6574065c85.webp" width="72" height="72" decoding="async" alt=""><img src="/payoff/assets/avatar-07-883c4b0955.webp" width="72" height="72" decoding="async" alt=""></span></p>
-    <p class="up-gap" id="offer-gap"></p>
-    <h1 class="up-name" id="offer-built"></h1>
-    <div class="up-example" aria-label="Example comparison">
-      <p class="up-example-label" id="example-label"></p>
-      <div class="up-cols">
-        <div class="up-col"><p class="up-col-title" id="example-current-title"></p><p class="up-col-cost" id="example-current-interest"></p><p class="up-col-date" id="example-current-date"></p></div>
-        <div class="up-col win"><p class="up-col-title" id="example-option-title"></p><p class="up-col-cost" id="example-option-interest"></p><p class="up-col-date" id="example-option-date"></p></div>
-      </div>
-      <p class="up-saving" id="example-saving"></p>
-      <p class="up-note" id="example-note"></p>
+    <p class="up-ready">Your Payoff plan is ready ✓</p>
+    <p class="up-wait-banner">Want someone in your corner every month?</p>
+    <h1 class="up-name">Payoff Coach</h1>
+    <p class="up-gap">Ask anything about your plan, any time. The Coach answers with your own numbers, worked out by Payoff.</p>
+    <div class="up-qa" aria-label="Example question and answer">
+      <p class="up-qa-q">“I’m getting a $2,400 tax refund. Where should it go?”</p>
+      <p class="up-qa-a">Put all of it on your Capital One card, your highest rate. You’ll be debt-free <b>7 months sooner</b> and pay <b>$2,720 less interest</b>.</p>
+      <p class="up-note">Example: $21,700 across two cards and a car loan, with $100 extra a month. Not your numbers.</p>
     </div>
-    <p class="up-price"><s>$147</s> <span>Today Only <b class="today" id="offer-price">107</b></span> <span class="up-save" id="offer-save">Save 40</span></p>
-    <button class="complete up-yes" type="button" id="offer-yes"><span class="buy-text"><span id="offer-yes-label"></span><small id="offer-one-click"></small></span></button>
+    <div class="up-plans" role="radiogroup" aria-label="Choose how to pay for the Coach">
+      <button type="button" role="radio" data-plan="year" aria-checked="true"><b>Yearly</b><span><b class="today">67</b> a year</span><small>Works out to $5.58 a month</small></button>
+      <button type="button" role="radio" data-plan="month" aria-checked="false"><b>Monthly</b><span><b class="today">9</b> a month</span><small>Cancel any time</small></button>
+    </div>
+    <button class="complete up-yes" type="button" id="offer-yes"><span class="buy-text"><span id="offer-yes-label">Yes! Add the Coach</span><small id="offer-one-click"></small></span></button>
+    <p class="up-terms" id="offer-terms"></p>
     <p class="status" id="offer-status" role="status" aria-live="polite"></p>
+    <ul class="up-benefits">
+      <li><b>Ask anything:</b> a tax refund, a tight month, a new card offer. Answers use your real balances and rates.</li>
+      <li><b>Check in any time:</b> update your balances and ask the Coach what changed and where you stand.</li>
+      <li><b>Lower your rates:</b> word-for-word call scripts, and a 0% transfer check that counts the fees.</li>
+      <li><b>Included:</b> the cash-flow calendar and the spending reset.</li>
+    </ul>
     <section class="up-proof" aria-label="What buyers say">
-      <p class="up-proof-title">What buyers say about the Interest Cutter</p>
+      <p class="up-proof-title">What buyers say about the call scripts, now part of the Coach</p>
       <img src="/payoff/assets/cutter-testimony-melissa-c7a8bce369.webp" width="760" height="950" loading="lazy" decoding="async" alt="Email from Melissa: I used the call scripts and was actually able to get my interest rate lowered on two of my cards. I also checked a 0% balance transfer option using the tool and it showed me the real savings after fees, which helped me avoid a bad deal.">
       <img src="/payoff/assets/cutter-testimony-sarah-e1caf8fa1c.webp" width="760" height="950" loading="lazy" decoding="async" alt="Email from Sarah: Then I decided to get the Interest Cutter and I'm so glad I did. The call scripts made it so much easier to reach out to my card companies and I was able to get my interest rate lowered on one of my cards and a late fee removed.">
       <p class="up-note">Individual results vary. Card companies decide whether to lower a rate or refund a fee.</p>
     </section>
-    <ul class="up-benefits" id="offer-benefits"></ul>
-    <p class="up-question" id="offer-question"></p>
-    <p class="up-guarantee" id="offer-guarantee"></p>
+    <p class="up-note">The Coach gives education, not financial advice.</p>
         <div class="safe" role="group" aria-label="Guaranteed safe checkout">
           <p class="safe-title" aria-hidden="true"><span>Guaranteed</span> <b>SAFE</b> <span>Checkout</span></p>
           <div class="safe-badges">
@@ -58,38 +59,14 @@
             <div class="safe-cards" aria-label="Visa, Mastercard, American Express and Discover"><img src="/payoff/assets/payment-visa.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-mastercard.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-americanexpress.svg" width="36" height="24" alt=""><img src="/payoff/assets/payment-discover.svg" width="36" height="24" alt=""></div>
           </div>
         </div>
-    <button class="up-no" type="button" id="offer-no"></button>
-  </main>
-
-  <main class="upgrade" id="stage-discount" hidden>
-    <p class="up-wait-banner" id="discount-headline"></p>
-    <p class="up-clock">This offer ends in <b id="discount-clock" role="timer" aria-live="off">02:00</b></p>
-    <p class="up-lead" id="discount-lead"></p>
-    <p class="up-price"><s>$107</s> <span>Today Only <b class="today" id="discount-price">47</b></span></p>
-    <button class="complete up-yes" type="button" id="discount-yes"><span class="buy-text"><span id="discount-yes-label"></span><small id="discount-one-click"></small></span></button>
-    <p class="status" id="discount-status" role="status" aria-live="polite"></p>
-    <p class="up-guarantee" id="discount-guarantee"></p>
-    <button class="up-no" type="button" id="discount-no"></button>
+    <button class="up-no" type="button" id="offer-no">No thanks, take me to my plan</button>
   </main>
 
   <main class="upgrade" id="stage-done" hidden>
-    <h1 class="up-name">The Interest Cutter is in your plan ✓</h1>
-    <p class="up-lead">It’s in its own tab at the top of Payoff. We emailed you the receipt.</p>
+    <h1 class="up-name">Your Payoff Coach is on ✓</h1>
+    <p class="up-lead">It’s in the Coach tab at the top of Payoff. We emailed you the receipt.</p>
     <a class="complete up-yes" id="done-open" href="/payoff/app"><span class="buy-text"><span>Continue to my plan</span></span></a>
   </main>
-
-  <div class="pay-sheet" id="pay-sheet" hidden>
-    <div class="pay-card" role="dialog" aria-modal="true" aria-labelledby="pay-title">
-      <h2 id="pay-title">Add the Interest Cutter</h2>
-      <p class="pay-amount" id="pay-amount"></p>
-      <div id="pay-express"></div>
-      <div class="or" id="pay-or" hidden><hr><p>OR</p></div>
-      <div id="pay-element"></div>
-      <button class="complete up-yes" type="button" id="pay-button" disabled><span class="buy-text"><span id="pay-label">Pay now</span></span></button>
-      <p class="status" id="pay-status" role="status" aria-live="polite"></p>
-      <button class="up-no" type="button" id="pay-cancel">Cancel</button>
-    </div>
-  </div>
 
   <footer class="legal">
     <p class="legal-links"><a href="/payoff/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> | <a href="/payoff/privacy" target="_blank" rel="noopener">Privacy Policy</a></p>

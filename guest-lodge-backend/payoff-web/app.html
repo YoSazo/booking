@@ -7,10 +7,10 @@
   <meta name="theme-color" content="#ffffff">
   <title>Marketel Payoff — your debt-free date</title>
   <link rel="icon" href="/marketel-frontdesk-icon.png">
-  <link rel="stylesheet" href="/payoff/app.css?v=5">
+  <link rel="stylesheet" href="/payoff/app.css?v=6">
   <script src="/payoff/engine.js?v=3" defer></script>
-  <script src="/payoff/cutter-content.js?v=2" defer></script>
-  <script src="/payoff/app.js?v=4" defer></script>
+  <script src="/payoff/cutter-content.js?v=3" defer></script>
+  <script src="/payoff/app.js?v=5" defer></script>
 </head>
 <body>
   <header class="bar"><a class="brand" href="/payoff/app">Marketel <span>Payoff</span></a>
@@ -18,7 +18,7 @@
       <button type="button" data-tab="plan">Plan</button>
       <button type="button" data-tab="cashflow" hidden>Cash flow</button>
       <button type="button" data-tab="reset" hidden>Reset</button>
-      <button type="button" data-tab="cutter">Interest Cutter</button>
+      <button type="button" data-tab="cutter">Coach</button>
     </nav>
   </header>
   <main id="main">
@@ -194,19 +194,48 @@
         <button class="ghost danger" id="reset-end" type="button">End this reset</button>
       </div>
     </section>
+    <!-- The Coach tab (its tab key stays "cutter": the lower-rate tools below were the Interest Cutter). -->
     <section class="view" id="cutter" hidden>
-      <div id="cutter-locked" hidden>
-        <h1 id="cutter-locked-title"></h1>
-        <p class="muted" id="cutter-locked-lead"></p>
-        <ul class="cutter-benefits" id="cutter-locked-benefits"></ul>
-        <a class="big" id="cutter-buy" href="/payoff/upgrade?offer=regular"></a>
-        <p class="fine" id="cutter-locked-fine"></p>
+      <h1>Payoff Coach</h1>
+      <p class="muted">Ask anything about your plan. Answers use your own numbers, worked out by Payoff.</p>
+      <div class="coach-consent" id="coach-consent" hidden>
+        <p><b>Before your first question:</b> to answer, the Coach sends your debts (names, balances, rates and payments) and your question to OpenAI, our AI provider. We don’t keep them. OpenAI doesn’t train on them, and may hold them for up to 30 days to check for abuse before deleting them.</p>
+        <button class="big" type="button" id="coach-agree">OK, ask the Coach</button>
+      </div>
+      <div id="coach-chat" hidden>
+        <ol class="coach-turns" id="coach-turns" aria-live="polite"></ol>
+        <div class="coach-ideas" id="coach-ideas">
+          <button type="button">Where should a $1,000 tax refund go?</button>
+          <button type="button">I’m short $200 this month. What do I pay?</button>
+          <button type="button">How much sooner if I add $50 a month?</button>
+        </div>
+        <form class="coach-ask" id="coach-form" novalidate>
+          <textarea id="coach-question" maxlength="600" rows="2" placeholder="Ask about your plan…" aria-label="Your question for the Coach"></textarea>
+          <button type="submit" id="coach-send">Ask</button>
+        </form>
+        <p class="fine" id="coach-free"></p>
+        <p class="fine">The Coach gives education, not financial advice, and can make mistakes. Your plan’s dates and amounts are worked out by Payoff.</p>
+      </div>
+      <div class="coach-start" id="cutter-locked" hidden>
+        <h2>Start the Coach</h2>
+        <ul class="cutter-benefits">
+          <li>Ask as much as you like, about a tax refund, a tight month or a card offer</li>
+          <li>Check in any time: update your balances and ask what changed</li>
+          <li>Lower-rate tools: call scripts and a 0% transfer check that counts the fees</li>
+          <li>The cash-flow calendar and the spending reset</li>
+        </ul>
+        <div class="coach-plans">
+          <button class="big" type="button" data-coach-plan="year">Yearly: $67 a year</button>
+          <button class="ghost" type="button" data-coach-plan="month">Monthly: $9 a month</button>
+        </div>
+        <p class="fine">Renews until you cancel. Cancel any time here. Your first payment is covered by the 30-day money-back guarantee.</p>
+        <p class="fine" id="coach-start-status" role="status" aria-live="polite"></p>
       </div>
       <div id="cutter-tool" hidden>
-        <h1>Interest Cutter</h1>
+        <h2>Lower your rates</h2>
         <p class="muted">Check whether a lower rate would really save you money, ask your card companies for one, and never miss when a 0% promo ends.</p>
 
-        <h2>Would a lower rate save you money?</h2>
+        <h3>Would a lower rate save you money?</h3>
         <p class="muted small" id="cutter-needs-debts" hidden>Add your debts in <button class="link" type="button" id="cutter-to-plan">Plan</button> first, then compare.</p>
         <div id="cutter-compare">
           <div class="segmented" role="radiogroup" aria-label="Lower-rate option">
@@ -229,11 +258,11 @@
           <div class="cutter-result" id="cutter-result" role="status" aria-live="polite"></div>
         </div>
 
-        <h2>Call scripts</h2>
+        <h3>Call scripts</h3>
         <p class="muted small">Read it, call the number on the back of your card, and keep notes of what they said.</p>
         <div id="cutter-scripts"></div>
 
-        <h2>0% promo tracker</h2>
+        <h3>0% promo tracker</h3>
         <p class="muted small">Add each 0% or promo rate and when it ends, so the new rate never surprises you.</p>
         <ul class="debt-list" id="cutter-promos"></ul>
         <form class="cutter-promo-form" id="cutter-promo-form" novalidate>
@@ -243,6 +272,8 @@
           <button class="ghost" type="submit">+ Add promo</button>
         </form>
         <p class="fine" id="cutter-disclaimer"></p>
+        <button class="ghost" type="button" id="coach-manage">Manage or cancel the Coach</button>
+        <p class="fine" id="coach-manage-status" role="status" aria-live="polite"></p>
       </div>
     </section>
   </main>
