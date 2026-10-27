@@ -21,7 +21,14 @@
     track.event(name, detail);
     return true;
   };
-  window.PayoffMeasure = { mark };
+  // Meta's AddToCart: 20 seconds on the order page, or starting to pay sooner
+  // (order.js calls this). A glance at the price and away isn't one; both
+  // first buyers stayed 28 and 67 seconds. The server sends its copy with the
+  // same event id.
+  const cart = () => {
+    if (page === 'order' && mark('cart')) track.pixel('AddToCart', { value: 33.11 }, track.visitor ? `payoff-cart.${track.visitor}` : undefined);
+  };
+  window.PayoffMeasure = { mark, cart };
 
   // Seconds on screen, counted only while the tab is showing: ten seconds is a
   // real reader, not a bounce.
@@ -30,6 +37,7 @@
     if (document.visibilityState !== 'visible') return;
     seconds += 1;
     if ([10, 60, 180].includes(seconds)) mark('time' + seconds);
+    if (seconds === 20) cart();
     if (seconds >= 180) clearInterval(clock);
   }, 1000);
   if (page === 'story') return; // story.js records its own reading steps.

@@ -8,6 +8,8 @@
   const track = window.PayoffTrack || { event() {}, pixel() {}, attribution: {}, visitor: null, headers: { 'Content-Type': 'application/json' } };
   // Each step toward paying, once per visitor, for the funnel (measure.js).
   const mark = detail => !!window.PayoffMeasure?.mark(detail);
+  // Starting to pay counts as Meta's AddToCart before the 20 seconds are up.
+  const cart = () => window.PayoffMeasure?.cart();
   const $ = id => document.getElementById(id);
   const form = $('order-form'), button = $('buy-button'), label = $('buy-label'), status = $('checkout-status');
   const NAME = 'Marketel Payoff - Your Debt-Free Date & Payoff Plan (Reg. $375)';
@@ -136,7 +138,7 @@
         $('or').hidden = !methods.length;
         if (methods.length) mark('wallet-shown');
       });
-      express.on('click', event => { mark('wallet-tap'); if (!busy) event.resolve({ emailRequired: true }); });
+      express.on('click', event => { mark('wallet-tap'); cart(); if (!busy) event.resolve({ emailRequired: true }); });
       express.on('confirm', payWithWallet);
       express.mount('#express-checkout');
       setTimeout(() => { if (!formReady) useHosted(); }, 20000);
@@ -207,6 +209,7 @@
   form.addEventListener('submit', async submit => {
     submit.preventDefault();
     if (busy || button.disabled) return;
+    cart();
     status.textContent = '';
     if (totalChanged()) return;
     const who = buyer();
@@ -264,7 +267,9 @@
   // sent to Meta as StartedPaying (the server sends its copy with the same id).
   $('name').addEventListener('change', () => { if ($('name').value.trim()) mark('name'); });
   $('email').addEventListener('change', () => {
-    if (validEmail($('email').value.trim()) && mark('email')) track.pixel('StartedPaying', { value: 33.11 }, track.visitor ? `payoff-started.${track.visitor}` : undefined, true);
+    if (!validEmail($('email').value.trim())) return;
+    cart();
+    if (mark('email')) track.pixel('StartedPaying', { value: 33.11 }, track.visitor ? `payoff-started.${track.visitor}` : undefined, true);
   });
   if (new URLSearchParams(location.search).has('cancelled')) {
     status.textContent = 'Checkout was canceled and you were not charged. You can try again any time.';

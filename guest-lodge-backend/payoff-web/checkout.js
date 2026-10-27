@@ -44,8 +44,8 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
 
   // Meta's pixel, on the sales and order pages only (never the tool, never the
   // owner, never a test browser or plain http). Each signal carries the event
-  // id the server sends too, so Meta counts it once. Reaching the order page is
-  // AddToCart: every "Get My Debt-Free Date" button leads there.
+  // id the server sends too, so Meta counts it once. AddToCart is sent by
+  // measure.js, once someone stays on the order page or starts paying.
   const PIXEL_ID = '1545780930244672';
   const pixelOn = !excluded && location.protocol === 'https:' && !navigator.webdriver;
   const pixel = (name, data = {}, eventID, custom = false) => {
@@ -92,14 +92,10 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
 
   const event = (name, detail = null) => {
     if (!excluded) fetch('/api/payoff/event', { method: 'POST', headers, keepalive: true,
-      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrderViewed' || (name === 'PayoffOrder' && detail === 'email') ? { attribution } : {}) }) }).catch(() => {});
+      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrder' && ['cart', 'email'].includes(detail) ? { attribution } : {}) }) }).catch(() => {});
   };
   event(form ? 'PayoffOrderViewed' : 'PayoffLanded');
   if (form) {
-    // Once per visitor, however many times they come back to this page.
-    let first = true;
-    try { first = sessionStorage.getItem('payoff.cartSent') !== visitor; sessionStorage.setItem('payoff.cartSent', visitor || ''); } catch { /* Send it. */ }
-    if (first) pixel('AddToCart', { value: 33.11 }, visitor ? `payoff-cart.${visitor}` : undefined);
     // The order page's own form (order.js) reports through the same helpers.
     window.PayoffTrack = { event, pixel, attribution, visitor, headers };
     return;

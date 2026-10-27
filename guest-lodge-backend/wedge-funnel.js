@@ -245,6 +245,7 @@ const PAYOFF_BRANCHES = Object.freeze([
   ] },
   { key: 'order-steps', label: 'Order page: how far they got', shownBy: 'PayoffOrder', steps: [
     ['Viewed the order page', ['PayoffOrderViewed']],
+    ['Stayed 20 seconds or started paying (Meta: AddToCart)', ['PayoffOrder:cart']],
     ['Scrolled to the form', ['PayoffOrder:saw-form']],
     ['Typed their name', ['PayoffOrder:name']],
     ['Typed a valid email (Meta: StartedPaying)', ['PayoffOrder:email']],

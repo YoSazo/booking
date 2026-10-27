@@ -49,7 +49,7 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
   PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS,
   PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
-  PayoffOrder: [...ON_SCREEN, 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'name', 'email',
+  PayoffOrder: [...ON_SCREEN, 'cart', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'name', 'email',
     'card-start', 'card-done', 'method-bank', 'method-klarna', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
@@ -445,9 +445,10 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (EVENT_DETAILS[req.body.name] && !detail && req.body.name !== 'PayoffFrom') throw fail(400, 'Unknown event.');
     const visitor = visitorId(req.body.visitorId);
     await record(req.body.name, visitor, null, detail);
-    // Reaching the order page is Meta's AddToCart (every "Get My Debt-Free
-    // Date" button leads there); the browser pixel sends the same event id.
-    if (req.body.name === 'PayoffOrderViewed' && visitor) {
+    // Meta's AddToCart is staying 20 seconds on the order page, or starting to
+    // pay sooner (measure.js), not a glance at it; the browser pixel sends the
+    // same event id.
+    if (req.body.name === 'PayoffOrder' && detail === 'cart' && visitor) {
       await sendCapi('AddToCart', { eventId: `payoff-cart.${visitor}`, value: PRICE(ITEMS.base.cents),
         ...visitorCapi(visitor, sanitizeInspectAttribution(req.body.attribution, req) || {}, req) });
     }

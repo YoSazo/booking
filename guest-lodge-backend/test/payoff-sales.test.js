@@ -360,13 +360,14 @@ test('anonymous funnel records contain no receipt email, and owner/headless even
   assert.ok(definition.steps.some(step => step.names.includes('PayoffPaid')));
 });
 
-test('Meta hears AddToCart on the order page, InitiateCheckout at Stripe and Purchase on payment, with the pixel\'s event ids', async () => {
+test('Meta hears AddToCart once someone stays on the order page or starts paying, InitiateCheckout at Stripe and Purchase on payment, with the pixel\'s event ids', async () => {
   const w = fixture(); const session = paid(['reset'], { preorder: false }); w.sessions.set(session.id, session);
   const attribution = { fbp: 'fb.1.1700000000000.123456789', fbc: 'fb.1.1700000000000.AbCdEf', sourceUrl: 'https://bookmarketel.com/payoff?utm_source=facebook', utmSource: 'facebook' };
   await serve(w, async ({ post }) => {
     await post('/api/payoff/event', { name: 'PayoffLanded', visitorId: 'v_abcdefghijk', attribution });
-    assert.equal(w.capi.length, 0);
     await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk', attribution });
+    assert.equal(w.capi.length, 0, 'a glance at the order page is not an AddToCart');
+    await post('/api/payoff/event', { name: 'PayoffOrder', detail: 'cart', visitorId: 'v_abcdefghijk', attribution });
     await post('/api/payoff/checkout', order({ addons: ['reset'], visitorId: 'v_abcdefghijk', attribution }));
     const { params } = w.creates.at(-1);
     assert.equal(params.metadata.fbp, attribution.fbp); assert.equal(params.metadata.fbc, attribution.fbc);
@@ -384,8 +385,8 @@ test('Meta hears AddToCart on the order page, InitiateCheckout at Stripe and Pur
 test('Meta hears nothing from the owner, no-track browsers, test browsers or sandbox orders', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
-    await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk' }, { 'x-marketel-no-track': '1' });
-    await post('/api/payoff/event', { name: 'PayoffOrderViewed', visitorId: 'v_abcdefghijk' }, { 'user-agent': 'HeadlessChrome' });
+    await post('/api/payoff/event', { name: 'PayoffOrder', detail: 'cart', visitorId: 'v_abcdefghijk' }, { 'x-marketel-no-track': '1' });
+    await post('/api/payoff/event', { name: 'PayoffOrder', detail: 'cart', visitorId: 'v_abcdefghijk' }, { 'user-agent': 'HeadlessChrome' });
     await post('/api/payoff/checkout', order({ email: 'owner@example.test', visitorId: 'v_abcdefghijk' }));
     await post('/api/payoff/checkout', order({ visitorId: 'v_abcdefghijk' }), { 'x-marketel-no-track': '1' });
     for (const change of [{ livemode: false }, { customer_details: { email: 'owner@example.test' } }]) {
@@ -691,7 +692,7 @@ test('the letter and order pages record their steps by name only, and a valid em
     for (const [name, detail] of [['PayoffLetter', 'tap-sticky'], ['PayoffLetter', 'time30'], ['PayoffOrder', 'buyer@example.test'], ['PayoffOrder', null], ['PayoffOrder', 'scroll50']]) {
       assert.equal((await post('/api/payoff/event', { name, detail, visitorId: 'v_abcdefghijk' })).status, 400, `${name}:${detail}`);
     }
-    assert.equal(w.capi.length, 0, 'only the email step goes to Meta');
+    assert.equal(w.capi.length, 0, 'only the email and add-to-cart steps go to Meta');
     assert.equal((await post('/api/payoff/event', { name: 'PayoffOrder', detail: 'email', visitorId: 'v_abcdefghijk', attribution })).status, 200);
   });
   assert.deepEqual(w.capi.map(event => [event.name, event.eventId, event.value, event.fbp, event.fbc]),

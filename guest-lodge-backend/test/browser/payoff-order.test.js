@@ -250,7 +250,7 @@ test('the order page records how far each visitor gets toward paying, by step na
   await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'addon-cashflow', 'saw-addons', 'saw-button', 'declined']);
   await page.locator('#email').dispatchEvent('change');
   await page.waitForTimeout(150);
-  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'missing-email', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
   assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
 }, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {
@@ -325,7 +325,7 @@ async function overHttps(page, base, calls) {
     await route.fulfill({ response });
   });
 }
-test("Meta's pixel: PageView on each page, AddToCart once on reaching the order page, InitiateCheckout on paying, with the server's event ids", async () => world(async ({ page, base, payments }) => {
+test("Meta's pixel: PageView on each page, AddToCart once on starting to pay (not on a glance at the order page), InitiateCheckout on paying, with the server's event ids", async () => world(async ({ page, base, payments }) => {
   const calls = [], posts = [];
   page.on('request', request => { if (request.method() === 'POST') posts.push({ url: request.url(), body: request.postData() || '' }); });
   await overHttps(page, base, calls);
@@ -338,6 +338,7 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
   await page.locator('#buy-button:enabled').waitFor();
   await page.reload();
   await page.locator('#buy-button:enabled').waitFor();
+  assert.ok(!calls.some(args => args[1] === 'AddToCart'), 'reaching the order page alone is not an AddToCart');
   await fillBuyer(page);
   await page.locator('#reset').check();
   await page.locator('#buy-button').click();
@@ -355,10 +356,26 @@ test("Meta's pixel: PageView on each page, AddToCart once on reaching the order 
   assert.match(JSON.parse(started.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);
   assert.ok(!started.body.includes('buyer@example.test'), 'never the email itself');
   // The server gets the click ids, so its copies match the same person.
-  const viewed = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('PayoffOrderViewed'));
-  assert.match(JSON.parse(viewed.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);
-  assert.match(JSON.parse(viewed.body).attribution.sourceUrl, /utm_source=facebook/);
+  const cart = posts.find(post => post.url.endsWith('/api/payoff/event') && post.body.includes('"detail":"cart"'));
+  assert.match(JSON.parse(cart.body).attribution.fbc, /^fb\.1\.\d+\.adclick123$/);
+  assert.match(JSON.parse(cart.body).attribution.sourceUrl, /utm_source=facebook/);
   assert.match(payments[0].params.metadata.fbc, /adclick123$/);
+}, { userAgent: PHONE_UA }));
+test("20 seconds on the order page is Meta's AddToCart, once per visitor, with the server's event id", async () => world(async ({ page, base, rows }) => {
+  const calls = [];
+  await overHttps(page, base, calls);
+  // A second of the on-screen clock passes every 10 ms here.
+  await page.addInitScript(() => { const every = window.setInterval; window.setInterval = (fn, ms, ...rest) => every(fn, ms === 1000 ? 10 : ms, ...rest); });
+  const steps = () => [...rows.values()].filter(row => row.name === 'PayoffOrder').map(row => row.detail);
+  const until = async step => { for (let i = 0; i < 60 && !steps().includes(step); i++) await page.waitForTimeout(25); };
+  await page.goto('https://payoff.test/payoff/order?fbclid=adclick123');
+  await until('cart');
+  const visitor = await page.evaluate(() => sessionStorage.getItem('payoff.visitor'));
+  assert.ok(steps().indexOf('time10') < steps().indexOf('cart'), 'after ten seconds, not on arrival');
+  await page.reload();
+  await until('time60');
+  assert.deepEqual(calls.filter(args => args[1] === 'AddToCart').map(args => [args[2].value, args[3]?.eventID]), [[33.11, `payoff-cart.${visitor}`]]);
+  assert.equal(steps().filter(step => step === 'cart').length, 1);
 }, { userAgent: PHONE_UA }));
 test("Meta's pixel never loads for the owner, over http, or in the tool", async () => {
   for (const setup of ['owner', 'http', 'tool']) await world(async ({ page, base }) => {
