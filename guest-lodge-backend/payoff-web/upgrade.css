@@ -58,3 +58,7 @@
 .pay-card h2 { margin: 0 0 4px; font-size: 20px; text-align: center; }
 .pay-amount { margin: 0 0 12px; color: #090; font-size: 18px; font-weight: 800; text-align: center; }
 #pay-element { min-height: 1px; }
+/* "OR" between the wallet buttons and the card form (the order page no longer has one). */
+.or { position: relative; display: flex; align-items: center; height: 17px; margin: 20px 0; }
+.or hr { flex: 1; height: 1px; margin: 8px 0; border: 0; background: rgba(26, 26, 26, .1); }
+.or p { position: absolute; left: 50%; margin: 0; padding: 0 8px; transform: translateX(-50%); background: #fff; color: rgba(26, 26, 26, .5); font-size: 14px; }
