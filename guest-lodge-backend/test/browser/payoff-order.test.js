@@ -164,13 +164,17 @@ test('the order page: one first screen with the product and price, why today, bo
     .map(sel => document.querySelector(sel).getBoundingClientRect().top));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
   assert.equal(await page.locator('.bump').count(), 2);
-  assert.deepEqual(await page.locator('.bump-headline').allInnerTexts(), ['Plan Around Payday', 'Get A Fresh Start']);
-  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This price is only offered here, at checkout\.$/);
+  // Laid out like the reference checkout's boxes: headline, offer line, question, what it does, three ticks, price, picture.
+  assert.deepEqual(await page.locator('.bump-headline').allInnerTexts(), ['Simplify Your Budget', 'Get An Instant Financial Reset']);
+  assert.deepEqual(await page.locator('.bump .oto').allInnerTexts(), ['ONE TIME OFFER: Add On The Cash-Flow Calendar - $22 Today Only (Reg. $79)', 'ONE TIME OFFER: Add On The Spending Reset - $9 Today Only (Reg. $49)']);
+  assert.deepEqual(await page.locator('.bump-q').allInnerTexts(), ['Want more confidence with your money month-to-month?', 'Need a little breathing room while you get started?']);
+  assert.deepEqual(await page.locator('.bump').evaluateAll(boxes => boxes.map(box => box.querySelectorAll('.bump-ticks li').length)), [3, 3]);
   assert.deepEqual(await page.locator('.bump-price').allInnerTexts(), ['Regular price: $79 Today only $22!', 'Regular price: $49 Today only $9!']);
+  assert.equal(await page.locator('.bump-price s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   const bumpLook = await page.evaluate(() => { const css = sel => getComputedStyle(document.querySelector(sel));
-    return { arrow: css('.arrow').animationName, headline: css('.bump-headline').color, bump: [css('.bump').backgroundColor, css('.bump').borderStyle] }; });
-  assert.deepEqual(bumpLook, { arrow: 'bump-arrow', headline: 'rgb(0, 153, 0)', bump: ['rgb(251, 248, 227)', 'dashed'] });
+    return { headline: css('.bump-headline').color, oto: [css('.oto').color, css('.oto').textDecorationLine], bump: [css('.bump').backgroundColor, css('.bump').borderStyle] }; });
+  assert.deepEqual(bumpLook, { headline: 'rgb(0, 153, 0)', oto: ['rgb(204, 51, 0)', 'underline'], bump: ['rgb(251, 248, 227)', 'dashed'] });
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.11/);
   const look = await page.evaluate(() => ({ button: getComputedStyle(document.getElementById('buy-button')).backgroundColor, font: getComputedStyle(document.querySelector('.order')).fontFamily }));
   assert.deepEqual(look, { button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
@@ -248,7 +252,10 @@ test('Stripe\'s fields charge Payoff alone, one payment per order, then the tool
 test('ticking both add-ons adds them to the total, the summary, Stripe\'s amount and the order; the pick survives a reload; the Coach page then leaves them out of "Included"', async () => world(async ({ page, base, payments, emails, stripeLog }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   const shots = process.env.ORDER_SHOT_DIR;
-  if (shots) { await page.evaluate(() => document.fonts.ready); await page.locator('#order-form').screenshot({ path: `${shots}/order-form.png` }); }
+  if (shots) {
+    await page.evaluate(() => Promise.all([document.fonts.ready, ...[...document.querySelectorAll('.bump-image')].map(img => { img.loading = 'eager'; return img.complete ? null : new Promise(done => { img.onload = img.onerror = done; }); })]));
+    await page.locator('#order-form').screenshot({ path: `${shots}/order-form.png` });
+  }
   await page.locator('#cashflow').check(); await page.locator('#reset').check();
   assert.equal(await page.locator('#order-total').innerText(), '$59.11');
   if (shots) await page.locator('#order-form').screenshot({ path: `${shots}/order-form-ticked.png` });
