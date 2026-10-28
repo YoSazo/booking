@@ -690,6 +690,46 @@ test('the landing splits new visitors between the letter and the quiz, keeps eac
     assert.ok(isLetter(r.html)); assert.equal(r.cookie, '');
   });
 });
+test('the landing test splits new story-page visitors: half go straight to the sales letter with the ad click and tags, each stays on their side, and a forced look joins nothing', async () => {
+  const world = options => { const w = fixture(); w.app = express(); registerPayoff(w.app, { prisma: w.prisma, stripe: w.stripe, mail: w.mail, env: { NODE_ENV: 'test' }, ...options }); return w; };
+  const AD = '?utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc';
+  const land = async (base, headers = {}, query = AD) => {
+    const r = await fetch(base + '/payoff/hidden-payoff' + query, { redirect: 'manual', headers: { 'user-agent': 'Buyer Browser', ...headers } });
+    return { status: r.status, location: r.headers.get('location'), cookie: r.headers.get('set-cookie') || '', html: r.status === 200 ? await r.text() : '' };
+  };
+  const draws = [0.2, 0.8];
+  await serve(world({ entryShare: 0.5, random: () => draws.shift() }), async ({ base }) => {
+    const first = await land(base);
+    assert.equal(first.status, 302);
+    assert.equal(first.location, '/payoff?v=letter&utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc', 'the ad click id and tags go with them');
+    assert.match(first.cookie, /payoff_entry=letter; Max-Age=7776000; Path=\/payoff/); assert.doesNotMatch(first.cookie, /HttpOnly/, 'the page reads its side');
+    const second = await land(base);
+    assert.equal(second.status, 200); assert.match(second.html, /data-page="story"/); assert.match(second.cookie, /payoff_entry=story/);
+    // Returning visitors keep their side without a new draw.
+    assert.equal((await land(base, { cookie: 'payoff_entry=letter' })).status, 302);
+    const back = await land(base, { cookie: 'payoff_entry=story' });
+    assert.equal(back.status, 200); assert.equal(back.cookie, '');
+    assert.equal(draws.length, 0);
+    // A forced look shows that side and joins nothing.
+    const forced = await land(base, { cookie: 'payoff_entry=letter' }, '?entry=story&fbclid=x');
+    assert.equal(forced.status, 200); assert.equal(forced.cookie, '');
+    const forcedLetter = await land(base, {}, '?entry=letter&fbclid=x');
+    assert.equal(forcedLetter.location, '/payoff?v=letter&fbclid=x'); assert.equal(forcedLetter.cookie, '');
+    // Crawlers and Meta's ad review see the page the ad links to, with no cookie.
+    for (const agent of ['facebookexternalhit/1.1', 'Mozilla/5.0 HeadlessChrome/120', 'Googlebot/2.1 (+http://www.google.com/bot.html)']) {
+      const bot = await land(base, { 'user-agent': agent });
+      assert.equal(bot.status, 200, agent); assert.equal(bot.cookie, '', agent);
+    }
+  });
+  // Ending the test sends everyone one way, whatever their cookie says.
+  await serve(world({ env: { NODE_ENV: 'test', PAYOFF_ENTRY_SHARE: '0' } }), async ({ base }) => {
+    const r = await land(base, { cookie: 'payoff_entry=letter' });
+    assert.equal(r.status, 200); assert.equal(r.cookie, '');
+  });
+  await serve(world({ env: { NODE_ENV: 'test', PAYOFF_ENTRY_SHARE: '1' } }), async ({ base }) => {
+    assert.equal((await land(base, { cookie: 'payoff_entry=story' })).status, 302);
+  });
+});
 test('the story page is served with the pixel-only policy and records only its own reading steps', async () => {
   const w = fixture();
   await serve(w, async ({ base, post }) => {

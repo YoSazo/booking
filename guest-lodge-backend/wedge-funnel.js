@@ -328,12 +328,14 @@ const PAYOFF_BRANCHES = Object.freeze([
 const DEFINITIONS = Object.freeze({
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
     PayoffUpgradeDeclined: 'Said no to an upsell', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed', PayoffCoach: 'Coach tab',
-    PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed', PayoffAd: 'Came from ad' }),
+    PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed', PayoffAd: 'Came from ad', PayoffEntry: 'Landing test side' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).map(name => name.split(':')[0]).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
-      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd']),
-    // The landing A/B test: each version's own ladder, judged on purchases per visitor.
-    variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
-      steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd', 'PayoffEntry']),
+    // The landing A/B test (Oct 28): the story page first, or straight to the
+    // sales letter as on the reference funnel. Each side's own ladder, judged
+    // on purchases per visitor.
+    variants: { event: 'PayoffEntry', values: [['story', 'Story page first'], ['letter', 'Straight to the sales letter']],
+      steps: [['Arrived', 'landed'], ['Opened the sales letter', 'letter'], ['Reached the order page', 'order'], ['Stayed 20 seconds or started paying', 'cart'], ['Typed email', 'email'], ['Paid', 'paid']] },
     // Each ad's own ladder, from the ad id its link carries (PayoffAd).
     ads: { event: 'PayoffAd', steps: [
       ['Opened the story page', ['PayoffStory:viewed']],

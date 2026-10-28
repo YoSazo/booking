@@ -10,10 +10,10 @@ const { registerPayoff } = require('../../payoff');
 // are sent and can be checked. The quiz takes every new visitor here, so the
 // story page's buttons have to choose the letter themselves.
 const PHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS]';
-async function world(fn) {
+async function world(fn, options = {}) {
   const app = express(), rows = [];
   const prisma = { inspectEvent: { upsert: async () => ({}), create: async ({ data }) => { rows.push(data); return data; }, delete: async () => ({}) } };
-  registerPayoff(app, { prisma, stripe: { checkout: { sessions: {} }, paymentIntents: {} }, mail: { sendMail: async () => {} }, env: { NODE_ENV: 'test' }, quizShare: 1 });
+  registerPayoff(app, { prisma, stripe: { checkout: { sessions: {} }, paymentIntents: {} }, mail: { sendMail: async () => {} }, env: { NODE_ENV: 'test' }, quizShare: 1, ...options });
   app.use(express.static(path.resolve(__dirname, '../../public')));
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -88,6 +88,40 @@ test('a click from an ad records which ad (its utm_content id) once per load, an
   await page.waitForTimeout(300);
   assert.equal(named(rows).filter(name => name.startsWith('PayoffAd')).length, 1);
 }));
+
+test('the landing test: a letter-side visitor lands on the sales letter with the ad click and the ad recorded, a story-side visitor on the story page, each recorded once; a forced look records no side', async () => {
+  const AD = '/payoff/hidden-payoff?utm_source=facebook&utm_medium=paid&utm_content=120251580459180103&fbclid=IwAR0story';
+  let draw = 0.2;
+  await world(async ({ page, base, rows }) => {
+    await page.goto(base + AD);
+    assert.equal(new URL(page.url()).pathname, '/payoff');
+    assert.equal(await page.locator('body').getAttribute('data-variant'), 'letter');
+    await settle(page, rows, ['PayoffEntry:letter', 'PayoffFrom:ad', 'PayoffAd:120251580459180103', 'PayoffVariant:letter']);
+    for (const name of ['PayoffEntry:letter', 'PayoffFrom:ad', 'PayoffAd:120251580459180103', 'PayoffVariant:letter']) assert.ok(named(rows).includes(name), name);
+    assert.ok(!named(rows).some(name => name.startsWith('PayoffStory')), 'they never saw the story page');
+    await page.reload(); await page.waitForTimeout(300);
+    assert.equal(named(rows).filter(name => name.startsWith('PayoffEntry')).length, 1, 'once per visitor');
+  }, { entryShare: 0.5, random: () => draw });
+  draw = 0.8;
+  await world(async ({ page, base, rows }) => {
+    await page.goto(base + AD);
+    assert.equal(new URL(page.url()).pathname, '/payoff/hidden-payoff');
+    await settle(page, rows, ['PayoffEntry:story', 'PayoffFrom:ad', 'PayoffStory:viewed']);
+    assert.ok(named(rows).includes('PayoffEntry:story'));
+    // Through the story page to the letter: still one side, the story one.
+    await page.locator('a.adv-cta').first().tap();
+    await page.waitForURL(url => url.pathname === '/payoff');
+    await settle(page, rows, ['PayoffVariant:letter']);
+    assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffEntry')), ['PayoffEntry:story']);
+  }, { entryShare: 0.5, random: () => draw });
+  await world(async ({ page, base, rows }) => {
+    await page.goto(base + '/payoff/hidden-payoff?entry=letter&fbclid=IwAR0look');
+    assert.equal(new URL(page.url()).pathname, '/payoff');
+    await settle(page, rows, ['PayoffFrom:ad']);
+    await page.waitForTimeout(200);
+    assert.ok(!named(rows).some(name => name.startsWith('PayoffEntry')), 'a forced look joins no side');
+  }, { entryShare: 0.5, random: () => 0.2 });
+});
 
 test('a visitor who reaches the letter without the story page is still asked where they came from', async () => world(async ({ page, base, rows }) => {
   await page.goto(base + '/payoff?v=letter');

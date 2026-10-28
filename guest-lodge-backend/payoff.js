@@ -35,10 +35,16 @@ const ITEMS = Object.freeze({
 const COACH_WINDOW_MS = 30 * 60 * 1000;
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
-  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd'];
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd', 'PayoffEntry'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
+// The landing test (Oct 28): new visitors to the story page the ads open are
+// split between it and going straight to the sales letter, as the reference
+// funnel does. The cookie keeps each visitor on one side; the page they land
+// on reads it to record their side (PayoffEntry).
+const ENTRY_COOKIE = 'payoff_entry';
+const ENTRIES = Object.freeze(['story', 'letter']);
 const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
 // 'offer', 'discount' and 'regular' were the Interest Cutter's pages; they
 // stay so older rows still read. The Coach's page is 'coach', its plans
@@ -47,7 +53,7 @@ const UPGRADE_OFFERS = ['offer', 'discount', 'regular', 'coach', 'month', 'year'
 // measure.js: seconds on screen, and the sales letter's sections in page order.
 const ON_SCREEN = ['time10', 'time60', 'time180'];
 const LETTER_SECTIONS = ['problem', 'example', 'mechanism', 'proof', 'founder', 'included', 'faq'];
-const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffQuizStep: QUIZ_STEPS,
+const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'other'], PayoffVariant: VARIANTS, PayoffEntry: ENTRIES, PayoffQuizStep: QUIZ_STEPS,
   PayoffUpgradeViewed: UPGRADE_OFFERS, PayoffUpgradeAccepted: UPGRADE_OFFERS, PayoffUpgradeDeclined: UPGRADE_OFFERS, PayoffUpgradeExpired: UPGRADE_OFFERS,
   PayoffStory: ['viewed', 'scroll25', 'scroll50', 'scroll75', 'scroll100', 'button', 'tapped', ...ON_SCREEN],
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
@@ -142,7 +148,7 @@ function pageHeaders(res) {
     'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 }
-function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env, now = Date.now, quizShare, random = Math.random, coachClient = null }) {
+function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env, now = Date.now, quizShare, entryShare, random = Math.random, coachClient = null }) {
   const origin = 'https://bookmarketel.com';
   const key = env.STRIPE_INSPECT_SECRET_KEY || env.STRIPE_MARKETEL_SECRET_KEY || '';
   const secret = env.PAYOFF_ACCESS_SECRET || env.INSPECT_AUTH_SECRET || (env.NODE_ENV === 'test' ? 'payoff-test-secret' : '');
@@ -182,6 +188,22 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     remember(variant);
     return variant;
   }
+  // The share of new story-page visitors sent straight to the letter
+  // (PAYOFF_ENTRY_SHARE overrides; 0 or 1 ends the test for everyone).
+  const letterShare = Math.min(1, Math.max(0, Number(entryShare ?? env.PAYOFF_ENTRY_SHARE ?? (env.NODE_ENV === 'test' ? 0 : 0.5)) || 0));
+  function entry(req, res) {
+    // ?entry=story or ?entry=letter shows that side without joining the test.
+    if (ENTRIES.includes(req.query.entry)) return req.query.entry;
+    if (letterShare === 0 || letterShare === 1) return letterShare ? 'letter' : 'story';
+    const saved = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${ENTRY_COOKIE}=`))?.slice(ENTRY_COOKIE.length + 1);
+    if (ENTRIES.includes(saved)) return saved;
+    // Crawlers and Meta's ad review see the page the ad links to, with no cookie.
+    if (automated(req) || /facebookexternalhit|Facebot/i.test(req.headers['user-agent'] || '')) return 'story';
+    const side = random() < letterShare ? 'letter' : 'story';
+    // Readable by the page (it holds only the side), so the page can record it.
+    res.cookie(ENTRY_COOKIE, side, { httpOnly: false, secure: env.NODE_ENV !== 'test', sameSite: 'lax', path: '/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
+    return side;
+  }
   const noTrack = req => req.headers['x-marketel-no-track'] === '1' || automated(req);
   const hits = new Map();
   function rate(req, action, limit) {
@@ -207,7 +229,15 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     res.set('Content-Security-Policy', META_CSP);
     res.sendFile(path.join(ROOT, landing(req, res) === 'quiz' ? 'quiz.html' : 'index.html'));
   });
-  // The static ad opens the story page, whose buttons lead to the sales letter.
+  // The static ad opens the story page, whose buttons lead to the sales letter;
+  // the letter side of the landing test goes straight there, keeping the ad's
+  // click id and tags.
+  pages.get('/hidden-payoff', (req, res, next) => {
+    if (entry(req, res) !== 'letter') return next();
+    const query = new URLSearchParams(req.originalUrl.split('?')[1] || '');
+    query.delete('entry'); query.delete('v');
+    res.redirect(302, `/payoff?v=letter${query.toString() ? '&' + query : ''}`);
+  });
   for (const [route, file] of [['/hidden-payoff', 'story.html'], ['/order', 'order.html'], ['/upgrade', 'upgrade.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
       if (file === 'order.html' || file === 'upgrade.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
