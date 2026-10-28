@@ -164,6 +164,7 @@
   <p class="track-note" id="ad-note" hidden>Only visitors with a recorded Meta click id. Their activity must occur inside the selected range; the ad click may have happened earlier. This is not a campaign-specific filter.</p>
   <section class="tiles" id="tiles" aria-live="polite"></section>
   <section class="card variants" id="variants" hidden></section>
+  <section class="card variants" id="ads" hidden></section>
 
   <section class="card">
     <h2>From arrival to paying</h2>
@@ -320,6 +321,14 @@ function render(data) {
       const other = b.steps[i], cell = s => `<b>${s.people}</b>${i ? ` <span class="muted">${pct(s.ofLanded)}</span>` : ''}`;
       return `<tr><td>${esc(step.label)}</td><td>${cell(step)}</td><td>${cell(other)}</td></tr>`;
     }).join('')}</tbody></table><p class="muted">Percentages are of each version's own visitors. The winner sells more per visitor, not the one that sends more people to the order page.</p>`;
+  }
+  // Each ad's own ladder, side by side, named as in Ads Manager (the part after the last " | ").
+  $('ads').hidden = !data.ads?.length;
+  if (data.ads?.length) {
+    const short = ad => ad.name ? ad.name.split(' | ').pop() : `Ad …${ad.ad.slice(-6)}`;
+    $('ads').innerHTML = `<h2>By ad</h2><table><thead><tr><th></th>${data.ads.map(ad => `<th title="${esc(ad.name || '')} (${esc(ad.ad)})">${esc(short(ad))}</th>`).join('')}</tr></thead><tbody>${data.ads[0].steps.map((step, i) =>
+      `<tr><td>${esc(step.label)}</td>${data.ads.map(ad => `<td><b>${ad.steps[i].people}</b>${i ? ` <span class="muted">${pct(ad.steps[i].ofVisitors)}</span>` : ''}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      <p class="muted">Each column is the people active in this range who came from that ad (the last ad they clicked, even if that was before the range). Percentages are of that ad's own visitors. Visits from before ads were recorded aren't here. For a cost per step, divide the ad's spend in Ads Manager by its row.</p>`;
   }
   $('branches').innerHTML = data.branches.map(b => `<div class="card"><h2>${esc(b.label)}</h2><ul>${b.steps.map(s => `<li><span>${esc(s.label)}</span><b>${s.people}</b></li>`).join('')}</ul></div>`).join('');
   const shown = feedAll ? data.recent : data.recent.slice(0, 25);

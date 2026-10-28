@@ -12029,6 +12029,24 @@ const dashboardWedges = () => [{ id: 'payoff', product: 'Payoff' }, { id: 'trace
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
     .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');
+// The names on the funnel's by-ad table, read from Meta one ad at a time (a
+// stray id can't spoil the rest) and kept for an hour. Without a token or an
+// answer the table shows the ad's id.
+const funnelAdNames = new Map();
+async function metaAdNames(ids) {
+    const token = process.env.MARKETEL_META_ADS_READ_TOKEN || MARKETEL_ACCESS_TOKEN;
+    const now = Date.now();
+    await Promise.all(ids.filter(id => token && !(funnelAdNames.get(id)?.until > now)).map(async id => {
+        let name = null;
+        try {
+            const response = await fetch(`https://graph.facebook.com/${MARKETEL_META_GRAPH_API_VERSION}/${id}?fields=name`,
+                { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+            if (response.ok) name = String((await response.json()).name || '').slice(0, 200) || null;
+        } catch { /* The id is enough. */ }
+        funnelAdNames.set(id, { name, until: now + 60 * 60 * 1000 });
+    }));
+    return new Map(ids.map(id => [id, funnelAdNames.get(id)?.name || null]));
+}
 app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
     try {
         const wedges = dashboardWedges();
@@ -12058,11 +12076,20 @@ app.get('/api/funnel/wedge', adminAuth, async (req, res) => {
             where: { tool, name: definition.fromEvent, detail: 'ad', visitorId: { in: visitorIds }, createdAt: { lte: range.until } },
             distinct: ['visitorId'], select: { name: true, detail: true, visitorId: true },
         })) : [];
+        // Which ad each visitor clicked, the same way: the click can be earlier.
+        const adTags = definition.ads && visitorIds.length ? await withRetry(() => prisma.inspectEvent.findMany({
+            where: { tool, name: definition.ads.event, visitorId: { in: visitorIds }, createdAt: { lte: range.until } },
+            select: { name: true, detail: true, visitorId: true, createdAt: true },
+        })) : [];
+        const funnel = wedgeFunnel.buildWedgeFunnel((req.query.ad === '1' ? wedgeFunnel.onlyAdClicks(visibleEvents, adSources, definition.fromEvent) : visibleEvents).filter(event => event.name !== wedgeFunnel.RESET_EVENT), definition, adTags);
+        if (funnel.ads?.length) {
+            const names = await metaAdNames(funnel.ads.map(ad => ad.ad));
+            for (const ad of funnel.ads) ad.name = names.get(ad.ad);
+        }
         res.json({ wedges, tool, from: range.since.toISOString(), to: range.until.toISOString(), requestedFrom,
             timezone: range.timeZone, period: range.period, resetApplied: range.since.toISOString() !== requestedFrom, truncated,
             countingSince: since ? since.toISOString() : null,
-            everything: req.query.everything === '1', adOnly: req.query.ad === '1',
-            ...wedgeFunnel.buildWedgeFunnel((req.query.ad === '1' ? wedgeFunnel.onlyAdClicks(visibleEvents, adSources, definition.fromEvent) : visibleEvents).filter(event => event.name !== wedgeFunnel.RESET_EVENT), definition) });
+            everything: req.query.everything === '1', adOnly: req.query.ad === '1', ...funnel });
     } catch (e) {
         if (e.status === 400) return res.status(400).json({ success: false, message: e.message });
         console.error('Wedge funnel error:', e.message);

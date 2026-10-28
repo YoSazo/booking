@@ -75,6 +75,20 @@ test('the story page reads as the article, counts the ad click once, and every b
   assert.ok(sources.length && sources.every(name => name === 'PayoffFrom:ad'), sources.join());
 }));
 
+test('a click from an ad records which ad (its utm_content id) once per load, and the letter it leads to records none', async () => world(async ({ page, base, rows }) => {
+  await page.goto(base + '/payoff/hidden-payoff?utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251563772920103&fbclid=IwAR0story');
+  await settle(page, rows, ['PayoffFrom:ad', 'PayoffAd:120251563772920103']);
+  assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffAd')), ['PayoffAd:120251563772920103']);
+  await page.locator('a.adv-cta').first().tap();
+  await page.waitForURL(url => url.pathname === '/payoff');
+  await settle(page, rows, ['PayoffVariant:letter']);
+  assert.equal(named(rows).filter(name => name.startsWith('PayoffAd')).length, 1);
+  // A tag that is not an ad id is not sent.
+  await page.goto(base + '/payoff/hidden-payoff?utm_content=summer-sale&fbclid=IwAR0story');
+  await page.waitForTimeout(300);
+  assert.equal(named(rows).filter(name => name.startsWith('PayoffAd')).length, 1);
+}));
+
 test('a visitor who reaches the letter without the story page is still asked where they came from', async () => world(async ({ page, base, rows }) => {
   await page.goto(base + '/payoff?v=letter');
   await settle(page, rows, ['PayoffFrom:direct']);

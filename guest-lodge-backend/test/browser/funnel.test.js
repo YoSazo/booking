@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
 const { open } = require('./harness');
-const { buildWedgeFunnel } = require('../../wedge-funnel');
+const { buildWedgeFunnel, definitionFor } = require('../../wedge-funnel');
 
 // The owner's own browser, once switched off on /funnel, sends no steps at
 // all, and every request it does make is marked so the server records nothing.
@@ -96,6 +96,37 @@ test('/funnel draws every step, the answers under the question and the reasons u
     const tiles = await page.$$eval('#tiles .tile', els => els.map(el => [el.querySelector('small').textContent, el.querySelector('strong').textContent]));
     assert.deepEqual(tiles.slice(0, 8), [['Landed', '3'], ['Saw the video', '2'], ['Did something on purpose', '1'], ['Stayed 20s', '0'], ['Answered the question', '2'], ['Said I want this', '1'], ["Said I don't want this", '1'], ['Saw the offer card', '1']]);
     await page.screenshot({ path: process.env.FUNNEL_SHOT || '/tmp/funnel-shot.png', fullPage: true });
+  } finally { await browser.close(); }
+});
+
+test('/funnel shows Payoff\'s ads side by side, named as in Ads Manager, or by id when Meta gave no name', async () => {
+  const ev = (name, visitorId, extra = {}) => ({ id: `${name}-${visitorId}-${extra.detail || ''}`, name, visitorId, accountId: null, detail: null, createdAt: new Date().toISOString(), ...extra });
+  const events = [
+    ev('PayoffAd', 'v_a', { detail: '120251563772920103' }), ev('PayoffStory', 'v_a', { detail: 'viewed' }), ev('PayoffOrderViewed', 'v_a'), ev('PayoffOrder', 'v_a', { detail: 'cart' }),
+    ev('PayoffAd', 'v_b', { detail: '120251563772920103' }), ev('PayoffStory', 'v_b', { detail: 'viewed' }),
+    ev('PayoffAd', 'v_c', { detail: '120251563874800103' }), ev('PayoffStory', 'v_c', { detail: 'viewed' }),
+  ];
+  const funnel = buildWedgeFunnel(events, definitionFor('payoff'));
+  for (const ad of funnel.ads) ad.name = ad.ad === '120251563772920103' ? 'PROJECT PAYOFF | ADD TO CART | CAR' : null;
+  const body = JSON.stringify({ wedges: [{ id: 'payoff', product: 'Payoff' }], tool: 'payoff', ...funnel });
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
+    await page.addInitScript(() => localStorage.setItem('marketelAdminToken', 'test'));
+    await page.route('http://funnel.test/**', route => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/funnel/wedge') return route.fulfill({ status: 200, body, headers: { 'content-type': 'application/json' } });
+      if (url.pathname === '/funnel') return route.fulfill({ status: 200, body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')), headers: { 'content-type': 'text/html' } });
+      return route.fulfill({ status: 404, body: '' });
+    });
+    await page.goto('http://funnel.test/funnel');
+    await page.waitForSelector('#ads:not([hidden]) tbody tr');
+    assert.deepEqual(await page.$$eval('#ads thead th', ths => ths.map(th => th.textContent)), ['', 'CAR', 'Ad …800103']);
+    const rows = await page.$$eval('#ads tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
+    assert.deepEqual(rows[0], ['Visitors from this ad', '2', '1']);
+    assert.deepEqual(rows.find(row => row[0].startsWith('Stayed 20 seconds')), ['Stayed 20 seconds or started paying (Meta: AddToCart)', '1 50%', '0 0%']);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'fits a phone');
+    await page.screenshot({ path: process.env.FUNNEL_ADS_SHOT || '/tmp/funnel-ads-shot.png', fullPage: true });
   } finally { await browser.close(); }
 });
 

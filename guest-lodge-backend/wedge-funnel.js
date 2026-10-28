@@ -320,12 +320,21 @@ const PAYOFF_BRANCHES = Object.freeze([
 const DEFINITIONS = Object.freeze({
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
     PayoffUpgradeDeclined: 'Said no to an upsell', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed', PayoffCoach: 'Coach tab',
-    PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed' }),
+    PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed', PayoffAd: 'Came from ad' }),
     fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
-      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach']),
+      'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
       steps: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Paid', 'paid']] },
+    // Each ad's own ladder, from the ad id its link carries (PayoffAd).
+    ads: { event: 'PayoffAd', steps: [
+      ['Opened the story page', ['PayoffStory:viewed']],
+      ['Opened the sales letter', ['PayoffVariant:letter']],
+      ['Viewed the order page', ['PayoffOrderViewed']],
+      ['Stayed 20 seconds or started paying (Meta: AddToCart)', ['PayoffOrder:cart']],
+      ['Typed a valid email', ['PayoffOrder:email']],
+      ['Paid', ['PayoffPaid']],
+    ] },
     split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Sent payment', 'checkout'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
@@ -349,7 +358,29 @@ const matches = (event, names) => names.some(name => {
 });
 const people = (events, names) => new Set(events.filter(event => matches(event, names)).map(personOf)).size;
 
-function buildWedgeFunnel(events, definition = DEFINITIONS.report) {
+// The ads' ladders side by side. A visitor belongs to the last ad they
+// clicked; `adTags` are the clicks from before the range began, so someone who
+// clicked yesterday and paid today still counts for their ad.
+function byAd(events, ads, adTags) {
+  const last = new Map();
+  for (const tag of [...adTags, ...events.filter(event => event.name === ads.event)]) {
+    if (!tag.visitorId || !/^\d{6,25}$/.test(tag.detail || '')) continue;
+    const at = new Date(tag.createdAt).getTime(), seen = last.get(tag.visitorId);
+    if (!seen || at >= seen.at) last.set(tag.visitorId, { ad: tag.detail, at });
+  }
+  const groups = new Map();
+  for (const event of events) {
+    const ad = event.visitorId && last.get(event.visitorId)?.ad;
+    if (ad) groups.set(ad, [...(groups.get(ad) || []), event]);
+  }
+  return [...groups].map(([ad, theirs]) => {
+    const visitors = new Set(theirs.map(personOf)).size;
+    return { ad, visitors, steps: [{ label: 'Visitors from this ad', people: visitors, ofVisitors: 1 },
+      ...ads.steps.map(([label, names]) => { const n = people(theirs, names); return { label, people: n, ofVisitors: n / visitors }; })] };
+  }).sort((a, b) => b.visitors - a.visitors).slice(0, 8);
+}
+
+function buildWedgeFunnel(events, definition = DEFINITIONS.report, adTags = []) {
   const { steps: STEP_LIST, branches: BRANCH_LIST, labels: LABEL_MAP } = definition;
   const landed = people(events, STEP_LIST[0].names);
   let previous = null;
@@ -397,7 +428,8 @@ function buildWedgeFunnel(events, definition = DEFINITIONS.report) {
       return { label: stepLabel, people: n, ofLanded: who.size ? n / who.size : null };
     }) };
   }) : null;
-  return { steps: shown, branches, split, recent, events: events.length, ...(definition.tiles ? { tiles: definition.tiles } : {}), ...(variants ? { variants } : {}) };
+  const ads = definition.ads ? byAd(events, definition.ads, adTags) : null;
+  return { steps: shown, branches, split, recent, events: events.length, ...(definition.tiles ? { tiles: definition.tiles } : {}), ...(variants ? { variants } : {}), ...(ads ? { ads } : {}) };
 }
 
 // Owner and App Review accounts, including plus-aliases of the owner emails

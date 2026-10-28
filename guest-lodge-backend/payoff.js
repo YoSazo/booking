@@ -35,7 +35,7 @@ const ITEMS = Object.freeze({
 const COACH_WINDOW_MS = 30 * 60 * 1000;
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
-  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach'];
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
@@ -58,6 +58,8 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const sessionId = value => typeof value === 'string' && /^cs_(?:live|test)_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
 const intentId = value => typeof value === 'string' && /^pi_[A-Za-z0-9]{8,200}$/.test(value) ? value : null;
+// PayoffAd's detail is the Meta ad id from the ad's utm_content tag.
+const adId = value => typeof value === 'string' && /^\d{6,25}$/.test(value) ? value : null;
 // Access is the paid order's id (a hosted Checkout Session, a PaymentIntent
 // from the order page, or an owner id) signed with the server secret.
 const accessId = value => sessionId(value) || intentId(value) || (typeof value === 'string' && /^own_[a-f0-9]{24}$/.test(value) ? value : null);
@@ -475,8 +477,8 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if (!EVENTS.includes(req.body?.name)) throw fail(400, 'Unknown event.');
     if (noTrack(req)) return res.json({ ignored: true });
     rate(req, 'event', 300);
-    const detail = EVENT_DETAILS[req.body.name]?.includes(req.body.detail) ? req.body.detail : null;
-    if (EVENT_DETAILS[req.body.name] && !detail && req.body.name !== 'PayoffFrom') throw fail(400, 'Unknown event.');
+    const detail = req.body.name === 'PayoffAd' ? adId(req.body.detail) : EVENT_DETAILS[req.body.name]?.includes(req.body.detail) ? req.body.detail : null;
+    if ((EVENT_DETAILS[req.body.name] || req.body.name === 'PayoffAd') && !detail && req.body.name !== 'PayoffFrom') throw fail(400, 'Unknown event.');
     const visitor = visitorId(req.body.visitorId);
     await record(req.body.name, visitor, null, detail);
     // Meta's AddToCart is staying 20 seconds on the order page, or starting to

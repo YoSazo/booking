@@ -381,7 +381,10 @@ test('anonymous funnel records contain no receipt email, and owner/headless even
     await post('/api/payoff/event', { name: 'PayoffLanded' }, { 'x-marketel-no-track': '1' });
     await post('/api/payoff/event', { name: 'PayoffLanded' }, { 'user-agent': 'HeadlessChrome' });
     assert.equal((await post('/api/payoff/event', { name: 'Unknown' })).status, 400);
-  }); assert.equal(w.rows.size, 2); assert.doesNotMatch(JSON.stringify([...w.rows.values()]), /private@/);
+    // The ad a visitor came from is its Meta ad id, digits only.
+    for (const detail of ['ad-123', '12', 'x'.repeat(30), null]) assert.equal((await post('/api/payoff/event', { name: 'PayoffAd', visitorId: 'v_abcdefghijk', detail })).status, 400, String(detail));
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffAd', visitorId: 'v_abcdefghijk', detail: '120251563772920103' })).status, 200);
+  }); assert.equal(w.rows.size, 3); assert.ok([...w.rows.values()].some(row => row.name === 'PayoffAd' && row.detail === '120251563772920103')); assert.doesNotMatch(JSON.stringify([...w.rows.values()]), /private@/);
   const definition = require('../wedge-funnel').definitionFor('payoff');
   assert.ok(definition.steps.some(step => step.names.includes('PayoffPaid')));
 });

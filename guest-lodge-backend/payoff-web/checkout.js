@@ -103,6 +103,9 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
   // A visitor sent on by the story page was counted there, with the ad click.
   if (query.get('from') !== 'story') event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
+  // Which ad: every Payoff ad links with utm_content={{ad.id}}, so the funnel
+  // page can follow each ad's visitors through to paying.
+  if (/^\d{6,25}$/.test(query.get('utm_content') || '')) event('PayoffAd', query.get('utm_content'));
   // Which landing this visitor saw (the A/B test), once per visitor.
   const variant = document.body.dataset.variant;
   if (['letter', 'quiz'].includes(variant)) {

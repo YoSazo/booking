@@ -364,6 +364,34 @@ test('Payoff counts checkout, purchases, delivery and sources separately', () =>
   for (const name of ['PayoffPaid', 'PayoffConfirmationEmailed']) assert.equal(definition.visitorEvents.has(name), false);
 });
 
+test('Payoff follows each ad\'s visitors to paying, by the last ad they clicked, even a click from before the range', () => {
+  const { definitionFor } = require('../wedge-funnel');
+  const definition = definitionFor('payoff');
+  const CAR = '120251563772920103', TABLE = '120251563874800103';
+  const events = [
+    ev('PayoffAd', 'v_a', { detail: CAR }), ev('PayoffStory', 'v_a', { detail: 'viewed' }), ev('PayoffVariant', 'v_a', { detail: 'letter' }),
+    ev('PayoffOrderViewed', 'v_a'), ev('PayoffOrder', 'v_a', { detail: 'cart' }), ev('PayoffOrder', 'v_a', { detail: 'email' }), ev('PayoffPaid', 'v_a'),
+    ev('PayoffAd', 'v_b', { detail: CAR }), ev('PayoffStory', 'v_b', { detail: 'viewed' }),
+    // Clicked CAR, then TABLE: theirs is TABLE.
+    ev('PayoffAd', 'v_c', { detail: CAR }), ev('PayoffAd', 'v_c', { detail: TABLE }), ev('PayoffStory', 'v_c', { detail: 'viewed' }), ev('PayoffOrderViewed', 'v_c'),
+    // Clicked TABLE yesterday (outside the range): today's visit still counts for it.
+    ev('PayoffOrderViewed', 'v_d'), ev('PayoffOrder', 'v_d', { detail: 'cart' }),
+    // No ad, and a junk tag: neither appears.
+    ev('PayoffStory', 'v_e', { detail: 'viewed' }), ev('PayoffAd', 'v_f', { detail: 'nope' }),
+  ];
+  const yesterday = [{ name: 'PayoffAd', visitorId: 'v_d', detail: TABLE, createdAt: at(-600) }];
+  const { ads } = buildWedgeFunnel(events, definition, yesterday);
+  const ladder = ad => Object.fromEntries(ads.find(a => a.ad === ad).steps.map(step => [step.label, step.people]));
+  assert.deepEqual(ads.map(a => a.ad).sort(), [CAR, TABLE].sort());
+  assert.deepEqual(ladder(CAR), { 'Visitors from this ad': 2, 'Opened the story page': 2, 'Opened the sales letter': 1, 'Viewed the order page': 1,
+    'Stayed 20 seconds or started paying (Meta: AddToCart)': 1, 'Typed a valid email': 1, Paid: 1 });
+  assert.deepEqual(ladder(TABLE), { 'Visitors from this ad': 2, 'Opened the story page': 1, 'Opened the sales letter': 0, 'Viewed the order page': 2,
+    'Stayed 20 seconds or started paying (Meta: AddToCart)': 1, 'Typed a valid email': 0, Paid: 0 });
+  assert.equal(ads.find(a => a.ad === CAR).steps.at(-1).ofVisitors, 0.5);
+  assert.ok(definition.visitorEvents.has('PayoffAd'), 'a reset clears the ad tags with the other visitor steps');
+  assert.equal(buildWedgeFunnel(events).ads, undefined, 'only Payoff has the by-ad table');
+});
+
 test('Payoff shows how far each visitor read the sales letter, how far they got on the order page, and how long each page was on screen', () => {
   const { definitionFor, buildWedgeFunnel } = require('../wedge-funnel');
   const definition = definitionFor('payoff');
