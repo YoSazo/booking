@@ -173,8 +173,8 @@ test('the order page: one first screen with the product and price, why today, bo
   assert.equal(await page.locator('.bump-price s').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
   assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   const bumpLook = await page.evaluate(() => { const css = sel => getComputedStyle(document.querySelector(sel));
-    return { headline: css('.bump-headline').color, oto: [css('.oto').color, css('.oto').textDecorationLine], bump: [css('.bump').backgroundColor, css('.bump').borderStyle] }; });
-  assert.deepEqual(bumpLook, { headline: 'rgb(0, 153, 0)', oto: ['rgb(204, 51, 0)', 'underline'], bump: ['rgb(251, 248, 227)', 'dashed'] });
+    return { arrow: [document.querySelectorAll('.bump-head .arrow').length, css('.arrow').animationName], headline: css('.bump-headline').color, oto: [css('.oto').color, css('.oto').textDecorationLine], bump: [css('.bump').backgroundColor, css('.bump').borderStyle] }; });
+  assert.deepEqual(bumpLook, { arrow: [2, 'bump-arrow'], headline: 'rgb(0, 153, 0)', oto: ['rgb(204, 51, 0)', 'underline'], bump: ['rgb(251, 248, 227)', 'dashed'] }, 'the flashing arrow before each checkbox, as on the reference');
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.11/);
   const look = await page.evaluate(() => ({ button: getComputedStyle(document.getElementById('buy-button')).backgroundColor, font: getComputedStyle(document.querySelector('.order')).fontFamily }));
   assert.deepEqual(look, { button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
