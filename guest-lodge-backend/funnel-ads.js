@@ -82,7 +82,8 @@ function cleanNote(kind, data = {}) {
       text: (Array.isArray(data.text) ? data.text : []).map(line => text(line, 400)).filter(Boolean).slice(0, 15) };
   }
   const entry = Object.fromEntries(NOTE_LIMITS.log.map(field => [field, text(data[field], field === 'result' || field === 'question' ? 3000 : 400)]));
-  entry.status = ['running', 'queued', 'done'].includes(data.status) ? data.status : 'running';
+  // 'guide' is the standing routine, kept at the top of the log.
+  entry.status = ['guide', 'running', 'queued', 'done'].includes(data.status) ? data.status : 'running';
   entry.ads = (Array.isArray(data.ads) ? data.ads : []).map(String).filter(id => /^\d{6,25}$/.test(id)).slice(0, 12);
   entry.outcomes = (Array.isArray(data.outcomes) ? data.outcomes : []).map(row => ({ if: text(row?.if, 300), means: text(row?.means, 800), next: text(row?.next, 800) }))
     .filter(row => row.if || row.means || row.next).slice(0, 10);

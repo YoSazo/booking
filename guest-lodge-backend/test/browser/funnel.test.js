@@ -115,7 +115,9 @@ function adsReport() {
     ads: [ad('111111', 'CAR', 'running', 'Running', { key: 'testing', label: '$23.40 of $60.00, no sale yet', progress: 0.39 }, { note: { image: 'Car at night', copy: 'Customer voice, long-form', testing: '', verdict: '' } }),
       ad('222222', 'TABLE', 'review', 'In review', { key: 'testing', label: '$0.00 of $60.00, no sale yet', progress: 0 }),
       ad('333333', 'OLD AD', 'off', 'Off', { key: 'off', label: 'Off after $38.16, no sale' })],
-    log: [{ id: 'log1', createdAt: '2026-10-28T12:00:00Z', title: 'Round 1: CAR vs TABLE vs kitchen', status: 'running', date: '2026-10-28', ads: ['111111', '222222'],
+    log: [{ id: 'guide1', createdAt: '2026-10-20T12:00:00Z', title: 'How we run it', status: 'guide', question: 'Most verdicts per dollar', changed: 'Two lanes',
+      outcomes: [{ if: 'A card says Turn it off', means: '$60, no sale', next: 'Swap in the next creative that day' }] },
+      { id: 'log1', createdAt: '2026-10-28T12:00:00Z', title: 'Round 1: CAR vs TABLE vs kitchen', status: 'running', date: '2026-10-28', ads: ['111111', '222222'],
       question: 'Which package sells?', changed: 'Image, voice and hook all differ (a package test)', result: '',
       outcomes: [{ if: 'CAR sells', means: 'The customer-voice package works', next: 'Hospital image with CAR\'s exact copy' }, { if: 'Nothing by $60 each', means: 'The angle or format isn\'t it', next: 'Warning-box hook or the video' }] }] };
 }
@@ -153,7 +155,10 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 1000
     assert.equal(await car.locator('img').evaluate(img => img.complete && img.naturalWidth > 0), true, 'the ad picture loads');
     assert.match(await page.locator('#rules').innerText(), /Off at \$60 with no sale[\s\S]*Winner: 2 sales at \$28\.11 or less each/);
     // The log entry with its outcomes.
-    const entry = page.locator('#log .log-entry').first();
+    // The standing routine sits at the top of the log, as a list, whatever its date.
+    const guide = page.locator('#log .log-entry').first();
+    assert.match(await guide.innerText(), /How we run it[\s\S]*The routine[\s\S]*A card says Turn it off: Swap in the next creative that day \(\$60, no sale\)/i);
+    const entry = page.locator('#log .log-entry').nth(1);
     assert.match(await entry.innerText(), /Round 1: CAR vs TABLE vs kitchen/);
     assert.deepEqual(await entry.locator('.chips span').allInnerTexts(), ['CAR', 'TABLE']);
     assert.match(await entry.locator('table.outcomes').innerText(), /CAR sells[\s\S]*Hospital image with CAR's exact copy/);

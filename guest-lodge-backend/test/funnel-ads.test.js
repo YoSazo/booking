@@ -131,5 +131,6 @@ test('notes are trimmed to their fields and sizes', () => {
   const entry = cleanNote('log', { title: ' T ', status: 'weird', outcomes: Array.from({ length: 20 }, (_, i) => ({ if: `r${i}` })) });
   assert.equal(entry.title, 'T');
   assert.equal(entry.status, 'running');
+  assert.equal(cleanNote('log', { title: 'Routine', status: 'guide' }).status, 'guide', 'the standing routine');
   assert.equal(entry.outcomes.length, 10);
 });

@@ -129,6 +129,10 @@
   table.outcomes td:first-child { font-weight: 700; }
   .log-entry .result { background: var(--subtle); border-radius: 10px; padding: 8px 10px; margin-top: 10px; }
   .log-entry.done { opacity: .85; }
+  .log-entry.guide { border-color: var(--green); }
+  .pill.st-guide { background: var(--green); color: #fff; }
+  ul.routine { margin: 4px 0 0; padding-left: 18px; }
+  ul.routine li { margin: 5px 0; }
 
   /* Visitors */
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -479,17 +483,19 @@ function editAd(id) {
   };
 }
 
-const STATUS_LABELS = { running: 'Running', queued: 'Up next', done: 'Done' };
+const STATUS_LABELS = { guide: 'How we run it', running: 'Running', queued: 'Up next', done: 'Done' };
 function logEntry(entry) {
+  const guide = entry.status === 'guide';
   const names = (entry.ads || []).map(id => (adsReport?.ads || []).find(a => a.id === id)?.short || `Ad …${id.slice(-6)}`);
-  return `<article class="card log-entry ${entry.status === 'done' ? 'done' : ''}" data-log="${esc(entry.id)}">
+  return `<article class="card log-entry ${entry.status === 'done' ? 'done' : ''}${guide ? ' guide' : ''}" data-log="${esc(entry.id)}">
     <div class="log-head"><span class="pill st-${esc(entry.status)}">${STATUS_LABELS[entry.status] || esc(entry.status)}</span><h3>${esc(entry.title)}</h3>
       <span class="muted">${esc(entry.date || day(entry.createdAt))}</span><span class="spacer"></span>
       <button type="button" class="quiet" data-log-edit="${esc(entry.id)}">Edit</button><button type="button" class="quiet danger" data-log-delete="${esc(entry.id)}">Delete</button></div>
     ${names.length ? `<div class="chips">${names.map(n => `<span>${esc(n)}</span>`).join('')}</div>` : ''}
-    ${entry.question ? `<span class="label">The question</span><p>${esc(entry.question)}</p>` : ''}
-    ${entry.changed ? `<span class="label">What changed</span><p>${esc(entry.changed)}</p>` : ''}
-    ${(entry.outcomes || []).length ? `<span class="label">If this happens, then</span><table class="outcomes"><thead><tr><th>If this happens</th><th>It tells us</th><th>Test next</th></tr></thead><tbody>${entry.outcomes.map(o => `<tr><td>${esc(o.if)}</td><td>${esc(o.means)}</td><td>${esc(o.next)}</td></tr>`).join('')}</tbody></table>` : ''}
+    ${entry.question ? `<span class="label">${guide ? 'The aim' : 'The question'}</span><p>${esc(entry.question)}</p>` : ''}
+    ${entry.changed ? `<span class="label">${guide ? 'The setup' : 'What changed'}</span><p>${esc(entry.changed)}</p>` : ''}
+    ${guide && (entry.outcomes || []).length ? `<span class="label">The routine</span><ul class="routine">${entry.outcomes.map(o => `<li><b>${esc(o.if)}:</b> ${esc(o.next)}${o.means ? ` <span class="muted">(${esc(o.means)})</span>` : ''}</li>`).join('')}</ul>` : ''}
+    ${!guide && (entry.outcomes || []).length ? `<span class="label">If this happens, then</span><table class="outcomes"><thead><tr><th>If this happens</th><th>It tells us</th><th>Test next</th></tr></thead><tbody>${entry.outcomes.map(o => `<tr><td>${esc(o.if)}</td><td>${esc(o.means)}</td><td>${esc(o.next)}</td></tr>`).join('')}</tbody></table>` : ''}
     ${entry.result ? `<div class="result"><span class="label" style="margin-top:0">Result</span>${esc(entry.result)}</div>` : ''}
   </article>`;
 }
@@ -546,7 +552,7 @@ function renderAds(report) {
   $('stopped-summary').textContent = `Stopped ads (${stopped.length})`;
   $('stopped-cards').innerHTML = stopped.map(adCard).join('');
   document.querySelectorAll('[data-edit-ad]').forEach(b => b.onclick = () => editAd(b.dataset.editAd));
-  const order = { running: 0, queued: 1, done: 2 };
+  const order = { guide: -1, running: 0, queued: 1, done: 2 };
   const log = [...report.log].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || new Date(b.createdAt) - new Date(a.createdAt));
   $('log').innerHTML = log.length ? log.map(logEntry).join('') : '<p class="muted">Nothing in the log yet. Add the test that is running now.</p>';
   document.querySelectorAll('[data-log-edit]').forEach(b => b.onclick = () => logForm(report.log.find(e => e.id === b.dataset.logEdit)));
