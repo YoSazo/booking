@@ -151,6 +151,22 @@ model InspectEvent {
   @@index([tool, name, createdAt])
 }
 
+// The funnel page's own notes, kept here so the plan outlives any chat: what
+// each ad is (kind "ad", key = Meta ad id), the test rules (kind "rules", key
+// "current") and the test log (kind "log", no key).
+model FunnelNote {
+  id        String   @id @default(cuid())
+  tool      String
+  kind      String
+  key       String?
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tool, kind, key])
+  @@index([tool, kind, createdAt])
+}
+
 // Durable private-object deletion queue; never fall back to public uploads.
 model InspectGarbage {
   objectKey String   @id

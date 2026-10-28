@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#eff4f0">
 <meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
 <title>Marketel · Funnel</title>
 <link rel="manifest" href="/manifest-funnel.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -13,60 +14,145 @@
   :root {
     --bg: #eff4f0; --card: #ffffff; --subtle: #f4f8f5; --border: #d8e4dc; --border-soft: #e6eee9;
     --text: #1a2b22; --soft: #4b5d52; --muted: #6b7d72; --green: #2e7d5b; --green-dark: #245f46; --track: #e3ece6;
-    --danger: #aa382b; --shadow: 0 1px 2px #173b2310, 0 8px 24px #173b230d;
+    --danger: #aa382b; --amber: #9a6a00; --amber-bg: #fff6df; --red-bg: #fdeeeb; --green-bg: #e7f4ec; --grey-bg: #eef1ef;
+    --shadow: 0 1px 2px #173b2310, 0 8px 24px #173b230d;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #101a15; --card: #17241d; --subtle: #1c2b23; --border: #2a3d33; --border-soft: #22342a;
       --text: #e7f0ea; --soft: #b8c9be; --muted: #8fa497; --green: #5fb58a; --green-dark: #7cc9a1; --track: #22342a;
-      --danger: #e0806f; --shadow: none;
+      --danger: #e0806f; --amber: #e3b94f; --amber-bg: #2d2714; --red-bg: #33201c; --green-bg: #17301f; --grey-bg: #1f2b25; --shadow: none;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 18px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 18px 16px 48px; }
+  [hidden] { display: none !important; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 6px; }
   h1 { margin: 0; font-size: 22px; letter-spacing: -.3px; }
   h1 small { color: var(--muted); font-weight: 500; }
   .spacer { flex: 1 1 auto; }
-  select, button, input { font: inherit; }
-  select, input { min-width: 0; max-width: 100%; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  select, button, input, textarea { font: inherit; }
+  select, input, textarea { min-width: 0; max-width: 100%; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  textarea { width: 100%; resize: vertical; }
+  .jump { display: flex; gap: 4px; margin: 4px 0 14px; position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; }
+  .jump a { padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--border-soft); color: var(--soft); font-weight: 600; font-size: 13px; text-decoration: none; }
+  .jump a:hover { color: var(--green-dark); border-color: var(--green); }
+  section.block { margin-bottom: 28px; scroll-margin-top: 56px; }
+  .section-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; margin: 0 0 12px; }
+  .section-head h2 { margin: 0; font-size: 20px; letter-spacing: -.2px; }
+  .lede { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 640px; }
   .range { display: inline-flex; flex-wrap: wrap; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
   .range button { border: 0; background: transparent; color: var(--soft); padding: 6px 11px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
   .range button[aria-pressed="true"] { background: var(--green); color: #fff; }
   .quiet { border: 0; background: transparent; color: var(--green); font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; text-decoration: none; font-size: 13px; }
   .quiet:hover { background: var(--subtle); }
   .quiet.danger { color: var(--danger); }
+  .btn { border: 0; border-radius: 10px; background: var(--green); color: #fff; font-weight: 600; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  .btn.secondary { background: var(--subtle); color: var(--text); border: 1px solid var(--border); }
   .updated { color: var(--muted); font-size: 12px; }
-  .date-controls { margin-bottom: 14px; }
-  .date-controls label { display: flex; flex-direction: column; gap: 4px; color: var(--soft); font-size: 13px; }
-  .date-controls input, .date-controls select { font-size: 16px; }
-  .date-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
-  .date-fields label { flex: 1 1 200px; min-width: 0; }
-  #custom-range { margin-top: 12px; }
-  #custom-range[hidden] { display: none; }
-  .split[hidden], #split-card[hidden] { display: none; }
+  .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 14px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; }
+  .card > p.muted { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .muted { color: var(--muted); }
+  .error { color: var(--danger); }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--grey-bg); color: var(--soft); white-space: nowrap; }
+  .pill.s-running, .pill.st-running { background: var(--green-bg); color: var(--green-dark); }
+  .pill.s-review, .pill.st-queued { background: var(--amber-bg); color: var(--amber); }
+  .pill.s-rejected { background: var(--red-bg); color: var(--danger); }
+
+  /* The rules */
+  .rules h3 { margin: 0; }
+  .rules-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chips span { padding: 4px 10px; border-radius: 999px; background: var(--subtle); border: 1px solid var(--border-soft); font-size: 13px; font-weight: 600; }
+  .rules ol { margin: 0; padding-left: 20px; color: var(--soft); font-size: 13px; }
+  .rules ol li { margin: 2px 0; }
+
+  /* Ad cards */
+  .ad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .ad { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
+  .ad-top { display: flex; gap: 12px; padding: 14px 14px 10px; }
+  .ad-img { width: 104px; height: 130px; object-fit: cover; border-radius: 10px; background: var(--subtle); flex: 0 0 auto; }
+  .ad-img.broken { visibility: hidden; }
+  .ad-name { font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+  .ad-sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .ad-head .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .verdict { margin: 0 14px; padding: 9px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; background: var(--grey-bg); color: var(--soft); }
+  .v-winner .verdict { background: var(--green-bg); color: var(--green-dark); }
+  .v-selling .verdict, .v-testing .verdict { background: var(--amber-bg); color: var(--amber); }
+  .v-kill .verdict { background: var(--red-bg); color: var(--danger); }
+  .verdict .bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, currentColor 18%, transparent); margin-top: 6px; overflow: hidden; }
+  .verdict .bar i { display: block; height: 100%; background: currentColor; border-radius: 3px; }
+  .ad-copy { padding: 10px 14px 0; }
+  .ad-copy .headline { font-weight: 700; }
+  .ad-copy .hook { margin: 4px 0 0; color: var(--soft); font-size: 14px; border-left: 3px solid var(--border); padding-left: 10px; }
+  .ad details { margin-top: 6px; font-size: 13px; }
+  .ad details summary { cursor: pointer; color: var(--green); font-weight: 600; }
+  .ad .body { white-space: pre-wrap; color: var(--soft); max-height: 340px; overflow: auto; margin-top: 6px; padding: 10px; background: var(--subtle); border-radius: 10px; }
+  .nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 12px 14px 0; background: var(--border-soft); border-radius: 10px; overflow: hidden; }
+  .nums div { background: var(--card); padding: 7px 9px; }
+  .nums dt { color: var(--muted); font-size: 11px; font-weight: 600; }
+  .nums dd { margin: 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .after { margin: 12px 14px 0; }
+  .after h4, .note h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .flow { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  .flow li { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 4px 6px; border-radius: 8px; background: var(--subtle); font-size: 11px; color: var(--muted); text-align: center; flex: 1 1 0; }
+  .flow li b { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .flow li.lit { background: var(--green-bg); }
+  .note { margin: 12px 14px 14px; padding-top: 10px; border-top: 1px solid var(--border-soft); font-size: 13px; }
+  .note p { margin: 2px 0; color: var(--soft); }
+  .note p b { color: var(--text); }
+  .note .empty-note { color: var(--muted); font-style: italic; }
+  .ad .spacer-grow { flex: 1 1 auto; }
+  details.stopped { margin-top: 14px; }
+  details.stopped > summary { cursor: pointer; font-weight: 600; color: var(--soft); margin-bottom: 10px; }
+
+  /* Forms */
+  form.edit { display: grid; gap: 8px; margin-top: 8px; }
+  form.edit label { display: grid; gap: 3px; font-size: 12px; font-weight: 600; color: var(--soft); }
+  form.edit .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  form.edit .row > label { flex: 1 1 140px; }
+  form.edit .actions { display: flex; gap: 8px; align-items: center; }
+  .outcome-row { display: grid; grid-template-columns: 1fr 1.4fr 1.4fr auto; gap: 6px; }
+  .ad-picks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-weight: 500; }
+  .ad-picks label { display: flex; gap: 6px; align-items: center; font-weight: 500; }
+
+  /* Test log */
+  .log-entry h3 { margin: 0; font-size: 17px; }
+  .log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+  .log-entry p { margin: 4px 0; }
+  .log-entry .label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; display: block; margin-top: 8px; }
+  table.outcomes { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 14px; }
+  table.outcomes th { text-align: left; color: var(--muted); font-size: 12px; font-weight: 600; padding: 0 8px 6px 0; }
+  table.outcomes td { padding: 7px 8px 7px 0; border-top: 1px solid var(--border-soft); vertical-align: top; }
+  table.outcomes td:first-child { font-weight: 700; }
+  .log-entry .result { background: var(--subtle); border-radius: 10px; padding: 8px 10px; margin-top: 10px; }
+  .log-entry.done { opacity: .85; }
+
+  /* Visitors */
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .controls .tz { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--soft); }
+  #custom-range { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; width: 100%; }
+  #custom-range label { display: flex; flex-direction: column; gap: 4px; color: var(--soft); font-size: 13px; flex: 1 1 200px; }
+  #custom-range input { font-size: 16px; }
   #apply-range { padding: 9px 16px; border: 0; border-radius: 10px; background: var(--green); color: #fff; font-weight: 600; cursor: pointer; }
-  #range-summary { margin: 12px 0 4px; font-size: 14px; font-weight: 600; }
-  #range-error { margin: 6px 0 0; }
-  .date-help { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  #range-summary { margin: 0; width: 100%; font-size: 13px; font-weight: 600; color: var(--soft); }
+  #range-error { margin: 0; width: 100%; }
+  .date-help { margin: 0; width: 100%; font-size: 12px; color: var(--muted); }
   .when time { display: block; color: var(--soft); }
   .when small { display: block; }
   .tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-  .tile, .card { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); }
-  .tile { padding: 14px 16px; }
+  .tile { background: var(--card); border: 1px solid var(--border-soft); border-radius: 16px; box-shadow: var(--shadow); padding: 14px 16px; }
   .tile small { display: block; color: var(--muted); font-size: 12px; font-weight: 600; }
   .tile strong { display: block; font-size: 30px; line-height: 1.1; letter-spacing: -.6px; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
   .tile span { color: var(--soft); font-size: 12px; }
-  .card { padding: 16px 18px; margin-bottom: 14px; }
-  .card h2 { margin: 0 0 4px; font-size: 16px; }
-  .card > p.muted { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
   .ladder { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .variants table { width: 100%; margin: 8px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   .variants th { color: var(--muted); font-size: 12px; font-weight: 600; text-align: right; padding: 0 0 6px 10px; }
   .variants td { padding: 6px 0 6px 10px; border-top: 1px solid var(--border-soft); text-align: right; font-size: 14px; }
   .variants td:first-child, .variants th:first-child { text-align: left; padding-left: 0; }
-  .variants .muted { font-size: 12px; color: var(--muted); }
+  .variants .muted { font-size: 12px; }
   .ladder th { text-align: right; color: var(--muted); font-size: 12px; font-weight: 600; padding: 0 0 8px 10px; }
   .ladder th:first-child, .ladder th:nth-child(2) { text-align: left; padding-left: 0; }
   .ladder td { padding: 5px 0 5px 10px; text-align: right; white-space: nowrap; font-size: 14px; }
@@ -85,23 +171,24 @@
   .flag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--danger); color: var(--danger); font-size: 11px; font-weight: 700; }
   .split { display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; color: var(--soft); }
   .split b { color: var(--text); font-size: 18px; font-variant-numeric: tabular-nums; margin-right: 4px; }
-  .branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .branches .card { margin: 0; }
+  .branches .card h2 { margin: 0 0 4px; font-size: 15px; }
   .branches ul { list-style: none; margin: 8px 0 0; padding: 0; }
   .branches li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: 1px solid var(--border-soft); font-size: 13px; color: var(--soft); }
   .branches li b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .sub-head { margin: 18px 0 8px; font-size: 15px; color: var(--soft); }
   .feed { width: 100%; border-collapse: collapse; font-size: 13px; }
   .feed td { padding: 6px 8px 6px 0; border-top: 1px solid var(--border-soft); vertical-align: top; }
   .feed td.when { color: var(--muted); white-space: normal; width: 145px; }
   .feed td.who { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; width: 70px; }
   .feed td.detail { color: var(--muted); }
   .empty { color: var(--muted); padding: 18px 0; text-align: center; }
-  .error { color: var(--danger); }
   .count-toggle { font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--green); background: transparent; color: var(--green-dark); }
   .filter-toggle { font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 11px; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--soft); }
-  .filter-toggle[aria-pressed="true"] { border-color: var(--green, #2e7d5b); color: var(--green, #2e7d5b); background: #eaf4ee; }
+  .filter-toggle[aria-pressed="true"] { border-color: var(--green); color: var(--green); background: var(--green-bg); }
   .count-toggle[aria-pressed="false"] { border-color: var(--danger); color: var(--danger); }
-  .track-note { color: var(--muted); font-size: 12px; margin: -8px 0 14px; }
+  .track-note { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
   #tip { position: fixed; z-index: 10; pointer-events: none; background: var(--text); color: var(--bg); padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5; box-shadow: 0 8px 24px #0003; opacity: 0; transition: opacity .12s; max-width: 260px; }
   #tip.on { opacity: 1; }
   footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
@@ -111,6 +198,16 @@
     .ladder td.bar { display: none; } .ladder th:nth-child(2) { display: none; }
   }
   @media (max-width: 520px) {
+    .ad-grid { grid-template-columns: minmax(0, 1fr); }
+    .ad-img { width: 88px; height: 110px; }
+    .branches { grid-template-columns: minmax(0, 1fr); }
+    .outcome-row { grid-template-columns: 1fr auto; }
+    .outcome-row input:nth-child(2), .outcome-row input:nth-child(3) { grid-column: 1 / -1; }
+    table.outcomes thead { display: none; }
+    table.outcomes tr { display: block; border-top: 1px solid var(--border-soft); padding: 6px 0; }
+    table.outcomes td { display: block; border: 0; padding: 2px 0; }
+    table.outcomes td:nth-child(2)::before { content: "Tells us: "; color: var(--muted); font-weight: 600; }
+    table.outcomes td:nth-child(3)::before { content: "Test next: "; color: var(--muted); font-weight: 600; }
     .feed { table-layout: fixed; }
     .feed td { overflow-wrap: anywhere; }
     .feed td.when { width: 115px; }
@@ -123,73 +220,98 @@
 <main>
   <header>
     <h1>Funnel <small id="wedge-name"></small></h1>
-    <select id="wedge" aria-label="Wedge"></select>
-    <button type="button" class="filter-toggle" id="ad-only" aria-pressed="false">Only ad clicks</button>
-    <div class="range" role="group" aria-label="Date range">
-      <button type="button" data-period="today">Today</button>
-      <button type="button" data-period="yesterday">Yesterday</button>
-      <button type="button" data-period="24h">Last 24 hours</button>
-      <button type="button" data-period="7d">7 days</button>
-      <button type="button" data-period="30d">30 days</button>
-      <button type="button" data-period="since-reset">Since latest change</button>
-      <button type="button" data-period="all">All time</button>
-      <button type="button" data-period="custom">Custom</button>
-    </div>
+    <select id="wedge" aria-label="Product"></select>
     <span class="spacer"></span>
     <button type="button" class="count-toggle" id="track-toggle" aria-pressed="true"></button>
-    <span class="updated" id="updated"></span>
     <button type="button" class="quiet" id="refresh">Refresh</button>
     <a class="quiet" href="/funnel/legacy">Bookings &amp; support →</a>
   </header>
-
-  <section class="card date-controls" aria-label="Reporting time range">
-    <div class="date-fields"><label>Reporting timezone<select id="timezone">
-      <option value="America/Chicago">Chicago — Central time</option>
-      <option value="America/New_York">New York — Eastern time</option>
-      <option value="America/Los_Angeles">Los Angeles — Pacific time</option>
-      <option value="UTC">UTC</option>
-    </select></label></div>
-    <form id="custom-range" class="date-fields" hidden>
-      <label>From<input type="datetime-local" id="range-from" required></label>
-      <label>Through<input type="datetime-local" id="range-to" required></label>
-      <button type="submit" id="apply-range">Apply range</button>
-    </form>
-    <p id="range-summary" aria-live="polite">Loading reporting range…</p>
-    <p id="range-error" class="error" role="alert" hidden></p>
-    <p class="date-help">Today and Yesterday are calendar days in the selected timezone. Custom ranges include the entire end minute. Counts are activity within this range, not a cohort's eventual conversion.</p>
-    <p class="date-help" id="range-warning" hidden></p>
-  </section>
   <p class="track-note" id="track-note"></p>
-  <p class="track-note" id="since-note" hidden></p>
-  <p class="track-note" id="ad-note" hidden>Only visitors with a recorded Meta click id. Their activity must occur inside the selected range; the ad click may have happened earlier. This is not a campaign-specific filter.</p>
-  <section class="tiles" id="tiles" aria-live="polite"></section>
-  <section class="card variants" id="variants" hidden></section>
-  <section class="card variants" id="ads" hidden></section>
+  <nav class="jump" id="jump" hidden><a href="#ads-section">Ads</a><a href="#log-section">Test log</a><a href="#visitors-section">Visitors</a></nav>
 
-  <section class="card">
-    <h2>From arrival to paying</h2>
-    <p class="muted">People at each step. "Of the step before" is the share who went on from the previous row on the main line; rows marked <em>of landed</em> run beside the line (someone can answer without staying twenty seconds), so they are measured against everyone who landed, and the indented rows are the answers to the question above them. Hover a row for details.</p>
-    <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>Of the step before</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
+  <section class="block" id="ads-section" hidden>
+    <div class="section-head">
+      <div><h2>Ads</h2><p class="lede">Every Payoff ad from the last 30 days: its picture and copy, Meta's lifetime numbers, and what the people it sent did on the site.</p></div>
+      <span class="spacer"></span><span class="updated" id="ads-updated"></span>
+    </div>
+    <div class="card rules" id="rules"></div>
+    <p class="error" id="ads-error" hidden></p>
+    <div class="ad-grid" id="ad-cards"></div>
+    <details class="stopped" id="stopped" hidden><summary id="stopped-summary"></summary><div class="ad-grid" id="stopped-cards"></div></details>
   </section>
 
-  <section class="card" id="split-card">
-    <h2>Where they landed</h2>
-    <div class="split" id="split"></div>
+  <section class="block" id="log-section" hidden>
+    <div class="section-head">
+      <div><h2>Test log</h2><p class="lede">What each test asks, what each result would mean and what goes up next. Saved on the server, so it outlives any chat.</p></div>
+      <span class="spacer"></span><button type="button" class="btn" id="log-new">New entry</button>
+    </div>
+    <div class="card" id="log-form-card" hidden></div>
+    <div id="log"></div>
   </section>
 
-  <section class="branches" id="branches"></section>
+  <section class="block" id="visitors-section">
+    <div class="section-head">
+      <div><h2>Visitors</h2><p class="lede">What people did on the site in the time range you pick.</p></div>
+    </div>
+    <div class="card controls" aria-label="Reporting time range">
+      <div class="range" role="group" aria-label="Date range">
+        <button type="button" data-period="today">Today</button>
+        <button type="button" data-period="yesterday">Yesterday</button>
+        <button type="button" data-period="24h">Last 24 hours</button>
+        <button type="button" data-period="7d">7 days</button>
+        <button type="button" data-period="30d">30 days</button>
+        <button type="button" data-period="since-reset">Since latest change</button>
+        <button type="button" data-period="all">All time</button>
+        <button type="button" data-period="custom">Custom</button>
+      </div>
+      <button type="button" class="filter-toggle" id="ad-only" aria-pressed="false">Only ad clicks</button>
+      <label class="tz">Timezone <select id="timezone">
+        <option value="America/Chicago">Chicago — Central</option>
+        <option value="America/New_York">New York — Eastern</option>
+        <option value="America/Los_Angeles">Los Angeles — Pacific</option>
+        <option value="UTC">UTC</option>
+      </select></label>
+      <form id="custom-range" hidden>
+        <label>From<input type="datetime-local" id="range-from" required></label>
+        <label>Through<input type="datetime-local" id="range-to" required></label>
+        <button type="submit" id="apply-range">Apply range</button>
+      </form>
+      <p id="range-summary" aria-live="polite">Loading reporting range…</p>
+      <p id="range-error" class="error" role="alert" hidden></p>
+      <p class="date-help">Today and Yesterday are calendar days in the chosen timezone. Counts are what happened inside the range.</p>
+      <p class="date-help" id="range-warning" hidden></p>
+    </div>
+    <p class="track-note" id="since-note" hidden></p>
+    <p class="track-note" id="ad-note" hidden>Only visitors with a recorded Meta click id. Their activity must be inside the range; the ad click may have been earlier. This is not a campaign filter.</p>
+    <section class="tiles" id="tiles" aria-live="polite"></section>
+    <section class="card variants" id="variants" hidden></section>
 
-  <section class="card">
-    <h2>Latest activity</h2>
-    <p class="muted">Newest first, with exact dates and times in the reporting timezone. Visitors are an anonymous id until they sign in; owner and App Review accounts are left out.</p>
-    <table class="feed" id="feed"><tbody></tbody></table>
-    <button type="button" class="quiet" id="feed-more" hidden>Show more</button>
+    <section class="card">
+      <h3>Step by step</h3>
+      <p class="muted">People who reached each step. The middle column is the share who made it from the row above. Rows marked <em>of landed</em> run beside the main line, so they're measured against everyone who landed. Hover a row for details.</p>
+      <table class="ladder" id="ladder"><thead><tr><th>Step</th><th></th><th>People</th><th>From the row above</th><th>Of everyone who landed</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="card" id="split-card">
+      <h3>Where they landed</h3>
+      <div class="split" id="split"></div>
+    </section>
+
+    <h3 class="sub-head">Page by page</h3>
+    <section class="branches" id="branches"></section>
+
+    <section class="card">
+      <h3>Latest activity</h3>
+      <p class="muted">Newest first, in the chosen timezone. Visitors are an anonymous id until they sign in; owner and App Review accounts are left out.</p>
+      <table class="feed" id="feed"><tbody></tbody></table>
+      <button type="button" class="quiet" id="feed-more" hidden>Show more</button>
+    </section>
+
+    <footer>
+      <span class="updated" id="updated"></span>
+      <button type="button" class="quiet danger" id="reset">Reset visitor steps…</button>
+    </footer>
   </section>
-
-  <footer>
-    <span class="updated">Refreshes every minute.</span>
-    <button type="button" class="quiet danger" id="reset">Reset visitor steps…</button>
-  </footer>
 </main>
 <div id="tip" role="tooltip"></div>
 <script>
@@ -220,6 +342,7 @@ try { new Intl.DateTimeFormat('en-US', { timeZone: state.timezone }); } catch (_
 const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
 const zoned = (iso, options = {}) => new Date(iso).toLocaleString('en-US', { timeZone: state.timezone,
   month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', ...options });
+const day = iso => new Date(iso).toLocaleDateString('en-US', { timeZone: state.timezone, month: 'short', day: 'numeric' });
 function inputTime(iso) {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: state.timezone,
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -254,6 +377,7 @@ async function adminFetch(url, options = {}, retry = true) {
   if (!response.ok) throw new Error(body.message || 'Could not load the funnel.');
   return body;
 }
+const postJson = (url, body) => adminFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 function ago(iso) {
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -263,6 +387,193 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// ---- Ads and the test log (Payoff) ----------------------------------------
+let adsReport = null, adsLoading = 0;
+const dollars = (value, cents = true) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 })}`;
+const editing = () => !!document.querySelector('form.edit');
+// The per-ad steps (definitionFor('payoff').ads), short enough for a phone.
+const FLOW_LABELS = ['Clicked', 'Story', 'Letter', 'Order page', 'Stayed 20s', 'Typed email', 'Paid'];
+const paragraphs = body => String(body || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+
+function adCard(ad) {
+  const m = ad.meta, perSale = ad.sales ? m.spend / ad.sales : null;
+  const hook = paragraphs(ad.body)[0] || '';
+  const verdict = ad.verdict || { key: 'old', label: '' };
+  const steps = ad.steps.length ? ad.steps : [];
+  const note = ad.note || {};
+  const noteRows = [['Image', note.image], ['Copy', note.copy], ['Testing', note.testing], ['Verdict', note.verdict]].filter(([, v]) => v);
+  return `<article class="ad v-${esc(verdict.key)}" data-ad="${esc(ad.id)}">
+    <div class="ad-top">
+      ${ad.image ? `<img class="ad-img" src="${esc(ad.thumb || ad.image)}" alt="${esc(ad.short)} ad image" loading="lazy" referrerpolicy="no-referrer" onerror="this.classList.add('broken')">` : '<div class="ad-img"></div>'}
+      <div class="ad-head">
+        <div class="ad-name">${esc(ad.short)}</div>
+        <div class="ad-sub">${esc(ad.campaign)}</div>
+        <div class="pills"><span class="pill s-${esc(ad.status)}">${esc(ad.statusLabel)}</span><span class="pill">For: ${esc(ad.eventLabel)}</span><span class="pill">Since ${esc(day(ad.created))}</span></div>
+      </div>
+    </div>
+    <div class="verdict">${esc(verdict.label)}${verdict.progress !== undefined ? `<div class="bar"><i style="width:${Math.round(verdict.progress * 100)}%"></i></div>` : ''}</div>
+    <div class="ad-copy">
+      ${ad.headline ? `<div class="headline">${esc(ad.headline)}</div>` : ''}
+      ${hook ? `<p class="hook">${esc(hook.length > 320 ? hook.slice(0, 317) + '…' : hook)}</p>` : ''}
+      ${ad.body ? `<details><summary>Full copy · ${ad.words} words</summary><div class="body">${esc(ad.body)}</div>${ad.description ? `<p class="muted">Description: ${esc(ad.description)}</p>` : ''}</details>` : ''}
+    </div>
+    <dl class="nums">
+      <div><dt>Spent</dt><dd>${dollars(m.spend)}</dd></div>
+      <div><dt>Cost per 1,000 views</dt><dd>${m.impressions ? dollars(m.cpm) : '—'}</dd></div>
+      <div><dt>Clicks</dt><dd>${m.clicks} <small class="muted">${m.impressions ? `${m.ctr.toFixed(1)}%` : ''}</small></dd></div>
+      <div><dt>Landed</dt><dd>${m.landingViews}</dd></div>
+      <div><dt>Sales</dt><dd>${ad.sales}</dd></div>
+      <div><dt>Cost per sale</dt><dd>${perSale ? dollars(perSale) : '—'}</dd></div>
+    </dl>
+    <div class="after"><h4>After the click (our count, since Oct 27)</h4>${steps.length
+      ? `<ol class="flow">${steps.map((s, i) => `<li class="${s.people && i ? 'lit' : ''}" title="${esc(s.label)}"><b>${s.people}</b>${esc(FLOW_LABELS[i] || s.label)}</li>`).join('')}</ol>`
+      : '<p class="muted" style="margin:0;font-size:13px">No visitors tagged with this ad yet.</p>'}</div>
+    <div class="spacer-grow"></div>
+    <div class="note"><h4>What it is</h4>${noteRows.length ? noteRows.map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join('') : '<p class="empty-note">No notes yet: what the image shows, what kind of copy it is, what it tests.</p>'}
+      <button type="button" class="quiet" data-edit-ad="${esc(ad.id)}">Edit notes</button></div>
+  </article>`;
+}
+
+function renderRules(rules) {
+  $('rules').innerHTML = `<div class="rules-head"><h3>The rules</h3><span class="spacer"></span><button type="button" class="quiet" id="rules-edit">Edit</button></div>
+    <div class="chips"><span>Purchase only</span><span>Off at ${dollars(rules.killAt, false)} with no sale</span><span>Winner: ${rules.winnerSales} sales at ${dollars(rules.breakEven)} or less each</span><span>Winners stay untouched</span></div>
+    <ol>${rules.text.map(line => `<li>${esc(line)}</li>`).join('')}</ol>`;
+  $('rules-edit').onclick = () => {
+    $('rules').innerHTML = `<form class="edit" id="rules-form"><div class="row">
+      <label>Turn off at ($ with no sale)<input name="killAt" inputmode="decimal" value="${esc(rules.killAt)}"></label>
+      <label>Winner: cost per sale at most ($)<input name="breakEven" inputmode="decimal" value="${esc(rules.breakEven)}"></label>
+      <label>Winner: sales needed<input name="winnerSales" inputmode="numeric" value="${esc(rules.winnerSales)}"></label></div>
+      <label>The rules in words (one per line)<textarea name="text" rows="6">${esc(rules.text.join('\n'))}</textarea></label>
+      <div class="actions"><button class="btn" type="submit">Save rules</button><button class="btn secondary" type="button" id="rules-cancel">Cancel</button><span class="error" id="rules-error"></span></div></form>`;
+    $('rules-cancel').onclick = () => renderRules(rules);
+    $('rules-form').onsubmit = async event => {
+      event.preventDefault();
+      const f = event.target.elements;
+      try {
+        await postJson('/api/funnel/notes', { tool: state.tool, kind: 'rules', data: { killAt: Number(f.killAt.value), breakEven: Number(f.breakEven.value), winnerSales: Number(f.winnerSales.value), text: f.text.value.split('\n') } });
+        loadAds();
+      } catch (error) { $('rules-error').textContent = error.message; }
+    };
+  };
+}
+
+function editAd(id) {
+  const ad = adsReport.ads.find(a => a.id === id); if (!ad) return;
+  const note = ad.note || {};
+  const box = document.querySelector(`article[data-ad="${CSS.escape(id)}"] .note`);
+  box.innerHTML = `<form class="edit" data-ad-form="${esc(id)}">
+    <label>Image (what it shows)<input name="image" value="${esc(note.image)}" placeholder="e.g. Car at night, phone with the app on the dash"></label>
+    <label>Copy (what kind)<input name="copy" value="${esc(note.copy)}" placeholder="e.g. Customer voice, long-form, &quot;told to pay more&quot; hook"></label>
+    <label>Testing (the one thing this ad changes)<input name="testing" value="${esc(note.testing)}"></label>
+    <label>Verdict (when it's done)<input name="verdict" value="${esc(note.verdict)}"></label>
+    <div class="actions"><button class="btn" type="submit">Save</button><button class="btn secondary" type="button" data-cancel>Cancel</button><span class="error"></span></div></form>`;
+  const form = box.querySelector('form');
+  form.querySelector('[data-cancel]').onclick = () => renderAds(adsReport);
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const f = form.elements;
+    try {
+      await postJson('/api/funnel/notes', { tool: state.tool, kind: 'ad', key: id, data: { image: f.image.value, copy: f.copy.value, testing: f.testing.value, verdict: f.verdict.value } });
+      form.remove(); loadAds();
+    } catch (error) { form.querySelector('.error').textContent = error.message; }
+  };
+}
+
+const STATUS_LABELS = { running: 'Running', queued: 'Up next', done: 'Done' };
+function logEntry(entry) {
+  const names = (entry.ads || []).map(id => (adsReport?.ads || []).find(a => a.id === id)?.short || `Ad …${id.slice(-6)}`);
+  return `<article class="card log-entry ${entry.status === 'done' ? 'done' : ''}" data-log="${esc(entry.id)}">
+    <div class="log-head"><span class="pill st-${esc(entry.status)}">${STATUS_LABELS[entry.status] || esc(entry.status)}</span><h3>${esc(entry.title)}</h3>
+      <span class="muted">${esc(entry.date || day(entry.createdAt))}</span><span class="spacer"></span>
+      <button type="button" class="quiet" data-log-edit="${esc(entry.id)}">Edit</button><button type="button" class="quiet danger" data-log-delete="${esc(entry.id)}">Delete</button></div>
+    ${names.length ? `<div class="chips">${names.map(n => `<span>${esc(n)}</span>`).join('')}</div>` : ''}
+    ${entry.question ? `<span class="label">The question</span><p>${esc(entry.question)}</p>` : ''}
+    ${entry.changed ? `<span class="label">What changed</span><p>${esc(entry.changed)}</p>` : ''}
+    ${(entry.outcomes || []).length ? `<span class="label">If this happens, then</span><table class="outcomes"><thead><tr><th>If this happens</th><th>It tells us</th><th>Test next</th></tr></thead><tbody>${entry.outcomes.map(o => `<tr><td>${esc(o.if)}</td><td>${esc(o.means)}</td><td>${esc(o.next)}</td></tr>`).join('')}</tbody></table>` : ''}
+    ${entry.result ? `<div class="result"><span class="label" style="margin-top:0">Result</span>${esc(entry.result)}</div>` : ''}
+  </article>`;
+}
+
+function logForm(entry = null) {
+  const e = entry || { title: '', status: 'running', date: new Date().toLocaleDateString('en-CA', { timeZone: state.timezone }), question: '', changed: '', ads: [], outcomes: [{ if: '', means: '', next: '' }], result: '' };
+  const outcomeRow = (o = {}) => `<div class="outcome-row"><input name="if" placeholder="If this happens" value="${esc(o.if)}"><input name="means" placeholder="It tells us" value="${esc(o.means)}"><input name="next" placeholder="Test next" value="${esc(o.next)}"><button type="button" class="quiet danger" data-remove-row>✕</button></div>`;
+  const card = $('log-form-card');
+  card.hidden = false;
+  card.innerHTML = `<form class="edit" id="log-form">
+    <div class="row"><label>Title<input name="title" required value="${esc(e.title)}" placeholder="e.g. Round 2: hospital image with CAR's copy"></label>
+      <label>Status<select name="status">${Object.entries(STATUS_LABELS).map(([v, l]) => `<option value="${v}"${v === e.status ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Date<input name="date" value="${esc(e.date)}"></label></div>
+    <label>The question this test answers<textarea name="question" rows="2">${esc(e.question)}</textarea></label>
+    <label>What changed (one thing)<input name="changed" value="${esc(e.changed)}"></label>
+    ${(adsReport?.ads || []).length ? `<label>Ads in this test<div class="ad-picks">${adsReport.ads.map(a => `<label><input type="checkbox" name="ads" value="${esc(a.id)}"${(e.ads || []).includes(a.id) ? ' checked' : ''}>${esc(a.short)} <span class="muted">(${esc(a.statusLabel)})</span></label>`).join('')}</div></label>` : ''}
+    <label>If this happens → it tells us → test next</label>
+    <div id="outcome-rows" style="display:grid;gap:6px">${(e.outcomes.length ? e.outcomes : [{}]).map(outcomeRow).join('')}</div>
+    <div><button type="button" class="quiet" id="add-row">+ Add a row</button></div>
+    <label>Result (when it's done)<textarea name="result" rows="2">${esc(e.result)}</textarea></label>
+    <div class="actions"><button class="btn" type="submit">${entry ? 'Save' : 'Add to the log'}</button><button class="btn secondary" type="button" id="log-cancel">Cancel</button><span class="error" id="log-error"></span></div>
+  </form>`;
+  const rows = $('outcome-rows');
+  const wire = () => rows.querySelectorAll('[data-remove-row]').forEach(b => b.onclick = () => { b.parentElement.remove(); });
+  wire();
+  $('add-row').onclick = () => { rows.insertAdjacentHTML('beforeend', outcomeRow()); wire(); };
+  $('log-cancel').onclick = () => { card.hidden = true; card.innerHTML = ''; };
+  $('log-form').onsubmit = async event => {
+    event.preventDefault();
+    const f = event.target.elements;
+    const data = { title: f.title.value, status: f.status.value, date: f.date.value, question: f.question.value, changed: f.changed.value, result: f.result.value,
+      ads: [...event.target.querySelectorAll('input[name="ads"]:checked')].map(i => i.value),
+      outcomes: [...rows.querySelectorAll('.outcome-row')].map(r => ({ if: r.querySelector('[name="if"]').value, means: r.querySelector('[name="means"]').value, next: r.querySelector('[name="next"]').value })) };
+    try {
+      await postJson('/api/funnel/notes', { tool: state.tool, kind: 'log', ...(entry ? { id: entry.id } : {}), data });
+      card.hidden = true; card.innerHTML = ''; loadAds();
+    } catch (error) { $('log-error').textContent = error.message; }
+  };
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.querySelector('input[name="title"]').focus({ preventScroll: true });
+}
+
+function renderAds(report) {
+  adsReport = report;
+  const on = !!report?.supported;
+  $('ads-section').hidden = !on; $('log-section').hidden = !on; $('jump').hidden = !on;
+  if (!on) return;
+  renderRules(report.rules);
+  $('ads-error').hidden = !report.metaError;
+  $('ads-error').textContent = report.metaError ? `Couldn't read the ads from Meta (${report.metaError}). The log below still works.` : '';
+  const live = report.ads.filter(a => a.status !== 'off'), stopped = report.ads.filter(a => a.status === 'off');
+  $('ad-cards').innerHTML = live.length ? live.map(adCard).join('') : (report.metaError ? '' : '<p class="muted">No ads running.</p>');
+  $('stopped').hidden = !stopped.length;
+  $('stopped-summary').textContent = `Stopped ads (${stopped.length})`;
+  $('stopped-cards').innerHTML = stopped.map(adCard).join('');
+  document.querySelectorAll('[data-edit-ad]').forEach(b => b.onclick = () => editAd(b.dataset.editAd));
+  const order = { running: 0, queued: 1, done: 2 };
+  const log = [...report.log].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || new Date(b.createdAt) - new Date(a.createdAt));
+  $('log').innerHTML = log.length ? log.map(logEntry).join('') : '<p class="muted">Nothing in the log yet. Add the test that is running now.</p>';
+  document.querySelectorAll('[data-log-edit]').forEach(b => b.onclick = () => logForm(report.log.find(e => e.id === b.dataset.logEdit)));
+  document.querySelectorAll('[data-log-delete]').forEach(b => b.onclick = async () => {
+    const entry = report.log.find(e => e.id === b.dataset.logDelete);
+    if (!entry || !window.confirm(`Delete "${entry.title}" from the log?`)) return;
+    try { await postJson('/api/funnel/notes', { tool: state.tool, kind: 'log', id: entry.id, delete: true }); loadAds(); } catch (error) { window.alert(error.message); }
+  });
+  $('ads-updated').textContent = report.checkedAt ? `From Meta ${ago(report.checkedAt)}` : '';
+}
+
+async function loadAds({ fresh = false } = {}) {
+  const version = ++adsLoading;
+  if (state.tool !== 'payoff') return renderAds(null);
+  try {
+    const report = await adminFetch(`/api/funnel/ads?tool=${encodeURIComponent(state.tool)}${fresh ? '&fresh=1' : ''}`);
+    if (version === adsLoading) renderAds(report);
+  } catch (error) {
+    if (version !== adsLoading) return;
+    $('ads-section').hidden = false; $('jump').hidden = false;
+    $('ads-error').hidden = false;
+    $('ads-error').textContent = `Couldn't load the ads and the test log (${error.message}). Refresh to try again.`;
+  }
+}
+$('log-new').onclick = () => logForm();
+
+// ---- Visitors ---------------------------------------------------------------
 function render(data) {
   $('wedge').innerHTML = (data.wedges || []).map(w => `<option value="${esc(w.id)}"${w.id === data.tool ? ' selected' : ''}>${esc(w.product)}</option>`).join('');
   $('wedge').hidden = (data.wedges || []).length < 2;
@@ -313,22 +624,15 @@ function render(data) {
   const started = (split.phone || 0) + (split.desktop || 0) + (split.unknown || 0);
   const share = n => started ? ` (${Math.round(n / started * 100)}%)` : '';
   $('split').innerHTML = `<span><b>${split.phone || 0}</b>on a phone${share(split.phone || 0)}</span><span><b>${split.desktop || 0}</b>on a computer${share(split.desktop || 0)}</span>${split.unknown ? `<span><b>${split.unknown}</b>before this was recorded</span>` : ''}`;
-  // The landing A/B test, side by side: the winner is the one with more purchases per visitor.
-  $('variants').hidden = !data.variants;
-  if (data.variants) {
-    const [a, b] = data.variants;
-    $('variants').innerHTML = `<h2>A/B test: ${esc(a.label)} vs ${esc(b.label)}</h2><table><thead><tr><th></th><th>${esc(a.label)}</th><th>${esc(b.label)}</th></tr></thead><tbody>${a.steps.map((step, i) => {
+  // The landing A/B test, side by side, only while both versions have visitors in the range.
+  const variants = data.variants && data.variants.every(v => v.steps[0].people) ? data.variants : null;
+  $('variants').hidden = !variants;
+  if (variants) {
+    const [a, b] = variants;
+    $('variants').innerHTML = `<h3>A/B test: ${esc(a.label)} vs ${esc(b.label)}</h3><table><thead><tr><th></th><th>${esc(a.label)}</th><th>${esc(b.label)}</th></tr></thead><tbody>${a.steps.map((step, i) => {
       const other = b.steps[i], cell = s => `<b>${s.people}</b>${i ? ` <span class="muted">${pct(s.ofLanded)}</span>` : ''}`;
       return `<tr><td>${esc(step.label)}</td><td>${cell(step)}</td><td>${cell(other)}</td></tr>`;
     }).join('')}</tbody></table><p class="muted">Percentages are of each version's own visitors. The winner sells more per visitor, not the one that sends more people to the order page.</p>`;
-  }
-  // Each ad's own ladder, side by side, named as in Ads Manager (the part after the last " | ").
-  $('ads').hidden = !data.ads?.length;
-  if (data.ads?.length) {
-    const short = ad => ad.name ? ad.name.split(' | ').pop() : `Ad …${ad.ad.slice(-6)}`;
-    $('ads').innerHTML = `<h2>By ad</h2><table><thead><tr><th></th>${data.ads.map(ad => `<th title="${esc(ad.name || '')} (${esc(ad.ad)})">${esc(short(ad))}</th>`).join('')}</tr></thead><tbody>${data.ads[0].steps.map((step, i) =>
-      `<tr><td>${esc(step.label)}</td>${data.ads.map(ad => `<td><b>${ad.steps[i].people}</b>${i ? ` <span class="muted">${pct(ad.steps[i].ofVisitors)}</span>` : ''}</td>`).join('')}</tr>`).join('')}</tbody></table>
-      <p class="muted">Each column is the people active in this range who came from that ad (the last ad they clicked, even if that was before the range). Percentages are of that ad's own visitors. Visits from before ads were recorded aren't here. For a cost per step, divide the ad's spend in Ads Manager by its row.</p>`;
   }
   $('branches').innerHTML = data.branches.map(b => `<div class="card"><h2>${esc(b.label)}</h2><ul>${b.steps.map(s => `<li><span>${esc(s.label)}</span><b>${s.people}</b></li>`).join('')}</ul></div>`).join('');
   const shown = feedAll ? data.recent : data.recent.slice(0, 25);
@@ -336,7 +640,7 @@ function render(data) {
   $('feed').querySelector('tbody').innerHTML = shown.length
     ? shown.map(e => `<tr><td class="when" title="${esc(e.at)}"><time datetime="${esc(e.at)}">${esc(zoned(e.at))}</time><small>${esc(ago(e.at))}</small></td><td>${esc(e.label)}</td><td class="detail">${esc(e.detail || '')}</td><td class="who">${esc(e.who)}</td></tr>`).join('')
     : '<tr><td class="empty" colspan="4">Nothing in this range yet.</td></tr>';
-  $('updated').textContent = `Updated ${zoned(new Date())} · ${state.timezone}`;
+  $('updated').textContent = `Updated ${zoned(new Date())} · ${state.timezone} · refreshes every minute`;
 }
 
 function tip(event, html) {
@@ -357,10 +661,12 @@ async function load() {
     if (state.tool) params.set('tool', state.tool);
     const data = await adminFetch(`/api/funnel/wedge?${params}`);
     if (version !== loadVersion) return;
-    if (data.tool && data.tool !== state.tool) { state.tool = data.tool; saveState(); }
+    const switched = data.tool && data.tool !== state.tool;
+    if (switched) { state.tool = data.tool; saveState(); }
     syncToolLink();
     lastData = data;
     render(data);
+    if (switched) loadAds();
   } catch (error) {
     if (version !== loadVersion) return;
     $('range-error').textContent = error.message;
@@ -384,7 +690,7 @@ function paintTrack() {
   $('track-toggle').setAttribute('aria-pressed', String(off));
   $('track-toggle').textContent = off ? '✓ Not counting this browser' : 'Counting this browser';
   $('track-note').textContent = off
-    ? 'Your visits to the site from this browser are left out of these numbers and out of Meta. Do the same on each phone and computer you test from; inside the Instagram or Facebook app, open any page with ?notrack=1 once (bookmarketel.com/payoff?notrack=1; this covers every product).'
+    ? 'This browser is left out of the numbers and out of Meta. On each phone you test from (including inside Instagram or Facebook), open bookmarketel.com/payoff?notrack=1 once.'
     : 'This browser counts like a visitor. Switch it off before looking at the site yourself.';
 }
 if (trackState() === null) setTrack('1');
@@ -409,8 +715,8 @@ $('custom-range').onsubmit = event => {
   state.period = 'custom'; feedAll = false; saveState(); load();
 };
 $('ad-only').onclick = () => { state.adOnly = !state.adOnly; saveState(); load(); };
-$('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load(); };
-$('refresh').onclick = load;
+$('wedge').onchange = () => { state.tool = $('wedge').value; saveState(); load(); loadAds(); };
+$('refresh').onclick = () => { load(); if (!editing()) loadAds({ fresh: true }); };
 $('feed-more').onclick = () => { feedAll = true; if (lastData) render(lastData); };
 $('reset').onclick = async () => {
   const typed = window.prompt(`This starts the count again from now for ${state.tool || 'this wedge'}: visitor steps are cleared, and earlier trials, payments and sign-ins stay stored but out of the numbers. Type RESET to continue.`);
@@ -422,7 +728,10 @@ $('reset').onclick = async () => {
   } catch (error) { window.alert(error.message); }
 };
 load();
+loadAds();
 setInterval(() => { if (document.visibilityState === 'visible' && !$('custom-range').contains(document.activeElement)) load(); }, 60000);
+// The ads come from Meta, which the server asks at most every five minutes.
+setInterval(() => { if (document.visibilityState === 'visible' && !editing()) loadAds(); }, 5 * 60000);
 </script>
 </body>
 </html>

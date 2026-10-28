@@ -99,34 +99,86 @@ test('/funnel draws every step, the answers under the question and the reasons u
   } finally { await browser.close(); }
 });
 
-test('/funnel shows Payoff\'s ads side by side, named as in Ads Manager, or by id when Meta gave no name', async () => {
-  const ev = (name, visitorId, extra = {}) => ({ id: `${name}-${visitorId}-${extra.detail || ''}`, name, visitorId, accountId: null, detail: null, createdAt: new Date().toISOString(), ...extra });
-  const events = [
-    ev('PayoffAd', 'v_a', { detail: '120251563772920103' }), ev('PayoffStory', 'v_a', { detail: 'viewed' }), ev('PayoffOrderViewed', 'v_a'), ev('PayoffOrder', 'v_a', { detail: 'cart' }),
-    ev('PayoffAd', 'v_b', { detail: '120251563772920103' }), ev('PayoffStory', 'v_b', { detail: 'viewed' }),
-    ev('PayoffAd', 'v_c', { detail: '120251563874800103' }), ev('PayoffStory', 'v_c', { detail: 'viewed' }),
-  ];
-  const funnel = buildWedgeFunnel(events, definitionFor('payoff'));
-  for (const ad of funnel.ads) ad.name = ad.ad === '120251563772920103' ? 'PROJECT PAYOFF | ADD TO CART | CAR' : null;
-  const body = JSON.stringify({ wedges: [{ id: 'payoff', product: 'Payoff' }], tool: 'payoff', ...funnel });
+// The Ads section: each ad as a card (picture, copy, Meta's numbers, our
+// steps, where it stands on the rules), stopped ads folded away, and a test
+// log that is saved on the server.
+function adsReport() {
+  const ad = (id, short, status, statusLabel, verdict, extra = {}) => ({ id, name: `PROJECT PAYOFF | PURCHASE | ${short}`, short, created: '2026-10-28T15:00:00Z', campaign: 'PROJECT PAYOFF | TESTING',
+    status, statusLabel, event: 'PURCHASE', eventLabel: 'Purchase', image: `https://img.test/${id}.jpg`, thumb: `https://img.test/${id}.jpg`,
+    headline: '2044 to 2032 on the Same Monthly Payment', description: 'even on one income',
+    body: 'We were told to pay more. We were already paying $1,780 a month.\n\nOur debt-free date was 2044.', words: 17,
+    meta: { spend: 23.4, impressions: 520, cpm: 45, clicks: 40, ctr: 7.7, landingViews: 31, purchases: 0 },
+    steps: ['Visitors from this ad', 'Opened the story page', 'Opened the sales letter', 'Viewed the order page', 'Stayed 20 seconds or started paying (Meta: AddToCart)', 'Typed a valid email', 'Paid']
+      .map((label, i) => ({ label, people: [9, 9, 3, 2, 1, 0, 0][i] })), sales: 0, verdict, note: null, ...extra });
+  return { tool: 'payoff', supported: true, checkedAt: new Date().toISOString(), metaError: null,
+    rules: { killAt: 60, breakEven: 28.11, winnerSales: 2, text: ['Every campaign optimises for Purchase.', 'An ad that spends $60 with no sale is turned off.'] },
+    ads: [ad('111111', 'CAR', 'running', 'Running', { key: 'testing', label: '$23.40 of $60.00, no sale yet', progress: 0.39 }, { note: { image: 'Car at night', copy: 'Customer voice, long-form', testing: '', verdict: '' } }),
+      ad('222222', 'TABLE', 'review', 'In review', { key: 'testing', label: '$0.00 of $60.00, no sale yet', progress: 0 }),
+      ad('333333', 'OLD AD', 'off', 'Off', { key: 'off', label: 'Off after $38.16, no sale' })],
+    log: [{ id: 'log1', createdAt: '2026-10-28T12:00:00Z', title: 'Round 1: CAR vs TABLE vs kitchen', status: 'running', date: '2026-10-28', ads: ['111111', '222222'],
+      question: 'Which package sells?', changed: 'Image, voice and hook all differ (a package test)', result: '',
+      outcomes: [{ if: 'CAR sells', means: 'The customer-voice package works', next: 'Hospital image with CAR\'s exact copy' }, { if: 'Nothing by $60 each', means: 'The angle or format isn\'t it', next: 'Warning-box hook or the video' }] }] };
+}
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 1000 }]) test(`/funnel shows Payoff's ads as cards with the rules and the test log, and saves notes and log entries (${viewport.width}px)`, async () => {
+  const { definitionFor } = require('../../wedge-funnel');
+  const report = adsReport(), posted = [], errors = [];
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
+    const page = await browser.newPage({ viewport });
+    page.on('pageerror', e => errors.push(e.message));
     await page.addInitScript(() => localStorage.setItem('marketelAdminToken', 'test'));
+    await page.route('https://img.test/**', route => route.fulfill({ contentType: 'image/jpeg', body: fs.readFileSync(path.join(__dirname, '../../payoff-web/assets/tool-result.jpg')) }));
     await page.route('http://funnel.test/**', route => {
       const url = new URL(route.request().url());
-      if (url.pathname === '/api/funnel/wedge') return route.fulfill({ status: 200, body, headers: { 'content-type': 'application/json' } });
-      if (url.pathname === '/funnel') return route.fulfill({ status: 200, body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')), headers: { 'content-type': 'text/html' } });
+      if (url.pathname === '/api/funnel/wedge') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ wedges: [{ id: 'payoff', product: 'Payoff' }], tool: 'payoff', ...buildWedgeFunnel([], definitionFor('payoff')) }) });
+      if (url.pathname === '/api/funnel/ads') return route.fulfill({ contentType: 'application/json', body: JSON.stringify(report) });
+      if (url.pathname === '/api/funnel/notes') { posted.push(JSON.parse(route.request().postData())); return route.fulfill({ contentType: 'application/json', body: '{"success":true}' }); }
+      if (url.pathname === '/funnel') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')) });
       return route.fulfill({ status: 404, body: '' });
     });
-    await page.goto('http://funnel.test/funnel');
-    await page.waitForSelector('#ads:not([hidden]) tbody tr');
-    assert.deepEqual(await page.$$eval('#ads thead th', ths => ths.map(th => th.textContent)), ['', 'CAR', 'Ad …800103']);
-    const rows = await page.$$eval('#ads tbody tr', trs => trs.map(tr => [...tr.cells].map(td => td.textContent.trim())));
-    assert.deepEqual(rows[0], ['Visitors from this ad', '2', '1']);
-    assert.deepEqual(rows.find(row => row[0].startsWith('Stayed 20 seconds')), ['Stayed 20 seconds or started paying (Meta: AddToCart)', '1 50%', '0 0%']);
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'fits a phone');
-    await page.screenshot({ path: process.env.FUNNEL_ADS_SHOT || '/tmp/funnel-ads-shot.png', fullPage: true });
+    await page.goto('http://funnel.test/funnel?tool=payoff');
+    await page.waitForSelector('#ad-cards .ad');
+    // Live ads as cards; the stopped one folded away.
+    assert.deepEqual(await page.$$eval('#ad-cards .ad-name', els => els.map(el => el.textContent)), ['CAR', 'TABLE']);
+    assert.deepEqual(await page.$$eval('#stopped-cards .ad-name', els => els.map(el => el.textContent)), ['OLD AD']);
+    assert.equal(await page.isVisible('#stopped-cards .ad'), false);
+    const car = page.locator('#ad-cards .ad').first();
+    assert.match(await car.locator('.verdict').innerText(), /\$23\.40 of \$60\.00, no sale yet/);
+    assert.match(await car.locator('.headline').innerText(), /2044 to 2032/);
+    assert.match(await car.locator('.hook').innerText(), /We were told to pay more/);
+    assert.match(await car.locator('.nums').innerText(), /Spent\s*\$23\.40/);
+    assert.deepEqual(await car.locator('.flow li b').allInnerTexts(), ['9', '9', '3', '2', '1', '0', '0']);
+    assert.match(await car.locator('.note').innerText(), /Image: Car at night[\s\S]*Copy: Customer voice, long-form/);
+    assert.equal(await car.locator('img').evaluate(img => img.complete && img.naturalWidth > 0), true, 'the ad picture loads');
+    assert.match(await page.locator('#rules').innerText(), /Off at \$60 with no sale[\s\S]*Winner: 2 sales at \$28\.11 or less each/);
+    // The log entry with its outcomes.
+    const entry = page.locator('#log .log-entry').first();
+    assert.match(await entry.innerText(), /Round 1: CAR vs TABLE vs kitchen/);
+    assert.deepEqual(await entry.locator('.chips span').allInnerTexts(), ['CAR', 'TABLE']);
+    assert.match(await entry.locator('table.outcomes').innerText(), /CAR sells[\s\S]*Hospital image with CAR's exact copy/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+    await page.screenshot({ path: process.env.FUNNEL_SHOT_DIR ? `${process.env.FUNNEL_SHOT_DIR}/funnel-${viewport.width}.png` : `/tmp/funnel-${viewport.width}.png`, fullPage: true });
+    // Notes on an ad are saved to the server.
+    await car.locator('[data-edit-ad]').click();
+    await car.locator('input[name="testing"]').fill('Customer voice vs Lauren');
+    await car.locator('form button[type="submit"]').click();
+    await page.waitForFunction(() => true);
+    for (let i = 0; i < 40 && !posted.length; i++) await page.waitForTimeout(25);
+    assert.deepEqual(posted[0], { tool: 'payoff', kind: 'ad', key: '111111', data: { image: 'Car at night', copy: 'Customer voice, long-form', testing: 'Customer voice vs Lauren', verdict: '' } });
+    // A new log entry.
+    await page.click('#log-new');
+    await page.fill('#log-form input[name="title"]', 'Round 2: hospital image');
+    await page.fill('#log-form input[name="changed"]', 'The image only');
+    await page.check('#log-form input[name="ads"][value="111111"]');
+    await page.fill('#outcome-rows .outcome-row input[name="if"]', 'Hospital sells');
+    await page.click('#log-form button[type="submit"]');
+    for (let i = 0; i < 40 && posted.length < 2; i++) await page.waitForTimeout(25);
+    assert.equal(posted[1].kind, 'log');
+    assert.equal(posted[1].data.title, 'Round 2: hospital image');
+    assert.deepEqual(posted[1].data.ads, ['111111']);
+    assert.deepEqual(posted[1].data.outcomes, [{ if: 'Hospital sells', means: '', next: '' }]);
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });
 
@@ -312,7 +364,7 @@ for (const linked of [false, true]) test(`/funnel opens Payoff ${linked ? 'from 
     await page.goto('http://funnel.test/funnel' + (linked ? '?tool=payoff' : ''));
     await page.locator('#wedge-name:has-text("Payoff")').waitFor();
     assert.equal(requests[0], 'payoff');
-    assert.match(await page.locator('#ladder').innerText(), /Landed on Payoff/);
+    assert.match(await page.locator('#ladder').innerText(), /Landed \(story page or sales letter\)/);
     assert.match(await page.locator('#branches').innerText(), /Where they came from/);
     assert.equal(await page.locator('#split-card').isHidden(), true);
     await page.locator('#wedge').selectOption('trace');

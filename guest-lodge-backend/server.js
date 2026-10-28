@@ -12112,6 +12112,28 @@ app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
         res.status(500).json({ success: false, message: 'Could not reset.' });
     }
 });
+// The funnel page's Ads and Test log (funnel-ads.js): the ads with their
+// pictures, copy and numbers, judged by the rules saved with the log.
+const funnelAds = require('./funnel-ads');
+const funnelAdsReport = funnelAds.createAdsReport({ prisma, accountId: process.env.MARKETEL_META_AD_ACCOUNT_ID,
+    meta: funnelAds.metaClient({ token: process.env.MARKETEL_META_ADS_READ_TOKEN || MARKETEL_ACCESS_TOKEN, version: MARKETEL_META_GRAPH_API_VERSION }) });
+app.get('/api/funnel/ads', adminAuth, async (req, res) => {
+    try {
+        res.json(await funnelAdsReport.report(String(req.query.tool || ''), { fresh: req.query.fresh === '1' }));
+    } catch (e) {
+        console.error('Funnel ads error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not load the ads.' });
+    }
+});
+app.post('/api/funnel/notes', adminAuth, async (req, res) => {
+    try {
+        res.json({ success: true, ...await funnelAdsReport.save(req.body || {}) });
+    } catch (e) {
+        if (e.status) return res.status(e.status).json({ success: false, message: e.message });
+        console.error('Funnel notes error:', e.message);
+        res.status(500).json({ success: false, message: 'Could not save that.' });
+    }
+});
 app.get('/funnel', (req, res) => {
     // Links from push notifications for bookings and support still say /funnel.
     if (req.query.view) return res.redirect(`/funnel/legacy?${new URLSearchParams(req.query)}`);

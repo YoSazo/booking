@@ -180,8 +180,11 @@ const labelsOf = (steps, branches) => Object.fromEntries([
 ]);
 // What each dashboard shows: the report wedges share one definition.
 const PAYOFF_STEPS = Object.freeze([
-  { key: 'landed', label: 'Landed on Payoff', names: ['PayoffLanded'] },
-  { key: 'order', label: 'Viewed order', names: ['PayoffOrderViewed'] },
+  { key: 'landed', label: 'Landed (story page or sales letter)', names: ['PayoffLanded'] },
+  { key: 'letter', label: 'Opened the sales letter', names: ['PayoffVariant:letter'] },
+  { key: 'order', label: 'Reached the order page', names: ['PayoffOrderViewed'] },
+  { key: 'cart', label: 'Stayed 20 seconds or started paying', names: ['PayoffOrder:cart'] },
+  { key: 'email', label: 'Typed a valid email', names: ['PayoffOrder:email'] },
   { key: 'tapped', label: 'Tapped Complete Order', names: ['PayoffCheckoutTapped'] },
   { key: 'checkout', label: 'Sent payment to Stripe', names: ['PayoffCheckoutOpened'] },
   { key: 'paid', label: 'Paid', names: ['PayoffPaid'] },
@@ -321,7 +324,7 @@ const DEFINITIONS = Object.freeze({
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
     PayoffUpgradeDeclined: 'Said no to an upsell', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed', PayoffCoach: 'Coach tab',
     PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed', PayoffAd: 'Came from ad' }),
-    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
+    fromEvent: 'PayoffFrom', visitorEvents: new Set([...PAYOFF_STEPS.flatMap(step => step.names).map(name => name.split(':')[0]).filter(name => !['PayoffPaid', 'PayoffConfirmationEmailed'].includes(name)), 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep',
       'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd']),
     // The landing A/B test: each version's own ladder, judged on purchases per visitor.
     variants: { event: 'PayoffVariant', values: [['letter', 'Sales letter'], ['quiz', 'Quiz']],
@@ -335,7 +338,7 @@ const DEFINITIONS = Object.freeze({
       ['Typed a valid email', ['PayoffOrder:email']],
       ['Paid', ['PayoffPaid']],
     ] },
-    split: false, tiles: [['Landed', 'landed'], ['Viewed order', 'order'], ['Tapped Complete Order', 'tapped'], ['Sent payment', 'checkout'], ['Paid', 'paid']] },
+    split: false, tiles: [['Landed', 'landed'], ['Sales letter', 'letter'], ['Order page', 'order'], ['Stayed 20 seconds', 'cart'], ['Typed email', 'email'], ['Paid', 'paid']] },
   report: { steps: STEPS, branches: BRANCHES, labels: LABELS, fromEvent: 'OfferFrom', visitorEvents: VISITOR_EVENTS, split: true, tiles: null },
   trace: { steps: TRACE_STEPS, branches: TRACE_BRANCHES, fromEvent: 'TraceFrom', visitorEvents: TRACE_VISITOR_EVENTS, split: false,
     // Events whose detail says which one (source, browser, what was picked) are
@@ -361,7 +364,7 @@ const people = (events, names) => new Set(events.filter(event => matches(event, 
 // The ads' ladders side by side. A visitor belongs to the last ad they
 // clicked; `adTags` are the clicks from before the range began, so someone who
 // clicked yesterday and paid today still counts for their ad.
-function byAd(events, ads, adTags) {
+function byAd(events, ads, adTags, limit = 8) {
   const last = new Map();
   for (const tag of [...adTags, ...events.filter(event => event.name === ads.event)]) {
     if (!tag.visitorId || !/^\d{6,25}$/.test(tag.detail || '')) continue;
@@ -377,7 +380,7 @@ function byAd(events, ads, adTags) {
     const visitors = new Set(theirs.map(personOf)).size;
     return { ad, visitors, steps: [{ label: 'Visitors from this ad', people: visitors, ofVisitors: 1 },
       ...ads.steps.map(([label, names]) => { const n = people(theirs, names); return { label, people: n, ofVisitors: n / visitors }; })] };
-  }).sort((a, b) => b.visitors - a.visitors).slice(0, 8);
+  }).sort((a, b) => b.visitors - a.visitors).slice(0, limit);
 }
 
 function buildWedgeFunnel(events, definition = DEFINITIONS.report, adTags = []) {
@@ -460,5 +463,5 @@ function onlyAdClicks(events, sources = events, fromEvent = 'OfferFrom') {
   return events.filter(event => event.visitorId && ads.has(event.visitorId));
 }
 
-module.exports = { onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince,
+module.exports = { byAd, onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince,
   TRACE_STEPS, TRACE_BRANCHES, TRACE_VISITOR_EVENTS, DEFINITIONS, definitionFor };
