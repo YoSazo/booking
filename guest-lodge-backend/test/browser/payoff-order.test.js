@@ -141,7 +141,7 @@ const skipOffers = async page => {
 };
 const fillBuyer = async page => { await page.locator('#name').fill('Test Buyer'); await page.locator('#email').fill('buyer@example.test'); };
 
-test('the order page: one first screen with the product and price, why today, both ways to pay and the refund, then the labeled form, summary, guarantee and proof, with no extras', async () => world(async ({ page, base }) => {
+test('the order page: one first screen with the product and price, why today, both ways to pay and the refund, then the labeled form with the order and both add-ons above the card fields, summary, guarantee and proof', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   assert.match((await page.locator('.reserve-line').innerText()).replace(/\s+/g, ' '), /^Your plan is reserved for (05:00|04:5\d)$/);
   assert.equal(await page.locator('.glance-name').innerText(), 'Your Debt-Free Date & Payoff Plan');
@@ -159,10 +159,18 @@ test('the order page: one first screen with the product and price, why today, bo
   assert.deepEqual(await page.locator('.section-head').allInnerTexts(), ['---- Contact Details ----', '---- Payment Information ----']);
   assert.deepEqual(await page.locator('.info label').allInnerTexts(), ['Full Name:', 'Email Address:']);
   assert.deepEqual(await page.locator('.info input').evaluateAll(inputs => inputs.map(input => input.placeholder)), ['Full Name', 'Email Address']);
-  const order = await page.evaluate(() => ['#payment-element', '.product', '#order-summary', '#buy-button']
+  // The reference checkout's order: contact details, the order, the add-ons, then the card fields and the button.
+  const order = await page.evaluate(() => ['#email', '.product', '.bumps', '#payment-element', '#order-summary', '#buy-button']
     .map(sel => document.querySelector(sel).getBoundingClientRect().top));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
-  assert.equal(await page.locator('.bump, #cashflow, #reset').count(), 0, 'the extras are part of the Coach, offered after paying');
+  assert.equal(await page.locator('.bump').count(), 2);
+  assert.deepEqual(await page.locator('.bump-headline').allInnerTexts(), ['Plan Around Payday', 'Get A Fresh Start']);
+  for (const copy of await page.locator('.bump-copy').allInnerTexts()) assert.match(copy, /^ONE TIME OFFER: .*This price is only offered here, at checkout\.$/);
+  assert.deepEqual(await page.locator('.bump-price').allInnerTexts(), ['Regular price: $79 Today only $22!', 'Regular price: $49 Today only $9!']);
+  assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
+  const bumpLook = await page.evaluate(() => { const css = sel => getComputedStyle(document.querySelector(sel));
+    return { arrow: css('.arrow').animationName, headline: css('.bump-headline').color, bump: [css('.bump').backgroundColor, css('.bump').borderStyle] }; });
+  assert.deepEqual(bumpLook, { arrow: 'bump-arrow', headline: 'rgb(0, 153, 0)', bump: ['rgb(251, 248, 227)', 'dashed'] });
   assert.match(await page.locator('.product').innerText(), /Marketel Payoff - Your Debt-Free Date & Payoff Plan \(Reg\. \$375\)\s+1\s+\$33\.11/);
   const look = await page.evaluate(() => ({ button: getComputedStyle(document.getElementById('buy-button')).backgroundColor, font: getComputedStyle(document.querySelector('.order')).fontFamily }));
   assert.deepEqual(look, { button: 'rgb(55, 202, 55)', font: 'Montserrat, sans-serif' });
@@ -237,6 +245,29 @@ test('Stripe\'s fields charge Payoff alone, one payment per order, then the tool
   assert.equal(new URL(page.url()).search, '');
   assert.equal(emails.length, 1); assert.match(emails[0].text, /Total paid: \$28\.11/);
 }));
+test('ticking both add-ons adds them to the total, the summary, Stripe\'s amount and the order; the pick survives a reload; the Coach page then leaves them out of "Included"', async () => world(async ({ page, base, payments, emails, stripeLog }) => {
+  await page.goto(base + '/payoff/order'); await ready(page);
+  const shots = process.env.ORDER_SHOT_DIR;
+  if (shots) { await page.evaluate(() => document.fonts.ready); await page.locator('#order-form').screenshot({ path: `${shots}/order-form.png` }); }
+  await page.locator('#cashflow').check(); await page.locator('#reset').check();
+  assert.equal(await page.locator('#order-total').innerText(), '$59.11');
+  if (shots) await page.locator('#order-form').screenshot({ path: `${shots}/order-form-ticked.png` });
+  assert.match(await page.locator('#summary-rows').innerText(), /Cash-flow calendar\s+1\s+\$ 22\.00\s+Spending reset\s+1\s+\$ 9\.00\s+Discount\s+-\$ 5\.00/);
+  assert.deepEqual((await stripeLog()).filter(entry => entry[0] === 'update').map(entry => entry[1]), [5011, 5011, 5911, 5911], 'the card form and the wallet both charge the new total');
+  await page.reload(); await ready(page);
+  assert.equal(await page.locator('#cashflow').isChecked(), true); assert.equal(await page.locator('#reset').isChecked(), true);
+  assert.equal(await page.locator('#order-total').innerText(), '$59.11');
+  await fillBuyer(page);
+  await page.locator('#buy-button').click();
+  await page.waitForURL(url => url.pathname === '/payoff/upgrade');
+  await page.locator('#stage-offer:not([hidden])').waitFor();
+  assert.equal(await page.locator('#up-included').isHidden(), true, 'both are bought already, so the Coach doesn\'t list them');
+  await page.locator('#offer-no').click();
+  await page.waitForURL(url => url.pathname === '/payoff/app');
+  assert.equal(payments.length, 1);
+  assert.equal(payments[0].params.amount, 5911); assert.equal(payments[0].params.metadata.addons, '["cashflow","reset"]');
+  assert.match(emails[0].text, /Cash-flow calendar: \$22\.00/); assert.match(emails[0].text, /Total paid: \$59\.11/);
+}));
 test('a declined card says why, keeps the same payment for the retry, and stays on the page', async () => world(async ({ page, base, payments }) => {
   await page.goto(base + '/payoff/order'); await ready(page);
   await fillBuyer(page);
@@ -265,12 +296,13 @@ test('the order page records how far each visitor gets toward paying, by step na
   assert.ok(!steps().includes('email'), 'only a valid email counts');
   await page.locator('#email').fill('buyer@example.test'); await page.locator('#email').dispatchEvent('change');
   await page.evaluate(() => { const change = window.__stripeHandlers.payment.change; change({ empty: false, complete: false, value: { type: 'card' } }); change({ empty: false, complete: true, value: { type: 'card' } }); change({ empty: true, complete: false, value: { type: 'klarna' } }); change({ empty: false, complete: false, value: { type: 'link' } }); });
+  await page.locator('#cashflow').check();
   await page.locator('#buy-button').scrollIntoViewIfNeeded();
   await page.locator('#buy-button').click();
-  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'method-link', 'saw-button', 'declined']);
+  await until(['saw-form', 'name', 'email', 'card-start', 'card-done', 'method-klarna', 'method-link', 'addon-cashflow', 'saw-addons', 'saw-button', 'declined']);
   await page.locator('#email').dispatchEvent('change');
   await page.waitForTimeout(150);
-  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'method-link', 'missing-email', 'missing-name', 'name', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
+  assert.deepEqual(steps().filter(step => !step.startsWith('time')).sort(), ['addon-cashflow', 'card-done', 'card-start', 'cart', 'declined', 'email', 'method-klarna', 'method-link', 'missing-email', 'missing-name', 'name', 'saw-addons', 'saw-button', 'saw-form', 'stripe-ready', 'wallet-shown'].sort());
   assert.ok(![...rows.values()].some(row => JSON.stringify(row).includes('example.test') || JSON.stringify(row).includes('Test Buyer')), 'step names, never what they typed');
 }, { userAgent: PHONE_UA, outcomes: ['decline'] }));
 test('a payment Stripe reports as not paid sends the buyer back to checkout and never opens the tool', async () => world(async ({ page, base, emails }) => {

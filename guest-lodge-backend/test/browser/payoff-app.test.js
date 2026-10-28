@@ -295,9 +295,10 @@ test('a buyer with both extras gets tabs, a cash-flow calendar that warns before
   }
 }, { addons: ['cashflow', 'reset'] }));
 
-test('the order page sells Payoff alone; the extras are part of the Coach, offered after paying', async () => world(async ({ page, base }) => {
+test('the order page offers the two add-ons unticked; the Coach comes after paying', async () => world(async ({ page, base }) => {
   await page.goto(base + '/payoff/order');
   await page.locator('#buy-button:enabled').waitFor();
-  assert.equal(await page.locator('.bump, #cashflow, #reset').count(), 0);
+  assert.equal(await page.locator('.bump').count(), 2);
+  assert.equal(await page.locator('#cashflow').isChecked(), false); assert.equal(await page.locator('#reset').isChecked(), false);
   assert.equal(await text(page, '#order-total'), '$28.11');
 }));

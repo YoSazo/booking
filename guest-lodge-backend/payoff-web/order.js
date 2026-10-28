@@ -21,8 +21,11 @@
   const money = cents => (cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
   const base = () => config?.priceCents || 3311;
   const discount = () => (offer && offer.discountCents > 0 ? offer.discountCents : 0);
-  // Payoff alone: the extras are part of the Coach now, offered after paying.
-  const total = () => base() - discount();
+  // The two add-ons, as on the reference checkout; the Coach is offered after paying.
+  const EXTRAS = [{ id: 'cashflow', name: 'Cash-flow calendar', cents: 2200 }, { id: 'reset', name: 'Spending reset', cents: 900 }];
+  const selected = () => EXTRAS.filter(extra => $(extra.id).checked);
+  const priceOf = extra => config?.addOns?.[extra.id] ?? extra.cents;
+  const total = () => base() - discount() + selected().reduce((sum, extra) => sum + priceOf(extra), 0);
   // The "reserved for" clock: five minutes, carried through reloads; at 00:00
   // it stays there, and the next page load starts a new five minutes. It never
   // ends the order or the gift, which the server honours whatever it shows.
@@ -45,6 +48,8 @@
   try {
     attempt = sessionStorage.getItem('payoff.attempt') || crypto.randomUUID();
     sessionStorage.setItem('payoff.attempt', attempt);
+    const saved = JSON.parse(sessionStorage.getItem('payoff.addons') || '[]');
+    for (const extra of EXTRAS) $(extra.id).checked = Array.isArray(saved) && saved.includes(extra.id);
   } catch { attempt = attempt || crypto.randomUUID(); }
 
   // The summary table, the value block and the amount Stripe's fields expect.
@@ -59,7 +64,8 @@
   };
   function paint() {
     const off = discount();
-    $('summary-rows').replaceChildren(row(NAME, '1', base()), ...(off ? [row('Discount', '', -off)] : []));
+    $('summary-rows').replaceChildren(row(NAME, '1', base()), ...selected().map(extra => row(extra.name, '1', priceOf(extra))),
+      ...(off ? [row('Discount', '', -off)] : []));
     $('order-total').textContent = money(total());
     paintClock();
     const price = base() - off;
@@ -191,7 +197,7 @@
     $(missing[0]).scrollIntoView({ behavior: 'smooth', block: 'center' });
     return null;
   }
-  const orderBody = email => ({ email, addons: [], attempt, visitorId: track.visitor,
+  const orderBody = email => ({ email, addons: selected().map(extra => extra.id), attempt, visitorId: track.visitor,
     attribution: track.attribution, useCheckoutOffer: discount() > 0, expectedTotalCents: total() });
   async function post(route, email) {
     const response = await fetch(route, { method: 'POST', headers: track.headers, body: JSON.stringify(orderBody(email)) });
@@ -206,7 +212,7 @@
   }
   // The same order (after a declined card, say) keeps the same payment.
   async function createPayment(email) {
-    const key = JSON.stringify([email, total()]);
+    const key = JSON.stringify([selected().map(extra => extra.id), email, total()]);
     if (payment?.key !== key) payment = { key, ...await post('/api/payoff/pay', email) };
     return payment;
   }
@@ -284,6 +290,12 @@
   // Filled in, not what was typed. A valid email is the first step of paying,
   // sent to Meta as StartedPaying (the server sends its copy with the same id).
   $('name').addEventListener('change', () => { if ($('name').value.trim()) mark('name'); });
+  form.addEventListener('change', event => {
+    if (!EXTRAS.some(extra => extra.id === event.target.id)) return;
+    if (event.target.checked) mark('addon-' + event.target.id);
+    try { sessionStorage.setItem('payoff.addons', JSON.stringify(selected().map(extra => extra.id))); } catch { /* Optional. */ }
+    paint();
+  });
   $('email').addEventListener('change', () => {
     if (!validEmail($('email').value.trim())) return;
     // So Link can recognise a buyer by email where it doesn't know the device.

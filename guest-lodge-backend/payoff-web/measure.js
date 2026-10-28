@@ -53,7 +53,7 @@
   // section still counts it.
   const spots = page === 'sales'
     ? [...document.querySelectorAll('section[data-section]:not([data-section="hero"])')].map(el => ({ el, detail: el.dataset.section, at: 0.5 }))
-    : [['#order-form', 'saw-form'], ['#buy-button', 'saw-button']]
+    : [['#order-form', 'saw-form'], ['.bumps', 'saw-addons'], ['#buy-button', 'saw-button']]
       .map(([selector, detail]) => ({ el: document.querySelector(selector), detail, at: 0.75 })).filter(spot => spot.el);
   const measure = () => {
     const last = spots.reduce((found, spot, index) => (spot.el.getBoundingClientRect().top < innerHeight * spot.at ? index : found), -1);

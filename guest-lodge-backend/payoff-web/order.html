@@ -7,10 +7,10 @@
   <link rel="preload" href="/payoff/assets/font-montserrat-06b16db7a9.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensans-d8e4fe0452.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/payoff/assets/font-opensanspriceitalic-83ff4ae04f.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/payoff/order.css?v=15">
+  <link rel="stylesheet" href="/payoff/order.css?v=16">
   <script src="/payoff/checkout.js?v=29" defer></script>
-  <script src="/payoff/measure.js?v=4" defer></script>
-  <script src="/payoff/order.js?v=14" defer></script>
+  <script src="/payoff/measure.js?v=5" defer></script>
+  <script src="/payoff/order.js?v=15" defer></script>
 </head>
 <body data-page="order">
   <header class="reserve" id="reserve">
@@ -57,14 +57,28 @@
             <input class="input" type="email" id="email" name="email" placeholder="Email Address" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" aria-describedby="email-error">
             <p class="field-error" id="email-error" hidden>Enter a valid email to continue.</p>
           </section>
+          <section class="product-detail">
+            <div class="grid head"><span>Total Payment</span><span class="c">Quantity</span><span class="r">Price</span></div>
+            <div class="divider"></div>
+            <div class="grid product"><div class="product-name"><input type="radio" checked tabindex="-1" aria-label="Marketel Payoff"><div><strong>Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</strong></div></div><span class="c">1</span><span class="r price">$33.11</span></div>
+          </section>
+          <div class="bumps">
+            <section class="bump">
+              <div class="bump-main"><label class="bump-head"><svg class="arrow" viewBox="0 0 28 17" width="22" height="13" aria-hidden="true"><path d="M0 4.5h15.5V0L28 8.5 15.5 17v-4.5H0z"/></svg><input type="checkbox" id="cashflow" name="cashflow" aria-label="Add the Cash-flow calendar for $22"><span class="bump-headline">Plan Around Payday</span></label></div>
+              <p class="bump-copy"><span class="oto">ONE TIME OFFER</span>: Add The Cash-Flow Calendar To Your Payoff Plan. Wondering if you'll have enough before payday? Put your income, bills and debt payments on one <b>Cash-flow calendar</b> and see your projected balance up to <b>18 months ahead</b>. This price is only offered here, at checkout.</p>
+              <p class="bump-price">Regular price: <s>$79</s> <b>Today only $22!</b></p>
+              <img class="bump-image" src="/payoff/assets/cashflow-devices-d08f6b83ca.webp" width="1040" height="693" loading="lazy" decoding="async" alt="The Cash-flow calendar on a phone and tablet">
+            </section>
+            <section class="bump">
+              <div class="bump-main"><label class="bump-head"><svg class="arrow" viewBox="0 0 28 17" width="22" height="13" aria-hidden="true"><path d="M0 4.5h15.5V0L28 8.5 15.5 17v-4.5H0z"/></svg><input type="checkbox" id="reset" name="reset" aria-label="Add the Spending reset for $9"><span class="bump-headline">Get A Fresh Start</span></label></div>
+              <p class="bump-copy"><span class="oto">ONE TIME OFFER</span>: Add The Spending Reset To Your Payoff Plan. Want to free up money for your plan, fast? The <b>Spending reset</b> helps you pause what you choose, keep the essentials covered and put what you save toward your debt. This price is only offered here, at checkout.</p>
+              <p class="bump-price">Regular price: <s>$49</s> <b>Today only $9!</b></p>
+              <img class="bump-image" src="/payoff/assets/reset-devices-a5b2880cad.webp" width="1040" height="693" loading="lazy" decoding="async" alt="The Spending reset on a phone and tablet">
+            </section>
+          </div>
           <h2 class="section-head"><span aria-hidden="true">----</span> Payment Information <span aria-hidden="true">----</span></h2>
           <div class="form-payment">
             <div id="payment-element"></div>
-            <section class="product-detail">
-              <div class="grid head"><span>Total Payment</span><span class="c">Quantity</span><span class="r">Price</span></div>
-              <div class="divider"></div>
-              <div class="grid product"><div class="product-name"><input type="radio" checked tabindex="-1" aria-label="Marketel Payoff"><div><strong>Marketel Payoff - Your Debt-Free Date &amp; Payoff Plan (Reg. $375)</strong></div></div><span class="c">1</span><span class="r price">$33.11</span></div>
-            </section>
             <section class="summary" id="order-summary">
               <div class="separator">Order summary</div>
               <div class="grid head"><span>Item</span><span class="c">Quantity</span><span class="r">Amount</span></div>

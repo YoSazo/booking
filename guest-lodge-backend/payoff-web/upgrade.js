@@ -107,6 +107,10 @@
     local.set('payoff.access', reply.body.access);
     local.set('payoff.extras', JSON.stringify(reply.body.extras || []));
     if ((reply.body.extras || []).includes('coach')) return openPlan(true);
+    // Bought at checkout already, so not a reason to start the Coach.
+    const missing = [['cashflow', 'the cash-flow calendar'], ['reset', 'the spending reset']].filter(([id]) => !(reply.body.extras || []).includes(id)).map(([, name]) => name);
+    $('up-included').hidden = !missing.length;
+    $('up-included').querySelector('span').textContent = missing.join(' and ');
     let config = null;
     try {
       const response = await fetch('/api/payoff/config', { headers });
