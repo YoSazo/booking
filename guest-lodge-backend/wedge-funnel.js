@@ -267,7 +267,7 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Tapped “Pay by card” at the top', ['PayoffOrder:top-card']],
     ['Picked bank account', ['PayoffOrder:method-bank']],
     ['Picked Klarna', ['PayoffOrder:method-klarna']],
-    ['Paid with Link (a saved card)', ['PayoffOrder:method-link']],
+    ['Picked Link (a saved card) in the card form', ['PayoffOrder:method-link']],
     ['Scrolled to the add-ons', ['PayoffOrder:saw-addons']],
     ['Ticked the cash-flow calendar ($22)', ['PayoffOrder:addon-cashflow']],
     ['Ticked the spending reset ($9)', ['PayoffOrder:addon-reset']],
