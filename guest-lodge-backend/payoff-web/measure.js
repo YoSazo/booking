@@ -7,7 +7,7 @@
 (() => {
   const track = window.PayoffTrack;
   const page = document.body.dataset.page;
-  const name = { story: 'PayoffStory', sales: 'PayoffLetter', order: 'PayoffOrder' }[page];
+  const name = { story: 'PayoffStory', sales: 'PayoffLetter', order: 'PayoffOrder', show: 'PayoffShow' }[page];
   if (!track || !name || (page === 'sales' && document.body.dataset.variant !== 'letter')) return;
 
   // Each step once per visitor, however often they reload or scroll back.
@@ -53,13 +53,13 @@
   // section still counts it.
   const spots = page === 'sales'
     ? [...document.querySelectorAll('section[data-section]:not([data-section="hero"])')].map(el => ({ el, detail: el.dataset.section, at: 0.5 }))
-    : [['#order-form', 'saw-form'], ['.bumps', 'saw-addons'], ['#buy-button', 'saw-button']]
+    : (page === 'show' ? [['#buy', 'saw-buy'], ['.math', 'saw-math'], ['.reviews', 'saw-reviews']] : [['#order-form', 'saw-form'], ['.bumps', 'saw-addons'], ['#buy-button', 'saw-button']])
       .map(([selector, detail]) => ({ el: document.querySelector(selector), detail, at: 0.75 })).filter(spot => spot.el);
   const measure = () => {
     const last = spots.reduce((found, spot, index) => (spot.el.getBoundingClientRect().top < innerHeight * spot.at ? index : found), -1);
     spots.slice(0, last + 1).forEach(spot => mark(spot.detail));
     const height = document.documentElement.scrollHeight;
-    if (page === 'sales' && height && (scrollY + innerHeight) / height >= 0.98) mark('end');
+    if ((page === 'sales' || page === 'show') && height && (scrollY + innerHeight) / height >= 0.98) mark('end');
   };
   let pending = false;
   const onScroll = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; measure(); }); } };
@@ -67,6 +67,13 @@
   addEventListener('resize', onScroll, { passive: true });
   addEventListener('load', onScroll);
   onScroll();
+  if (page === 'show') {
+    mark('viewed');
+    document.addEventListener('click', event => {
+      const cta = event.target.closest?.('a.cta');
+      if (cta) mark('tap-' + (cta.dataset.placement || 'buy'));
+    }, true);
+  }
   if (page !== 'sales') return;
 
   // Which button sent them on, by the section it sits in, and which answers they opened.

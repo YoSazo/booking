@@ -100,16 +100,16 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     window.PayoffTrack = { event, pixel, attribution, visitor, headers };
     return;
   }
-  // A visitor sent on by the story page was counted there, with the ad click.
-  if (query.get('from') !== 'story') event('PayoffFrom', query.has('fbclid') ? 'ad'
+  // A visitor sent on by the story or product page was counted there, with the ad click.
+  if (!['story', 'show'].includes(query.get('from'))) event('PayoffFrom', query.has('fbclid') ? 'ad'
     : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
   // Which ad: every Payoff ad links with utm_content={{ad.id}}, so the funnel
   // page can follow each ad's visitors through to paying.
   if (/^\d{6,25}$/.test(query.get('utm_content') || '')) event('PayoffAd', query.get('utm_content'));
   // The landing test: the side this visitor is on, once, from the page that
   // side lands on (the cookie is set only for visitors in the test).
-  const side = (String(document.cookie || '').match(/(?:^|;\s*)payoff_entry=(story|letter)\b/) || [])[1];
-  const here = document.body.dataset.page === 'story' ? 'story' : document.body.dataset.variant === 'letter' ? 'letter' : null;
+  const side = (String(document.cookie || '').match(/(?:^|;\s*)payoff_entry=(story|letter|show)\b/) || [])[1];
+  const here = ['story', 'show'].includes(document.body.dataset.page) ? document.body.dataset.page : document.body.dataset.variant === 'letter' ? 'letter' : null;
   if (side && side === here) {
     let first = true;
     try { first = sessionStorage.getItem('payoff.entrySent') !== visitor; sessionStorage.setItem('payoff.entrySent', visitor || ''); } catch { /* Send it. */ }

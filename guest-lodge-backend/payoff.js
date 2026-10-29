@@ -35,7 +35,7 @@ const ITEMS = Object.freeze({
 const COACH_WINDOW_MS = 30 * 60 * 1000;
 const ROOT = path.join(__dirname, 'payoff-web');
 const EVENTS = ['PayoffLanded', 'PayoffFrom', 'PayoffVariant', 'PayoffQuizStep', 'PayoffOrderViewed', 'PayoffCheckoutTapped', 'PayoffCheckoutOpened', 'PayoffCheckoutFailed', 'PayoffCheckoutCancelled',
-  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd', 'PayoffEntry'];
+  'PayoffUpgradeViewed', 'PayoffUpgradeAccepted', 'PayoffUpgradeDeclined', 'PayoffUpgradeExpired', 'PayoffStory', 'PayoffLetter', 'PayoffOrder', 'PayoffCoach', 'PayoffAd', 'PayoffEntry', 'PayoffShow'];
 // The A/B test on the landing: the sales letter or the quiz, kept per visitor.
 const VARIANTS = Object.freeze(['letter', 'quiz']);
 const VARIANT_COOKIE = 'payoff_variant';
@@ -44,7 +44,10 @@ const VARIANT_COOKIE = 'payoff_variant';
 // funnel does. The cookie keeps each visitor on one side; the page they land
 // on reads it to record their side (PayoffEntry).
 const ENTRY_COOKIE = 'payoff_entry';
-const ENTRIES = Object.freeze(['story', 'letter']);
+// The landing test's sides. 'story' is the page the ads link to; since Oct 29
+// the test is the sales letter vs the one-page product page ('show'), and
+// visitors already on the story side keep it.
+const ENTRIES = Object.freeze(['story', 'letter', 'show']);
 const QUIZ_STEPS = Object.freeze(['q1', 'q2', 'why-interest', 'why-order', 'why-tracking', 'why-life', 'card-1', 'cards', 'reveal', 'extra', 'plan', 'unlock']);
 // 'offer', 'discount' and 'regular' were the Interest Cutter's pages; they
 // stay so older rows still read. The Coach's page is 'coach', its plans
@@ -59,6 +62,8 @@ const EVENT_DETAILS = Object.freeze({ PayoffFrom: ['ad', 'social', 'direct', 'ot
   PayoffLetter: [...ON_SCREEN, ...LETTER_SECTIONS, 'end', ...['hero', ...LETTER_SECTIONS, 'other'].map(place => 'tap-' + place), 'faq-open', 'math-open'],
   PayoffOrder: [...ON_SCREEN, 'cart', 'form20', 'saw-form', 'saw-addons', 'saw-button', 'stripe-ready', 'hosted', 'wallet-shown', 'wallet-tap', 'top-card', 'name', 'email',
     'card-start', 'card-done', 'method-bank', 'method-klarna', 'method-link', 'addon-cashflow', 'addon-reset', 'missing-name', 'missing-email', 'card-incomplete', 'declined', 'error'],
+  // The product page: how far down they got, which order option and which button.
+  PayoffShow: ['viewed', ...ON_SCREEN, 'saw-buy', 'saw-math', 'saw-reviews', 'end', 'tap-buy', 'tap-sticky', 'tap-final', 'option-1', 'option-2', 'option-3'],
   // The Coach tab inside Payoff: opened, agreed to send their numbers, asked, tapped to start it.
   PayoffCoach: ['opened', 'consent', 'asked', 'start-month', 'start-year', 'manage'] });
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
@@ -188,18 +193,19 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     remember(variant);
     return variant;
   }
-  // The share of new story-page visitors sent straight to the letter
-  // (PAYOFF_ENTRY_SHARE overrides; 0 or 1 ends the test for everyone).
+  // The share of new story-page visitors sent straight to the letter; the rest
+  // get the product page (PAYOFF_ENTRY_SHARE overrides; 0 ends the test with
+  // everyone on the story page the ads link to, 1 with everyone on the letter).
   const letterShare = Math.min(1, Math.max(0, Number(entryShare ?? env.PAYOFF_ENTRY_SHARE ?? (env.NODE_ENV === 'test' ? 0 : 0.5)) || 0));
   function entry(req, res) {
-    // ?entry=story or ?entry=letter shows that side without joining the test.
+    // ?entry=story, letter or show shows that side without joining the test.
     if (ENTRIES.includes(req.query.entry)) return req.query.entry;
     if (letterShare === 0 || letterShare === 1) return letterShare ? 'letter' : 'story';
     const saved = String(req.headers.cookie || '').split(';').map(part => part.trim()).find(part => part.startsWith(`${ENTRY_COOKIE}=`))?.slice(ENTRY_COOKIE.length + 1);
     if (ENTRIES.includes(saved)) return saved;
     // Crawlers and Meta's ad review see the page the ad links to, with no cookie.
     if (automated(req) || /facebookexternalhit|Facebot/i.test(req.headers['user-agent'] || '')) return 'story';
-    const side = random() < letterShare ? 'letter' : 'story';
+    const side = random() < letterShare ? 'letter' : 'show';
     // Readable by the page (it holds only the side), so the page can record it.
     res.cookie(ENTRY_COOKIE, side, { httpOnly: false, secure: env.NODE_ENV !== 'test', sameSite: 'lax', path: '/payoff', maxAge: 90 * 24 * 60 * 60 * 1000 });
     return side;
@@ -230,22 +236,24 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     res.sendFile(path.join(ROOT, landing(req, res) === 'quiz' ? 'quiz.html' : 'index.html'));
   });
   // The static ad opens the story page, whose buttons lead to the sales letter;
-  // the letter side of the landing test goes straight there, keeping the ad's
-  // click id and tags.
+  // the landing test sends its sides straight to the sales letter or to the
+  // product page instead, keeping the ad's click id and tags.
   pages.get('/hidden-payoff', (req, res, next) => {
-    if (entry(req, res) !== 'letter') return next();
+    const side = entry(req, res);
+    if (side === 'story') return next();
     const query = new URLSearchParams(req.originalUrl.split('?')[1] || '');
     query.delete('entry'); query.delete('v');
+    if (side === 'show') return res.redirect(302, `/payoff/show${query.toString() ? '?' + query : ''}`);
     res.redirect(302, `/payoff?v=letter${query.toString() ? '&' + query : ''}`);
   });
-  for (const [route, file] of [['/hidden-payoff', 'story.html'], ['/order', 'order.html'], ['/upgrade', 'upgrade.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
+  for (const [route, file] of [['/hidden-payoff', 'story.html'], ['/show', 'show.html'], ['/order', 'order.html'], ['/upgrade', 'upgrade.html'], ['/confirmation', 'confirmation.html'], ['/terms', 'terms.html'], ['/privacy', 'privacy.html'], ['/app', 'app.html']]) {
     pages.get(route, (_req, res) => {
       if (file === 'order.html' || file === 'upgrade.html') res.set({ 'Content-Security-Policy': ORDER_CSP, 'Permissions-Policy': ORDER_PERMISSIONS });
       else if (file !== 'app.html') res.set('Content-Security-Policy', META_CSP);
       res.sendFile(path.join(ROOT, file));
     });
   }
-  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js', 'cutter-content.js', 'upgrade.js', 'upgrade.css', 'story.js', 'story.css', 'measure.js']) {
+  for (const file of ['content.js', 'page.js', 'purchase-notices.js', 'checkout.js', 'order.js', 'quiz.js', 'confirmation.js', 'style.css', 'order.css', 'quiz.css', 'app.js', 'app.css', 'engine.js', 'cutter-content.js', 'upgrade.js', 'upgrade.css', 'story.js', 'story.css', 'measure.js', 'show.js', 'show.css']) {
     pages.get('/' + file, (_req, res) => res.sendFile(path.join(ROOT, file)));
   }
   pages.get('/assets/:file', (req, res) => {

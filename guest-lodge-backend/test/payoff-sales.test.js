@@ -690,7 +690,7 @@ test('the landing splits new visitors between the letter and the quiz, keeps eac
     assert.ok(isLetter(r.html)); assert.equal(r.cookie, '');
   });
 });
-test('the landing test splits new story-page visitors: half go straight to the sales letter with the ad click and tags, each stays on their side, and a forced look joins nothing', async () => {
+test('the landing test splits new story-page visitors between the sales letter and the product page with the ad click and tags, each stays on their side, and a forced look joins nothing', async () => {
   const world = options => { const w = fixture(); w.app = express(); registerPayoff(w.app, { prisma: w.prisma, stripe: w.stripe, mail: w.mail, env: { NODE_ENV: 'test' }, ...options }); return w; };
   const AD = '?utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc';
   const land = async (base, headers = {}, query = AD) => {
@@ -704,17 +704,23 @@ test('the landing test splits new story-page visitors: half go straight to the s
     assert.equal(first.location, '/payoff?v=letter&utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc', 'the ad click id and tags go with them');
     assert.match(first.cookie, /payoff_entry=letter; Max-Age=7776000; Path=\/payoff/); assert.doesNotMatch(first.cookie, /HttpOnly/, 'the page reads its side');
     const second = await land(base);
-    assert.equal(second.status, 200); assert.match(second.html, /data-page="story"/); assert.match(second.cookie, /payoff_entry=story/);
-    // Returning visitors keep their side without a new draw.
+    assert.equal(second.status, 302);
+    assert.equal(second.location, '/payoff/show?utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc');
+    assert.match(second.cookie, /payoff_entry=show/);
+    // Returning visitors keep their side without a new draw, including the
+    // story side from before the product page joined the test.
     assert.equal((await land(base, { cookie: 'payoff_entry=letter' })).status, 302);
+    assert.equal((await land(base, { cookie: 'payoff_entry=show' })).location, '/payoff/show?utm_source=facebook&utm_medium=paid&utm_campaign=120251563772910103&utm_content=120251580459180103&fbclid=IwAR0abc');
     const back = await land(base, { cookie: 'payoff_entry=story' });
-    assert.equal(back.status, 200); assert.equal(back.cookie, '');
+    assert.equal(back.status, 200); assert.match(back.html, /data-page="story"/); assert.equal(back.cookie, '');
     assert.equal(draws.length, 0);
     // A forced look shows that side and joins nothing.
     const forced = await land(base, { cookie: 'payoff_entry=letter' }, '?entry=story&fbclid=x');
     assert.equal(forced.status, 200); assert.equal(forced.cookie, '');
     const forcedLetter = await land(base, {}, '?entry=letter&fbclid=x');
     assert.equal(forcedLetter.location, '/payoff?v=letter&fbclid=x'); assert.equal(forcedLetter.cookie, '');
+    const forcedShow = await land(base, {}, '?entry=show');
+    assert.equal(forcedShow.location, '/payoff/show'); assert.equal(forcedShow.cookie, '');
     // Crawlers and Meta's ad review see the page the ad links to, with no cookie.
     for (const agent of ['facebookexternalhit/1.1', 'Mozilla/5.0 HeadlessChrome/120', 'Googlebot/2.1 (+http://www.google.com/bot.html)']) {
       const bot = await land(base, { 'user-agent': agent });
@@ -728,6 +734,25 @@ test('the landing test splits new story-page visitors: half go straight to the s
   });
   await serve(world({ env: { NODE_ENV: 'test', PAYOFF_ENTRY_SHARE: '1' } }), async ({ base }) => {
     assert.equal((await land(base, { cookie: 'payoff_entry=story' })).status, 302);
+  });
+});
+test('the product page is served with the pixel-only policy, its files load, and it records only its own steps', async () => {
+  const w = fixture();
+  await serve(w, async ({ base, post }) => {
+    const r = await fetch(base + '/payoff/show');
+    assert.equal(r.status, 200);
+    const html = await r.text();
+    assert.match(html, /data-page="show"/); assert.match(html, /href="\/payoff\/order\?from=show"/);
+    const csp = r.headers.get('content-security-policy');
+    assert.match(csp, /script-src 'self' https:\/\/connect\.facebook\.net/); assert.doesNotMatch(csp, /stripe/);
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex, nofollow');
+    for (const file of ['show.js', 'show.css', 'engine.js']) assert.equal((await fetch(base + '/payoff/' + file)).status, 200, file);
+    for (const asset of html.match(/\/payoff\/assets\/[a-z0-9-]+\.(?:webp|png|jpg)/g)) assert.equal((await fetch(base + asset)).status, 200, asset);
+    for (const detail of ['viewed', 'time10', 'saw-buy', 'option-3', 'tap-buy', 'tap-sticky', 'end']) {
+      assert.equal((await post('/api/payoff/event', { name: 'PayoffShow', detail, visitorId: 'v_abcdefghijk' })).status, 200, detail);
+    }
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffEntry', detail: 'show', visitorId: 'v_abcdefghijk' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffShow', detail: 'tap-anything', visitorId: 'v_abcdefghijk' })).status, 400);
   });
 });
 test('the story page is served with the pixel-only policy and records only its own reading steps', async () => {

@@ -1,7 +1,7 @@
 /* Payoff product page preview, laid out like lumerval.com: wine bands, peach
    cards, one green button colour, every argument drawn rather than written. */
-@font-face { font-family: 'Montserrat'; src: url('assets/font-montserrat-06b16db7a9.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: 'Open Sans'; src: url('assets/font-opensans-d8e4fe0452.woff2') format('woff2'); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: 'Montserrat'; src: url('/payoff/assets/font-montserrat-06b16db7a9.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Open Sans'; src: url('/payoff/assets/font-opensans-d8e4fe0452.woff2') format('woff2'); font-weight: 300 800; font-display: swap; }
 :root {
   --wine: #6a0f2a; --wine-2: #4d0a1e; --cream: #fdf5ef; --peach: #f9e3d8; --peach-2: #f3cdbd;
   --rose: #c2185b; --ink: #2b1419; --muted: #6e5660; --line: #ecd3c8; --green: #23a548; --green-2: #1b8c3c;

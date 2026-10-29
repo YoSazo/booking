@@ -89,7 +89,7 @@ test('a click from an ad records which ad (its utm_content id) once per load, an
   assert.equal(named(rows).filter(name => name.startsWith('PayoffAd')).length, 1);
 }));
 
-test('the landing test: a letter-side visitor lands on the sales letter with the ad click and the ad recorded, a story-side visitor on the story page, each recorded once; a forced look records no side', async () => {
+test('the landing test: a letter-side visitor lands on the sales letter and a product-page visitor on the product page, with the ad click and the ad recorded, each once; a returning story-side visitor keeps the story page; a forced look records no side', async () => {
   const AD = '/payoff/hidden-payoff?utm_source=facebook&utm_medium=paid&utm_content=120251580459180103&fbclid=IwAR0story';
   let draw = 0.2;
   await world(async ({ page, base, rows }) => {
@@ -105,15 +105,30 @@ test('the landing test: a letter-side visitor lands on the sales letter with the
   draw = 0.8;
   await world(async ({ page, base, rows }) => {
     await page.goto(base + AD);
+    assert.equal(new URL(page.url()).pathname, '/payoff/show');
+    assert.equal(await page.locator('body').getAttribute('data-page'), 'show');
+    const want = ['PayoffEntry:show', 'PayoffFrom:ad', 'PayoffAd:120251580459180103', 'PayoffShow:viewed'];
+    await settle(page, rows, want);
+    for (const name of want) assert.ok(named(rows).includes(name), name);
+    // On to the order page: still one side, and no second count of where they came from.
+    await page.locator('a[data-cta]').tap();
+    await page.waitForURL(url => url.pathname === '/payoff/order');
+    await settle(page, rows, ['PayoffShow:tap-buy']);
+    assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffEntry')), ['PayoffEntry:show']);
+    assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffFrom')), ['PayoffFrom:ad']);
+  }, { entryShare: 0.5, random: () => draw });
+  // Visitors on the story side from before the product page joined the test keep it.
+  await world(async ({ page, base, rows }) => {
+    await page.context().addCookies([{ name: 'payoff_entry', value: 'story', url: base + '/payoff' }]);
+    await page.goto(base + AD);
     assert.equal(new URL(page.url()).pathname, '/payoff/hidden-payoff');
-    await settle(page, rows, ['PayoffEntry:story', 'PayoffFrom:ad', 'PayoffStory:viewed']);
-    assert.ok(named(rows).includes('PayoffEntry:story'));
+    await settle(page, rows, ['PayoffEntry:story', 'PayoffStory:viewed']);
     // Through the story page to the letter: still one side, the story one.
     await page.locator('a.adv-cta').first().tap();
     await page.waitForURL(url => url.pathname === '/payoff');
     await settle(page, rows, ['PayoffVariant:letter']);
     assert.deepEqual(named(rows).filter(name => name.startsWith('PayoffEntry')), ['PayoffEntry:story']);
-  }, { entryShare: 0.5, random: () => draw });
+  }, { entryShare: 0.5, random: () => 0.9 });
   await world(async ({ page, base, rows }) => {
     await page.goto(base + '/payoff/hidden-payoff?entry=letter&fbclid=IwAR0look');
     assert.equal(new URL(page.url()).pathname, '/payoff');

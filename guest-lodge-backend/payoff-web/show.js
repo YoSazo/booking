@@ -1,5 +1,5 @@
 'use strict';
-// Payoff product page preview: picture gallery, order options, testimonial
+// Payoff product page: picture gallery, order options, testimonial
 // tabs, the sticky button, and the example numbers worked out by engine.js
 // (the app's own maths), so the chart and face-off match what the app shows.
 (() => {
@@ -22,13 +22,38 @@
   $('[data-prev]').addEventListener('click', () => show(current() - 1));
   $('[data-next]').addEventListener('click', () => show(current() + 1));
 
-  // Order options: the button shows the chosen option's price.
+  // Order options: the button shows the chosen option's price, and carries its
+  // add-ons to the order page, which ticks the ones saved in payoff.addons.
+  // While the checkout's $5-off offer is running, every price shows it, as the
+  // sales letter does, so this page and the order page agree.
   const options = $$('.option');
+  let offCents = 0;
+  const priceOf = option => ((Math.round(Number(option.dataset.price) * 100) - offCents) / 100).toFixed(2);
+  const paint = () => {
+    options.forEach(o => {
+      o.querySelector('.opt-price').textContent = '$' + priceOf(o);
+      o.querySelector('.opt-save').textContent = 'Save $' + Math.round(Number(o.dataset.reg) - Number(priceOf(o)));
+    });
+    $$('[data-base-price]').forEach(el => { el.textContent = '$' + priceOf(options[0]); });
+    const chosen = $('.option.is-on') || options[0];
+    $('[data-cta-price]').textContent = '$' + priceOf(chosen);
+    $('[data-cta-reg]').textContent = '$' + chosen.dataset.reg;
+  };
   options.forEach(option => option.addEventListener('click', () => {
     options.forEach(o => { o.classList.toggle('is-on', o === option); o.setAttribute('aria-checked', String(o === option)); });
-    $('[data-cta-price]').textContent = '$' + option.dataset.price;
-    $('[data-cta-reg]').textContent = '$' + option.dataset.reg;
+    paint();
+    window.PayoffMeasure?.mark('option-' + option.dataset.option);
   }));
+  const refreshOffer = () => fetch('/api/payoff/config?offer=preview', { headers: window.PayoffTrack?.headers || {} })
+    .then(r => (r.ok ? r.json() : null))
+    .then(config => { offCents = config?.checkoutOffer?.discountCents === 500 ? 500 : 0; paint(); })
+    .catch(() => { /* The listed prices stand. */ });
+  refreshOffer();
+  addEventListener('pageshow', event => { if (event.persisted) refreshOffer(); });
+  $('[data-cta]').addEventListener('click', () => {
+    const chosen = $('.option.is-on');
+    try { sessionStorage.setItem('payoff.addons', JSON.stringify((chosen?.dataset.extras || '').split(' ').filter(Boolean))); } catch { /* The order page still lets them tick the add-ons. */ }
+  });
 
   // Testimonial tabs.
   $$('.tab').forEach(tab => tab.addEventListener('click', () => {
