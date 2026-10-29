@@ -519,6 +519,16 @@ function registerPayoff(app, { stripe, mail, prisma, isExcludedEmail = () => fal
     if ((EVENT_DETAILS[req.body.name] || req.body.name === 'PayoffAd') && !detail && req.body.name !== 'PayoffFrom') throw fail(400, 'Unknown event.');
     const visitor = visitorId(req.body.visitorId);
     await record(req.body.name, visitor, null, detail);
+    // The server's copy of the pixel's PageView, with that page load's id, so
+    // Meta still counts views the browser pixel misses (blockers, iPhone).
+    const viewPrefix = `payoff-pv.${visitor}.`;
+    const pageView = visitor && typeof req.body.pageView === 'string' && req.body.pageView.startsWith(viewPrefix)
+      && /^[a-z0-9]{6,16}$/.test(req.body.pageView.slice(viewPrefix.length)) ? req.body.pageView : null;
+    if (pageView && ['PayoffLanded', 'PayoffOrderViewed'].includes(req.body.name)) {
+      const page = typeof req.body.page === 'string' && req.body.page.length <= 500 && req.body.page.startsWith(`${origin}/payoff`) ? req.body.page : null;
+      const attribution = sanitizeInspectAttribution(req.body.attribution, req) || {};
+      await sendCapi('PageView', { eventId: pageView, ...visitorCapi(visitor, page ? { ...attribution, sourceUrl: page } : attribution, req) });
+    }
     // Meta's AddToCart is staying 20 seconds on the order page, or starting to
     // pay sooner (measure.js), not a glance at it; the browser pixel sends the
     // same event id.

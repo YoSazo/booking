@@ -41,6 +41,10 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
   } catch { /* Checkout still works when storage is unavailable. */ }
   const headers = { 'Content-Type': 'application/json', ...(excluded ? { 'x-marketel-no-track': '1' } : {}) };
   const query = new URLSearchParams(location.search);
+  // One id per page load for Meta's PageView: the pixel and the server's copy
+  // both carry it, so Meta counts the view once.
+  let pageView = null;
+  try { if (visitor) pageView = `payoff-pv.${visitor}.` + [...crypto.getRandomValues(new Uint8Array(10))].map(b => (b % 36).toString(36)).join(''); } catch { /* No copy then. */ }
 
   // Meta's pixel, on the sales and order pages only (never the tool, never the
   // owner, never a test browser or plain http). Each signal carries the event
@@ -58,7 +62,7 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     // People type balances on the quiz: no automatic collection there.
     if (document.body.dataset.variant === 'quiz') window.fbq('set', 'autoConfig', false, PIXEL_ID);
     window.fbq('init', PIXEL_ID);
-    window.fbq('track', 'PageView');
+    window.fbq('track', 'PageView', {}, pageView ? { eventID: pageView } : undefined);
   }
   // Meta's browser ids and the ad's utm tags, kept from the landing page so
   // the server's copies of the events match the same person (as on /trace).
@@ -90,11 +94,19 @@ window.PAYOFF_PAINT_PRICE = (box, cents) => {
     } catch { return {}; }
   })();
 
-  const event = (name, detail = null) => {
+  const event = (name, detail = null, extra = {}) => {
     if (!excluded) fetch('/api/payoff/event', { method: 'POST', headers, keepalive: true,
-      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrder' && ['cart', 'email'].includes(detail) ? { attribution } : {}) }) }).catch(() => {});
+      body: JSON.stringify({ name, detail, visitorId: visitor, ...(name === 'PayoffOrder' && ['cart', 'email'].includes(detail) ? { attribution } : {}), ...extra }) }).catch(() => {});
   };
-  event(form ? 'PayoffOrderViewed' : 'PayoffLanded');
+  // The landing carries the PageView's id, this page's address and the Meta
+  // ids, so the server sends Meta its copy: views the browser pixel misses
+  // (ad blockers, iPhone privacy) still count. Only where the pixel runs.
+  const page = new URL(location.origin + location.pathname);
+  for (const param of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid']) {
+    const value = String(query.get(param) || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 180);
+    if (value) page.searchParams.set(param, value);
+  }
+  event(form ? 'PayoffOrderViewed' : 'PayoffLanded', null, pixelOn && pageView ? { pageView, page: page.toString(), attribution } : {});
   if (form) {
     // The order page's own form (order.js) reports through the same helpers.
     window.PayoffTrack = { event, pixel, attribution, visitor, headers };

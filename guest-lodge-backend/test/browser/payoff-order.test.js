@@ -389,8 +389,16 @@ test("Meta's pixel: PageView on each page, AddToCart once on starting to pay (no
   await overHttps(page, base, calls);
   await page.goto('https://payoff.test/payoff?fbclid=adclick123&utm_source=facebook');
   await page.locator('.offer-slot .cta').first().waitFor();
-  assert.deepEqual(calls.slice(0, 2), [['init', '1545780930244672'], ['track', 'PageView']]);
   const visitor = await page.evaluate(() => sessionStorage.getItem('payoff.visitor'));
+  assert.deepEqual(calls[0], ['init', '1545780930244672']);
+  // The PageView carries this page load's id, and the landing sends the server the same one for its copy.
+  assert.deepEqual(calls[1].slice(0, 3), ['track', 'PageView', {}]);
+  const viewId = calls[1][3]?.eventID;
+  assert.match(viewId, new RegExp(`^payoff-pv\\.${visitor}\\.[a-z0-9]{10}$`));
+  await page.waitForTimeout(200);
+  const landing = posts.map(p => { try { return JSON.parse(p.body); } catch { return {}; } }).find(body => body.name === 'PayoffLanded');
+  assert.equal(landing.pageView, viewId);
+  assert.equal(landing.page, 'https://payoff.test/payoff?utm_source=facebook&fbclid=adclick123');
   await page.locator('.offer-slot .cta').first().click();
   await page.waitForURL('https://payoff.test/payoff/order');
   await page.locator('#buy-button:enabled').waitFor();

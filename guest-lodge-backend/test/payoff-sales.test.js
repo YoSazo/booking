@@ -794,6 +794,25 @@ test('the letter and order pages record their steps by name only, and a valid em
   assert.equal(w.capi[0].email, undefined, 'never the email itself');
   assert.equal([...w.rows.values()].length, 11);
 });
+test('each page view goes to Meta from the server too, with the pixel\'s id, the page and the Meta ids; never for someone else\'s id, another event or the owner', async () => {
+  const w = fixture();
+  const attribution = { fbp: 'fb.1.1700000000000.123456789', fbc: 'fb.1.1700000000000.AbCdEf', sourceUrl: 'https://bookmarketel.com/payoff/hidden-payoff?fbclid=AbCdEf' };
+  await serve(w, async ({ post }) => {
+    const view = id => ({ visitorId: 'v_abcdefghijk', pageView: `payoff-pv.v_abcdefghijk.${id}`, attribution });
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffLanded', ...view('k3j9x0a1b2'), page: 'https://bookmarketel.com/payoff/show?utm_content=120251603585080103' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffOrderViewed', ...view('q8w7e6r5t4'), page: 'https://elsewhere.example/payoff/order' })).status, 200);
+    // Not a page view, not this visitor's id, not a usable id, or the owner's browser: nothing goes to Meta.
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffStory', detail: 'viewed', ...view('z1z1z1z1z1') })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffLanded', ...view('a1a1a1a1a1'), visitorId: 'v_someoneelse1' })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffLanded', ...view('NOT VALID!') })).status, 200);
+    assert.equal((await post('/api/payoff/event', { name: 'PayoffLanded', ...view('b2b2b2b2b2') }, { 'x-marketel-no-track': '1' })).status, 200);
+  });
+  assert.deepEqual(w.capi.map(event => [event.name, event.eventId, event.sourceUrl, event.fbp, event.fbc, event.externalId]), [
+    ['PageView', 'payoff-pv.v_abcdefghijk.k3j9x0a1b2', 'https://bookmarketel.com/payoff/show?utm_content=120251603585080103', attribution.fbp, attribution.fbc, 'payoff-visitor:v_abcdefghijk'],
+    ['PageView', 'payoff-pv.v_abcdefghijk.q8w7e6r5t4', attribution.sourceUrl, attribution.fbp, attribution.fbc, 'payoff-visitor:v_abcdefghijk'],
+  ], 'a page from another site falls back to where they landed');
+  assert.ok(w.capi.every(event => event.userAgent === 'Buyer Browser' && event.ip), 'with the browser and address that loaded the page');
+});
 test('the landing version and quiz steps are recorded by name only, never with numbers', async () => {
   const w = fixture();
   await serve(w, async ({ post }) => {
