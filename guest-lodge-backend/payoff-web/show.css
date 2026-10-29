@@ -41,7 +41,7 @@ main > section > h2 { font-size: 30px; line-height: 1.12; font-weight: 800; text
 .gallery { display: flex; flex-direction: column; gap: 10px; }
 .gallery-main { position: relative; border-radius: 16px; overflow: hidden; background: var(--white); border: 1px solid var(--line); }
 .gallery-main img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
-.badge-corner { position: absolute; top: 12px; right: 12px; background: var(--white); color: var(--wine); font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 10px; box-shadow: 0 2px 6px rgba(0, 0, 0, .15); }
+/* (no corner badge: the product shot carries its own) */
 .gallery-nav { display: flex; align-items: center; gap: 8px; }
 .arrow { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--wine); color: var(--white); font-size: 22px; line-height: 1; cursor: pointer; }
 .thumbs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; padding: 2px; }
