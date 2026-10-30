@@ -61,7 +61,9 @@ const paid = (id, overrides = {}) => ({ object: 'checkout.session', id, mode: 's
   ...overrides });
 
 test('the order form needs an email, the property, a name, a textable phone and the PMS', () => {
-  assert.deepEqual(order(BUYER), { email: 'owner@lakeview.test', property: 'Lakeview Inn', name: 'Dana Reyes', phone: '(205) 555-0142', pms: 'Little Hotelier' });
+  assert.deepEqual(order(BUYER), { email: 'owner@lakeview.test', property: 'Lakeview Inn', name: 'Dana Reyes', phone: '(205) 555-0142', pms: 'Little Hotelier', plan: 'monthly' });
+  assert.equal(order({ ...BUYER, plan: 'once' }).plan, 'once');
+  assert.equal(order({ ...BUYER, plan: 'free' }).plan, 'monthly');
   assert.throws(() => order({ ...BUYER, email: 'nope' }), /valid email/);
   assert.throws(() => order({ ...BUYER, property: ' ' }), /property/);
   assert.throws(() => order({ ...BUYER, name: '' }), /your name/);
@@ -75,7 +77,7 @@ test('checkout is $97 today: the $49 month plus the $48 setup, as one subscripti
   await serve(w, async ({ post }) => {
     const first = await post('/api/engine/checkout', { attempt: ATTEMPT, ...BUYER, visitorId: 'v_abcdefgh12', attribution: { fbp: 'fb.1.1.2', sourceUrl: 'https://bookmarketel.com/engine' } });
     assert.equal(first.status, 200, JSON.stringify(first.body));
-    assert.deepEqual(first.body, { clientSecret: 'cs_test_created_secret_1', value: 97 });
+    assert.deepEqual(first.body, { clientSecret: 'cs_test_created_secret_1', value: 97, plan: 'monthly' });
     const { params, options } = w.creates[0];
     assert.equal(params.ui_mode, 'embedded');
     assert.equal(params.mode, 'subscription');
@@ -143,7 +145,7 @@ test('a paid order is confirmed once: one Purchase, one text, one welcome email,
   await serve(w, async ({ post }) => {
     const done = await post('/api/engine/confirm', { sessionId: 'cs_test_paid0000001' });
     assert.equal(done.status, 200, JSON.stringify(done.body));
-    assert.deepEqual(done.body, { paid: true, reference: 'cs_test_paid0000001', value: 97, property: 'Lakeview Inn', pms: 'Little Hotelier', email: 'owner@lakeview.test', emailSent: true,
+    assert.deepEqual(done.body, { paid: true, reference: 'cs_test_paid0000001', plan: 'monthly', value: 97, property: 'Lakeview Inn', pms: 'Little Hotelier', email: 'owner@lakeview.test', emailSent: true,
       lifetime: { open: false, done: false, oneClick: false, priceCents: LIFETIME.cents } });
     await post('/api/engine/confirm', { sessionId: 'cs_test_paid0000001' });
     await w.registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: { id: 'cs_test_paid0000001', metadata: { product: PRODUCT } } } });
@@ -296,4 +298,48 @@ test('the pay-once offer ends an hour after paying', async () => {
     assert.match(late.body.error, /offer has ended/);
   });
   assert.equal(w.intents.length, 0);
+});
+
+test('pay-once from the page: one $497 payment, no subscription, counted as the purchase', async () => {
+  const w = world();
+  await serve(w, async ({ post }) => {
+    const opened = await post('/api/engine/checkout', { attempt: ATTEMPT, ...BUYER, plan: 'once', visitorId: 'v_abcdefgh12' });
+    assert.deepEqual(opened.body, { clientSecret: 'cs_test_created_secret_1', value: 497, plan: 'once' });
+    const { params } = w.creates[0];
+    assert.equal(params.ui_mode, 'embedded');
+    assert.equal(params.mode, 'payment');
+    assert.equal(params.customer_creation, 'always');
+    assert.deepEqual(params.line_items.map(i => [i.price_data.unit_amount, i.price_data.recurring]), [[49700, undefined]]);
+    assert.equal(params.subscription_data, undefined);
+    assert.equal(params.metadata.plan, 'once');
+    assert.deepEqual(params.payment_intent_data.metadata, params.metadata);
+    assert.match(w.texts[0], /pay-once \$497/);
+    assert.deepEqual(w.capi.map(e => [e.name, e.value]), [['Lead', 497], ['InitiateCheckout', 497]]);
+    // Paid: confirmed like any sale, with no pay-once offer after it.
+    w.sessions.set('cs_test_once0000001', paid('cs_test_once0000001', { mode: 'payment', subscription: null, amount_total: 49700,
+      metadata: { ...paid('x').metadata, plan: 'once' } }));
+    const done = await post('/api/engine/confirm', { sessionId: 'cs_test_once0000001' });
+    assert.equal(done.status, 200, JSON.stringify(done.body));
+    assert.equal(done.body.plan, 'once');
+    assert.equal(done.body.value, 497);
+    assert.deepEqual(done.body.lifetime, { open: false, done: false, oneClick: false, priceCents: 49700 });
+    assert.equal((await post('/api/engine/lifetime', { sessionId: 'cs_test_once0000001' })).status, 410);
+    assert.equal(await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: 'pi_x', metadata: { product: PRODUCT, plan: 'once' } } } }), true);
+    await w.registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: { id: 'cs_test_once0000001', metadata: { product: PRODUCT, plan: 'once' } } } });
+  });
+  assert.match(w.texts.at(-1), /^Engine sale \(pay-once\): \$497\.00\. Lakeview Inn/);
+  assert.equal(w.texts.filter(t => /^Engine sale/.test(t)).length, 1);
+  assert.match(w.emails[0].text, /\$497\.00 paid once\. There are no monthly charges\./);
+  assert.deepEqual([...new Set(w.capi.filter(e => e.name === 'Purchase').map(e => `${e.eventId}:${e.value}`))], ['engine-purchase.cs_test_once0000001:497']);
+});
+
+test('a pay-once order is never mistaken for a monthly one, or the other way round', async () => {
+  const w = world();
+  w.sessions.set('cs_test_mixed000001', paid('cs_test_mixed000001', { mode: 'subscription', metadata: { ...paid('x').metadata, plan: 'once' } }));
+  w.sessions.set('cs_test_mixed000002', paid('cs_test_mixed000002', { mode: 'payment' }));
+  await serve(w, async ({ post }) => {
+    assert.equal((await post('/api/engine/confirm', { sessionId: 'cs_test_mixed000001' })).status, 402);
+    assert.equal((await post('/api/engine/confirm', { sessionId: 'cs_test_mixed000002' })).status, 402);
+  });
+  assert.equal(w.texts.length, 0);
 });

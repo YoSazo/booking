@@ -22,12 +22,15 @@ const TODAY_CENTS = SETUP.cents + MONTHLY.cents;
 // The one upsell: on the welcome page, for an hour after paying, $497 once
 // instead of $49 a month (about ten months of it), and the monthly plan is
 // cancelled. Meta hears it as its own event, so Purchase stays one per customer.
+// The two plans on the page, as Artistly shows its two: the ad's price first,
+// pay-once below it. A pay-once order is a single $497 payment, no subscription.
+const PLANS = Object.freeze({ monthly: { todayCents: TODAY_CENTS }, once: { todayCents: 49700 } });
 const LIFETIME = Object.freeze({ product: 'marketel-engine-lifetime', name: 'Marketel booking engine, paid once', cents: 49700,
   description: 'Your booking engine and PMS connection, paid once. No monthly charge.', windowMs: 60 * 60 * 1000, event: 'LifetimeUpgrade' });
 const PRICE = cents => Math.round(cents) / 100;
 // The page's own steps, recorded per visitor so the test can be read without Meta.
 const STEPS = Object.freeze(['viewed', 'time10', 'time60', 'scroll50', 'scroll100', 'example', 'faq', 'tap-hero', 'tap-plan', 'tap-sticky', 'tap-final',
-  'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no']);
+  'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no', 'plan-once', 'plan-monthly']);
 const ROOT = __dirname;
 const PAGES = Object.freeze({ '/engine': 'engine.html', '/engine/welcome': 'engine-welcome.html' });
 
@@ -53,7 +56,7 @@ function order(body) {
   if (phone.replace(/\D/g, '').length < 7) throw fail(400, 'Enter a mobile number we can text about your setup.');
   const pms = line(body?.pms, 60);
   if (pms.length < 2) throw fail(400, 'Tell us which PMS you use.');
-  return { email, property, name, phone, pms };
+  return { email, property, name, phone, pms, plan: body?.plan === 'once' ? 'once' : 'monthly' };
 }
 
 function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () => false, queueCapi = null, capiConfigured = false, text = null, env = process.env }) {
@@ -104,10 +107,11 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
 
   // A completed, paid checkout for this product, or null.
   function paidSession(session) {
-    if (session?.object !== 'checkout.session' || !isEngine(session.metadata) || session.mode !== 'subscription'
+    const once = session?.metadata?.plan === 'once';
+    if (session?.object !== 'checkout.session' || !isEngine(session.metadata) || session.mode !== (once ? 'payment' : 'subscription')
       || session.status !== 'complete' || session.payment_status !== 'paid') return null;
     const m = session.metadata;
-    return { id: session.id, livemode: session.livemode, metadata: m, totalCents: session.amount_total,
+    return { id: session.id, livemode: session.livemode, metadata: m, totalCents: session.amount_total, plan: once ? 'once' : 'monthly',
       email: session.customer_details?.email || session.customer_email || '', fullName: session.customer_details?.name || m.name || '',
       property: m.property || '', name: m.name || '', phone: m.phone || '', pms: m.pms || '', subscription: idOf(session.subscription) };
   }
@@ -134,7 +138,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
       await record('EnginePaid', visitor, `engine-paid:${sale.id}`, sale.pms.slice(0, 60));
       await sendCapi('Purchase', { eventId: `engine-purchase.${sale.id}`, ...saleCapi(sale, { req, webhook }), value: PRICE(sale.totalCents) });
       await textOwner(`engine-sale-text:${sale.id}`, visitor,
-        `Engine sale: $${PRICE(sale.totalCents).toFixed(2)}. ${sale.property} (${sale.pms}). ${sale.name}, ${sale.phone}, ${sale.email}. Live within 24h.`);
+        `Engine sale${sale.plan === 'once' ? ' (pay-once)' : ''}: $${PRICE(sale.totalCents).toFixed(2)}. ${sale.property} (${sale.pms}). ${sale.name}, ${sale.phone}, ${sale.email}. Live within 24h.`);
     }
     let emailSent = false;
     if (sale.email && mail) {
@@ -151,7 +155,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
         }
       }
     }
-    return { paid: true, reference: sale.id, value: PRICE(sale.totalCents), property: sale.property, pms: sale.pms, email: sale.email, emailSent };
+    return { paid: true, reference: sale.id, plan: sale.plan, value: PRICE(sale.totalCents), property: sale.property, pms: sale.pms, email: sale.email, emailSent };
   }
 
   function welcomeMail(sale) {
@@ -164,7 +168,9 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
         `1. We'll text or email you shortly to set up a staff login for Marketel in ${sale.pms}. It's a separate user you can switch off any time.`,
         '2. We build your booking page with your rooms, photos and rates. Reply with your website or a few photos if you like; otherwise we\'ll ask.',
         `3. We connect it to ${sale.pms}, test a booking end to end, and send you your link.`, '',
-        `Billing: $${PRICE(sale.totalCents).toFixed(2)} today, then $${PRICE(MONTHLY.cents).toFixed(2)} a month from next month. Cancel any time by replying to this email.`,
+        sale.plan === 'once'
+          ? `Billing: $${PRICE(sale.totalCents).toFixed(2)} paid once. There are no monthly charges.`
+          : `Billing: $${PRICE(sale.totalCents).toFixed(2)} today, then $${PRICE(MONTHLY.cents).toFixed(2)} a month from next month. Cancel any time by replying to this email.`,
         '30-day money-back guarantee: if we can\'t connect it to your PMS, or you\'re not happy, reply within 30 days and we\'ll refund your payment.', '',
         `Order reference: ${sale.id}`, '',
         'Marketel', 'support@bookmarketel.com',
@@ -270,32 +276,38 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
     const visitor = visitorId(req.body?.visitorId);
     const attribution = sanitizeInspectAttribution(req.body?.attribution, req) || {};
     const tracked = !noTrack(req) && !isExcludedEmail(buyer.email);
-    const metadata = { product: PRODUCT, offerVersion: VERSION, property: buyer.property, name: buyer.name, phone: buyer.phone, pms: buyer.pms,
+    const today = PLANS[buyer.plan].todayCents;
+    const metadata = { product: PRODUCT, offerVersion: VERSION, plan: buyer.plan, property: buyer.property, name: buyer.name, phone: buyer.phone, pms: buyer.pms,
       visitorId: visitor || '', noTrack: tracked ? '' : '1',
       fbp: (attribution.fbp || '').slice(0, 500), fbc: (attribution.fbc || '').slice(0, 500), sourceUrl: (attribution.sourceUrl || '').slice(0, 500) };
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, buyer, metadata.fbp, metadata.fbc, TODAY_CENTS, VERSION])).digest('hex');
-    const session = await stripe.checkout.sessions.create({
-      ui_mode: 'embedded', mode: 'subscription', customer_email: buyer.email,
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify([attempt, buyer, metadata.fbp, metadata.fbc, today, VERSION])).digest('hex');
+    const shared = { ui_mode: 'embedded', customer_email: buyer.email, metadata, return_url: `${origin}/engine/welcome?session_id={CHECKOUT_SESSION_ID}` };
+    const session = await stripe.checkout.sessions.create(buyer.plan === 'once' ? {
+      ...shared, mode: 'payment', customer_creation: 'always',
+      line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: today, product_data: { name: LIFETIME.name, description: LIFETIME.description } } }],
+      payment_intent_data: { description: `${LIFETIME.name}: ${buyer.property}`, metadata },
+      custom_text: { submit: { message: `One payment of $${PRICE(today)}. No monthly fees. 30-day money-back guarantee.` } },
+    } : {
+      ...shared, mode: 'subscription',
       line_items: [
         { quantity: 1, price_data: { currency: 'usd', unit_amount: MONTHLY.cents, recurring: { interval: 'month' },
           product_data: { name: MONTHLY.name, description: MONTHLY.description } } },
         { quantity: 1, price_data: { currency: 'usd', unit_amount: SETUP.cents,
           product_data: { name: SETUP.name, description: SETUP.description } } },
       ],
-      metadata, subscription_data: { description: `${MONTHLY.name}: ${buyer.property}`, metadata },
+      subscription_data: { description: `${MONTHLY.name}: ${buyer.property}`, metadata },
       custom_text: { submit: { message: `$${PRICE(TODAY_CENTS)} today, then $${PRICE(MONTHLY.cents)}/month from next month. Cancel anytime. 30-day money-back guarantee.` } },
-      return_url: `${origin}/engine/welcome?session_id={CHECKOUT_SESSION_ID}`,
     }, { idempotencyKey: `engine-checkout:${fingerprint}` });
     if (!session.client_secret) throw fail(502, 'Checkout could not start. Please try again.');
     if (tracked) {
       const capi = { ...visitorCapi(visitor || attempt, attribution, req), email: buyer.email, phone: buyer.phone, fullName: buyer.name };
       await record('EngineLead', visitor, `engine-lead:${fingerprint}`, buyer.pms);
-      await sendCapi('Lead', { eventId: `engine-lead.${attempt}`, value: PRICE(TODAY_CENTS), ...capi });
-      await sendCapi('InitiateCheckout', { eventId: `engine-checkout.${attempt}`, value: PRICE(TODAY_CENTS), ...capi });
+      await sendCapi('Lead', { eventId: `engine-lead.${attempt}`, value: PRICE(today), ...capi });
+      await sendCapi('InitiateCheckout', { eventId: `engine-checkout.${attempt}`, value: PRICE(today), ...capi });
       await textOwner(`engine-lead-text:${attempt}`, visitor,
-        `Engine lead (at checkout, not paid yet): ${buyer.property} (${buyer.pms}). ${buyer.name}, ${buyer.phone}, ${buyer.email}.`);
+        `Engine lead (at checkout${buyer.plan === 'once' ? ', pay-once $497' : ''}, not paid yet): ${buyer.property} (${buyer.pms}). ${buyer.name}, ${buyer.phone}, ${buyer.email}.`);
     }
-    res.json({ clientSecret: session.client_secret, value: PRICE(TODAY_CENTS) });
+    res.json({ clientSecret: session.client_secret, value: PRICE(today), plan: buyer.plan });
   }));
   // The welcome page confirms its own order; the webhook does the same if the
   // buyer never gets there. Both are safe to repeat.
@@ -396,6 +408,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
       }
       return true;
     }
+    if (event.type === 'payment_intent.succeeded' && isEngine(object.metadata)) return true;
     if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
       if (!isEngine(object.metadata)) return false;
       const session = await stripe.checkout.sessions.retrieve(object.id);
@@ -427,4 +440,4 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   return { handleStripeEvent };
 }
 
-module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, LIFETIME, STEPS };
+module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, PLANS, LIFETIME, STEPS };

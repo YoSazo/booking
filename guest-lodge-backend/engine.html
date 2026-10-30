@@ -93,6 +93,8 @@ label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margi
 .incl span::before { content: '\2713 '; color: var(--green); font-weight: 800; }
 .error { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: #fdf0ea; color: var(--red); font-size: 14px; line-height: 1.5; font-weight: 600; }
 .error.show { display: block; }
+.plan-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 14px; padding: 10px 12px; border-radius: 14px; background: var(--text); color: #fff; font-size: 14px; font-weight: 600; }
+.plan-note button { flex: none; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: #bfe6cf; text-decoration: underline; cursor: pointer; padding: 6px 2px; }
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 14px; background: var(--page); font-size: 14px; }
 .summary b { display: block; }
 .summary span { color: var(--muted); }
@@ -191,7 +193,12 @@ h2 { font-size: clamp(24px, 5.6vw, 34px); line-height: 1.15; letter-spacing: -.0
 .proof p { margin-top: 10px; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,.85); max-width: 560px; }
 .proof cite { display: block; margin-top: 14px; font-style: normal; font-size: 14px; font-weight: 700; color: #bfe6cf; }
 
-.plan { background: var(--surface); border: 2px solid var(--green); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 20px; max-width: 520px; margin: 0 auto; }
+.plans-head { text-align: center; max-width: 620px; margin: 0 auto 18px; }
+.plans { display: grid; gap: 14px; max-width: 1000px; margin: 0 auto; }
+@media (min-width: 900px) { .plans { grid-template-columns: 1fr 1fr; align-items: start; } }
+.plan { background: var(--surface); border: 2px solid var(--green); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 20px; min-width: 0; }
+.plan.once { border-color: var(--text); }
+.plan.once .tag { color: #fff; background: var(--text); }
 .plan .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--green-dark); background: var(--pale); padding: 4px 10px; border-radius: 999px; }
 .plan h2 { margin-top: 12px; }
 .plan .price { font-size: 48px; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 6px 0 4px; }
@@ -263,9 +270,10 @@ footer a { color: var(--muted); text-decoration: none; }
     </div>
     <div class="order" id="order">
       <div class="deal">
-        <div><small>Done-for-you launch</small><strong>Your booking engine</strong></div>
-        <div class="amount"><b>$97</b><span>then $49/mo</span></div>
+        <div><small id="dealTag">Done-for-you launch</small><strong>Your booking engine</strong></div>
+        <div class="amount"><b id="dealAmount">$97</b><span id="dealThen">then $49/mo</span></div>
       </div>
+      <div class="plan-note" id="planNote" hidden><span>Pay-once plan: no monthly fees</span><button type="button" id="planBack">Switch to $97 + $49/mo</button></div>
 
       <form id="emailForm" novalidate>
         <div class="field">
@@ -316,7 +324,7 @@ footer a { color: var(--muted); text-decoration: none; }
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#fff" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>30-day money-back guarantee. If it doesn&rsquo;t connect to your PMS, you don&rsquo;t pay.</span>
       </div>
-      <p class="fine"><strong>$97 today</strong>, then $49/month from next month. Cancel anytime.</p>
+      <p class="fine" id="orderFine"><strong>$97 today</strong>, then $49/month from next month. Cancel anytime.</p>
       <div class="incl"><span>Hosting</span><span>PMS connection</span><span>Edits by us for 30 days</span></div>
     </div>
     <div class="more">
@@ -386,7 +394,7 @@ footer a { color: var(--muted); text-decoration: none; }
           <tr><td>Bookings entered into your PMS for you</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span><small>only if listed</small></td><td><span class="yes">&#10003;</span></td></tr>
           <tr><td>Built for you</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span></td><td><span class="no">&#10005;</span></td></tr>
           <tr><td>Live in 24 hours</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span></td><td><span class="no">&#10005;</span></td></tr>
-          <tr><td>What it costs</td><td class="us">$97, then $49/mo</td><td>Setup fee plus monthly</td><td>Part of your PMS bill</td></tr>
+          <tr><td>What it costs</td><td class="us">$97, then $49/mo, or $497 once</td><td>Setup fee plus monthly</td><td>Part of your PMS bill</td></tr>
         </tbody>
       </table>
     </div>
@@ -438,25 +446,42 @@ footer a { color: var(--muted); text-decoration: none; }
 
 <section class="block">
   <div class="wrap">
-    <div class="plan">
-      <span class="tag">Done-for-you launch</span>
+    <div class="plans-head">
       <h2>Your booking engine, connected to your PMS</h2>
-      <div class="price">$97</div>
-      <p class="then">today, then $49/month &middot; cancel anytime</p>
-      <ul>
-        <li>Your booking page, built by us with your rooms, photos and rates</li>
-        <li>Connected to the PMS you already use</li>
-        <li>Every booking entered into your PMS and checked before it&rsquo;s saved</li>
-        <li>0% commission on your direct bookings</li>
-        <li>Fast, secure hosting and updates</li>
-        <li>Edits done by us for 30 days</li>
-        <li>Live within 24 hours</li>
-      </ul>
-      <a class="btn" href="#order" data-go="tap-plan">Get my booking engine for $97</a>
-      <div class="guarantee">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#fff" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>30-day money-back guarantee. No questions asked.</span>
+      <p class="sub" style="margin: 0 auto">Two ways to pay. Same engine, same 24 hours, same guarantee.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <span class="tag">Done-for-you launch</span>
+        <div class="price" style="margin-top:14px">$97</div>
+        <p class="then">today, then $49/month &middot; cancel anytime</p>
+        <ul>
+          <li>Your booking page, built by us with your rooms, photos and rates</li>
+          <li>Connected to the PMS you already use</li>
+          <li>Every booking entered into your PMS and checked before it&rsquo;s saved</li>
+          <li>0% commission on your direct bookings</li>
+          <li>Fast, secure hosting and updates</li>
+          <li>Edits done by us for 30 days</li>
+          <li>Live within 24 hours</li>
+        </ul>
+        <a class="btn" href="#order" data-go="tap-plan" data-plan="monthly">Get my booking engine for $97</a>
       </div>
+      <div class="plan once">
+        <span class="tag">Pay once</span>
+        <div class="price" style="margin-top:14px">$497</div>
+        <p class="then">once &middot; no monthly fees, ever</p>
+        <ul>
+          <li>Everything in the launch plan</li>
+          <li>No $49 a month: about ten months of it, then every month is free</li>
+          <li>No subscription to cancel, no renewals</li>
+          <li>Live within 24 hours</li>
+        </ul>
+        <a class="btn" href="#order" data-go="tap-plan" data-plan="once">Get it for $497 once</a>
+      </div>
+    </div>
+    <div class="guarantee" style="max-width:520px;margin:16px auto 0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#fff" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>30-day money-back guarantee on both. No questions asked.</span>
     </div>
   </div>
 </section>
@@ -468,6 +493,10 @@ footer a { color: var(--muted); text-decoration: none; }
       <details>
         <summary>What do I get for $97?</summary>
         <p>We build your booking page with your rooms, photos and rates, connect it to your PMS, test a booking end to end, and send you the link, all within 24 hours. The $97 covers the setup and your first month. After that it&rsquo;s $49 a month.</p>
+      </details>
+      <details>
+        <summary>Can I pay once instead of monthly?</summary>
+        <p>Yes. Pay $497 once and there&rsquo;s no monthly fee, ever. Choose &ldquo;Pay once&rdquo; in the plans above. Same engine, same 24 hours, same 30-day money-back guarantee.</p>
       </details>
       <details>
         <summary>Which PMS does it work with?</summary>
@@ -511,7 +540,7 @@ footer a { color: var(--muted); text-decoration: none; }
 </footer>
 
 <div class="sticky" id="sticky" aria-hidden="true">
-  <div><b>$97 today</b>then $49/mo &middot; 30-day guarantee</div>
+  <div><b id="stickyPrice">$97 today</b><span id="stickyThen">then $49/mo &middot; 30-day guarantee</span></div>
   <a class="btn" href="#order" data-go="tap-sticky" tabindex="-1">Get started</a>
 </div>
 
@@ -555,12 +584,41 @@ footer a { color: var(--muted); text-decoration: none; }
     $('exampleLink').href = url;
   }));
 
+  // The plan the order card charges: the ad's $97 unless the owner picks pay-once below.
+  let plan = 'monthly';
+  const PLAN_TEXT = {
+    monthly: { tag: 'Done-for-you launch', amount: '$97', then: 'then $49/mo', button: 'Lock in my $97 launch', fine: '<strong>$97 today</strong>, then $49/month from next month. Cancel anytime.',
+      sticky: '$97 today', stickyThen: 'then $49/mo · 30-day guarantee' },
+    once: { tag: 'Pay once', amount: '$497', then: 'no monthly fees', button: 'Lock in my $497 pay-once', fine: '<strong>$497 once.</strong> No monthly fees, ever.',
+      sticky: '$497 once', stickyThen: 'no monthly fees · 30-day guarantee' },
+  };
+  function setPlan(next) {
+    if (!PLAN_TEXT[next] || next === plan) return;
+    plan = next;
+    const text = PLAN_TEXT[plan];
+    $('dealTag').textContent = text.tag;
+    $('dealAmount').textContent = text.amount;
+    $('dealThen').textContent = text.then;
+    $('orderFine').innerHTML = text.fine;
+    $('planNote').hidden = plan !== 'once';
+    $('stickyPrice').textContent = text.sticky;
+    $('stickyThen').textContent = text.stickyThen;
+    const button = $('detailsBtn');
+    delete button.dataset.label;
+    if (!busy) button.textContent = text.button;
+    // A checkout already open was for the other plan.
+    if (!payStage.hidden) backToDetails();
+    track.step(plan === 'once' ? 'plan-once' : 'plan-monthly');
+  }
+  $('planBack').addEventListener('click', () => { press($('planBack')); setPlan('monthly'); });
+
   // Every "Get started" brings the owner to the one order card.
   const firstEmpty = () => [...document.querySelectorAll('#order input')].find(i => i.offsetParent && !i.value.trim());
   document.querySelectorAll('[data-go]').forEach(link => link.addEventListener('click', event => {
     event.preventDefault();
     press(link);
     if (link.dataset.go !== 'tap-strip') track.step(link.dataset.go);
+    if (link.dataset.plan) setPlan(link.dataset.plan);
     $('order').scrollIntoView({ behavior: 'smooth', block: 'start' });
     const input = firstEmpty();
     if (input) setTimeout(() => input.focus({ preventScroll: true }), 450);
@@ -632,7 +690,7 @@ footer a { color: var(--muted); text-decoration: none; }
       await configLoad;
       if (!config?.available || !config.stripeKey) throw new Error('Checkout opens soon. Leave your details with support@bookmarketel.com and we’ll get you started.');
       const response = await fetch('/api/engine/checkout', { method: 'POST', headers: track.headers,
-        body: JSON.stringify({ attempt, ...buyer, visitorId: track.visitor, attribution: track.attribution }) });
+        body: JSON.stringify({ attempt, ...buyer, plan, visitorId: track.visitor, attribution: track.attribution }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.clientSecret) throw new Error(data.error || 'Checkout could not open. Please try again.');
       // The server sends Meta the same two events with these ids.
@@ -676,12 +734,15 @@ footer a { color: var(--muted); text-decoration: none; }
   }
 
   // Back to the details, keeping everything typed.
-  $('editBtn').addEventListener('click', () => {
-    press($('editBtn'));
+  function backToDetails() {
     if (checkout) { checkout.destroy(); checkout = null; }
     $('checkout').innerHTML = '<div class="loading"><span class="spinner" aria-hidden="true"></span> Opening secure checkout…</div>';
     payStage.hidden = true;
     detailsForm.hidden = false;
+  }
+  $('editBtn').addEventListener('click', () => {
+    press($('editBtn'));
+    backToDetails();
     $('property').focus();
   });
 })();

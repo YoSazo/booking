@@ -100,6 +100,7 @@ a { color: var(--green-dark); font-weight: 700; }
       try { fired = sessionStorage.getItem('engine.purchase') === data.reference; sessionStorage.setItem('engine.purchase', data.reference); } catch { /* Fire it. */ }
       if (!fired) track.pixel('Purchase', { value: data.value }, 'engine-purchase.' + data.reference);
       show('done');
+      if (data.plan === 'once') { $('billing').textContent = '$497 paid once. No monthly charges, ever.'; return; }
       const back = new URLSearchParams(location.search).get('lifetime_session');
       if (back && !data.lifetime?.done) return finishLifetime('/api/engine/lifetime/confirm', { sessionId, lifetimeSession: back });
       if (data.lifetime?.done) return lifetimeDone();

@@ -161,9 +161,9 @@ test('when checkout is shut the owner is told and keeps the form', async () => w
 
 test('every lower button brings the owner back to the order card, and the sticky bar hides while paying', async () => world(async ({ page, base }) => {
   await page.goto(base + '/engine');
-  await page.locator('.plan [data-go]').scrollIntoViewIfNeeded();
+  await page.locator('.plan [data-plan="monthly"]').scrollIntoViewIfNeeded();
   await page.waitForFunction(() => document.getElementById('sticky').classList.contains('show'));
-  await page.locator('.plan [data-go]').click();
+  await page.locator('.plan [data-plan="monthly"]').click();
   await page.waitForFunction(() => document.activeElement?.id === 'email');
   await page.fill('#email', 'owner@lakeview.test');
   await page.click('#emailBtn');
@@ -263,3 +263,48 @@ test('an hour after paying, the welcome page no longer offers pay-once', async (
   await page.waitForSelector('#done:not([hidden])');
   assert.equal(await page.locator('#lifetime').isVisible(), false);
 }, { sessions: { cs_test_late0000001: welcomeOrder('cs_test_late0000001', { minutesAgo: 61 }) }, ...monthly('cs_test_late0000001') }));
+
+test('two plans on the page: pay-once switches the order card to one $497 payment, and back', async () => world(async ({ page, base, creates }) => {
+  await page.goto(base + '/engine');
+  const plans = page.locator('.plans .plan');
+  assert.equal(await plans.count(), 2);
+  assert.match(await plans.nth(0).innerText(), /\$97[\s\S]*then \$49\/month/);
+  assert.match(await plans.nth(1).innerText(), /\$497[\s\S]*no monthly fees/);
+  // The order card at the top leads with the ad's price.
+  assert.equal(await page.locator('#dealAmount').innerText(), '$97');
+  assert.equal(await page.locator('#planNote').isVisible(), false);
+  await page.locator('.plans [data-plan="once"]').click();
+  await page.waitForFunction(() => document.activeElement?.id === 'email');
+  assert.equal(await page.locator('#dealAmount').innerText(), '$497');
+  assert.equal(await page.locator('#planNote').isVisible(), true);
+  assert.match(await page.locator('#orderFine').innerText(), /\$497 once\. No monthly fees/);
+  assert.equal(await page.locator('#stickyPrice').innerText(), '$497 once');
+  await page.fill('#email', 'owner@lakeview.test');
+  await page.click('#emailBtn');
+  assert.equal(await page.locator('#detailsBtn').innerText(), 'Lock in my $497 pay-once');
+  await fillDetails(page);
+  await page.click('#detailsBtn');
+  await page.waitForFunction(() => window.__stripe?.mounts === 1);
+  assert.equal(creates[0].mode, 'payment');
+  assert.equal(creates[0].metadata.plan, 'once');
+  assert.equal(creates[0].line_items[0].price_data.unit_amount, 49700);
+  // Switching back closes the $497 checkout and returns to the details, as typed.
+  await page.click('#planBack');
+  assert.equal(await page.evaluate(() => window.__stripe.destroyed), 1);
+  assert.equal(await page.locator('#detailsForm').isVisible(), true);
+  assert.equal(await page.inputValue('#property'), 'Lakeview Inn');
+  assert.equal(await page.locator('#dealAmount').innerText(), '$97');
+  assert.equal(await page.locator('#detailsBtn').innerText(), 'Lock in my $97 launch');
+  await page.click('#detailsBtn');
+  await page.waitForFunction(() => window.__stripe?.mounts === 2);
+  assert.equal(creates[1].mode, 'subscription');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+}));
+
+test('a pay-once buyer\'s welcome page says paid once, with nothing more to buy', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine/welcome?session_id=cs_test_once0000001');
+  await page.waitForSelector('#done:not([hidden])');
+  assert.equal(await page.locator('#billing').innerText(), '$497 paid once. No monthly charges, ever.');
+  assert.equal(await page.locator('#lifetime').isVisible(), false);
+}, { sessions: { cs_test_once0000001: { ...welcomeOrder('cs_test_once0000001'), mode: 'payment', subscription: null, amount_total: 49700,
+  metadata: { ...welcomeOrder('x').metadata, plan: 'once' } } } }));
