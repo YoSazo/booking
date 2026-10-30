@@ -76,7 +76,10 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
   const ads = [metaAd(CAR, 'PROJECT PAYOFF | PURCHASE | CAR', 'ACTIVE', 'PURCHASE'), metaAd(TABLE, 'PROJECT PAYOFF | PURCHASE | TABLE', 'PENDING_REVIEW', 'PURCHASE'),
     metaAd(OLD, 'PROJECT PAYOFF | ATC | OLD AD', 'CAMPAIGN_PAUSED', 'ADD_TO_CART'),
     metaAd('999', 'CLAIMS AD', 'ACTIVE', 'PURCHASE', { creative: { object_story_spec: { link_data: { link: 'https://bookmarketel.com/claims' } } } }),
-    metaAd('998', 'OLD PAYOFF', 'PAUSED', 'PURCHASE', { created_time: '2026-08-01T00:00:00+0000' })];
+    metaAd('998', 'OLD PAYOFF', 'PAUSED', 'PURCHASE', { created_time: '2026-08-01T00:00:00+0000' }),
+    // A video ad keeps its link and words in video_data.
+    metaAd('997', 'PROJECT PAYOFF | PURCHASE | VIDEO', 'ACTIVE', 'PURCHASE', { created_time: '2026-10-20T00:00:00+0000', creative: { thumbnail_url: 'https://scontent.example/997-thumb.jpg',
+      object_story_spec: { video_data: { title: 'See Your Debt-Free Date in 2 Minutes', message: 'Spreadsheets aren\'t for everyone.', call_to_action: { type: 'LEARN_MORE', value: { link: 'https://bookmarketel.com/payoff' } } } } } })];
   const stats = [{ ad_id: CAR, spend: '12.50', impressions: '300', cpm: '41.6', inline_link_clicks: '25', inline_link_click_ctr: '8.3',
     actions: [{ action_type: 'landing_page_view', value: '20' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '0' }] }];
   const { meta, calls } = fakeMeta(ads, stats);
@@ -86,7 +89,9 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
     outcomes: [{ if: 'CAR sells', means: 'customer voice works', next: 'hospital image, same copy' }, { if: '', means: '', next: '' }] } });
   const report = await reporter.report('payoff');
   assert.equal(report.supported, true);
-  assert.deepEqual(report.ads.map(ad => ad.short), ['CAR', 'TABLE', 'OLD AD'], 'Payoff ads from the last 30 days, live ones first');
+  assert.deepEqual(report.ads.map(ad => ad.short), ['CAR', 'TABLE', 'VIDEO', 'OLD AD'], 'Payoff ads from the last 30 days, live ones first, video ads too');
+  const video = report.ads.find(ad => ad.short === 'VIDEO');
+  assert.equal(video.headline, 'See Your Debt-Free Date in 2 Minutes'); assert.equal(video.body, 'Spreadsheets aren\'t for everyone.'); assert.equal(video.image, 'https://scontent.example/997-thumb.jpg');
   const car = report.ads[0];
   assert.equal(car.image, `https://scontent.example/${CAR}.jpg`);
   assert.equal(car.headline, 'PROJECT PAYOFF | PURCHASE | CAR headline');
@@ -97,7 +102,7 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
   assert.equal(car.verdict.key, 'selling');
   assert.deepEqual(car.note, { image: 'Car at night', copy: 'Customer voice, long-form', testing: '', verdict: '' });
   assert.equal(report.ads[1].statusLabel, 'In review');
-  assert.equal(report.ads[2].verdict.key, 'old');
+  assert.equal(report.ads.find(ad => ad.short === 'OLD AD').verdict.key, 'old');
   assert.equal(report.log.length, 1);
   assert.deepEqual(report.log[0].ads, [CAR]);
   assert.deepEqual(report.log[0].outcomes, [{ if: 'CAR sells', means: 'customer voice works', next: 'hospital image, same copy' }]);

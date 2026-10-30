@@ -22,7 +22,14 @@ const TOOLS = Object.freeze(['payoff']);
 const STATUSES = ['ACTIVE', 'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED', 'PENDING_REVIEW', 'IN_PROCESS', 'PREAPPROVED', 'DISAPPROVED', 'WITH_ISSUES'];
 const RECENT_DAYS = 30;
 const AD_FIELDS = 'id,name,created_time,effective_status,campaign{id,name},adset{id,name,promoted_object},'
-  + 'creative.thumbnail_width(600).thumbnail_height(600){thumbnail_url,image_url,object_story_spec{link_data{message,name,description,link}}}';
+  + 'creative.thumbnail_width(600).thumbnail_height(600){thumbnail_url,image_url,object_story_spec{link_data{message,name,description,link},video_data{message,title,link_description,call_to_action}}}';
+// A picture ad keeps its words and link in link_data; a video ad in video_data.
+const copyOf = ad => {
+  const spec = ad.creative?.object_story_spec || {};
+  if (spec.link_data) return spec.link_data;
+  const video = spec.video_data || {};
+  return { message: video.message, name: video.title, description: video.link_description, link: video.call_to_action?.value?.link, video: !!spec.video_data };
+};
 const EVENT_LABELS = { PURCHASE: 'Purchase', ADD_TO_CART: 'Add to cart', INITIATED_CHECKOUT: 'Checkout', LEAD: 'Lead', COMPLETE_REGISTRATION: 'Registration' };
 
 function metaClient({ token, version, fetchImpl = fetch }) {
@@ -100,7 +107,7 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     if (!account) throw new Error('No ad account for this token');
     const listed = await meta(`act_${account}/ads`, { fields: AD_FIELDS, limit: '200', filtering: [{ field: 'effective_status', operator: 'IN', value: STATUSES }] });
     const since = now() - RECENT_DAYS * 86400000;
-    const ads = (listed.data || []).filter(ad => /\/payoff/.test(ad.creative?.object_story_spec?.link_data?.link || '')
+    const ads = (listed.data || []).filter(ad => /\/payoff/.test(copyOf(ad).link || '')
       && (ad.effective_status === 'ACTIVE' || new Date(ad.created_time).getTime() >= since));
     const insights = ads.length ? await meta(`act_${account}/insights`, { level: 'ad', date_preset: 'maximum', limit: '200',
       fields: 'ad_id,spend,impressions,cpm,inline_link_clicks,inline_link_click_ctr,actions',
@@ -127,7 +134,7 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     try { listed = await metaAds(); } catch (error) { metaError = error.message; }
     const ours = await ourSteps(prisma, tool, listed.map(({ ad }) => ad.id));
     const ads = listed.map(({ ad, stats }) => {
-      const link = ad.creative?.object_story_spec?.link_data || {};
+      const link = copyOf(ad);
       const [status, statusLabel] = statusOf(ad.effective_status);
       const event = ad.adset?.promoted_object?.custom_event_type || null;
       const spend = number(stats.spend), purchases = action(stats.actions, 'offsite_conversion.fb_pixel_purchase');
