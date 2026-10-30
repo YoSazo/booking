@@ -54,6 +54,9 @@ async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, ses
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://js.stripe.com/v3/', route => route.fulfill({ headers: { 'content-type': 'application/javascript' }, body: STRIPE_STUB }));
     await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ headers: { 'content-type': 'text/css' }, body: '' }));
+    // The live hotel pages, stood in for.
+    await page.route(/^https:\/\/[a-z]+\.clickinns\.com\/?$/, route => route.fulfill({ headers: { 'content-type': 'text/html' },
+      body: `<title>live</title><h1>${new URL(route.request().url()).hostname}</h1>` }));
     await fn({ page, base, creates, rows });
     assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
@@ -189,4 +192,21 @@ test('an unpaid or unknown order says so, with a way back', async () => world(as
   await page.goto(base + '/engine/welcome?session_id=cs_test_unknown00001');
   await page.waitForSelector('#problem:not([hidden])');
   assert.match(await page.locator('#problem').innerText(), /Order not found[\s\S]*go back to checkout/);
+}));
+
+test('the live hotel pages switch in place, with the address and the new-tab link to match', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine');
+  await page.locator('.live').scrollIntoViewIfNeeded();
+  assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://suitestay.clickinns.com');
+  await page.click('.tabs [data-site="hp"]');
+  assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://hp.clickinns.com');
+  assert.equal(await page.locator('#liveHost').innerText(), 'hp.clickinns.com');
+  assert.equal(await page.getAttribute('#exampleLink', 'href'), 'https://hp.clickinns.com');
+  assert.match(await page.locator('#exampleLink').innerText(), /Home Place Suites/);
+  assert.equal(await page.getAttribute('.tabs [data-site="hp"]', 'aria-selected'), 'true');
+  assert.equal(await page.getAttribute('.tabs [data-site="suitestay"]', 'aria-selected'), 'false');
+  const frame = page.frameLocator('#liveFrame');
+  await frame.locator('h1').waitFor();
+  assert.equal(await frame.locator('h1').innerText(), 'hp.clickinns.com');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
 }));

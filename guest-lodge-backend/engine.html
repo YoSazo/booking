@@ -158,8 +158,16 @@ h2 { font-size: clamp(24px, 5.6vw, 34px); line-height: 1.15; letter-spacing: -.0
 .table small { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
 
 .example { display: grid; gap: 22px; align-items: center; margin-top: 20px; }
-.phone { width: min(300px, 82vw); margin: 0 auto; border: 10px solid var(--text); border-radius: 40px; overflow: hidden; background: #fff; box-shadow: 0 18px 40px rgba(26,43,34,.18); aspect-ratio: 780 / 1500; }
-.phone img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+/* The live pages, in a phone-sized browser. */
+.live { display: grid; gap: 12px; justify-items: center; min-width: 0; }
+.tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.tabs button { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; touch-action: manipulation; transition: background .14s, color .14s, border-color .14s; }
+.tabs button[aria-selected="true"] { background: var(--green); border-color: var(--green); color: #fff; }
+.phone { width: min(320px, 82vw); border: 8px solid var(--text); border-radius: 34px; overflow: hidden; background: #fff; box-shadow: 0 18px 40px rgba(26,43,34,.18); }
+.phone .bar { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; background: #f1f3f2; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: #3d5146; }
+.phone .screen { position: relative; height: min(600px, 70vh); background: #fff; }
+.phone .screen::before { content: 'Loading the live page…'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+.phone iframe { position: relative; display: block; width: 100%; height: 100%; border: 0; background: transparent; }
 .example ul { list-style: none; display: grid; gap: 10px; margin: 16px 0 18px; }
 .example li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
 .example li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
@@ -338,18 +346,28 @@ footer a { color: var(--muted); text-decoration: none; }
 
 <section class="block">
   <div class="wrap">
-    <p class="eyebrow">See a real one</p>
+    <p class="eyebrow">Properties using this right now</p>
     <div class="example">
-      <div class="phone"><img src="/engine-example-suitestay.webp" alt="Suite Stay's booking page on a phone: its rooms, photos and nightly price" loading="lazy" width="780" height="1500"></div>
+      <div class="live">
+        <div class="tabs" role="tablist" aria-label="Live booking pages">
+          <button type="button" role="tab" aria-selected="true" data-site="suitestay" data-name="Suite Stay">Suite Stay &middot; AL</button>
+          <button type="button" role="tab" aria-selected="false" data-site="stcroix" data-name="St Croix Falls">St Croix Falls &middot; WI</button>
+          <button type="button" role="tab" aria-selected="false" data-site="hp" data-name="Home Place Suites">Home Place Suites &middot; OK</button>
+        </div>
+        <div class="phone">
+          <div class="bar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" fill="#6b7d72"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#6b7d72" stroke-width="2.2"/></svg><span id="liveHost">suitestay.clickinns.com</span></div>
+          <div class="screen"><iframe id="liveFrame" src="https://suitestay.clickinns.com" title="Suite Stay&rsquo;s live booking page" loading="lazy"></iframe></div>
+        </div>
+      </div>
       <div>
-        <h2>This is Suite Stay&rsquo;s booking page. Yours looks like your property.</h2>
-        <p class="sub">A Marketel booking page took $5,800 in direct bookings in one recorded month for Suite Stay in Alabama, with no OTA commission.</p>
+        <h2>Real hotels taking direct bookings on Marketel. Tap around.</h2>
+        <p class="sub">These are their live booking pages, not mockups. Suite Stay in Alabama took $5,800 in direct bookings in one recorded month, with no OTA commission.</p>
         <ul>
           <li>Your rooms, photos and nightly rates</li>
           <li>Guests pick dates and pay on your page</li>
           <li>Works on any phone, and behind the Book Now button on your site</li>
         </ul>
-        <a class="btn ghost" href="https://suitestay.clickinns.com" target="_blank" rel="noopener" id="exampleLink">Open Suite Stay&rsquo;s live page &rarr;</a>
+        <a class="btn ghost" href="https://suitestay.clickinns.com" target="_blank" rel="noopener" id="exampleLink">Open <span id="liveName">Suite Stay</span>&rsquo;s page in a new tab &rarr;</a>
       </div>
     </div>
   </div>
@@ -521,6 +539,21 @@ footer a { color: var(--muted); text-decoration: none; }
   // Every tap answers for at least 140ms, even a quick one on a phone.
   document.addEventListener('touchstart', () => {}, { passive: true });
   const press = el => { el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 160); };
+
+  // The live pages: one tab per property, loaded in place.
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    press(tab);
+    track.step('example');
+    if (tab.getAttribute('aria-selected') === 'true') return;
+    for (const other of tabs) other.setAttribute('aria-selected', String(other === tab));
+    const url = `https://${tab.dataset.site}.clickinns.com`;
+    $('liveFrame').src = url;
+    $('liveFrame').title = `${tab.dataset.name}’s live booking page`;
+    $('liveHost').textContent = `${tab.dataset.site}.clickinns.com`;
+    $('liveName').textContent = tab.dataset.name;
+    $('exampleLink').href = url;
+  }));
 
   // Every "Get started" brings the owner to the one order card.
   const firstEmpty = () => [...document.querySelectorAll('#order input')].find(i => i.offsetParent && !i.value.trim());
