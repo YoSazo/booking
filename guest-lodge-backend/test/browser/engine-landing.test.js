@@ -212,6 +212,10 @@ test('the live hotel sites switch in place, with the address to match and no new
   await page.locator('.browser').scrollIntoViewIfNeeded();
   assert.match(await page.locator('.examples').innerText(), /A FEW EXAMPLES/i);
   assert.equal(await page.locator('.examples a').count(), 0);
+  // The site is shown whole, can't be scrolled or tapped inside, and with motion off it rests at the top.
+  const shown = await page.locator('#liveFrame').evaluate(frame => ({ scrolling: frame.getAttribute('scrolling'), taps: getComputedStyle(frame).pointerEvents,
+    height: frame.offsetHeight, glides: frame.getAnimations().length }));
+  assert.deepEqual({ ...shown, height: shown.height > 1700 }, { scrolling: 'no', taps: 'none', height: true, glides: 0 });
   assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://suitestay.clickinns.com');
   await page.click('.tabs [data-site="hp"]');
   assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://hp.clickinns.com');
@@ -224,26 +228,45 @@ test('the live hotel sites switch in place, with the address to match and no new
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
 }));
 
-test('on a computer the live site\'s scroll bar sits outside its window', async () => world(async ({ page, base }) => {
+test('the live site glides down and back up on its own while in view, and scrolling over it scrolls the page', async () => world(async ({ page, base }) => {
   await page.goto(base + '/engine');
-  const sizes = await page.evaluate(() => {
-    const probe = Object.assign(document.createElement('div'), { style: 'width:100px;height:100px;overflow:scroll' });
-    document.body.appendChild(probe);
-    return { bar: probe.offsetWidth - probe.clientWidth, frame: document.getElementById('liveFrame').offsetWidth, screen: document.querySelector('.browser .screen').clientWidth };
-  });
-  assert.equal(sizes.frame, sizes.screen + sizes.bar, JSON.stringify(sizes));
-}, { viewport: { width: 1280, height: 860 } }));
+  const glide = () => page.evaluate(() => document.getElementById('liveFrame').getAnimations()[0]?.playState || 'none');
+  await page.locator('.browser').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getElementById('liveFrame').getAnimations()[0]?.playState === 'running');
+  // Down to the end of the last room and back: Suite Stay's ends about 1,600px down.
+  const travel = await page.evaluate(() => -parseFloat(document.getElementById('liveFrame').getAnimations()[0].effect.getKeyframes()[2].transform.match(/-?[\d.]+/)[0]));
+  assert.ok(travel > 900 && travel < 1400, String(travel));
+  const box = await page.locator('.browser .screen').boundingBox(), before = await page.evaluate(() => scrollY);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 300);
+  await page.waitForFunction(y => scrollY > y + 200, before);
+  // Out of view it waits; back in view it carries on.
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+  await page.waitForFunction(() => document.getElementById('liveFrame').getAnimations()[0]?.playState === 'paused');
+  await page.locator('.browser').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getElementById('liveFrame').getAnimations()[0]?.playState === 'running');
+  // Another hotel starts from its own top, at its own length.
+  await page.click('.tabs [data-site="hp"]');
+  await page.waitForFunction(() => document.getElementById('liveFrame').offsetHeight > 2600);
+  await page.frameLocator('#liveFrame').locator('h1', { hasText: 'hp.clickinns.com' }).waitFor();
+  await page.waitForFunction(() => document.getElementById('liveFrame').getAnimations()[0]?.playState === 'running');
+  assert.equal(await glide(), 'running');
+}, { viewport: { width: 1280, height: 860 }, reducedMotion: 'no-preference' }));
 
 test('How does it work? and each But…? lead down the story, one part at a time', async () => world(async ({ page, base }) => {
   await page.goto(base + '/engine');
-  const order = [['.howlink', 'how'], ['#how .next', 'booking'], ['#booking .next', 'checked'], ['#checked .next', 'setup'], ['#setup .next', 'cost']];
+  const order = [['.howlink', 'how'], ['#how .next', 'checked'], ['#checked .next', 'site'], ['#site .next', 'setup'], ['#setup .next', 'cost']];
   for (const [link, section] of order) {
     await page.click(link);
     await page.waitForFunction(id => Math.abs(document.getElementById(id).getBoundingClientRect().top) < 12, section);
   }
-  assert.match(await page.locator('#how .next').innerText(), /But what happens when a guest books\?/);
-  assert.match(await page.locator('#booking').innerText(), /11:42 pm, Thursday[\s\S]*Sarah books Room 104 for Friday/i);
-  assert.match(await page.locator('#booking .logos').innerText(), /Little Hotelier[\s\S]*\+ Yours/);
+  // Sarah's booking answers How does it work?, and each part asks the next question.
+  assert.match(await page.locator('#how').innerText(), /11:42 pm, Thursday[\s\S]*Sarah books Room 104 for Friday/i);
+  assert.match(await page.locator('#how .logos').innerText(), /Little Hotelier[\s\S]*\+ Yours/);
+  assert.match(await page.locator('#how .next').innerText(), /But what if it types something wrong\?/);
+  assert.match(await page.locator('#checked .next').innerText(), /But what will my site look like\?/);
+  assert.match(await page.locator('#site').innerText(), /Your rooms, live on your own booking site[\s\S]*A few examples/i);
+  assert.match(await page.locator('#site .next').innerText(), /But how do I get set up\?/);
   assert.match(await page.locator('#checked').innerText(), /99% accurate[\s\S]*across 257 bookings/);
   // With reduced motion the agent's booking is shown saved.
   assert.equal(await page.locator('#pmsTarget').evaluate(cell => cell.classList.contains('booked')), true);

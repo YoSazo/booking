@@ -98,8 +98,8 @@ label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margi
 .browser .bar { display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; background: #f6f8f7; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: #3d5146; }
 .browser .screen { position: relative; height: min(560px, 66vh); overflow: hidden; background: #fff; }
 .browser .screen::before { content: 'Loading the live site\2026'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
-/* Wider than its window by the width of a scroll bar, so the bar sits outside it (phones have none). */
-.browser iframe { position: relative; display: block; width: calc(100% + var(--scrollbar, 0px)); height: 100%; border: 0; background: transparent; }
+/* The whole site at its full height, gliding past the window: nothing to scroll inside it, and a swipe on it scrolls this page. */
+.browser iframe { position: absolute; top: 0; left: 0; display: block; width: 100%; height: 1900px; border: 0; background: transparent; pointer-events: none; }
 .examples .proof { font-size: 14px; color: var(--muted); text-align: center; max-width: 380px; }
 
 /* THE AGENT AT WORK: a simplified PMS, played step by step. */
@@ -276,28 +276,6 @@ footer a { color: var(--muted); text-decoration: none; }
 
 <section class="story" id="how">
   <div class="wrap narrow">
-    <p class="eyebrow">How it works</p>
-    <h2>Your rooms, live on your own booking site.</h2>
-    <p>Guests see your real rooms, photos and prices, and book on your site. No commission. <b>Our AI agent watches your PMS around the clock</b> and updates your site every few minutes, so when a room sells on Booking.com, it comes off your site too.</p>
-    <div class="examples">
-      <h3>A few examples</h3>
-      <div class="tabs" role="tablist" aria-label="Live booking sites">
-        <button type="button" role="tab" aria-selected="true" data-site="suitestay" data-name="Suite Stay">Suite Stay &middot; AL</button>
-        <button type="button" role="tab" aria-selected="false" data-site="stcroix" data-name="St Croix Falls">St Croix Falls &middot; WI</button>
-        <button type="button" role="tab" aria-selected="false" data-site="hp" data-name="Home Place Suites">Home Place Suites &middot; OK</button>
-      </div>
-      <div class="browser">
-        <div class="bar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" fill="#6b7d72"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#6b7d72" stroke-width="2.2"/></svg><span id="liveHost">suitestay.clickinns.com</span></div>
-        <div class="screen"><iframe id="liveFrame" src="https://suitestay.clickinns.com" title="Suite Stay&rsquo;s live booking site" loading="lazy"></iframe></div>
-      </div>
-      <p class="proof">Live sites, not mockups. Suite Stay took $5,800 in direct bookings on theirs in one recorded month.</p>
-    </div>
-    <div class="center"><a class="next" href="#booking" data-next="booking">But what happens when a guest books? <span>&darr;</span></a></div>
-  </div>
-</section>
-
-<section class="story" id="booking">
-  <div class="wrap narrow">
     <p class="eyebrow">11:42 pm, Thursday</p>
     <h2>Sarah books Room 104 for Friday. You&rsquo;re asleep.</h2>
     <p>She pays on your site. Our agent checks your PMS that Room 104 is still free on Friday, then <b>types her booking in for you</b>: her name, the dates, the room and the rate. Just like your front desk would, in about five minutes.</p>
@@ -349,6 +327,28 @@ footer a { color: var(--muted); text-decoration: none; }
       <div class="check"><span class="n">3</span><div><b>If it ever gets stuck</b><span>A person on our team enters the booking by hand within a minute. Every booking reaches your PMS.</span></div></div>
     </div>
     <div class="stat"><b>99% accurate</b><span>across 257 bookings by our AI agent</span></div>
+    <div class="center"><a class="next" href="#site" data-next="site">But what will my site look like? <span>&darr;</span></a></div>
+  </div>
+</section>
+
+<section class="story" id="site">
+  <div class="wrap narrow">
+    <p class="eyebrow">Your site</p>
+    <h2>Your rooms, live on your own booking site.</h2>
+    <p>Guests see your real rooms, photos and prices, and book on your site. No commission. <b>Our AI agent watches your PMS around the clock</b> and updates your site every few minutes, so when a room sells on Booking.com, it comes off your site too.</p>
+    <div class="examples">
+      <h3>A few examples</h3>
+      <div class="tabs" role="tablist" aria-label="Live booking sites">
+        <button type="button" role="tab" aria-selected="true" data-site="suitestay" data-name="Suite Stay" data-ends="1669,1564">Suite Stay &middot; AL</button>
+        <button type="button" role="tab" aria-selected="false" data-site="stcroix" data-name="St Croix Falls" data-ends="1732,1608">St Croix Falls &middot; WI</button>
+        <button type="button" role="tab" aria-selected="false" data-site="hp" data-name="Home Place Suites" data-ends="2677,2508">Home Place Suites &middot; OK</button>
+      </div>
+      <div class="browser">
+        <div class="bar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" fill="#6b7d72"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#6b7d72" stroke-width="2.2"/></svg><span id="liveHost">suitestay.clickinns.com</span></div>
+        <div class="screen"><iframe id="liveFrame" src="https://suitestay.clickinns.com" title="Suite Stay&rsquo;s live booking site" loading="lazy" scrolling="no" tabindex="-1"></iframe></div>
+      </div>
+      <p class="proof">Live sites, not mockups. Suite Stay took $5,800 in direct bookings on theirs in one recorded month.</p>
+    </div>
     <div class="center"><a class="next" href="#setup" data-next="setup">But how do I get set up? <span>&darr;</span></a></div>
   </div>
 </section>
@@ -464,20 +464,56 @@ footer a { color: var(--muted); text-decoration: none; }
     $(link.dataset.next).scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 
-  // The live sites: one tab per property, loaded in place. The frame is wider
-  // than its window by this browser's scroll bar, so the bar never shows.
-  const probe = Object.assign(document.createElement('div'), { style: 'position:absolute;top:-200px;width:100px;height:100px;overflow:scroll' });
-  document.body.appendChild(probe);
-  document.documentElement.style.setProperty('--scrollbar', probe.offsetWidth - probe.clientWidth + 'px');
-  probe.remove();
+  // The live sites: one tab per property. Each loads at its full height and
+  // glides slowly down and back up in the window while it's on screen, so
+  // there's nothing to scroll inside it. Motion off: it rests at the top.
+  const frame = $('liveFrame'), view = frame.parentElement;
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  let site = tabs.find(tab => tab.getAttribute('aria-selected') === 'true'), glide = null, onScreen = false, width = 0;
+  // Where the site's last room ends: measured at 286px and 378px wide, in between for the rest.
+  const contentEnd = () => {
+    const [narrow, wide] = site.dataset.ends.split(',').map(Number);
+    const t = Math.min(1, Math.max(0, (view.clientWidth - 286) / 92));
+    return Math.round(narrow + (wide - narrow) * t) + 24;
+  };
+  function startGlide() {
+    glide?.cancel();
+    glide = null;
+    const travel = contentEnd() - view.clientHeight;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || travel <= 0) return;
+    // 40px a second down, quicker back up, two seconds still at each end.
+    const hold = 2000, down = travel * 25, up = travel * 8, total = hold * 2 + down + up;
+    glide = frame.animate([
+      { transform: 'translateY(0)', offset: 0 },
+      { transform: 'translateY(0)', offset: hold / total, easing: 'ease-in-out' },
+      { transform: `translateY(${-travel}px)`, offset: (hold + down) / total },
+      { transform: `translateY(${-travel}px)`, offset: (hold * 2 + down) / total, easing: 'ease-in-out' },
+      { transform: 'translateY(0)', offset: 1 },
+    ], { duration: total, iterations: Infinity });
+    if (!onScreen) glide.pause();
+  }
+  const sizeFrame = () => { width = view.clientWidth; frame.style.height = contentEnd() + 220 + 'px'; };
+  sizeFrame();
+  frame.addEventListener('load', startGlide);
+  // A phone turned sideways: the site reflows, so measure again (a toolbar hiding doesn't count).
+  addEventListener('resize', () => { if (view.clientWidth !== width) { sizeFrame(); startGlide(); } });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      if (glide) onScreen ? glide.play() : glide.pause();
+    }).observe(view);
+  } else onScreen = true;
   tabs.forEach(tab => tab.addEventListener('click', () => {
     press(tab);
     track.step('example');
-    if (tab.getAttribute('aria-selected') === 'true') return;
+    if (tab === site) return;
+    site = tab;
     for (const other of tabs) other.setAttribute('aria-selected', String(other === tab));
-    $('liveFrame').src = `https://${tab.dataset.site}.clickinns.com`;
-    $('liveFrame').title = `${tab.dataset.name}’s live booking site`;
+    glide?.cancel();
+    glide = null;
+    sizeFrame();
+    frame.src = `https://${tab.dataset.site}.clickinns.com`;
+    frame.title = `${tab.dataset.name}’s live booking site`;
     $('liveHost').textContent = `${tab.dataset.site}.clickinns.com`;
   }));
 
