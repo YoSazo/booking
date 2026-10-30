@@ -27,7 +27,7 @@ const STRIPE_STUB = `
   } }; };`;
 
 // The /engine pages with the real module, a stand-in Stripe and the real public scripts.
-async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, sessions = {}, subscriptions = {}, methods = {} } = {}) {
+async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, sessions = {}, subscriptions = {}, methods = {}, reducedMotion = 'reduce' } = {}) {
   const app = express();
   const creates = [], charges = [];
   const stripe = { checkout: { sessions: {
@@ -55,8 +55,8 @@ async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, ses
   const base = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch();
   try {
-    // Reduced motion: no smooth scrolling under Playwright's clicks.
-    const page = await browser.newPage({ viewport, reducedMotion: 'reduce', ...(viewport.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+    // Reduced motion: no smooth scrolling under Playwright's clicks (and the agent's booking shown done).
+    const page = await browser.newPage({ viewport, reducedMotion, ...(viewport.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.route('https://js.stripe.com/v3/', route => route.fulfill({ headers: { 'content-type': 'application/javascript' }, body: STRIPE_STUB }));
     await page.route('https://fonts.googleapis.com/**', route => route.fulfill({ headers: { 'content-type': 'text/css' }, body: '' }));
@@ -79,25 +79,28 @@ const fillDetails = async page => {
 };
 
 for (const width of [320, 390]) {
-  test(`${width}px: the page fits a phone and says the price, the PMS and the guarantee up top`, async () => world(async ({ page, base }) => {
+  test(`${width}px: the page fits a phone and says what it is, the proof, the price and the guarantee up top`, async () => world(async ({ page, base }) => {
     await page.goto(base + '/engine');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width, 'no sideways scroll at phone width');
+    assert.equal(await page.locator('h1').innerText(), 'Your own booking engine, built for you. Connected to any PMS.');
+    const hero = await page.locator('.hero').innerText();
+    assert.match(hero, /Trusted by 23 hotels/);
+    assert.match(hero, /257 bookings by our AI agent · 99% accurate/);
+    assert.match(hero, /How does it work\?/);
+    assert.match(hero, /\$97 today, then \$49\/month/);
+    assert.match(hero, /Doesn.t work with your PMS\? You don.t pay\./);
     const text = await page.locator('body').innerText();
-    assert.match(text, /connected to your PMS/i);
-    assert.match(text, /\$97 today/);
-    assert.match(text, /then \$49\/month/);
     assert.match(text, /30-day money-back guarantee/);
-    assert.match(text, /If it doesn.t connect to your PMS, you don.t pay/);
-    assert.match(text, /Trusted by 23 hotels/);
-    assert.match(text, /250\+ bookings already entered into hotel PMSs by our AI agent\. If it ever can.t enter one, a person does it within a minute\./);
+    assert.match(text, /a person on our team enters the booking by hand within a minute/i);
     // The PMS logos load and fit.
     for (const alt of ['Cloudbeds', 'BookingCenter']) {
       assert.ok(await page.locator(`.logos img[alt="${alt}"]`).evaluate(img => img.complete && img.naturalWidth > 0), alt);
     }
     assert.match(await page.locator('.logos').innerText(), /Little Hotelier[\s\S]*\+ Yours/);
     assert.equal(await page.locator('#email').isVisible(), true);
+    // The order card is on the first screen, Get started included (no web fonts here, so a little slack).
     const button = await page.locator('#emailBtn').boundingBox();
-    assert.ok(button.y + button.height < 844 * 2.2, 'the order card is within two screens');
+    assert.ok(button.y + button.height < 844 * 1.05, JSON.stringify(button));
   }, { viewport: { width, height: 844 } }));
 }
 
@@ -176,10 +179,12 @@ test('every lower button brings the owner back to the order card, and the sticky
   assert.equal(await page.evaluate(() => document.getElementById('sticky').classList.contains('show')), false);
 }));
 
-test('on a computer the order card sits beside the headline', async () => world(async ({ page, base }) => {
+test('on a computer the headline and the order card are centered, one under the other', async () => world(async ({ page, base }) => {
   await page.goto(base + '/engine');
   const head = await page.locator('h1').boundingBox(), card = await page.locator('#order').boundingBox();
-  assert.ok(card.x > head.x + head.width, JSON.stringify({ head, card }));
+  assert.ok(card.y > head.y + head.height, JSON.stringify({ head, card }));
+  assert.ok(Math.abs(card.x + card.width / 2 - 640) < 2 && Math.abs(head.x + head.width / 2 - 640) < 2, JSON.stringify({ head, card }));
+  assert.ok(card.y + 200 < 860, 'the card starts on the first screen');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 1280);
   assert.equal(await page.locator('#sticky').isVisible(), false);
 }, { viewport: { width: 1280, height: 860 } }));
@@ -202,15 +207,15 @@ test('an unpaid or unknown order says so, with a way back', async () => world(as
   assert.match(await page.locator('#problem').innerText(), /Order not found[\s\S]*go back to checkout/);
 }));
 
-test('the live hotel pages switch in place, with the address and the new-tab link to match', async () => world(async ({ page, base }) => {
+test('the live hotel sites switch in place, with the address to match and no new-tab link', async () => world(async ({ page, base }) => {
   await page.goto(base + '/engine');
-  await page.locator('.live').scrollIntoViewIfNeeded();
+  await page.locator('.browser').scrollIntoViewIfNeeded();
+  assert.match(await page.locator('.examples').innerText(), /A FEW EXAMPLES/i);
+  assert.equal(await page.locator('.examples a').count(), 0);
   assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://suitestay.clickinns.com');
   await page.click('.tabs [data-site="hp"]');
   assert.equal(await page.getAttribute('#liveFrame', 'src'), 'https://hp.clickinns.com');
   assert.equal(await page.locator('#liveHost').innerText(), 'hp.clickinns.com');
-  assert.equal(await page.getAttribute('#exampleLink', 'href'), 'https://hp.clickinns.com');
-  assert.match(await page.locator('#exampleLink').innerText(), /Home Place Suites/);
   assert.equal(await page.getAttribute('.tabs [data-site="hp"]', 'aria-selected'), 'true');
   assert.equal(await page.getAttribute('.tabs [data-site="suitestay"]', 'aria-selected'), 'false');
   const frame = page.frameLocator('#liveFrame');
@@ -218,6 +223,52 @@ test('the live hotel pages switch in place, with the address and the new-tab lin
   assert.equal(await frame.locator('h1').innerText(), 'hp.clickinns.com');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
 }));
+
+test('on a computer the live site\'s scroll bar sits outside its window', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine');
+  const sizes = await page.evaluate(() => {
+    const probe = Object.assign(document.createElement('div'), { style: 'width:100px;height:100px;overflow:scroll' });
+    document.body.appendChild(probe);
+    return { bar: probe.offsetWidth - probe.clientWidth, frame: document.getElementById('liveFrame').offsetWidth, screen: document.querySelector('.browser .screen').clientWidth };
+  });
+  assert.equal(sizes.frame, sizes.screen + sizes.bar, JSON.stringify(sizes));
+}, { viewport: { width: 1280, height: 860 } }));
+
+test('How does it work? and each But…? lead down the story, one part at a time', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine');
+  const order = [['.howlink', 'how'], ['#how .next', 'booking'], ['#booking .next', 'checked'], ['#checked .next', 'setup'], ['#setup .next', 'cost']];
+  for (const [link, section] of order) {
+    await page.click(link);
+    await page.waitForFunction(id => Math.abs(document.getElementById(id).getBoundingClientRect().top) < 12, section);
+  }
+  assert.match(await page.locator('#how .next').innerText(), /But what happens when a guest books\?/);
+  assert.match(await page.locator('#booking').innerText(), /11:42 pm, Thursday[\s\S]*Sarah books Room 104 for Friday/i);
+  assert.match(await page.locator('#booking .logos').innerText(), /Little Hotelier[\s\S]*\+ Yours/);
+  assert.match(await page.locator('#checked').innerText(), /99% accurate[\s\S]*across 257 bookings/);
+  // With reduced motion the agent's booking is shown saved.
+  assert.equal(await page.locator('#pmsTarget').evaluate(cell => cell.classList.contains('booked')), true);
+  assert.match(await page.locator('#pmsCaption').innerText(), /Sarah is in your PMS: Room 104, Friday\./);
+}));
+
+test('the agent plays its booking while in view, stops when scrolled away and starts over on return', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine');
+  const status = () => page.locator('#pmsStatus').innerText();
+  assert.equal(await status(), 'AI agent ready');
+  await page.locator('#pmsDemo').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getElementById('pmsStatus').textContent === 'Typing the booking…', null, { timeout: 10000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1200);
+  const stoppedAt = await page.locator('#pfDates').innerText();
+  await page.waitForTimeout(800);
+  assert.equal(await page.locator('#pfDates').innerText(), stoppedAt, 'nothing types while out of view');
+  await page.locator('#pmsDemo').scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => document.getElementById('pmsStatus').textContent === 'Checking availability…', null, { timeout: 3000 });
+  await page.waitForFunction(() => document.getElementById('pmsTarget').classList.contains('booked'), null, { timeout: 20000 });
+  assert.equal(await page.locator('#pfGuest').innerText(), 'Sarah Lee');
+  assert.equal(await page.locator('#pfRoom').innerText(), '104 · Queen');
+  assert.equal(await status(), 'Saved · checked twice');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+}, { reducedMotion: 'no-preference' }));
 
 const welcomeOrder = (id, { minutesAgo = 2 } = {}) => ({ object: 'checkout.session', id, mode: 'subscription', status: 'complete', payment_status: 'paid', livemode: false,
   amount_total: 9700, subscription: 'sub_' + id, created: Math.floor(Date.now() / 1000) - minutesAgo * 60,
@@ -311,7 +362,7 @@ test('a pay-once buyer\'s welcome page says paid once, with nothing more to buy'
 test('the one-time ad\'s link lands with $497 picked; both options sit above the email, side by side', async () => world(async ({ page, base, creates }) => {
   await page.goto(base + '/engine?plan=once&utm_content=123456789');
   assert.equal(await page.getAttribute('[data-pick="once"]', 'aria-checked'), 'true');
-  assert.match(await page.locator('.strip').innerText(), /\$497 one time/);
+  assert.match(await page.locator('#orderFine').innerText(), /\$497 once\. No monthly fees/);
   const picker = await page.locator('.picker').boundingBox(), email = await page.locator('#email').boundingBox();
   assert.ok(picker.y + picker.height <= email.y, 'the choice comes before the email');
   const [a, b] = await Promise.all([page.locator('[data-pick="monthly"]').boundingBox(), page.locator('[data-pick="once"]').boundingBox()]);

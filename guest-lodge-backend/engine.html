@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Done-For-You Booking Engine, $97 &mdash; Marketel</title>
-<meta name="description" content="Your own booking engine, built for you and connected to the PMS you already use, live in 24 hours. $97 today, then $49/month. 30-day money-back guarantee.">
+<title>Your Own Booking Engine, Connected to Any PMS &mdash; Marketel</title>
+<meta name="description" content="Your own booking engine, built for you and connected to any PMS. Our AI agent enters every booking into your PMS. Live in 24 hours. Doesn't work with your PMS? You don't pay.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
@@ -21,55 +21,25 @@ html { scroll-behavior: smooth; }
 body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--page); color: var(--text); -webkit-font-smoothing: antialiased; }
 a { color: var(--green-dark); }
 .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
-.narrow { max-width: 680px; }
+.narrow { max-width: 640px; margin: 0 auto; }
+[hidden] { display: none !important; }
 
-/* DEAL STRIP */
-.strip { display: block; background: var(--text); color: #fff; font-size: 14px; font-weight: 600; text-decoration: none; }
-.strip .wrap { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; text-align: center; }
-.strip b { color: #bfe6cf; }
-.strip .go { color: #fff; background: var(--green); padding: 4px 12px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
-@media (max-width: 520px) { .strip { font-size: 13px; } .strip .go { display: none; } .strip b::after { content: ' \2192'; } }
-
-/* NAV */
-.nav { background: rgba(239,244,240,.92); border-bottom: 1px solid var(--border); }
-.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+/* NAV: the logo, nothing to compete with the order card. */
+.nav { border-bottom: 1px solid var(--border); }
+.nav .wrap { display: flex; align-items: center; justify-content: center; height: 52px; }
 .nav img { height: 20px; display: block; }
-.nav a { font-size: 14px; font-weight: 700; text-decoration: none; color: var(--green-dark); padding: 8px 12px; border-radius: 999px; background: var(--pale); }
 
-/* HERO */
-.hero { padding: 28px 0 32px; }
-.hero .wrap { display: grid; gap: 24px; }
-.lede { margin-bottom: 0; }
-.kicker { font-size: 12px; font-weight: 800; letter-spacing: .06em; color: var(--green-dark); text-transform: uppercase; margin-bottom: 12px; }
-h1 { font-size: clamp(30px, 7.6vw, 48px); line-height: 1.08; letter-spacing: -.025em; font-weight: 800; margin-bottom: 14px; }
+/* HERO: centered. The title, the proof, a quiet way into the story, then the order card. */
+.hero { padding: 24px 0 36px; text-align: center; }
+h1 { font-size: clamp(30px, 8vw, 52px); line-height: 1.05; letter-spacing: -.03em; font-weight: 800; text-wrap: balance; max-width: 820px; margin: 0 auto; }
 h1 em { font-style: normal; color: var(--green); }
-.lede { font-size: 17px; line-height: 1.55; color: #3d5146; }
-.proofline { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--green-dark); background: var(--surface); border: 1px solid var(--border); padding: 7px 12px; border-radius: 999px; margin-bottom: 18px; }
-.ticks { list-style: none; display: grid; gap: 10px; }
-.ticks li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
-.ticks li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+.trust { margin-top: 14px; display: grid; gap: 4px; justify-items: center; font-size: 15px; font-weight: 700; }
+.trust .stars { color: #e8a317; letter-spacing: 2px; margin-right: 6px; }
+.trust .agent { font-weight: 600; color: #3d5146; }
+.trust .agent b { color: var(--text); }
+.howlink { display: inline-block; margin-top: 8px; padding: 8px 10px; font-size: 15px; font-weight: 700; color: var(--green-dark); text-decoration: underline; text-underline-offset: 3px; touch-action: manipulation; }
+.order { max-width: 460px; margin: 10px auto 0; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 18px; scroll-margin-top: 16px; }
 
-.trust { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 15px; font-weight: 700; }
-.trust .stars { color: #e8a317; letter-spacing: 2px; font-size: 17px; }
-.proof-line { margin-top: 10px; font-size: 15px; line-height: 1.5; color: #3d5146; }
-.proof-line b { color: var(--text); }
-
-/* WORKS WITH */
-.works { padding: 8px 0 8px; }
-.works-title { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-.logos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.logo { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-weight: 800; font-size: 16px; color: #2b2b2b; text-align: center; }
-.logo img { display: block; max-width: 100%; height: 26px; width: auto; }
-.logo img.icon { height: 26px; border-radius: 6px; }
-.logo.yours { flex-direction: column; gap: 2px; border-style: dashed; color: var(--green-dark); }
-.logo.yours span { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.35; }
-@media (min-width: 900px) { .logos { grid-template-columns: repeat(4, 1fr); } }
-
-/* ORDER CARD */
-.order { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; align-self: start; scroll-margin-top: 16px; }
-.deal { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.deal strong { font-size: 17px; font-weight: 800; }
-.deal small { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--hot); white-space: nowrap; }
 label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margin: 0 0 6px; }
 .field { margin-bottom: 12px; }
 .field input { width: 100%; height: 52px; padding: 0 14px; border: 1.5px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; }
@@ -86,13 +56,11 @@ label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margi
 @keyframes spin { to { transform: rotate(360deg) } }
 .fine { margin-top: 10px; font-size: 13px; color: var(--muted); line-height: 1.5; text-align: center; }
 .fine strong { color: var(--text); }
-.guarantee { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--pale); font-size: 14px; line-height: 1.4; font-weight: 600; color: var(--green-dark); }
+.guarantee { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--pale); font-size: 14px; line-height: 1.4; font-weight: 700; color: var(--green-dark); }
 .guarantee svg { flex: none; }
-.incl { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 12px; font-size: 13px; font-weight: 600; color: #3d5146; }
-.incl span::before { content: '\2713 '; color: var(--green); font-weight: 800; }
 .error { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: #fdf0ea; color: var(--red); font-size: 14px; line-height: 1.5; font-weight: 600; }
 .error.show { display: block; }
-.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -2px 0 16px; }
+.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
 .picker button { display: grid; gap: 2px; text-align: left; padding: 12px; border: 2px solid var(--border); border-radius: 14px; background: var(--surface); font: inherit; color: var(--text); cursor: pointer; touch-action: manipulation; transition: border-color .14s, background .14s, transform .14s; }
 .picker button b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 .picker button span { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
@@ -106,112 +74,103 @@ label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margi
 #checkout { min-height: 120px; }
 .loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 120px; color: var(--muted); font-size: 14px; }
 .loading .spinner { border-color: var(--border); border-top-color: var(--green); }
-[hidden] { display: none !important; }
 
-/* THE BOOKING GOING IN */
-.flow { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 18px; }
-.flow-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.flow-head span { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
-.flow-head .tag { color: var(--muted); background: var(--page); border-radius: 999px; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
-.card { border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
-.card-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
-.card-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
-.card-meta { font-size: 14px; color: #3d5146; }
-.paid { font-size: 12px; font-weight: 700; color: var(--green-dark); background: var(--pale); padding: 2px 8px; border-radius: 999px; }
-.steps { list-style: none; margin: 12px 4px; position: relative; }
-.steps::before { content: ''; position: absolute; left: 11px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
-.step { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; font-size: 14px; line-height: 1.35; }
-.dot { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border); display: grid; place-items: center; z-index: 1; }
-.dot svg { opacity: 0; }
-.step small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-.pms { background: #f7faf8; }
-.pms .confirmed { font-size: 12px; font-weight: 700; color: var(--muted); background: #fff; border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
-.flow-foot { margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center; }
-.flow.play .step { opacity: .35; animation: lit .01s forwards; }
-.flow.play .step .dot { animation: done .3s forwards; }
-.flow.play .step:nth-child(1), .flow.play .step:nth-child(1) .dot { animation-delay: .4s; }
-.flow.play .step:nth-child(2), .flow.play .step:nth-child(2) .dot { animation-delay: 1.3s; }
-.flow.play .step:nth-child(3), .flow.play .step:nth-child(3) .dot { animation-delay: 2.2s; }
-.flow.play .step:nth-child(4), .flow.play .step:nth-child(4) .dot { animation-delay: 3.1s; }
-.flow.play .step .dot svg { animation: tick .2s forwards; animation-delay: inherit; }
-.flow.play .pms .confirmed { animation: confirm .3s forwards 3.4s; }
-@media (prefers-reduced-motion: reduce) {
-  .flow .step { opacity: 1 !important; animation: none !important; }
-  .flow .step .dot { background: var(--green); border-color: var(--green); animation: none !important; }
-  .flow .step .dot svg { opacity: 1; animation: none !important; }
-  .flow .pms .confirmed { color: var(--green-dark); background: var(--pale); border-color: rgba(46,125,91,.2); animation: none !important; }
-}
-@keyframes lit { to { opacity: 1 } }
-@keyframes done { to { background: var(--green); border-color: var(--green) } }
-@keyframes tick { to { opacity: 1 } }
-@keyframes confirm { to { color: var(--green-dark); background: var(--pale); border-color: rgba(46,125,91,.2) } }
+/* THE STORY: each part answers the question the last one raised. */
+.story { padding: 44px 0; border-top: 1px solid var(--border); scroll-margin-top: 8px; }
+.story .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--hot); margin-bottom: 10px; }
+.story h2 { font-size: clamp(26px, 6.4vw, 38px); line-height: 1.1; letter-spacing: -.025em; font-weight: 800; text-wrap: balance; margin-bottom: 12px; }
+.story p { font-size: 17px; line-height: 1.6; color: #3d5146; }
+.story p + p { margin-top: 10px; }
+.story p b { color: var(--text); }
+.center { text-align: center; }
+.next { display: inline-flex; align-items: center; gap: 8px; margin-top: 28px; padding: 12px 18px; border-radius: 999px; background: var(--surface); border: 1.5px solid var(--border); font-size: 16px; font-weight: 800; color: var(--text); text-decoration: none; touch-action: manipulation; transition: border-color .14s, transform .14s; }
+.next span { color: var(--green); font-size: 18px; line-height: 1; }
+.next:hover, .next.pressed { border-color: var(--green); }
+.next.pressed { transform: scale(.98); }
 
-/* SECTIONS */
-section.block { padding: 40px 0; }
-h2 { font-size: clamp(24px, 5.6vw, 34px); line-height: 1.15; letter-spacing: -.02em; font-weight: 800; margin-bottom: 10px; }
-.eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--green-dark); margin-bottom: 8px; }
-.sub { font-size: 16px; line-height: 1.6; color: #3d5146; max-width: 620px; }
-
-.table { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; overflow: hidden; }
-.table table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
-.table th, .table td { padding: 12px 8px; text-align: center; border-bottom: 1px solid var(--border); line-height: 1.35; }
-.table tr:last-child td { border-bottom: 0; }
-.table th { font-size: 13px; font-weight: 800; vertical-align: bottom; }
-.table th:first-child, .table td:first-child { text-align: left; padding-left: 14px; width: 38%; font-weight: 600; }
-.table .us { background: var(--pale); color: var(--green-dark); font-weight: 800; }
-.yes { color: var(--green); font-weight: 800; font-size: 16px; }
-.no { color: #b9a294; font-weight: 800; font-size: 16px; }
-.table small { display: block; font-size: 12px; color: var(--muted); font-weight: 500; }
-
-.example { display: grid; gap: 22px; align-items: center; margin-top: 20px; }
-/* The live pages, in a phone-sized browser. */
-.live { display: grid; gap: 12px; justify-items: center; min-width: 0; }
+/* A FEW EXAMPLES: the live sites, in a plain browser window. */
+.examples { margin-top: 24px; display: grid; gap: 12px; justify-items: center; }
+.examples h3 { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .tabs button { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; touch-action: manipulation; transition: background .14s, color .14s, border-color .14s; }
 .tabs button[aria-selected="true"] { background: var(--green); border-color: var(--green); color: #fff; }
-.phone { width: min(320px, 82vw); border: 8px solid var(--text); border-radius: 34px; overflow: hidden; background: #fff; box-shadow: 0 18px 40px rgba(26,43,34,.18); }
-.phone .bar { display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; background: #f1f3f2; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: #3d5146; }
-.phone .screen { position: relative; height: min(600px, 70vh); background: #fff; }
-.phone .screen::before { content: 'Loading the live page…'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
-.phone iframe { position: relative; display: block; width: 100%; height: 100%; border: 0; background: transparent; }
-.example ul { list-style: none; display: grid; gap: 10px; margin: 16px 0 18px; }
-.example li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
-.example li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
-.btn.ghost { background: var(--surface); color: var(--green-dark); border: 1.5px solid var(--green); box-shadow: none; }
-.btn.ghost:hover, .btn.ghost:active { background: var(--pale); }
+.browser { width: min(380px, 100%); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: #fff; box-shadow: var(--shadow); }
+.browser .bar { display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; background: #f6f8f7; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: #3d5146; }
+.browser .screen { position: relative; height: min(560px, 66vh); overflow: hidden; background: #fff; }
+.browser .screen::before { content: 'Loading the live site\2026'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: var(--muted); }
+/* Wider than its window by the width of a scroll bar, so the bar sits outside it (phones have none). */
+.browser iframe { position: relative; display: block; width: calc(100% + var(--scrollbar, 0px)); height: 100%; border: 0; background: transparent; }
+.examples .proof { font-size: 14px; color: var(--muted); text-align: center; max-width: 380px; }
 
-.how { list-style: none; display: grid; gap: 12px; margin-top: 20px; }
-.how li { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 18px 20px; display: grid; grid-template-columns: 40px 1fr; gap: 14px; }
-.how .n { width: 40px; height: 40px; border-radius: 12px; background: var(--pale); color: var(--green-dark); font-weight: 800; font-size: 18px; display: grid; place-items: center; }
-.how h3 { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
-.how p { font-size: 15px; line-height: 1.5; color: #3d5146; }
-.how .when { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--green-dark); }
+/* THE AGENT AT WORK: a simplified PMS, played step by step. */
+.pms { position: relative; margin-top: 24px; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; background: #fff; box-shadow: var(--shadow); text-align: left; user-select: none; -webkit-user-select: none; }
+.pms-top { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; background: #1f2a33; color: #e7ecef; font-size: 13px; font-weight: 700; }
+.pms-top .dots { color: #5b6b78; letter-spacing: 2px; font-size: 9px; }
+.pms-top .agent { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: #2c3b47; font-size: 11.5px; font-weight: 700; color: #b8f0cf; white-space: nowrap; }
+.pms-top .agent i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.2); }
+.pms-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e8edf0; font-size: 13px; font-weight: 700; color: #3a4a55; }
+.pms-new { border: 0; border-radius: 8px; padding: 7px 10px; background: #2563eb; color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; transition: transform .12s, background .12s; }
+.pms-new.click { transform: scale(.94); background: #1d4ed8; }
+.pms-stage { position: relative; min-height: 262px; padding: 10px 12px 14px; }
+.cal { display: grid; grid-template-columns: 44px repeat(4, 1fr); gap: 4px; font-size: 11.5px; }
+.cal .h { font-weight: 700; color: #6b7a86; text-align: center; padding-bottom: 2px; }
+.cal .r { font-weight: 800; color: #3a4a55; display: flex; align-items: center; }
+.cal .c { position: relative; height: 38px; border-radius: 6px; background: #f2f5f7; overflow: hidden; transition: background .2s, box-shadow .2s; }
+.cal .c.taken { background: #dbe4ea; }
+.cal .c.taken::after { content: attr(data-guest); position: absolute; inset: 0; display: flex; align-items: center; padding: 0 6px; font-size: 10.5px; font-weight: 700; color: #50606c; white-space: nowrap; }
+.cal .c.target.checked { box-shadow: inset 0 0 0 2px #16a34a; background: #effaf3; }
+.cal .c.target.checked::before { content: 'Free'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #15803d; }
+.cal .c.target.booked { background: #16a34a; box-shadow: none; }
+.cal .c.target.booked::before { content: 'Sarah Lee'; color: #fff; }
+.scan { position: absolute; top: 8px; height: 220px; left: 56px; width: 3px; border-radius: 3px; background: linear-gradient(#22c55e, #86efac); box-shadow: 0 0 12px #22c55e; opacity: 0; }
+.scan.run { animation: scan 1.4s ease-in-out forwards; }
+@keyframes scan { 0% { opacity: 1; transform: translateX(0) } 92% { opacity: 1 } 100% { opacity: 0; transform: translateX(var(--scan-to, 240px)) } }
+.form { position: absolute; inset: 6px 10px 10px; border-radius: 12px; background: #fff; border: 1px solid #dfe6ea; box-shadow: 0 10px 30px rgba(15,25,35,.16); padding: 12px; display: grid; gap: 8px; align-content: start; transform: translateY(14px); opacity: 0; pointer-events: none; transition: transform .28s ease, opacity .28s ease; }
+.form.open { transform: none; opacity: 1; }
+.form .t { font-size: 13px; font-weight: 800; color: #1f2a33; }
+.form .f { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 8px; font-size: 11.5px; color: #6b7a86; font-weight: 700; }
+.form .v { height: 30px; border: 1px solid #dfe6ea; border-radius: 7px; padding: 0 9px; display: flex; align-items: center; font-size: 13px; font-weight: 700; color: #1f2a33; background: #fbfcfd; white-space: nowrap; overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+.form .v.active { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.form .v .caret { display: inline-block; width: 1.5px; height: 15px; background: #2563eb; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0 } }
+.pms-save { justify-self: end; margin-top: 2px; border: 0; border-radius: 8px; padding: 7px 16px; background: #16a34a; color: #fff; font: inherit; font-size: 12.5px; font-weight: 800; transition: transform .12s, background .12s; }
+.pms-save.click { transform: scale(.94); background: #15803d; }
+.cursor { position: absolute; left: 0; top: 0; width: 22px; height: 22px; z-index: 5; pointer-events: none; transition: transform .7s cubic-bezier(.45,.05,.25,1); filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
+.pms-caption { margin-top: 12px; min-height: 50px; font-size: 15px; font-weight: 700; color: var(--text); text-align: center; line-height: 1.45; }
+.pms-caption span { color: var(--green); }
 
-.checks { display: grid; gap: 12px; margin-top: 20px; }
-.check { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; }
-.check h3 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
-.check p { font-size: 15px; line-height: 1.5; color: #3d5146; }
+/* WORKS WITH ANY PMS */
+.works-title { margin-top: 24px; text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.logos { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.logo { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 60px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-weight: 800; font-size: 16px; color: #2b2b2b; text-align: center; }
+.logo img { display: block; max-width: 100%; height: 24px; width: auto; }
+.logo img.icon { height: 24px; border-radius: 6px; }
+.logo.yours { flex-direction: column; gap: 2px; border-style: dashed; color: var(--green-dark); }
+.logo.yours span { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.35; }
 
-.proof { background: var(--green-dark); color: #fff; border-radius: 24px; padding: 28px 22px; }
-.proof .num { font-size: clamp(40px, 11vw, 64px); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
-.proof p { margin-top: 10px; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,.85); max-width: 560px; }
-.proof cite { display: block; margin-top: 14px; font-style: normal; font-size: 14px; font-weight: 700; color: #bfe6cf; }
+/* CHECKED TWICE, AND SETUP */
+.checks { margin-top: 20px; display: grid; gap: 10px; }
+.check { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+.check .n { width: 34px; height: 34px; border-radius: 10px; background: var(--pale); color: var(--green-dark); display: grid; place-items: center; font-weight: 800; }
+.check b { display: block; font-size: 16px; color: var(--text); margin-bottom: 2px; }
+.check span { font-size: 15px; line-height: 1.5; color: #3d5146; }
+.stat { margin-top: 16px; padding: 18px; border-radius: 18px; background: var(--green-dark); color: #fff; text-align: center; }
+.stat b { display: block; font-size: clamp(36px, 10vw, 52px); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.stat span { display: block; margin-top: 6px; font-size: 15px; color: #cfeedd; }
 
-.plans-head { text-align: center; max-width: 620px; margin: 0 auto 18px; }
-.plans { display: grid; gap: 14px; max-width: 1000px; margin: 0 auto; }
-@media (min-width: 900px) { .plans { grid-template-columns: 1fr 1fr; align-items: start; } }
-.plan { background: var(--surface); border: 2px solid var(--green); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 20px; min-width: 0; }
+/* PLANS */
+.plans { display: grid; gap: 12px; margin-top: 20px; max-width: 760px; margin-left: auto; margin-right: auto; }
+.plan { background: var(--surface); border: 2px solid var(--green); border-radius: 22px; box-shadow: var(--shadow); padding: 20px; min-width: 0; }
 .plan.once { border-color: var(--text); }
-.plan.once .tag { color: #fff; background: var(--text); }
 .plan .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--green-dark); background: var(--pale); padding: 4px 10px; border-radius: 999px; }
-.plan h2 { margin-top: 12px; }
-.plan .price { font-size: 48px; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 6px 0 4px; }
-.plan .then { font-size: 15px; color: var(--muted); margin-bottom: 18px; }
-.plan ul { list-style: none; display: grid; gap: 10px; margin: 0 0 20px; }
-.plan li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
-.plan li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+.plan.once .tag { color: #fff; background: var(--text); }
+.plan .price { font-size: 46px; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 12px 0 4px; }
+.plan .then { font-size: 15px; color: var(--muted); margin-bottom: 16px; }
+.plans-guarantee { margin-top: 16px; text-align: center; font-size: 17px; font-weight: 800; color: var(--green-dark); }
+.plans-guarantee span { display: block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--muted); }
 
-.faq { margin-top: 18px; display: grid; gap: 10px; }
+/* QUESTIONS */
+.faq { margin-top: 16px; display: grid; gap: 10px; }
 .faq details { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 0 18px; }
 .faq summary { list-style: none; cursor: pointer; padding: 16px 0; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
 .faq summary::-webkit-details-marker { display: none; }
@@ -219,10 +178,7 @@ h2 { font-size: clamp(24px, 5.6vw, 34px); line-height: 1.15; letter-spacing: -.0
 .faq details[open] summary::after { content: '\2212'; }
 .faq p { padding: 0 0 16px; font-size: 15px; line-height: 1.55; color: #3d5146; }
 
-.final { text-align: center; }
-.final .btn { max-width: 420px; margin: 18px auto 0; }
-
-footer { padding: 32px 0 110px; text-align: center; font-size: 12px; color: var(--muted); }
+footer { padding: 32px 0 110px; text-align: center; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
 footer nav { display: flex; justify-content: center; gap: 16px; margin-top: 8px; }
 footer a { color: var(--muted); text-decoration: none; }
 
@@ -234,15 +190,10 @@ footer a { color: var(--muted); text-decoration: none; }
 .sticky .btn { width: auto; min-height: 48px; font-size: 16px; padding: 0 18px; box-shadow: none; }
 
 @media (min-width: 900px) {
-  .hero { padding: 56px 0 48px; }
-  .hero .wrap { grid-template-columns: 1.05fr .95fr; grid-template-areas: "intro order" "more order"; grid-template-rows: auto 1fr; align-items: start; gap: 22px 48px; }
-  .intro { grid-area: intro; } .order { grid-area: order; } .more { grid-area: more; }
-  .example { grid-template-columns: 340px 1fr; gap: 48px; }
-  .how { grid-template-columns: repeat(4, 1fr); }
-  .how li { grid-template-columns: 1fr; }
-  .checks { grid-template-columns: repeat(3, 1fr); }
-  section.block { padding: 60px 0; }
-  .proof { padding: 40px; }
+  .hero { padding: 48px 0 56px; }
+  .story { padding: 64px 0; }
+  .logos { grid-template-columns: repeat(4, 1fr); }
+  .plans { grid-template-columns: 1fr 1fr; align-items: start; }
   .sticky { display: none; }
   footer { padding-bottom: 48px; }
 }
@@ -252,29 +203,19 @@ footer a { color: var(--muted); text-decoration: none; }
 </head>
 <body>
 
-<a class="strip" href="#order" data-go="tap-strip">
-  <div class="wrap"><span>🔥 Your booking engine, <b id="stripPrice">done for you for $97</b></span><span class="go">Get started</span></div>
-</a>
-
-<header class="nav">
-  <div class="wrap">
-    <img src="/marketel.svg" alt="Marketel">
-    <a href="#order" data-go="tap-hero">Get started</a>
-  </div>
-</header>
+<header class="nav"><div class="wrap"><img src="/marketel.svg" alt="Marketel"></div></header>
 
 <main>
 <section class="hero">
   <div class="wrap">
-    <div class="intro">
-      <p class="kicker">Done for you &middot; Live in 24 hours</p>
-      <h1>Your own booking engine, built for you and <em>connected to your PMS</em>.</h1>
-      <p class="lede">Guests book direct on your own page, with 0% commission. Every booking goes into the PMS you already use, entered and checked for you.</p>
-      <div class="trust"><span class="stars" aria-hidden="true">★★★★★</span><span>Trusted by 23 hotels</span></div>
-      <p class="proof-line"><b>250+ bookings</b> already entered into hotel PMSs by our AI agent. If it ever can&rsquo;t enter one, a person does it within a minute.</p>
+    <h1>Your own booking engine, built for you. Connected to <em>any PMS</em>.</h1>
+    <div class="trust">
+      <span><span class="stars" aria-hidden="true">★★★★★</span>Trusted by 23 hotels</span>
+      <span class="agent"><b>257 bookings</b> by our AI agent &middot; <b>99% accurate</b></span>
     </div>
+    <a class="howlink" href="#how" data-next="how">How does it work? &darr;</a>
+
     <div class="order" id="order">
-      <div class="deal"><strong>Your booking engine</strong><small>Done for you &middot; 24h</small></div>
       <div class="picker" role="radiogroup" aria-label="Choose how to pay">
         <button type="button" role="radio" aria-checked="true" data-pick="monthly"><b>$97</b><span>today, then $49/mo. Cancel anytime.</span></button>
         <button type="button" role="radio" aria-checked="false" data-pick="once"><b>$497</b><span>one time. No subscription, ever.</span></button>
@@ -286,7 +227,6 @@ footer a { color: var(--muted); text-decoration: none; }
           <input type="email" id="email" name="email" placeholder="you@yourhotel.com" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false">
         </div>
         <button class="btn" type="submit" id="emailBtn">Get started</button>
-        <p class="fine">Takes 1 minute.</p>
       </form>
 
       <form id="detailsForm" novalidate hidden>
@@ -327,215 +267,154 @@ footer a { color: var(--muted); text-decoration: none; }
       <div class="error" id="orderError" role="alert"></div>
       <div class="guarantee">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#fff" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>30-day money-back guarantee. If it doesn&rsquo;t connect to your PMS, you don&rsquo;t pay.</span>
+        <span>Doesn&rsquo;t work with your PMS? You don&rsquo;t pay.</span>
       </div>
       <p class="fine" id="orderFine"><strong>$97 today</strong>, then $49/month from next month. Cancel anytime.</p>
-      <div class="incl"><span>Hosting</span><span>PMS connection</span><span>Edits by us for 30 days</span></div>
-    </div>
-    <div class="more">
-      <div class="proofline">$5,800 booked direct in one month at Suite Stay</div>
-      <ul class="ticks">
-        <li>Works with the PMS you already use. No integration list.</li>
-        <li>Your rooms, photos and rates on your own booking page</li>
-        <li>0% commission on every direct booking</li>
-        <li>Built by us and live within 24 hours</li>
-      </ul>
-    </div>
-
-  </div>
-</section>
-
-<section class="works" aria-labelledby="worksTitle">
-  <div class="wrap">
-    <p class="works-title" id="worksTitle">Works with the PMS you already use</p>
-    <div class="logos">
-      <div class="logo"><img src="/engine-logos/cloudbeds.svg" alt="Cloudbeds" width="178" height="26"></div>
-      <div class="logo"><img class="icon" src="/engine-logos/little-hotelier.svg" alt="" width="26" height="26"><span>Little Hotelier</span></div>
-      <div class="logo"><img src="/engine-logos/bookingcenter.png" alt="BookingCenter" width="116" height="26"></div>
-      <div class="logo yours"><b>+ Yours</b><span>If your front desk can log in, so can we.</span></div>
     </div>
   </div>
 </section>
 
-<section class="block">
-  <div class="wrap">
-    <p class="eyebrow">Properties using this right now</p>
-    <div class="example">
-      <div class="live">
-        <div class="tabs" role="tablist" aria-label="Live booking pages">
-          <button type="button" role="tab" aria-selected="true" data-site="suitestay" data-name="Suite Stay">Suite Stay &middot; AL</button>
-          <button type="button" role="tab" aria-selected="false" data-site="stcroix" data-name="St Croix Falls">St Croix Falls &middot; WI</button>
-          <button type="button" role="tab" aria-selected="false" data-site="hp" data-name="Home Place Suites">Home Place Suites &middot; OK</button>
-        </div>
-        <div class="phone">
-          <div class="bar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" fill="#6b7d72"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#6b7d72" stroke-width="2.2"/></svg><span id="liveHost">suitestay.clickinns.com</span></div>
-          <div class="screen"><iframe id="liveFrame" src="https://suitestay.clickinns.com" title="Suite Stay&rsquo;s live booking page" loading="lazy"></iframe></div>
-        </div>
-      </div>
-      <div>
-        <h2>Real hotels taking direct bookings on Marketel. Tap around.</h2>
-        <p class="sub">These are their live booking pages, not mockups. Suite Stay in Alabama took $5,800 in direct bookings in one recorded month, with no OTA commission.</p>
-        <ul>
-          <li>Your rooms, photos and nightly rates</li>
-          <li>Guests pick dates and pay on your page</li>
-          <li>Works on any phone, and behind the Book Now button on your site</li>
-        </ul>
-        <a class="btn ghost" href="https://suitestay.clickinns.com" target="_blank" rel="noopener" id="exampleLink">Open <span id="liveName">Suite Stay</span>&rsquo;s page in a new tab &rarr;</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="block">
-  <div class="wrap">
-    <p class="eyebrow">What makes Marketel different</p>
-    <h2 class="narrow">Every other engine needs your PMS on its list. Ours doesn&rsquo;t.</h2>
-    <p class="sub">Booking engines only send bookings to PMSs that built a connection for them. Most PMSs small properties use never did. Our agent uses your PMS the way your front desk does: on the screen.</p>
-    <div class="table">
-      <table>
-        <thead><tr><th></th><th class="us">Marketel</th><th>Other booking engines</th><th>Your PMS&rsquo;s own engine</th></tr></thead>
-        <tbody>
-          <tr><td>Works with the PMS you already use</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span><small>only their list</small></td><td><span class="yes">&#10003;</span></td></tr>
-          <tr><td>Bookings entered into your PMS for you</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span><small>only if listed</small></td><td><span class="yes">&#10003;</span></td></tr>
-          <tr><td>Built for you</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span></td><td><span class="no">&#10005;</span></td></tr>
-          <tr><td>Live in 24 hours</td><td class="us"><span class="yes">&#10003;</span></td><td><span class="no">&#10005;</span></td><td><span class="no">&#10005;</span></td></tr>
-          <tr><td>What it costs</td><td class="us">$97, then $49/mo, or $497 once</td><td>Setup fee plus monthly</td><td>Part of your PMS bill</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section class="block">
-  <div class="wrap">
+<section class="story" id="how">
+  <div class="wrap narrow">
     <p class="eyebrow">How it works</p>
-    <h2>You do one minute. We do the rest.</h2>
-    <ol class="how">
-      <li><span class="n">1</span><div><h3>Tell us about your property</h3><p>Your email, your property and which PMS you use.</p><span class="when">1 minute</span></div></li>
-      <li><span class="n">2</span><div><h3>Lock in your launch</h3><p>Pay $97 today. Then $49 a month from next month.</p><span class="when">Today</span></div></li>
-      <li><span class="n">3</span><div><h3>We build it and connect your PMS</h3><p>Your page with your rooms, photos and rates. You give our agent its own staff login.</p><span class="when">Within 24 hours</span></div></li>
-      <li><span class="n">&#9733;</span><div><h3>Then it runs on its own</h3><p>Every booking from your page goes into your PMS, entered and checked, with nobody at the desk.</p><span class="when">Every booking</span></div></li>
-    </ol>
+    <h2>Your rooms, live on your own booking site.</h2>
+    <p>Guests see your real rooms, photos and prices, and book on your site. No commission. <b>Our AI agent watches your PMS around the clock</b> and updates your site every few minutes, so when a room sells on Booking.com, it comes off your site too.</p>
+    <div class="examples">
+      <h3>A few examples</h3>
+      <div class="tabs" role="tablist" aria-label="Live booking sites">
+        <button type="button" role="tab" aria-selected="true" data-site="suitestay" data-name="Suite Stay">Suite Stay &middot; AL</button>
+        <button type="button" role="tab" aria-selected="false" data-site="stcroix" data-name="St Croix Falls">St Croix Falls &middot; WI</button>
+        <button type="button" role="tab" aria-selected="false" data-site="hp" data-name="Home Place Suites">Home Place Suites &middot; OK</button>
+      </div>
+      <div class="browser">
+        <div class="bar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" fill="#6b7d72"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#6b7d72" stroke-width="2.2"/></svg><span id="liveHost">suitestay.clickinns.com</span></div>
+        <div class="screen"><iframe id="liveFrame" src="https://suitestay.clickinns.com" title="Suite Stay&rsquo;s live booking site" loading="lazy"></iframe></div>
+      </div>
+      <p class="proof">Live sites, not mockups. Suite Stay took $5,800 in direct bookings on theirs in one recorded month.</p>
+    </div>
+    <div class="center"><a class="next" href="#booking" data-next="booking">But what happens when a guest books? <span>&darr;</span></a></div>
   </div>
 </section>
 
-<section class="block">
-  <div class="wrap">
-    <div class="flow" id="flow" aria-label="Example: a booking going into the PMS">
-      <div class="flow-head"><span>A booking, start to finish</span><span class="tag">Example</span></div>
-      <div class="card">
-        <div class="card-label"><span>Your booking page</span><span class="paid">Paid</span></div>
-        <div class="card-title">Room 101 &middot; Queen</div>
-        <div class="card-meta">Nov 10 &rarr; Nov 11 &middot; 1 adult &middot; $99</div>
+<section class="story" id="booking">
+  <div class="wrap narrow">
+    <p class="eyebrow">11:42 pm, Thursday</p>
+    <h2>Sarah books Room 104 for Friday. You&rsquo;re asleep.</h2>
+    <p>She pays on your site. Our agent checks your PMS that Room 104 is still free on Friday, then <b>types her booking in for you</b>: her name, the dates, the room and the rate. Just like your front desk would, in about five minutes.</p>
+
+    <div class="pms" id="pmsDemo" role="img" aria-label="Our AI agent checks Friday in a PMS calendar, opens a new reservation, types in Sarah Lee for Room 104 on Friday and saves it.">
+      <div class="pms-top"><span class="dots">&#9679;&#9679;&#9679;</span><span>Your PMS</span><span class="agent"><i></i><span id="pmsStatus">AI agent ready</span></span></div>
+      <div class="pms-tools"><span>Calendar &middot; this week</span><button type="button" class="pms-new" id="pmsNew" tabindex="-1">+ New reservation</button></div>
+      <div class="pms-stage" id="pmsStage">
+        <div class="cal">
+          <span></span><span class="h">Wed</span><span class="h">Thu</span><span class="h">Fri</span><span class="h">Sat</span>
+          <span class="r">101</span><span class="c taken" data-guest="M. Diaz"></span><span class="c taken" data-guest=""></span><span class="c"></span><span class="c"></span>
+          <span class="r">102</span><span class="c"></span><span class="c taken" data-guest="J. Park"></span><span class="c taken" data-guest=""></span><span class="c taken" data-guest=""></span>
+          <span class="r">103</span><span class="c"></span><span class="c"></span><span class="c taken" data-guest="R. Cole"></span><span class="c"></span>
+          <span class="r">104</span><span class="c taken" data-guest="T. Ng"></span><span class="c"></span><span class="c target" id="pmsTarget"></span><span class="c"></span>
+          <span class="r">105</span><span class="c"></span><span class="c taken" data-guest="A. Shah"></span><span class="c taken" data-guest=""></span><span class="c"></span>
+        </div>
+        <div class="scan" id="pmsScan"></div>
+        <div class="form" id="pmsForm">
+          <div class="t">New reservation</div>
+          <div class="f">Guest<span class="v" id="pfGuest"></span></div>
+          <div class="f">Dates<span class="v" id="pfDates"></span></div>
+          <div class="f">Room<span class="v" id="pfRoom"></span></div>
+          <div class="f">Rate<span class="v" id="pfRate"></span></div>
+          <button type="button" class="pms-save" id="pmsSave" tabindex="-1">Save</button>
+        </div>
       </div>
-      <ol class="steps">
-        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Our agent opens your PMS<small>With a staff login you control</small></span></li>
-        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Fills in the reservation<small>Guest, dates, room, rate</small></span></li>
-        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>A second AI checks it before saving<small>Nothing saves until it matches</small></span></li>
-        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Saves it, then reads it back<small>Same guest, same dates, same room</small></span></li>
-      </ol>
-      <div class="card pms">
-        <div class="card-label"><span>Your PMS</span><span class="confirmed">Confirmed</span></div>
-        <div class="card-title">Reservation saved</div>
-        <div class="card-meta">Room 101 &middot; Nov 10&ndash;11 &middot; $99</div>
-      </div>
-      <p class="flow-foot">About 5 minutes, start to finish, with nobody at the desk. 50 of 50 test bookings went in right.</p>
+      <svg class="cursor" id="pmsCursor" viewBox="0 0 24 24"><path d="M4 2.5l15 9.2-6.6 1.3 3.8 7.2-2.6 1.4-3.8-7.3-4.7 4.6z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
     </div>
+    <p class="pms-caption" id="pmsCaption">Sarah&rsquo;s booking, going into your PMS.</p>
+
+    <p class="works-title">Works with any PMS</p>
+    <div class="logos">
+      <div class="logo"><img src="/engine-logos/cloudbeds.svg" alt="Cloudbeds" width="164" height="24"></div>
+      <div class="logo"><img class="icon" src="/engine-logos/little-hotelier.svg" alt="" width="24" height="24"><span>Little Hotelier</span></div>
+      <div class="logo"><img src="/engine-logos/bookingcenter.png" alt="BookingCenter" width="107" height="24"></div>
+      <div class="logo yours"><b>+ Yours</b><span>If your front desk can log in, so can our agent.</span></div>
+    </div>
+    <div class="center"><a class="next" href="#checked" data-next="checked">But what if it types something wrong? <span>&darr;</span></a></div>
+  </div>
+</section>
+
+<section class="story" id="checked">
+  <div class="wrap narrow">
+    <p class="eyebrow">Before it saves</p>
+    <h2>It checks every booking twice.</h2>
     <div class="checks">
-      <div class="check"><h3>Checked before saving</h3><p>A second AI compares the filled-in form with the guest&rsquo;s booking. If anything is off, nothing is saved.</p></div>
-      <div class="check"><h3>Read back after</h3><p>Once it&rsquo;s saved, the agent opens the reservation again and makes sure your PMS has the right guest, dates and room.</p></div>
-      <div class="check"><h3>A person within a minute</h3><p>We keep a screenshot of every step. If something doesn&rsquo;t match, the agent stops and a person on our team enters the booking by hand within a minute.</p></div>
+      <div class="check"><span class="n">1</span><div><b>Before saving</b><span>A second AI compares the form with Sarah&rsquo;s booking. If anything is off, nothing is saved.</span></div></div>
+      <div class="check"><span class="n">2</span><div><b>After saving</b><span>The agent opens the reservation again and makes sure your PMS has the right guest, dates and room.</span></div></div>
+      <div class="check"><span class="n">3</span><div><b>If it ever gets stuck</b><span>A person on our team enters the booking by hand within a minute. Every booking reaches your PMS.</span></div></div>
     </div>
+    <div class="stat"><b>99% accurate</b><span>across 257 bookings by our AI agent</span></div>
+    <div class="center"><a class="next" href="#setup" data-next="setup">But how do I get set up? <span>&darr;</span></a></div>
   </div>
 </section>
 
-<section class="block">
+<section class="story" id="setup">
+  <div class="wrap narrow">
+    <p class="eyebrow">Setup</p>
+    <h2>We set it all up in 24 hours.</h2>
+    <div class="checks">
+      <div class="check"><span class="n">1</span><div><b>You order</b><span>Your email, your property and your PMS. One minute.</span></div></div>
+      <div class="check"><span class="n">2</span><div><b>You make our agent a staff login</b><span>A separate user in your PMS, just for us. Two minutes, and you can switch it off any time.</span></div></div>
+      <div class="check"><span class="n">3</span><div><b>We build it and test it</b><span>Your site with your rooms, photos and rates, connected to your PMS and tested with a real booking. You get your link within 24 hours.</span></div></div>
+    </div>
+    <div class="center"><a class="next" href="#cost" data-next="cost">But what does it cost? <span>&darr;</span></a></div>
+  </div>
+</section>
+
+<section class="story" id="cost">
   <div class="wrap">
-    <div class="plans-head">
-      <h2>Your booking engine, connected to your PMS</h2>
-      <p class="sub" style="margin: 0 auto">Two ways to pay. Same engine, same 24 hours, same guarantee.</p>
+    <div class="narrow center">
+      <p class="eyebrow">Two ways to pay</p>
+      <h2>Same engine. Same 24 hours.</h2>
     </div>
     <div class="plans">
       <div class="plan">
-        <span class="tag">Done-for-you launch</span>
-        <div class="price" style="margin-top:14px">$97</div>
+        <span class="tag">Monthly</span>
+        <div class="price">$97</div>
         <p class="then">today, then $49/month &middot; cancel anytime</p>
-        <ul>
-          <li>Your booking page, built by us with your rooms, photos and rates</li>
-          <li>Connected to the PMS you already use</li>
-          <li>Every booking entered into your PMS and checked before it&rsquo;s saved</li>
-          <li>0% commission on your direct bookings</li>
-          <li>Fast, secure hosting and updates</li>
-          <li>Edits done by us for 30 days</li>
-          <li>Live within 24 hours</li>
-        </ul>
-        <a class="btn" href="#order" data-go="tap-plan" data-plan="monthly">Get my booking engine for $97</a>
+        <a class="btn" href="#order" data-go="tap-plan" data-plan="monthly">Get started for $97</a>
       </div>
       <div class="plan once">
         <span class="tag">Pay once</span>
-        <div class="price" style="margin-top:14px">$497</div>
-        <p class="then">once &middot; no monthly fees, ever</p>
-        <ul>
-          <li>Everything in the launch plan</li>
-          <li>No $49 a month: about ten months of it, then every month is free</li>
-          <li>No subscription to cancel, no renewals</li>
-          <li>Live within 24 hours</li>
-        </ul>
+        <div class="price">$497</div>
+        <p class="then">one time &middot; no monthly fees, ever</p>
         <a class="btn" href="#order" data-go="tap-plan" data-plan="once">Get it for $497 once</a>
       </div>
     </div>
-    <div class="guarantee" style="max-width:520px;margin:16px auto 0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#fff" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>30-day money-back guarantee on both. No questions asked.</span>
-    </div>
+    <p class="plans-guarantee">Doesn&rsquo;t work with your PMS? You don&rsquo;t pay.<span>And a 30-day money-back guarantee on both.</span></p>
   </div>
 </section>
 
-<section class="block">
+<section class="story" id="questions">
   <div class="wrap narrow">
     <h2>Questions</h2>
     <div class="faq" id="faq">
       <details>
         <summary>What do I get for $97?</summary>
-        <p>We build your booking page with your rooms, photos and rates, connect it to your PMS, test a booking end to end, and send you the link, all within 24 hours. The $97 covers the setup and your first month. After that it&rsquo;s $49 a month.</p>
-      </details>
-      <details>
-        <summary>Can I pay once instead of monthly?</summary>
-        <p>Yes. Pay $497 once and there&rsquo;s no monthly fee, ever. Choose &ldquo;Pay once&rdquo; in the plans above. Same engine, same 24 hours, same 30-day money-back guarantee.</p>
+        <p>We build your booking site with your rooms, photos and rates, connect it to your PMS, test a booking end to end and send you the link, all within 24 hours. The $97 covers setup and your first month. After that it&rsquo;s $49 a month. Or pay $497 once and never pay monthly.</p>
       </details>
       <details>
         <summary>Which PMS does it work with?</summary>
-        <p>Cloudbeds and BookingCenter connect directly. Little Hotelier goes through our agent, which entered 50 of 50 test bookings correctly. Most other PMSs your team opens in a web browser work the same way. If we can&rsquo;t connect yours, you get your money back.</p>
-      </details>
-      <details>
-        <summary>What do you need from me?</summary>
-        <p>Two things, after you order: a separate staff login for Marketel in your PMS, and your website or a few photos of your rooms. We text or email you for both.</p>
-      </details>
-      <details>
-        <summary>What if the agent can&rsquo;t enter a booking?</summary>
-        <p>A person on our team enters it by hand within a minute. Every booking reaches your PMS either way. The agent has already entered 250+ bookings into hotel PMSs.</p>
+        <p>Any PMS your team logs into in a web browser. Cloudbeds and BookingCenter also connect directly. If we can&rsquo;t connect yours, you don&rsquo;t pay.</p>
       </details>
       <details>
         <summary>Is giving you a PMS login safe?</summary>
-        <p>Make a separate staff user just for Marketel, so you can switch it off at any time without touching anyone else&rsquo;s login. The agent only enters and checks bookings, and we keep a screenshot of every step it takes.</p>
+        <p>Make a separate staff user just for our agent, so you can switch it off any time without touching anyone else&rsquo;s login. It only checks rooms and enters bookings, and we keep a screenshot of every step it takes.</p>
       </details>
       <details>
         <summary>Do I have to change anything I use now?</summary>
-        <p>No. Keep your PMS, your channel manager and your website. Your booking page gets its own link; put it behind the Book Now button on your site.</p>
+        <p>No. Keep your PMS, your channel manager and your website. Put your new booking site&rsquo;s link behind the Book Now button on your website.</p>
       </details>
       <details>
         <summary>Can I cancel?</summary>
         <p>Any time. Reply to any email from us or write to support@bookmarketel.com. And for 30 days you can ask for your money back, no questions asked.</p>
       </details>
     </div>
-  </div>
-</section>
-
-<section class="block final">
-  <div class="wrap narrow">
-    <h2>Your booking engine, done for you, live in 24 hours.</h2>
-    <p class="sub" style="margin: 0 auto">$97 today, then $49/month. 30-day money-back guarantee.</p>
-    <a class="btn" href="#order" data-go="tap-final">Get my booking engine for $97</a>
   </div>
 </section>
 </main>
@@ -571,34 +450,43 @@ footer a { color: var(--muted); text-decoration: none; }
     if (seen > .5) track.step('scroll50');
     if (seen > .97) track.step('scroll100');
   }, { passive: true });
-  $('exampleLink').addEventListener('click', () => track.step('example'));
   $('faq').addEventListener('toggle', () => track.step('faq'), true);
 
   // Every tap answers for at least 140ms, even a quick one on a phone.
   document.addEventListener('touchstart', () => {}, { passive: true });
   const press = el => { el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 160); };
 
-  // The live pages: one tab per property, loaded in place.
+  // The story: "How does it work?" and each "But…?" scroll to the part that answers it.
+  document.querySelectorAll('[data-next]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    press(link);
+    track.step(link.dataset.next === 'how' ? 'how' : 'bridge');
+    $(link.dataset.next).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
+  // The live sites: one tab per property, loaded in place. The frame is wider
+  // than its window by this browser's scroll bar, so the bar never shows.
+  const probe = Object.assign(document.createElement('div'), { style: 'position:absolute;top:-200px;width:100px;height:100px;overflow:scroll' });
+  document.body.appendChild(probe);
+  document.documentElement.style.setProperty('--scrollbar', probe.offsetWidth - probe.clientWidth + 'px');
+  probe.remove();
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
   tabs.forEach(tab => tab.addEventListener('click', () => {
     press(tab);
     track.step('example');
     if (tab.getAttribute('aria-selected') === 'true') return;
     for (const other of tabs) other.setAttribute('aria-selected', String(other === tab));
-    const url = `https://${tab.dataset.site}.clickinns.com`;
-    $('liveFrame').src = url;
-    $('liveFrame').title = `${tab.dataset.name}’s live booking page`;
+    $('liveFrame').src = `https://${tab.dataset.site}.clickinns.com`;
+    $('liveFrame').title = `${tab.dataset.name}’s live booking site`;
     $('liveHost').textContent = `${tab.dataset.site}.clickinns.com`;
-    $('liveName').textContent = tab.dataset.name;
-    $('exampleLink').href = url;
   }));
 
-  // The plan the order card charges: the ad's $97 unless the owner picks pay-once below.
+  // The plan the order card charges: the ad's price unless the owner picks the other.
   let plan = 'monthly';
   const PLAN_TEXT = {
-    monthly: { strip: 'done for you for $97', tag: 'Done-for-you launch', amount: '$97', then: 'then $49/mo', button: 'Lock in my $97 launch', fine: '<strong>$97 today</strong>, then $49/month from next month. Cancel anytime.',
+    monthly: { button: 'Lock in my $97 launch', fine: '<strong>$97 today</strong>, then $49/month from next month. Cancel anytime.',
       sticky: '$97 today', stickyThen: 'then $49/mo · 30-day guarantee' },
-    once: { strip: 'done for you, $497 one time', tag: 'Pay once', amount: '$497', then: 'one time, no subscription', button: 'Lock in my $497 pay-once', fine: '<strong>$497 once.</strong> No monthly fees, ever.',
+    once: { button: 'Lock in my $497 pay-once', fine: '<strong>$497 once.</strong> No monthly fees, ever.',
       sticky: '$497 once', stickyThen: 'no monthly fees · 30-day guarantee' },
   };
   function setPlan(next, { record = true } = {}) {
@@ -608,7 +496,6 @@ footer a { color: var(--muted); text-decoration: none; }
     $('orderFine').innerHTML = text.fine;
     for (const option of document.querySelectorAll('[data-pick]')) option.setAttribute('aria-checked', String(option.dataset.pick === plan));
     $('stickyPrice').textContent = text.sticky;
-    $('stripPrice').textContent = text.strip;
     $('stickyThen').textContent = text.stickyThen;
     const button = $('detailsBtn');
     delete button.dataset.label;
@@ -626,7 +513,7 @@ footer a { color: var(--muted); text-decoration: none; }
   document.querySelectorAll('[data-go]').forEach(link => link.addEventListener('click', event => {
     event.preventDefault();
     press(link);
-    if (link.dataset.go !== 'tap-strip') track.step(link.dataset.go);
+    track.step(link.dataset.go);
     if (link.dataset.plan) setPlan(link.dataset.plan);
     $('order').scrollIntoView({ behavior: 'smooth', block: 'start' });
     const input = firstEmpty();
@@ -636,19 +523,79 @@ footer a { color: var(--muted); text-decoration: none; }
   // The sticky bar shows once the order card is out of view, and never while paying.
   const sticky = $('sticky');
   if ('IntersectionObserver' in window) {
-    let past = false;
     new IntersectionObserver(([entry]) => {
-      past = !entry.isIntersecting && entry.boundingClientRect.top < 0;
-      sticky.classList.toggle('show', past && payStage.hidden);
+      sticky.classList.toggle('show', !entry.isIntersecting && entry.boundingClientRect.top < 0 && payStage.hidden);
     }).observe($('order'));
   }
 
-  // The animated example plays once, when it comes into view.
-  const flow = $('flow');
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { flow.classList.add('play'); io.disconnect(); } }, { threshold: .4 });
-    io.observe(flow);
-  } else flow.classList.add('play');
+  // The agent at work: it checks Friday, opens a new reservation, types Sarah
+  // in, saves, and her booking lands on the calendar. It plays while in view,
+  // and shows the saved booking when motion is reduced.
+  (() => {
+    const box = $('pmsDemo'), cursor = $('pmsCursor'), status = $('pmsStatus'), caption = $('pmsCaption');
+    const target = $('pmsTarget'), form = $('pmsForm'), scan = $('pmsScan'), buttons = [$('pmsNew'), $('pmsSave')];
+    const fields = { guest: $('pfGuest'), dates: $('pfDates'), room: $('pfRoom'), rate: $('pfRate') };
+    const VALUES = { guest: 'Sarah Lee', dates: 'Fri → Sat · 1 night', room: '104 · Queen', rate: '$129' };
+    // Each play has its own number; leaving the screen bumps it, which stops the old one at its next pause.
+    const STOP = Symbol('stop');
+    let run = 0;
+    const wait = (ms, id) => new Promise((resolve, reject) => setTimeout(() => (id === run ? resolve() : reject(STOP)), ms));
+    const say = (state, text) => { status.textContent = state; caption.innerHTML = text; };
+    const point = el => {
+      const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+      cursor.style.transform = `translate(${r.left - b.left + r.width * .55}px, ${r.top - b.top + r.height * .45}px)`;
+    };
+    const click = async (el, id) => { point(el); await wait(750, id); el.classList.add('click'); await wait(160, id); el.classList.remove('click'); };
+    async function type(field, text, id) {
+      field.classList.add('active');
+      for (let i = 1; i <= text.length; i++) {
+        field.textContent = text.slice(0, i);
+        field.insertAdjacentHTML('beforeend', '<i class="caret"></i>');
+        await wait(55, id);
+      }
+      field.textContent = text;
+      field.classList.remove('active');
+    }
+    function reset() {
+      target.classList.remove('checked', 'booked'); form.classList.remove('open'); scan.classList.remove('run');
+      for (const button of buttons) button.classList.remove('click');
+      for (const field of Object.values(fields)) { field.textContent = ''; field.classList.remove('active'); }
+      cursor.style.transition = 'none'; cursor.style.transform = 'translate(14px, 70px)'; void cursor.offsetWidth; cursor.style.transition = '';
+      say('AI agent ready', 'Sarah&rsquo;s booking, going into your PMS.');
+    }
+    function saved() {
+      target.classList.add('booked'); form.classList.remove('open');
+      say('Saved · checked twice', 'Sarah is in your PMS: <span>Room 104, Friday.</span>');
+    }
+    async function play() {
+      const id = ++run;
+      try {
+        for (;;) {
+          reset(); await wait(700, id);
+          say('Checking availability…', 'Our agent checks your PMS: <span>is Room 104 free on Friday?</span>');
+          scan.style.setProperty('--scan-to', `${Math.max(120, $('pmsStage').clientWidth - 80)}px`);
+          scan.classList.add('run'); await wait(1500, id);
+          target.classList.add('checked'); point(target);
+          say('Room 104 is free', 'It&rsquo;s free. <span>Opening a new reservation…</span>'); await wait(1100, id);
+          await click($('pmsNew'), id); form.classList.add('open'); await wait(450, id);
+          say('Typing the booking…', 'It types Sarah&rsquo;s booking in, <span>like your front desk would.</span>');
+          for (const key of Object.keys(VALUES)) { point(fields[key]); await wait(600, id); await type(fields[key], VALUES[key], id); }
+          say('Second AI is checking…', 'A second AI checks it against Sarah&rsquo;s booking <span>before it saves.</span>'); await wait(1200, id);
+          await click($('pmsSave'), id); await wait(250, id);
+          saved(); point(target); await wait(3400, id);
+        }
+      } catch (error) { if (error !== STOP) throw error; }
+    }
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+      cursor.style.display = 'none';
+      saved();
+      return;
+    }
+    reset();
+    new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { track.step('demo'); play(); } else run++;
+    }, { threshold: .35 }).observe(box);
+  })();
 
   const showError = message => { errorBox.textContent = message; errorBox.classList.add('show'); };
   const clearError = () => { errorBox.textContent = ''; errorBox.classList.remove('show'); };

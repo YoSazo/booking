@@ -31,7 +31,8 @@ const LIFETIME = Object.freeze({ product: 'marketel-engine-lifetime', name: 'Mar
 const PRICE = cents => Math.round(cents) / 100;
 // The page's own steps, recorded per visitor so the test can be read without Meta.
 const STEPS = Object.freeze(['viewed', 'time10', 'time60', 'scroll50', 'scroll100', 'example', 'faq', 'tap-hero', 'tap-plan', 'tap-sticky', 'tap-final',
-  'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no', 'plan-once', 'plan-monthly']);
+  'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no', 'plan-once', 'plan-monthly',
+  'how', 'bridge', 'demo']);
 // Where a visitor came from, and which ad: the funnel page's per-ad view.
 const FROM = Object.freeze(['ad', 'social', 'direct', 'other']);
 const ROOT = __dirname;
