@@ -45,6 +45,9 @@
   .range { display: inline-flex; flex-wrap: wrap; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
   .range button { border: 0; background: transparent; color: var(--soft); padding: 6px 11px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
   .range button[aria-pressed="true"] { background: var(--green); color: #fff; }
+  .seg { display: inline-flex; gap: 2px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: transparent; color: var(--soft); padding: 6px 11px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
+  .seg button[aria-pressed="true"] { background: var(--green); color: #fff; }
   .quiet { border: 0; background: transparent; color: var(--green); font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; text-decoration: none; font-size: 13px; }
   .quiet:hover { background: var(--subtle); }
   .quiet.danger { color: var(--danger); }
@@ -235,8 +238,8 @@
 
   <section class="block" id="ads-section" hidden>
     <div class="section-head">
-      <div><h2>Ads</h2><p class="lede">Every Payoff ad from the last 30 days: its picture and copy, Meta's lifetime numbers, and what the people it sent did on the site.</p></div>
-      <span class="spacer"></span><span class="updated" id="ads-updated"></span>
+      <div><h2>Ads</h2><p class="lede">Every Payoff ad from the last 30 days: its picture and copy, Meta's numbers for today or all time, and what the people it sent did on the site. The verdict line always counts all time, as Meta's rules do.</p></div>
+      <span class="spacer"></span><div class="seg" id="ads-range" role="group" aria-label="Show the ads' numbers for"><button type="button" data-ads-range="today">Today</button><button type="button" data-ads-range="all">All time</button></div><span class="updated" id="ads-updated"></span>
     </div>
     <div class="card rules" id="rules"></div>
     <p class="error" id="ads-error" hidden></p>
@@ -325,7 +328,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
 let adminToken = '';
 try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
-let state = { version: 2, tool: 'payoff', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false };
+let state = { version: 2, tool: 'payoff', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false, adsRange: 'today' };
 let feedAll = false, lastData = null;
 try {
   const saved = JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}');
@@ -342,6 +345,7 @@ const syncToolLink = () => {
   history.replaceState(null, '', url);
 };
 if (!['today','yesterday','24h','7d','30d','all','since-reset','custom'].includes(state.period)) state.period = 'today';
+if (!['today', 'all'].includes(state.adsRange)) state.adsRange = 'today';
 try { new Intl.DateTimeFormat('en-US', { timeZone: state.timezone }); } catch (_) { state.timezone = 'America/Chicago'; }
 const saveState = () => { try { localStorage.setItem('marketelWedgeFunnel', JSON.stringify(state)); } catch (_) {} };
 const zoned = (iso, options = {}) => new Date(iso).toLocaleString('en-US', { timeZone: state.timezone,
@@ -400,10 +404,13 @@ const FLOW_LABELS = ['Clicked', 'Story', 'Letter', 'Order page', 'Stayed 20s', '
 const paragraphs = body => String(body || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 
 function adCard(ad) {
-  const m = ad.meta, perSale = ad.sales ? m.spend / ad.sales : null;
+  // Today's numbers or all time (the switch above the cards); the verdict is always all time.
+  const today = state.adsRange === 'today';
+  const m = (today ? ad.today : ad.meta) || ad.meta, sales = today ? (ad.salesToday || 0) : ad.sales;
+  const perSale = sales ? m.spend / sales : null;
   const hook = paragraphs(ad.body)[0] || '';
   const verdict = ad.verdict || { key: 'old', label: '' };
-  const steps = ad.steps.length ? ad.steps : [];
+  const steps = (today ? ad.stepsToday : ad.steps) || [];
   const note = ad.note || {};
   const noteRows = [['Image', note.image], ['Copy', note.copy], ['Testing', note.testing], ['Verdict', note.verdict]].filter(([, v]) => v);
   return `<article class="ad v-${esc(verdict.key)}" data-ad="${esc(ad.id)}">
@@ -415,7 +422,7 @@ function adCard(ad) {
         <div class="pills"><span class="pill s-${esc(ad.status)}">${esc(ad.statusLabel)}</span><span class="pill">For: ${esc(ad.eventLabel)}</span><span class="pill">Since ${esc(day(ad.created))}</span></div>
       </div>
     </div>
-    <div class="verdict">${esc(verdict.label)}${verdict.progress !== undefined ? `<div class="bar"><i style="width:${Math.round(verdict.progress * 100)}%"></i></div>` : ''}</div>
+    <div class="verdict">${esc(verdict.label)}${today ? ' <span class="muted">· all time</span>' : ''}${verdict.progress !== undefined ? `<div class="bar"><i style="width:${Math.round(verdict.progress * 100)}%"></i></div>` : ''}</div>
     <div class="ad-copy">
       ${ad.headline ? `<div class="headline">${esc(ad.headline)}</div>` : ''}
       ${hook ? `<p class="hook">${esc(hook.length > 320 ? hook.slice(0, 317) + '…' : hook)}</p>` : ''}
@@ -426,12 +433,12 @@ function adCard(ad) {
       <div><dt>Cost per 1,000 views</dt><dd>${m.impressions ? dollars(m.cpm) : '—'}</dd></div>
       <div><dt>Clicks</dt><dd>${m.clicks} <small class="muted">${m.impressions ? `${m.ctr.toFixed(1)}%` : ''}</small></dd></div>
       <div><dt>Landed</dt><dd>${m.landingViews}</dd></div>
-      <div><dt>Sales</dt><dd>${ad.sales}</dd></div>
+      <div><dt>Sales${today ? ' today' : ''}</dt><dd>${sales}</dd></div>
       <div><dt>Cost per sale</dt><dd>${perSale ? dollars(perSale) : '—'}</dd></div>
     </dl>
-    <div class="after"><h4>After the click (our count, since Oct 27)</h4>${steps.length
+    <div class="after"><h4>After the click (our count, ${today ? 'today' : 'since Oct 27'})</h4>${steps.length
       ? `<ol class="flow">${steps.map((s, i) => `<li class="${s.people && i ? 'lit' : ''}" title="${esc(s.label)}"><b>${s.people}</b>${esc(FLOW_LABELS[i] || s.label)}</li>`).join('')}</ol>`
-      : '<p class="muted" style="margin:0;font-size:13px">No visitors tagged with this ad yet.</p>'}</div>
+      : `<p class="muted" style="margin:0;font-size:13px">No visitors tagged with this ad ${today ? 'today' : 'yet'}.</p>`}</div>
     <div class="spacer-grow"></div>
     <div class="note"><h4>What it is</h4>${noteRows.length ? noteRows.map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join('') : '<p class="empty-note">No notes yet: what the image shows, what kind of copy it is, what it tests.</p>'}
       <button type="button" class="quiet" data-edit-ad="${esc(ad.id)}">Edit notes</button></div>
@@ -546,7 +553,9 @@ function renderAds(report) {
   renderRules(report.rules);
   $('ads-error').hidden = !report.metaError;
   $('ads-error').textContent = report.metaError ? `Couldn't read the ads from Meta (${report.metaError}). The log below still works.` : '';
-  const live = report.ads.filter(a => a.status !== 'off'), stopped = report.ads.filter(a => a.status === 'off');
+  const isLive = a => ['running', 'review'].includes(a.status);
+  const live = report.ads.filter(isLive), stopped = report.ads.filter(a => !isLive(a));
+  document.querySelectorAll('[data-ads-range]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.adsRange === state.adsRange)));
   $('ad-cards').innerHTML = live.length ? live.map(adCard).join('') : (report.metaError ? '' : '<p class="muted">No ads running.</p>');
   $('stopped').hidden = !stopped.length;
   $('stopped-summary').textContent = `Stopped ads (${stopped.length})`;
@@ -578,6 +587,10 @@ async function loadAds({ fresh = false } = {}) {
   }
 }
 $('log-new').onclick = () => logForm();
+document.querySelectorAll('[data-ads-range]').forEach(button => button.onclick = () => {
+  state.adsRange = button.dataset.adsRange; saveState();
+  if (adsReport && !editing()) renderAds(adsReport);
+});
 
 // ---- Visitors ---------------------------------------------------------------
 function render(data) {

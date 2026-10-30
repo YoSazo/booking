@@ -109,11 +109,15 @@ function adsReport() {
     body: 'We were told to pay more. We were already paying $1,780 a month.\n\nOur debt-free date was 2044.', words: 17,
     meta: { spend: 23.4, impressions: 520, cpm: 45, clicks: 40, ctr: 7.7, landingViews: 31, purchases: 0 },
     steps: ['Visitors from this ad', 'Opened the story page', 'Opened the sales letter', 'Viewed the order page', 'Stayed 20 seconds or started paying (Meta: AddToCart)', 'Typed a valid email', 'Paid']
-      .map((label, i) => ({ label, people: [9, 9, 3, 2, 1, 0, 0][i] })), sales: 0, verdict, note: null, ...extra });
+      .map((label, i) => ({ label, people: [9, 9, 3, 2, 1, 0, 0][i] })), sales: 0, verdict, note: null,
+    today: { spend: 6.1, impressions: 130, cpm: 46.9, clicks: 9, ctr: 6.9, landingViews: 7, purchases: 0 },
+    stepsToday: ['Visitors from this ad', 'Opened the story page', 'Opened the sales letter', 'Viewed the order page', 'Stayed 20 seconds or started paying (Meta: AddToCart)', 'Typed a valid email', 'Paid']
+      .map((label, i) => ({ label, people: [3, 3, 1, 1, 0, 0, 0][i] })), salesToday: 0, ...extra });
   return { tool: 'payoff', supported: true, checkedAt: new Date().toISOString(), metaError: null,
     rules: { killAt: 60, breakEven: 28.11, winnerSales: 2, text: ['Every campaign optimises for Purchase.', 'An ad that spends $60 with no sale is turned off.'] },
     ads: [ad('111111', 'CAR', 'running', 'Running', { key: 'testing', label: '$23.40 of $60.00, no sale yet', progress: 0.39 }, { note: { image: 'Car at night', copy: 'Customer voice, long-form', testing: '', verdict: '' } }),
       ad('222222', 'TABLE', 'review', 'In review', { key: 'testing', label: '$0.00 of $60.00, no sale yet', progress: 0 }),
+      ad('444444', 'REJECTED', 'rejected', 'Has issues', { key: 'off', label: 'Off after $32.50, no sale' }),
       ad('333333', 'OLD AD', 'off', 'Off', { key: 'off', label: 'Off after $38.16, no sale' })],
     log: [{ id: 'guide1', createdAt: '2026-10-20T12:00:00Z', title: 'How we run it', status: 'guide', question: 'Most verdicts per dollar', changed: 'Two lanes',
       outcomes: [{ if: 'A card says Turn it off', means: '$60, no sale', next: 'Swap in the next creative that day' }] },
@@ -143,10 +147,19 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 1000
     await page.waitForSelector('#ad-cards .ad');
     // Live ads as cards; the stopped one folded away.
     assert.deepEqual(await page.$$eval('#ad-cards .ad-name', els => els.map(el => el.textContent)), ['CAR', 'TABLE']);
-    assert.deepEqual(await page.$$eval('#stopped-cards .ad-name', els => els.map(el => el.textContent)), ['OLD AD']);
+    assert.deepEqual(await page.$$eval('#stopped-cards .ad-name', els => els.map(el => el.textContent)), ['REJECTED', 'OLD AD'], 'a rejected ad is not running either');
     assert.equal(await page.isVisible('#stopped-cards .ad'), false);
     const car = page.locator('#ad-cards .ad').first();
-    assert.match(await car.locator('.verdict').innerText(), /\$23\.40 of \$60\.00, no sale yet/);
+    // Today's numbers to start; the verdict stays all time, as Meta's rules count.
+    assert.equal(await page.getAttribute('[data-ads-range="today"]', 'aria-pressed'), 'true');
+    assert.match(await car.locator('.verdict').innerText(), /\$23\.40 of \$60\.00, no sale yet · all time/);
+    assert.match(await car.locator('.nums').innerText(), /Spent\s*\$6\.10[\s\S]*Sales today\s*0/);
+    assert.deepEqual(await car.locator('.flow li b').allInnerTexts(), ['3', '3', '1', '1', '0', '0', '0']);
+    assert.match(await car.locator('.after h4').innerText(), /our count, today/);
+    await page.locator('[data-ads-range="all"]').click();
+    assert.equal(await page.getAttribute('[data-ads-range="all"]', 'aria-pressed'), 'true');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('marketelWedgeFunnel')).adsRange), 'all', 'the choice is remembered');
+    assert.doesNotMatch(await car.locator('.verdict').innerText(), /all time/);
     assert.match(await car.locator('.headline').innerText(), /2044 to 2032/);
     assert.match(await car.locator('.hook').innerText(), /We were told to pay more/);
     assert.match(await car.locator('.nums').innerText(), /Spent\s*\$23\.40/);

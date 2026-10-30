@@ -51,6 +51,14 @@ const statusOf = status => (status === 'ACTIVE' ? ['running', 'Running']
   : ['PENDING_REVIEW', 'IN_PROCESS', 'PREAPPROVED'].includes(status) ? ['review', 'In review']
     : ['DISAPPROVED', 'WITH_ISSUES'].includes(status) ? ['rejected', status === 'DISAPPROVED' ? 'Rejected' : 'Has issues'] : ['off', 'Off']);
 const money = value => `$${value.toFixed(2)}`;
+// "Today" is the ad account's day (US/Central), as Meta counts it.
+const TIME_ZONE = 'America/Chicago';
+function startOfDay(at, timeZone = TIME_ZONE) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+    .formatToParts(at).map(part => [part.type, part.value]));
+  const offset = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - Math.floor(at.getTime() / 1000) * 1000;
+  return new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) - offset);
+}
 
 // Where the ad stands by the rules. Sales are the higher of Meta's count and
 // ours, so a sale either side saw counts.
@@ -66,10 +74,11 @@ function verdictOf({ status, event, spend, sales }, rules) {
 
 // Our own steps for each ad, since ads were tagged (Oct 27): everyone who
 // clicked it, followed through to paying.
-async function ourSteps(prisma, tool, ids) {
+async function ourSteps(prisma, tool, ids, since = null) {
   const ads = definitionFor(tool).ads;
   if (!ads || !ids.length) return new Map();
-  const tags = await prisma.inspectEvent.findMany({ where: { tool, name: ads.event, detail: { in: ids } }, select: { name: true, detail: true, visitorId: true, createdAt: true } });
+  const tags = await prisma.inspectEvent.findMany({ where: { tool, name: ads.event, detail: { in: ids }, ...(since ? { createdAt: { gte: since } } : {}) },
+    select: { name: true, detail: true, visitorId: true, createdAt: true } });
   const visitors = [...new Set(tags.map(tag => tag.visitorId).filter(Boolean))];
   const names = [...new Set(ads.steps.flatMap(([, list]) => list).map(name => name.split(':')[0]))];
   const events = visitors.length ? await prisma.inspectEvent.findMany({ where: { tool, visitorId: { in: visitors }, name: { in: [...names, ads.event] } },
@@ -109,11 +118,12 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     const since = now() - RECENT_DAYS * 86400000;
     const ads = (listed.data || []).filter(ad => /\/payoff/.test(copyOf(ad).link || '')
       && (ad.effective_status === 'ACTIVE' || new Date(ad.created_time).getTime() >= since));
-    const insights = ads.length ? await meta(`act_${account}/insights`, { level: 'ad', date_preset: 'maximum', limit: '200',
+    // Lifetime (what the verdict and Meta's rules use) and today, for the page's toggle.
+    const byDay = async preset => new Map(((ads.length ? await meta(`act_${account}/insights`, { level: 'ad', date_preset: preset, limit: '200',
       fields: 'ad_id,spend,impressions,cpm,inline_link_clicks,inline_link_click_ctr,actions',
-      filtering: [{ field: 'ad.id', operator: 'IN', value: ads.map(ad => ad.id) }] }) : { data: [] };
-    const stats = new Map((insights.data || []).map(row => [row.ad_id, row]));
-    const result = ads.map(ad => ({ ad, stats: stats.get(ad.id) || {} }));
+      filtering: [{ field: 'ad.id', operator: 'IN', value: ads.map(ad => ad.id) }] }) : { data: [] }).data || []).map(row => [row.ad_id, row]));
+    const [stats, today] = await Promise.all([byDay('maximum'), byDay('today')]);
+    const result = ads.map(ad => ({ ad, stats: stats.get(ad.id) || {}, today: today.get(ad.id) || {} }));
     cached = { ads: result, until: now() + cacheMs };
     return result;
   }
@@ -132,23 +142,26 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     const { rules, adNotes, log } = await notes(tool);
     let metaError = null, listed = [];
     try { listed = await metaAds(); } catch (error) { metaError = error.message; }
-    const ours = await ourSteps(prisma, tool, listed.map(({ ad }) => ad.id));
-    const ads = listed.map(({ ad, stats }) => {
+    const ids = listed.map(({ ad }) => ad.id);
+    const [ours, oursToday] = await Promise.all([ourSteps(prisma, tool, ids), ourSteps(prisma, tool, ids, startOfDay(new Date(now())))]);
+    const numbers = stats => ({ spend: number(stats.spend), impressions: number(stats.impressions), cpm: number(stats.cpm), clicks: number(stats.inline_link_clicks),
+      ctr: number(stats.inline_link_click_ctr), landingViews: action(stats.actions, 'landing_page_view'), purchases: action(stats.actions, 'offsite_conversion.fb_pixel_purchase') });
+    const ads = listed.map(({ ad, stats, today = {} }) => {
       const link = copyOf(ad);
       const [status, statusLabel] = statusOf(ad.effective_status);
       const event = ad.adset?.promoted_object?.custom_event_type || null;
-      const spend = number(stats.spend), purchases = action(stats.actions, 'offsite_conversion.fb_pixel_purchase');
-      const steps = ours.get(ad.id)?.steps || [];
-      const sales = Math.max(purchases, steps.at(-1)?.people || 0);
+      const meta = numbers(stats), metaToday = numbers(today);
+      const spend = meta.spend;
+      const steps = ours.get(ad.id)?.steps || [], stepsToday = oursToday.get(ad.id)?.steps || [];
+      const sales = Math.max(meta.purchases, steps.at(-1)?.people || 0);
       const body = String(link.message || '');
       return {
         id: ad.id, name: ad.name, short: short(ad.name), created: ad.created_time, campaign: ad.campaign?.name || '', adset: ad.adset?.name || '',
         status, statusLabel, event, eventLabel: EVENT_LABELS[event] || event || '—',
         image: ad.creative?.image_url || ad.creative?.thumbnail_url || null, thumb: ad.creative?.thumbnail_url || null,
         headline: link.name || '', description: link.description || '', body, words: body.split(/\s+/).filter(Boolean).length,
-        meta: { spend, impressions: number(stats.impressions), cpm: number(stats.cpm), clicks: number(stats.inline_link_clicks), ctr: number(stats.inline_link_click_ctr),
-          landingViews: action(stats.actions, 'landing_page_view'), purchases },
-        steps, sales, verdict: verdictOf({ status, event, spend, sales }, rules), note: adNotes.get(ad.id) || null,
+        meta, today: metaToday, steps, stepsToday, salesToday: Math.max(metaToday.purchases, stepsToday.at(-1)?.people || 0),
+        sales, verdict: verdictOf({ status, event, spend, sales }, rules), note: adNotes.get(ad.id) || null,
       };
     }).sort((a, b) => (a.status === 'off') - (b.status === 'off') || new Date(b.created) - new Date(a.created));
     return { tool, supported: true, rules, ads, log, metaError, checkedAt: new Date(now()).toISOString() };
@@ -182,4 +195,4 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
   return { report, save };
 }
 
-module.exports = { createAdsReport, metaClient, verdictOf, cleanNote, RULE_DEFAULTS };
+module.exports = { startOfDay, createAdsReport, metaClient, verdictOf, cleanNote, RULE_DEFAULTS };

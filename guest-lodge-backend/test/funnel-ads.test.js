@@ -11,6 +11,7 @@ function fakePrisma(events = []) {
   let seq = 0;
   const matches = (row, where) => Object.entries(where).every(([key, want]) => {
     if (want && typeof want === 'object' && 'in' in want) return want.in.includes(row[key]);
+    if (want && typeof want === 'object' && 'gte' in want) return row[key] >= want.gte;
     return row[key] === want;
   });
   return {
@@ -38,13 +39,13 @@ const metaAd = (id, name, status, event, extra = {}) => ({
   ...extra,
 });
 
-function fakeMeta(ads, stats) {
+function fakeMeta(ads, stats, todayStats = []) {
   const calls = [];
   const meta = async (path, params) => {
     calls.push(path);
     if (path === 'me/adaccounts') return { data: [{ account_id: '42' }] };
     if (path === 'act_42/ads') return { data: ads };
-    if (path === 'act_42/insights') return { data: stats.filter(row => params.filtering[0].value.includes(row.ad_id)) };
+    if (path === 'act_42/insights') return { data: (params.date_preset === 'today' ? todayStats : stats).filter(row => params.filtering[0].value.includes(row.ad_id)) };
     throw new Error(`unexpected ${path}`);
   };
   return { meta, calls };
@@ -72,6 +73,8 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
     { id: 'e5', tool: 'payoff', name: 'PayoffPaid', detail: 'x', visitorId: 'v_a', createdAt: at(5) },
     { id: 'e6', tool: 'payoff', name: 'PayoffAd', detail: CAR, visitorId: 'v_b', createdAt: at(6) },
     { id: 'e7', tool: 'payoff', name: 'PayoffStory', detail: 'viewed', visitorId: 'v_b', createdAt: at(7) },
+    // Yesterday afternoon (Central): counts all time, not today.
+    { id: 'e8', tool: 'payoff', name: 'PayoffAd', detail: CAR, visitorId: 'v_old', createdAt: new Date(Date.UTC(2026, 9, 27, 20)) },
   ]);
   const ads = [metaAd(CAR, 'PROJECT PAYOFF | PURCHASE | CAR', 'ACTIVE', 'PURCHASE'), metaAd(TABLE, 'PROJECT PAYOFF | PURCHASE | TABLE', 'PENDING_REVIEW', 'PURCHASE'),
     metaAd(OLD, 'PROJECT PAYOFF | ATC | OLD AD', 'CAMPAIGN_PAUSED', 'ADD_TO_CART'),
@@ -82,7 +85,8 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
       object_story_spec: { video_data: { title: 'See Your Debt-Free Date in 2 Minutes', message: 'Spreadsheets aren\'t for everyone.', call_to_action: { type: 'LEARN_MORE', value: { link: 'https://bookmarketel.com/payoff' } } } } } })];
   const stats = [{ ad_id: CAR, spend: '12.50', impressions: '300', cpm: '41.6', inline_link_clicks: '25', inline_link_click_ctr: '8.3',
     actions: [{ action_type: 'landing_page_view', value: '20' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '0' }] }];
-  const { meta, calls } = fakeMeta(ads, stats);
+  const todayStats = [{ ad_id: CAR, spend: '4.10', impressions: '90', cpm: '45.5', inline_link_clicks: '6', inline_link_click_ctr: '6.7', actions: [{ action_type: 'landing_page_view', value: '5' }] }];
+  const { meta, calls } = fakeMeta(ads, stats, todayStats);
   const reporter = createAdsReport({ prisma, meta, now: () => Date.UTC(2026, 9, 28, 16) });
   await reporter.save({ tool: 'payoff', kind: 'ad', key: CAR, data: { image: 'Car at night', copy: 'Customer voice, long-form', extra: 'dropped' } });
   const logged = await reporter.save({ tool: 'payoff', kind: 'log', data: { title: 'Round 1: CAR vs TABLE vs kitchen', status: 'running', ads: [CAR, 'nope'],
@@ -97,7 +101,12 @@ test('the Ads report lists Payoff ads with picture, copy, Meta numbers, our step
   assert.equal(car.headline, 'PROJECT PAYOFF | PURCHASE | CAR headline');
   assert.equal(car.words, 8);
   assert.deepEqual(car.meta, { spend: 12.5, impressions: 300, cpm: 41.6, clicks: 25, ctr: 8.3, landingViews: 20, purchases: 0 });
-  assert.deepEqual(car.steps.map(s => s.people), [2, 2, 1, 1, 0, 0, 1]);
+  assert.deepEqual(car.steps.map(s => s.people), [3, 2, 1, 1, 0, 0, 1]);
+  // Today (the ad account's day, US/Central): Meta's numbers for today and our visitors tagged since its midnight.
+  assert.deepEqual(car.today, { spend: 4.1, impressions: 90, cpm: 45.5, clicks: 6, ctr: 6.7, landingViews: 5, purchases: 0 });
+  assert.deepEqual(car.stepsToday.map(s => s.people), [2, 2, 1, 1, 0, 0, 1], 'both visitors came on Oct 28, which is today at 11 AM Central');
+  assert.equal(car.salesToday, 1);
+  assert.equal(report.ads.find(ad => ad.short === 'TABLE').today.spend, 0, 'no row today is zero, not missing');
   assert.equal(car.sales, 1, 'our paid count counts even when Meta missed it');
   assert.equal(car.verdict.key, 'selling');
   assert.deepEqual(car.note, { image: 'Car at night', copy: 'Customer voice, long-form', testing: '', verdict: '' });
