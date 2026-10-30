@@ -12163,9 +12163,16 @@ app.get('/guest-support', (req, res) => {
     res.sendFile(path.join(__dirname, 'guest-support.html'));
 });
 
-// Root serves landing page too (for mktel.co)
+// The homepage is the booking engine offer (the same page as /engine); the
+// old trial landing stays at /landing. Other names for this server send the
+// visitor to bookmarketel.com, where checkout runs, keeping the ad's click id.
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'landing.html'));
+    const host = normalizeDomain(req.hostname || '');
+    if (['mktel.co', 'www.mktel.co', 'www.bookmarketel.com'].includes(host)) {
+        return res.redirect(302, `https://bookmarketel.com${req.originalUrl}`);
+    }
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, 'engine.html'));
 });
 
 // ── SELF-SERVE SETUP ──────────────────────────────────────────
