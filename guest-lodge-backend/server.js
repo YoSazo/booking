@@ -392,6 +392,12 @@ async function buildGuestBookingUrl(hotelId, code, req) {
     return `${base}/booking/${encodeURIComponent(code)}`;
 }
 
+// Guestel, the guest app, and its App Clip are off for now (Oct 30 2026): the
+// Marketel app on the App Store is a different product. While this is false no
+// guest email offers the app, no install reminders go out, and no domain
+// advertises the App Clip. GUESTEL_ENABLED=true on Render turns it back on.
+const GUESTEL_ENABLED = process.env.GUESTEL_ENABLED === 'true';
+
 function buildGuestelInvocationUrl({ hotelId, domain, intent = 'add', handoffToken, ref = 'email' }) {
     const params = new URLSearchParams({ p: 'com.bookmarketel.guestel.Clip' });
     if (domain) params.set('domain', domain);
@@ -403,6 +409,7 @@ function buildGuestelInvocationUrl({ hotelId, domain, intent = 'add', handoffTok
 }
 
 async function buildGuestInstallUrl(hotelId, code, req, ref = 'email') {
+    if (!GUESTEL_ENABLED) return '';
     const base = await buildGuestSiteBase(hotelId, req);
     let domain = '';
     try { domain = base ? new URL(base).hostname : ''; } catch (_) {}
@@ -1062,13 +1069,13 @@ app.use(cors(corsOptions));
 // dotfile dirs (.well-known) by default. Required for the Guestel App Clip to be
 // invocable from bookmarketel.com (appclips) and for Universal Links.
 const APPLE_APP_SITE_ASSOCIATION = {
-    appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] },
+    ...(GUESTEL_ENABLED ? { appclips: { apps: ['YAS2Z7ZY3M.com.bookmarketel.guestel.Clip'] } } : {}),
     applinks: {
         details: [
-            {
+            ...(GUESTEL_ENABLED ? [{
                 appIDs: ['YAS2Z7ZY3M.com.bookmarketel.guestel'],
                 components: [{ '/': '/clip/*', comment: 'Open a hotel directly in Guestel' }],
-            },
+            }] : []),
             {
                 appIDs: ['YAS2Z7ZY3M.com.bookmarketel.frontdesk'],
                 components: [{ '/': '/inspect/open', comment: 'Continue an Inspect report in Marketel' }],
@@ -18994,7 +19001,7 @@ function startServer() {
     return app.listen(PORT, () => {
     console.log(`Backend server is running on http://localhost:${PORT}`);
     // Pre-check-in guest install reminders (12–36h before check-in)
-    if (process.env.ENABLE_GUEST_INSTALL_REMINDERS !== 'false') {
+    if (GUESTEL_ENABLED && process.env.ENABLE_GUEST_INSTALL_REMINDERS !== 'false') {
         const REMINDER_INTERVAL_MS = 60 * 60 * 1000;
         setTimeout(() => runGuestInstallReminders().catch((e) => console.error('Guest install reminders:', e.message)), 90_000);
         setInterval(() => runGuestInstallReminders().catch((e) => console.error('Guest install reminders:', e.message)), REMINDER_INTERVAL_MS);

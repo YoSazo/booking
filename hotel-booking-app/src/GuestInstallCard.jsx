@@ -5,6 +5,7 @@ import { BRAND, isAndroid, isIos } from './guestInstallUtils.js';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
 import { guestelInvocationUrl } from './appClipInstall.js';
+import { GUEST_APP_ENABLED } from './guestApp.js';
 
 function GuestInstallCard({
   hotelName,
@@ -203,4 +204,5 @@ function GuestInstallCard({
   );
 }
 
-export default GuestInstallCard;
+// Off while the guest app is (guestApp.js): every page that shows this shows nothing.
+export default GUEST_APP_ENABLED ? GuestInstallCard : function NoGuestInstallCard() { return null; };

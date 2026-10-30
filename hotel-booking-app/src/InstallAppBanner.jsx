@@ -4,6 +4,7 @@ import { BRAND, isAndroid, isIos } from './guestInstallUtils.js';
 import { trackGuestInstall } from './guestInstallTracking.js';
 import GuestInstallQrOverlay from './GuestInstallQrOverlay.jsx';
 import { guestelInvocationUrl } from './appClipInstall.js';
+import { GUEST_APP_ENABLED } from './guestApp.js';
 
 // The booking engine has one guest-app path: Guestel. iPhone taps invoke the
 // App Clip; desktop taps reveal the exact same experience as a QR code.
@@ -151,4 +152,5 @@ function InstallAppBanner({
   );
 }
 
-export default InstallAppBanner;
+// Off while the guest app is (guestApp.js): every page that shows this shows nothing.
+export default GUEST_APP_ENABLED ? InstallAppBanner : function NoInstallAppBanner() { return null; };
