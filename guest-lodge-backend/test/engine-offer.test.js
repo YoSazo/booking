@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { registerEngineOffer, order, PRODUCT, TODAY_CENTS, SETUP, MONTHLY } = require('../engine-offer');
+const { registerEngineOffer, order, PRODUCT, TODAY_CENTS, SETUP, MONTHLY, LIFETIME } = require('../engine-offer');
 
 const ACCOUNT = '51AbCdEfGhIjKlMnO';
 const ENV = { NODE_ENV: 'test', STRIPE_INSPECT_SECRET_KEY: `sk_test_${ACCOUNT}xyz`, STRIPE_INSPECT_PUBLISHABLE_KEY: `pk_test_${ACCOUNT}abc` };
@@ -11,6 +11,7 @@ const ATTEMPT = '0123456789abcdef0123456789abcdef';
 
 function world({ env = ENV, failText = false, failMail = false } = {}) {
   const rows = new Map(), creates = [], sessions = new Map(), subscriptions = new Map(), capi = [], texts = [], emails = [];
+  const methods = new Map(), intents = [], cancelled = [], world = { intentStatus: 'succeeded' };
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return rows.get(where.sourceId); },
     create: async ({ data }) => {
@@ -21,16 +22,29 @@ function world({ env = ENV, failText = false, failMail = false } = {}) {
     delete: async ({ where }) => rows.delete(where.sourceId),
   } };
   const stripe = { checkout: { sessions: {
-    create: async (params, options) => { creates.push({ params, options }); return { id: 'cs_test_created' + creates.length, client_secret: 'cs_test_created_secret_' + creates.length }; },
+    create: async (params, options) => { creates.push({ params, options }); return { id: 'cs_test_created' + creates.length, client_secret: 'cs_test_created_secret_' + creates.length,
+      url: params.mode === 'payment' ? 'https://checkout.stripe.com/c/pay/cs_test_life' + creates.length : undefined }; },
     retrieve: async id => { if (!sessions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return sessions.get(id); },
-  } }, subscriptions: { retrieve: async id => subscriptions.get(id) } };
+  } }, subscriptions: {
+    retrieve: async id => { if (!subscriptions.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return subscriptions.get(id); },
+    update: async (id, { metadata }) => { const sub = subscriptions.get(id); sub.metadata = { ...sub.metadata, ...metadata }; return sub; },
+    cancel: async id => { const sub = subscriptions.get(id); sub.status = 'canceled'; cancelled.push(id); return sub; },
+  }, paymentMethods: { retrieve: async id => { if (!methods.has(id)) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return methods.get(id); } },
+  paymentIntents: {
+    create: async (params, options) => {
+      intents.push({ params, options });
+      if (world.intentStatus === 'declined') throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError' });
+      return { id: 'pi_test' + intents.length, status: world.intentStatus, amount: params.amount, amount_received: world.intentStatus === 'succeeded' ? params.amount : 0, metadata: params.metadata };
+    },
+    cancel: async id => { cancelled.push(id); return { id, status: 'canceled' }; },
+  } };
   const app = express();
   const registration = registerEngineOffer(app, { stripe, prisma, env, capiConfigured: true,
     mail: { sendMail: async message => { if (failMail) throw new Error('smtp down'); emails.push(message); } },
     queueCapi: async (name, input) => { capi.push({ name, ...input }); return { queued: true }; },
     text: async body => { if (failText) throw new Error('twilio down'); texts.push(body); },
     isExcludedEmail: email => email === 'owner@bookmarketel.com' });
-  return { app, registration, rows, creates, sessions, subscriptions, capi, texts, emails };
+  return { app, registration, rows, creates, sessions, subscriptions, capi, texts, emails, methods, intents, cancelled, world };
 }
 
 async function serve(w, fn) {
@@ -129,7 +143,8 @@ test('a paid order is confirmed once: one Purchase, one text, one welcome email,
   await serve(w, async ({ post }) => {
     const done = await post('/api/engine/confirm', { sessionId: 'cs_test_paid0000001' });
     assert.equal(done.status, 200, JSON.stringify(done.body));
-    assert.deepEqual(done.body, { paid: true, reference: 'cs_test_paid0000001', value: 97, property: 'Lakeview Inn', pms: 'Little Hotelier', email: 'owner@lakeview.test', emailSent: true });
+    assert.deepEqual(done.body, { paid: true, reference: 'cs_test_paid0000001', value: 97, property: 'Lakeview Inn', pms: 'Little Hotelier', email: 'owner@lakeview.test', emailSent: true,
+      lifetime: { open: false, done: false, oneClick: false, priceCents: LIFETIME.cents } });
     await post('/api/engine/confirm', { sessionId: 'cs_test_paid0000001' });
     await w.registration.handleStripeEvent({ type: 'checkout.session.completed', data: { object: { id: 'cs_test_paid0000001', metadata: { product: PRODUCT } } } });
   });
@@ -198,4 +213,87 @@ test('page steps are recorded per visitor; unknown ones are refused', async () =
   });
   assert.deepEqual([...w.rows.values()].map(r => [r.name, r.detail]), [['EngineStep', 'viewed']]);
   assert.deepEqual(w.capi.map(e => [e.name, e.eventId]), [['PageView', 'engine-pv.v_abcdefgh12.abc123def4']]);
+});
+
+// A paid order whose monthly plan was just started with a card (or a wallet).
+function justPaid(w, id, { wallet = false, minutesAgo = 2 } = {}) {
+  w.sessions.set(id, paid(id, { subscription: 'sub_' + id, created: Math.floor(Date.now() / 1000) - minutesAgo * 60 }));
+  w.subscriptions.set('sub_' + id, { id: 'sub_' + id, status: 'active', customer: 'cus_1', default_payment_method: 'pm_' + id, metadata: { product: PRODUCT, property: 'Lakeview Inn' } });
+  w.methods.set('pm_' + id, { id: 'pm_' + id, type: 'card', customer: 'cus_1', card: wallet ? { wallet: { type: 'apple_pay' } } : { wallet: null } });
+}
+
+test('right after paying, $497 pay-once is one tap on the same card, and the monthly plan is cancelled', async () => {
+  const w = world();
+  justPaid(w, 'cs_test_life0000001');
+  await serve(w, async ({ post }) => {
+    const offer = await post('/api/engine/confirm', { sessionId: 'cs_test_life0000001' });
+    assert.deepEqual(offer.body.lifetime, { open: true, done: false, oneClick: true, priceCents: 49700 });
+    const yes = await post('/api/engine/lifetime', { sessionId: 'cs_test_life0000001' });
+    assert.equal(yes.status, 200, JSON.stringify(yes.body));
+    assert.deepEqual(yes.body, { lifetime: true, value: 497, reference: 'cs_test_life0000001' });
+    assert.equal(w.intents[0].params.amount, 49700);
+    assert.equal(w.intents[0].params.payment_method, 'pm_cs_test_life0000001');
+    assert.equal(w.intents[0].options.idempotencyKey, 'engine-lifetime:cs_test_life0000001:saved');
+    const sub = w.subscriptions.get('sub_cs_test_life0000001');
+    assert.equal(sub.status, 'canceled');
+    assert.equal(sub.metadata.lifetime, 'pi_test1');
+    // Tapping again, the webhook and Stripe's cancellation repeat nothing.
+    assert.equal((await post('/api/engine/lifetime', { sessionId: 'cs_test_life0000001' })).body.lifetime, true);
+    await w.registration.handleStripeEvent({ type: 'payment_intent.succeeded', data: { object: { id: 'pi_test1', amount_received: 49700,
+      metadata: { product: LIFETIME.product, parentOrder: 'cs_test_life0000001' } } } });
+    await w.registration.handleStripeEvent({ type: 'customer.subscription.deleted', data: { object: sub } });
+    const after = await post('/api/engine/confirm', { sessionId: 'cs_test_life0000001' });
+    assert.deepEqual(after.body.lifetime, { open: false, done: true, oneClick: false, priceCents: 49700 });
+  });
+  assert.equal(w.intents.length, 1);
+  assert.deepEqual(w.texts.filter(t => /upgrade|cancelled/.test(t)), ['Engine upgrade: $497.00 pay-once from Lakeview Inn. Their $49/month is cancelled.']);
+  assert.equal(w.emails.filter(e => /pay-once/.test(e.subject)).length, 1);
+  const upgrades = w.capi.filter(e => e.name === LIFETIME.event);
+  // Meta's queue keeps one event per id, so a repeat is harmless; Purchase stays one per customer.
+  assert.deepEqual([...new Set(upgrades.map(e => `${e.eventId}:${e.value}`))], ['engine-lifetime.cs_test_life0000001:497']);
+  assert.deepEqual([...new Set(w.capi.filter(e => e.name === 'Purchase').map(e => e.eventId))], ['engine-purchase.cs_test_life0000001']);
+});
+
+test('Apple Pay, or a card that needs another step, pays the $497 on Stripe\'s page instead', async () => {
+  const w = world();
+  justPaid(w, 'cs_test_wallet00001', { wallet: true });
+  justPaid(w, 'cs_test_3dsecure001');
+  w.world.intentStatus = 'requires_action';
+  await serve(w, async ({ post }) => {
+    const wallet = await post('/api/engine/lifetime', { sessionId: 'cs_test_wallet00001', attempt: ATTEMPT });
+    assert.equal(wallet.body.next, 'checkout');
+    assert.match(wallet.body.url, /^https:\/\/checkout\.stripe\.com\//);
+    assert.equal(wallet.body.declined, undefined);
+    assert.equal(w.intents.length, 0);
+    const made = w.creates.at(-1).params;
+    assert.equal(made.mode, 'payment');
+    assert.equal(made.line_items[0].price_data.unit_amount, 49700);
+    assert.equal(made.metadata.parentOrder, 'cs_test_wallet00001');
+    assert.equal(made.success_url, 'https://bookmarketel.com/engine/welcome?session_id=cs_test_wallet00001&lifetime_session={CHECKOUT_SESSION_ID}');
+    const action = await post('/api/engine/lifetime', { sessionId: 'cs_test_3dsecure001' });
+    assert.equal(action.body.next, 'checkout');
+    assert.match(action.body.declined, /another step/);
+    assert.deepEqual(w.cancelled, ['pi_test1'], 'the half-done charge is cancelled');
+    assert.equal(w.subscriptions.get('sub_cs_test_3dsecure001').status, 'active');
+    // Back from Stripe's page, paid.
+    w.sessions.set('cs_test_lifepaid001', { object: 'checkout.session', id: 'cs_test_lifepaid001', mode: 'payment', status: 'complete', payment_status: 'paid', amount_total: 49700,
+      metadata: { product: LIFETIME.product, parentOrder: 'cs_test_wallet00001' } });
+    assert.equal((await post('/api/engine/lifetime/confirm', { sessionId: 'cs_test_3dsecure001', lifetimeSession: 'cs_test_lifepaid001' })).status, 404, 'another order\'s payment');
+    const back = await post('/api/engine/lifetime/confirm', { sessionId: 'cs_test_wallet00001', lifetimeSession: 'cs_test_lifepaid001' });
+    assert.equal(back.body.lifetime, true);
+    assert.equal(w.subscriptions.get('sub_cs_test_wallet00001').status, 'canceled');
+    assert.equal(w.subscriptions.get('sub_cs_test_wallet00001').metadata.lifetime, 'cs_test_lifepaid001');
+  });
+});
+
+test('the pay-once offer ends an hour after paying', async () => {
+  const w = world();
+  justPaid(w, 'cs_test_late0000001', { minutesAgo: 61 });
+  await serve(w, async ({ post }) => {
+    assert.equal((await post('/api/engine/confirm', { sessionId: 'cs_test_late0000001' })).body.lifetime.open, false);
+    const late = await post('/api/engine/lifetime', { sessionId: 'cs_test_late0000001' });
+    assert.equal(late.status, 410);
+    assert.match(late.body.error, /offer has ended/);
+  });
+  assert.equal(w.intents.length, 0);
 });

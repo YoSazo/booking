@@ -30,6 +30,18 @@ li b { display: block; color: var(--text); }
 @keyframes spin { to { transform: rotate(360deg) } }
 .error { color: var(--red); font-weight: 600; }
 a { color: var(--green-dark); font-weight: 700; }
+.offer { margin: 20px 0 4px; padding: 18px; border: 2px solid var(--green); border-radius: 20px; background: #fbfdfc; }
+.offer .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #c8175f; margin-bottom: 8px; }
+.offer h2 { font-size: 22px; line-height: 1.2; letter-spacing: -.01em; font-weight: 800; margin-bottom: 8px; }
+.offer p { font-size: 15px; }
+.offer .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px; margin-top: 14px; border: 0; border-radius: 14px; background: var(--green); color: #fff; font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 16px rgba(46,125,91,.28); touch-action: manipulation; transition: transform .14s, background .14s; }
+.offer .btn:active, .offer .btn.pressed { transform: scale(.98); background: var(--green-dark); }
+.offer .btn[disabled] { opacity: .8; cursor: progress; }
+.offer .btn .spinner { border-color: rgba(255,255,255,.4); border-top-color: #fff; width: 18px; height: 18px; }
+.offer .fine { margin-top: 8px; font-size: 13px; color: var(--muted); text-align: center; }
+.offer .skip { display: block; margin: 10px auto 0; padding: 10px; border: 0; background: none; font: inherit; font-size: 14px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+.offer .error { margin-top: 10px; font-size: 14px; text-align: center; }
+.offer.done { border-style: solid; background: var(--pale); font-weight: 700; color: var(--green-dark); }
 [hidden] { display: none !important; }
 </style>
 <script src="/engine-track.js"></script>
@@ -43,12 +55,22 @@ a { color: var(--green-dark); font-weight: 700; }
     <div class="badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2e7d5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <h1>You&rsquo;re in. We&rsquo;re building <span id="property">your</span> booking engine.</h1>
     <p>It will be live within 24 hours. We sent the details to <b id="email">your email</b>.</p>
+    <div class="offer" id="lifetime" hidden>
+      <span class="tag">One-time offer, only on this page</span>
+      <h2>Skip the monthly. Pay $497 once.</h2>
+      <p>Your booking engine and PMS connection, paid off. No $49 a month, ever. That&rsquo;s about ten months of the monthly price, and every month after is free.</p>
+      <button class="btn" type="button" id="lifetimeYes">Yes, switch me to pay-once: $497</button>
+      <p class="fine" id="lifetimeFine">Charged to the card you just used. Same 30-day money-back guarantee.</p>
+      <p class="error" id="lifetimeError" role="alert" hidden></p>
+      <button class="skip" type="button" id="lifetimeNo">No thanks, I&rsquo;ll keep $49 a month</button>
+    </div>
+    <div class="offer done" id="lifetimeDone" hidden>&#10003; You&rsquo;re on pay-once. $497 paid, and there&rsquo;s nothing more to pay each month.</div>
     <ol>
       <li><span><b>We&rsquo;ll text or email you shortly</b>to set up a staff login for Marketel in <span id="pms">your PMS</span>. It&rsquo;s a separate user you can switch off any time.</span></li>
       <li><span><b>We build your booking page</b>with your rooms, photos and rates. Reply to our email with your website or a few photos if you like.</span></li>
       <li><span><b>We connect it and test a booking</b>end to end, then send you your link to put behind your Book Now button.</span></li>
     </ol>
-    <div class="billing">$97 paid today. Then $49 a month from next month. Cancel any time, and for 30 days you can ask for your money back. Questions: <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></div>
+    <div class="billing"><span id="billing">$97 paid today. Then $49 a month from next month.</span> Cancel any time, and for 30 days you can ask for your money back. Questions: <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></div>
   </div>
 
   <div class="card" id="problem" hidden>
@@ -78,11 +100,62 @@ a { color: var(--green-dark); font-weight: 700; }
       try { fired = sessionStorage.getItem('engine.purchase') === data.reference; sessionStorage.setItem('engine.purchase', data.reference); } catch { /* Fire it. */ }
       if (!fired) track.pixel('Purchase', { value: data.value }, 'engine-purchase.' + data.reference);
       show('done');
+      const back = new URLSearchParams(location.search).get('lifetime_session');
+      if (back && !data.lifetime?.done) return finishLifetime('/api/engine/lifetime/confirm', { sessionId, lifetimeSession: back });
+      if (data.lifetime?.done) return lifetimeDone();
+      if (data.lifetime?.open) offerLifetime(data.lifetime.oneClick);
     } catch {
       if (tries < 3) return setTimeout(() => confirmOrder(tries + 1), 2000);
       problem('Your connection dropped while we checked. Refresh this page to try again.');
     }
   }
+  // The pay-once upgrade: one tap on the saved card, or Stripe's page.
+  const offer = $('lifetime'), yes = $('lifetimeYes'), offerError = $('lifetimeError');
+  const attempt = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+  function offerLifetime(oneClick) {
+    if (!oneClick) $('lifetimeFine').textContent = 'You’ll pay on Stripe’s secure page. Same 30-day money-back guarantee.';
+    offer.hidden = false;
+    track.step?.('lifetime-viewed');
+  }
+  function lifetimeDone(value = 497) {
+    offer.hidden = true;
+    $('lifetimeDone').hidden = false;
+    $('billing').textContent = '$97 + $497 paid. No monthly charges, ever.';
+    let fired = false;
+    try { fired = sessionStorage.getItem('engine.lifetime') === sessionId; sessionStorage.setItem('engine.lifetime', sessionId); } catch { /* Fire it. */ }
+    // The server sends Meta the same event with this id.
+    if (!fired) track.pixel('LifetimeUpgrade', { value }, 'engine-lifetime.' + sessionId, true);
+  }
+  async function finishLifetime(path, body) {
+    offerError.hidden = true;
+    try {
+      const response = await fetch(path, { method: 'POST', headers: track.headers, body: JSON.stringify(body) });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.lifetime) return lifetimeDone(data.value);
+      if (response.ok && data.next === 'checkout' && data.url) {
+        yes.innerHTML = '<span class="spinner" aria-hidden="true"></span> ' + (data.declined ? 'Your card needs another step. Opening Stripe…' : 'Opening Stripe’s secure page…');
+        location.href = data.url;
+        return;
+      }
+      throw new Error(data.error || 'That didn’t go through. You haven’t been charged; please try again.');
+    } catch (error) {
+      offer.hidden = false;
+      offerError.textContent = error.message;
+      offerError.hidden = false;
+      yes.disabled = false;
+      yes.textContent = 'Yes, switch me to pay-once: $497';
+    }
+  }
+  yes.addEventListener('click', () => {
+    if (yes.disabled) return;
+    yes.classList.add('pressed'); setTimeout(() => yes.classList.remove('pressed'), 160);
+    yes.disabled = true;
+    yes.innerHTML = '<span class="spinner" aria-hidden="true"></span> Switching you to pay-once…';
+    track.step?.('lifetime-yes');
+    finishLifetime('/api/engine/lifetime', { sessionId, attempt });
+  });
+  $('lifetimeNo').addEventListener('click', () => { offer.hidden = true; track.step?.('lifetime-no'); });
+
   if (!/^cs_(test|live)_/.test(sessionId)) problem('This link is missing its order reference.');
   else confirmOrder();
 })();

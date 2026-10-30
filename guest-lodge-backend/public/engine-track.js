@@ -19,8 +19,8 @@
 
   const PIXEL_ID = '1545780930244672';
   const pixelOn = !excluded && location.protocol === 'https:' && !navigator.webdriver;
-  const pixel = (name, data = {}, eventID) => {
-    try { if (pixelOn && window.fbq) window.fbq('track', name, { content_name: 'Marketel booking engine', currency: 'USD', ...data }, eventID ? { eventID } : undefined); } catch { /* never break the page */ }
+  const pixel = (name, data = {}, eventID, custom = false) => {
+    try { if (pixelOn && window.fbq) window.fbq(custom ? 'trackCustom' : 'track', name, { content_name: 'Marketel booking engine', currency: 'USD', ...data }, eventID ? { eventID } : undefined); } catch { /* never break the page */ }
   };
   if (pixelOn) {
     /* eslint-disable */

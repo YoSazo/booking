@@ -27,13 +27,19 @@ const STRIPE_STUB = `
   } }; };`;
 
 // The /engine pages with the real module, a stand-in Stripe and the real public scripts.
-async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, sessions = {} } = {}) {
+async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, sessions = {}, subscriptions = {}, methods = {} } = {}) {
   const app = express();
-  const creates = [];
+  const creates = [], charges = [];
   const stripe = { checkout: { sessions: {
-    create: async params => { creates.push(params); return { id: 'cs_test_made' + creates.length, client_secret: 'cs_test_secret_' + creates.length }; },
+    create: async params => { creates.push(params); return { id: 'cs_test_made' + creates.length, client_secret: 'cs_test_secret_' + creates.length,
+      url: params.mode === 'payment' ? 'https://checkout.stripe.com/c/pay/cs_test_lifetime' : undefined }; },
     retrieve: async id => { if (!sessions[id]) throw Object.assign(new Error('missing'), { code: 'resource_missing' }); return sessions[id]; },
-  } } };
+  } }, subscriptions: {
+    retrieve: async id => subscriptions[id],
+    update: async (id, { metadata }) => Object.assign(subscriptions[id].metadata, metadata),
+    cancel: async id => Object.assign(subscriptions[id], { status: 'canceled' }),
+  }, paymentMethods: { retrieve: async id => methods[id] },
+  paymentIntents: { create: async params => { charges.push(params); return { id: 'pi_test' + charges.length, status: 'succeeded', amount_received: params.amount }; }, cancel: async () => ({}) } };
   const rows = new Map();
   const prisma = { inspectEvent: {
     upsert: async ({ where, create }) => { if (!rows.has(where.sourceId)) rows.set(where.sourceId, create); return create; },
@@ -57,7 +63,8 @@ async function world(fn, { viewport = { width: 390, height: 844 }, env = {}, ses
     // The live hotel pages, stood in for.
     await page.route(/^https:\/\/[a-z]+\.clickinns\.com\/?$/, route => route.fulfill({ headers: { 'content-type': 'text/html' },
       body: `<title>live</title><h1>${new URL(route.request().url()).hostname}</h1>` }));
-    await fn({ page, base, creates, rows });
+    await page.route('https://checkout.stripe.com/**', route => route.fulfill({ headers: { 'content-type': 'text/html' }, body: '<title>Stripe</title><p>Stripe checkout</p>' }));
+    await fn({ page, base, creates, rows, charges, subscriptions });
     assert.deepEqual(errors, []);
   } finally { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 }
@@ -210,3 +217,49 @@ test('the live hotel pages switch in place, with the address and the new-tab lin
   assert.equal(await frame.locator('h1').innerText(), 'hp.clickinns.com');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
 }));
+
+const welcomeOrder = (id, { minutesAgo = 2 } = {}) => ({ object: 'checkout.session', id, mode: 'subscription', status: 'complete', payment_status: 'paid', livemode: false,
+  amount_total: 9700, subscription: 'sub_' + id, created: Math.floor(Date.now() / 1000) - minutesAgo * 60,
+  customer_details: { email: 'owner@lakeview.test', name: 'Dana Reyes' }, metadata: { product: PRODUCT, property: 'Lakeview Inn', name: 'Dana Reyes', phone: '205', pms: 'Little Hotelier' } });
+const monthly = (id, wallet = false) => ({
+  subscriptions: { ['sub_' + id]: { id: 'sub_' + id, status: 'active', customer: 'cus_1', default_payment_method: 'pm_1', metadata: { product: PRODUCT } } },
+  methods: { pm_1: { id: 'pm_1', type: 'card', customer: 'cus_1', card: { wallet: wallet ? { type: 'apple_pay' } : null } } },
+});
+
+test('after paying: the $497 pay-once offer, one tap on the same card, and the page says it is done', async () => world(async ({ page, base, charges, subscriptions }) => {
+  await page.goto(base + '/engine/welcome?session_id=cs_test_life0000001');
+  await page.waitForSelector('#lifetime:not([hidden])');
+  assert.match(await page.locator('#lifetime').innerText(), /Pay \$497 once[\s\S]*Charged to the card you just used/);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+  await page.click('#lifetimeYes');
+  await page.waitForSelector('#lifetimeDone:not([hidden])');
+  assert.equal(await page.locator('#lifetime').isVisible(), false);
+  assert.match(await page.locator('#billing').innerText(), /\$97 \+ \$497 paid\. No monthly charges/);
+  assert.equal(charges.length, 1);
+  assert.equal(charges[0].amount, 49700);
+  assert.equal(subscriptions.sub_cs_test_life0000001.status, 'canceled');
+  // Coming back to the page shows it done, not the offer again.
+  await page.reload();
+  await page.waitForSelector('#lifetimeDone:not([hidden])');
+  assert.equal(await page.locator('#lifetime').isVisible(), false);
+}, { sessions: { cs_test_life0000001: welcomeOrder('cs_test_life0000001') }, ...monthly('cs_test_life0000001') }));
+
+test('paid with Apple Pay: yes opens Stripe\'s page for the $497; no thanks just closes the offer', async () => world(async ({ page, base, charges }) => {
+  await page.goto(base + '/engine/welcome?session_id=cs_test_wallet00001');
+  await page.waitForSelector('#lifetime:not([hidden])');
+  assert.match(await page.locator('#lifetimeFine').innerText(), /Stripe.s secure page/);
+  await page.click('#lifetimeYes');
+  await page.waitForURL(url => url.hostname === 'checkout.stripe.com');
+  assert.equal(charges.length, 0);
+  await page.goto(base + '/engine/welcome?session_id=cs_test_wallet00001');
+  await page.waitForSelector('#lifetime:not([hidden])');
+  await page.click('#lifetimeNo');
+  assert.equal(await page.locator('#lifetime').isVisible(), false);
+  assert.equal(await page.locator('#done').isVisible(), true);
+}, { sessions: { cs_test_wallet00001: welcomeOrder('cs_test_wallet00001') }, ...monthly('cs_test_wallet00001', true) }));
+
+test('an hour after paying, the welcome page no longer offers pay-once', async () => world(async ({ page, base }) => {
+  await page.goto(base + '/engine/welcome?session_id=cs_test_late0000001');
+  await page.waitForSelector('#done:not([hidden])');
+  assert.equal(await page.locator('#lifetime').isVisible(), false);
+}, { sessions: { cs_test_late0000001: welcomeOrder('cs_test_late0000001', { minutesAgo: 61 }) }, ...monthly('cs_test_late0000001') }));

@@ -19,10 +19,15 @@ const SETUP = Object.freeze({ name: 'Done-for-you setup and PMS connection', cen
 const MONTHLY = Object.freeze({ name: 'Marketel booking engine', cents: 4900,
   description: 'Your booking engine, connected to your PMS: every booking entered and checked for you. Hosting and support included.' });
 const TODAY_CENTS = SETUP.cents + MONTHLY.cents;
+// The one upsell: on the welcome page, for an hour after paying, $497 once
+// instead of $49 a month (about ten months of it), and the monthly plan is
+// cancelled. Meta hears it as its own event, so Purchase stays one per customer.
+const LIFETIME = Object.freeze({ product: 'marketel-engine-lifetime', name: 'Marketel booking engine, paid once', cents: 49700,
+  description: 'Your booking engine and PMS connection, paid once. No monthly charge.', windowMs: 60 * 60 * 1000, event: 'LifetimeUpgrade' });
 const PRICE = cents => Math.round(cents) / 100;
 // The page's own steps, recorded per visitor so the test can be read without Meta.
 const STEPS = Object.freeze(['viewed', 'time10', 'time60', 'scroll50', 'scroll100', 'example', 'faq', 'tap-hero', 'tap-plan', 'tap-sticky', 'tap-final',
-  'email', 'details', 'checkout-ready', 'checkout-failed']);
+  'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no']);
 const ROOT = __dirname;
 const PAGES = Object.freeze({ '/engine': 'engine.html', '/engine/welcome': 'engine-welcome.html' });
 
@@ -34,6 +39,7 @@ const idOf = value => (typeof value === 'string' ? value : value?.id) || null;
 // One line of plain text from the buyer: no control characters, bounded.
 const line = (value, max) => String(value ?? '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 const isEngine = metadata => metadata?.product === PRODUCT;
+const isLifetime = metadata => metadata?.product === LIFETIME.product;
 
 // What the checkout sells, from the order form's fields. The price is the server's.
 function order(body) {
@@ -106,23 +112,27 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
       property: m.property || '', name: m.name || '', phone: m.phone || '', pms: m.pms || '', subscription: idOf(session.subscription) };
   }
 
+  // Who bought, for Meta. A webhook request is Stripe's, never the buyer's IP or browser.
+  function saleCapi(sale, { req = null, webhook = false } = {}) {
+    const visitor = visitorId(sale.metadata.visitorId);
+    return {
+      hotelId: visitor ? `engine-visitor:${visitor}` : `engine-session:${sale.id}`,
+      externalId: visitor ? `engine-visitor:${visitor}` : `engine-session:${sale.id}`,
+      email: sale.email, phone: sale.phone, fullName: sale.fullName,
+      ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
+      sourceUrl: sale.metadata.sourceUrl || `${origin}/engine`, fbp: sale.metadata.fbp || '', fbc: sale.metadata.fbc || '',
+    };
+  }
+  // Owner, no-track and sandbox orders are confirmed but don't count as sales.
+  const counted = sale => sale.livemode !== false && sale.metadata.noTrack !== '1' && !isExcludedEmail(sale.email);
+
   async function confirm(session, { req = null, webhook = false, retryMail = false } = {}) {
     const sale = paidSession(session);
     if (!sale) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
     const visitor = visitorId(sale.metadata.visitorId);
-    // Owner, no-track and sandbox orders are confirmed but don't count as sales.
-    if (sale.livemode !== false && sale.metadata.noTrack !== '1' && !isExcludedEmail(sale.email)) {
+    if (counted(sale)) {
       await record('EnginePaid', visitor, `engine-paid:${sale.id}`, sale.pms.slice(0, 60));
-      await sendCapi('Purchase', {
-        eventId: `engine-purchase.${sale.id}`,
-        hotelId: visitor ? `engine-visitor:${visitor}` : `engine-session:${sale.id}`,
-        externalId: visitor ? `engine-visitor:${visitor}` : `engine-session:${sale.id}`,
-        email: sale.email, phone: sale.phone, fullName: sale.fullName,
-        // A webhook request is Stripe's, never the buyer's IP or browser.
-        ip: webhook || !req ? '' : req.ip || '', userAgent: webhook || !req ? '' : req.headers['user-agent'] || '',
-        sourceUrl: sale.metadata.sourceUrl || `${origin}/engine`, fbp: sale.metadata.fbp || '', fbc: sale.metadata.fbc || '',
-        value: PRICE(sale.totalCents),
-      });
+      await sendCapi('Purchase', { eventId: `engine-purchase.${sale.id}`, ...saleCapi(sale, { req, webhook }), value: PRICE(sale.totalCents) });
       await textOwner(`engine-sale-text:${sale.id}`, visitor,
         `Engine sale: $${PRICE(sale.totalCents).toFixed(2)}. ${sale.property} (${sale.pms}). ${sale.name}, ${sale.phone}, ${sale.email}. Live within 24h.`);
     }
@@ -156,6 +166,66 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
         `3. We connect it to ${sale.pms}, test a booking end to end, and send you your link.`, '',
         `Billing: $${PRICE(sale.totalCents).toFixed(2)} today, then $${PRICE(MONTHLY.cents).toFixed(2)} a month from next month. Cancel any time by replying to this email.`,
         '30-day money-back guarantee: if we can\'t connect it to your PMS, or you\'re not happy, reply within 30 days and we\'ll refund your payment.', '',
+        `Order reference: ${sale.id}`, '',
+        'Marketel', 'support@bookmarketel.com',
+      ].join('\n') };
+  }
+
+  // The pay-once upgrade. Its state lives on the monthly subscription:
+  // metadata.lifetime names the payment that replaced it.
+  async function lifetimeState(session) {
+    const subscriptionId = idOf(session.subscription);
+    const subscription = subscriptionId ? await stripe.subscriptions.retrieve(subscriptionId).catch(() => null) : null;
+    const done = !!subscription?.metadata?.lifetime;
+    const open = !done && ['active', 'trialing'].includes(subscription?.status) && Date.now() - session.created * 1000 <= LIFETIME.windowMs;
+    return { subscription, done, open };
+  }
+  // The card the buyer just paid with, if it can pay again in one tap. A
+  // wallet (Apple Pay, Google Pay) can't, so it goes through Stripe's page.
+  async function savedCard(subscription) {
+    const methodId = idOf(subscription?.default_payment_method), customer = idOf(subscription?.customer);
+    if (!methodId || !customer) return null;
+    const method = await stripe.paymentMethods.retrieve(methodId).catch(() => null);
+    return method?.type === 'card' && !method.card?.wallet && idOf(method.customer) === customer ? method : null;
+  }
+  // Paid: off the monthly plan (marked first, so its cancellation reads as the
+  // upgrade), then recorded, Meta, the owner's text and the buyer's email.
+  // Every step is safe to repeat; the one-tap, Stripe's page and the webhook
+  // can all arrive here for the same order.
+  async function finishLifetime(parentId, { ref, cents, req = null, webhook = false }) {
+    const sale = paidSession(await stripe.checkout.sessions.retrieve(parentId));
+    if (!sale) throw fail(404, 'Order not found.');
+    const visitor = visitorId(sale.metadata.visitorId);
+    if (sale.subscription) {
+      const subscription = await stripe.subscriptions.retrieve(sale.subscription);
+      if (!['canceled', 'incomplete_expired'].includes(subscription.status)) {
+        if (!subscription.metadata?.lifetime) await stripe.subscriptions.update(sale.subscription, { metadata: { lifetime: ref } });
+        await stripe.subscriptions.cancel(sale.subscription);
+      }
+    }
+    if (counted(sale)) {
+      await record('EngineLifetime', visitor, `engine-lifetime:${parentId}`, sale.pms.slice(0, 60));
+      await sendCapi(LIFETIME.event, { eventId: `engine-lifetime.${parentId}`, ...saleCapi(sale, { req, webhook }), value: PRICE(cents), contentName: LIFETIME.name });
+      await textOwner(`engine-lifetime-text:${parentId}`, visitor, `Engine upgrade: $${PRICE(cents).toFixed(2)} pay-once from ${sale.property}. Their $49/month is cancelled.`);
+    }
+    if (sale.email && mail) {
+      const sourceId = `engine-lifetime-mail:${parentId}`;
+      try {
+        await prisma.inspectEvent.create({ data: { name: 'EngineLifetimeEmailed', tool: 'engine', sourceId, visitorId: visitor } });
+        try { await mail.sendMail(lifetimeMail(sale, cents)); }
+        catch (error) { await prisma.inspectEvent.delete({ where: { sourceId } }).catch(() => {}); console.error('Engine pay-once email failed:', error.message); }
+      } catch (error) { if (error.code !== 'P2002') throw error; }
+    }
+    return { lifetime: true, value: PRICE(cents), reference: parentId };
+  }
+  function lifetimeMail(sale, cents) {
+    return { from: '"Marketel" <support@bookmarketel.com>', to: sale.email, replyTo: 'support@bookmarketel.com',
+      subject: `${sale.property} is on pay-once`,
+      text: [
+        `Hi ${sale.name.split(' ')[0] || 'there'},`, '',
+        `You've switched to pay-once: $${PRICE(cents).toFixed(2)}, paid today. Your $49 a month is cancelled, so there's nothing more to pay.`, '',
+        `Everything else is the same: we're building ${sale.property}'s booking engine and connecting it to ${sale.pms}, live within 24 hours.`,
+        '30-day money-back guarantee: reply within 30 days and we\'ll refund your payments.', '',
         `Order reference: ${sale.id}`, '',
         'Marketel', 'support@bookmarketel.com',
       ].join('\n') };
@@ -242,7 +312,70 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
       return res.status(202).json({ processing: true, message: 'Your bank is still confirming the payment. We’ll email you as soon as it clears.' });
     }
     if (session.status !== 'complete') throw fail(402, 'Your payment didn’t go through and you weren’t charged. Go back to try again.');
-    res.json(await confirm(session, { req }));
+    const result = await confirm(session, { req });
+    const state = available() ? await lifetimeState(session) : { done: false, open: false };
+    const oneClick = state.open ? !!(await savedCard(state.subscription)) : false;
+    res.json({ ...result, lifetime: { open: state.open, done: state.done, oneClick, priceCents: LIFETIME.cents } });
+  }));
+  // Yes to pay-once: the saved card in one tap, or Stripe's page.
+  api.post('/lifetime', guarded(async (req, res) => {
+    if (!available()) throw fail(503, 'This offer is temporarily unavailable.');
+    if (req.headers.origin && req.headers.origin !== origin && env.NODE_ENV !== 'test') throw fail(403, 'Open this on bookmarketel.com.');
+    rate(req, 'lifetime', 30);
+    const id = sessionId(req.body?.sessionId);
+    if (!id) throw fail(400, 'The order reference is invalid.');
+    let session;
+    try { session = await stripe.checkout.sessions.retrieve(id); }
+    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
+    const sale = paidSession(session);
+    if (!sale) throw fail(404, 'Order not found.');
+    const { subscription, done, open } = await lifetimeState(session);
+    // Already paid: finish whatever didn't (a retry after a dropped connection).
+    if (done) return res.json(await finishLifetime(session.id, { ref: subscription.metadata.lifetime, cents: LIFETIME.cents, req }));
+    if (!open) throw fail(410, 'This offer has ended. Reply to your welcome email if you’d like to switch to pay-once.');
+    const customer = idOf(subscription.customer);
+    const metadata = { product: LIFETIME.product, offerVersion: VERSION, parentOrder: session.id, property: sale.property, pms: sale.pms,
+      visitorId: sale.metadata.visitorId || '', noTrack: sale.metadata.noTrack || '' };
+    const saved = req.body?.method !== 'checkout' ? await savedCard(subscription) : null;
+    let declined = null;
+    if (saved) {
+      let intent = null;
+      try {
+        intent = await stripe.paymentIntents.create({ amount: LIFETIME.cents, currency: 'usd', customer, payment_method: saved.id,
+          payment_method_types: ['card'], confirm: true, receipt_email: sale.email || undefined, description: LIFETIME.name, metadata },
+        { idempotencyKey: `engine-lifetime:${session.id}:saved` });
+      } catch (error) {
+        if (error.type !== 'StripeCardError') throw error;
+      }
+      if (intent?.status === 'succeeded') return res.json(await finishLifetime(session.id, { ref: intent.id, cents: intent.amount_received, req }));
+      // A card that needs another step: nothing is left waiting on it.
+      if (intent && intent.status !== 'canceled') await stripe.paymentIntents.cancel(intent.id).catch(() => {});
+      declined = 'Your card needs another step. Finish on Stripe’s secure page, or use Apple Pay, Google Pay or another card.';
+    }
+    const attempt = typeof req.body?.attempt === 'string' && /^[a-f0-9-]{16,64}$/.test(req.body.attempt) ? req.body.attempt : crypto.randomUUID();
+    const checkout = await stripe.checkout.sessions.create({
+      mode: 'payment', ...(customer ? { customer } : { customer_email: sale.email }),
+      line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: LIFETIME.cents, product_data: { name: LIFETIME.name, description: LIFETIME.description } } }],
+      metadata, payment_intent_data: { metadata, description: LIFETIME.name },
+      custom_text: { submit: { message: `One payment of $${PRICE(LIFETIME.cents)}. Your $49/month plan is cancelled. 30-day money-back guarantee.` } },
+      success_url: `${origin}/engine/welcome?session_id=${session.id}&lifetime_session={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/engine/welcome?session_id=${session.id}`,
+    }, { idempotencyKey: `engine-lifetime-checkout:${session.id}:${attempt}` });
+    if (!checkout.url || !checkout.url.startsWith('https://checkout.stripe.com/')) throw fail(502, 'Checkout could not open. Please try again.');
+    res.json({ next: 'checkout', url: checkout.url, ...(declined ? { declined } : {}) });
+  }));
+  // Back from Stripe's page with the pay-once paid.
+  api.post('/lifetime/confirm', guarded(async (req, res) => {
+    if (!stripe || !prisma?.inspectEvent) throw fail(503, 'Confirmation is temporarily unavailable.');
+    rate(req, 'lifetime-confirm', 60);
+    const parent = sessionId(req.body?.sessionId), id = sessionId(req.body?.lifetimeSession);
+    if (!parent || !id) throw fail(400, 'The order reference is invalid.');
+    let checkout;
+    try { checkout = await stripe.checkout.sessions.retrieve(id); }
+    catch (error) { if (error.code === 'resource_missing') throw fail(404, 'Order not found.'); throw error; }
+    if (!isLifetime(checkout.metadata) || checkout.metadata.parentOrder !== parent) throw fail(404, 'Order not found.');
+    if (checkout.status !== 'complete' || checkout.payment_status !== 'paid') throw fail(402, 'The payment wasn’t finished, and you weren’t charged. You’re still on $49/month.');
+    res.json(await finishLifetime(parent, { ref: checkout.id, cents: checkout.amount_total, req }));
   }));
   api.use((error, _req, res, _next) => {
     if (!error.forBuyer) console.error('Engine offer error:', error.message);
@@ -255,6 +388,14 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   // true when the event was this product's, so other handlers skip it.
   async function handleStripeEvent(event) {
     const object = event.data?.object || {};
+    if (isLifetime(object.metadata)) {
+      const paid = event.type === 'payment_intent.succeeded'
+        || (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type) && object.payment_status === 'paid');
+      if (paid && sessionId(object.metadata.parentOrder)) {
+        await finishLifetime(object.metadata.parentOrder, { ref: object.id, cents: object.amount_received ?? object.amount_total, webhook: true });
+      }
+      return true;
+    }
     if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
       if (!isEngine(object.metadata)) return false;
       const session = await stripe.checkout.sessions.retrieve(object.id);
@@ -274,7 +415,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
     if (event.type === 'customer.subscription.deleted') {
       if (!isEngine(object.metadata)) return false;
       const visitor = visitorId(object.metadata.visitorId);
-      if (object.metadata.noTrack !== '1') {
+      if (object.metadata.noTrack !== '1' && !object.metadata.lifetime) {
         await record('EngineCancelled', visitor, `engine-cancelled:${object.id}`, object.metadata.pms || null);
         await textOwner(`engine-cancelled-text:${object.id}`, visitor, `Engine cancelled: ${object.metadata.property || 'a property'}.`);
       }
@@ -286,4 +427,4 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   return { handleStripeEvent };
 }
 
-module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, STEPS };
+module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, LIFETIME, STEPS };
