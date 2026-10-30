@@ -3,7 +3,9 @@
 // Meta's pixel (never for the owner, a test browser or plain http), and each
 // pixel event's id sent to the server too, so Meta counts it once.
 (() => {
-  let visitor = null, excluded = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent);
+  // A browser driven by software (Meta's page checks, test tools) says so in
+  // navigator.webdriver; a person's phone never does. Neither counts.
+  let visitor = null, excluded = /HeadlessChrome|Playwright|bot\b/i.test(navigator.userAgent) || navigator.webdriver === true;
   try {
     const tracking = new URLSearchParams(location.search).get('notrack');
     if (tracking === '1') localStorage.setItem('marketel.noTrack', '1');

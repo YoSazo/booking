@@ -347,3 +347,12 @@ test('a pay-once order is never mistaken for a monthly one, or the other way rou
   });
   assert.equal(w.texts.length, 0);
 });
+
+test('the pages ask for the tracking script by its version, so no browser keeps an old copy', () => {
+  const { pageHtml } = require('../engine-offer');
+  const page = pageHtml('engine.html'), welcome = pageHtml('engine-welcome.html');
+  const version = page.match(/src="\/engine-track\.js\?v=([a-f0-9]{10})"/)?.[1];
+  assert.ok(version, 'versioned on the offer page');
+  assert.match(welcome, new RegExp(`src="/engine-track\\.js\\?v=${version}"`));
+  assert.doesNotMatch(page, /src="\/engine-track\.js"/);
+});

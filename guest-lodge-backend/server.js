@@ -12183,7 +12183,7 @@ app.get('/', (req, res) => {
         return res.redirect(302, `https://bookmarketel.com${req.originalUrl}`);
     }
     res.set('Cache-Control', 'no-cache');
-    res.sendFile(path.join(__dirname, 'engine.html'));
+    res.type('html').send(require('./engine-offer').pageHtml('engine.html'));
 });
 
 // ── SELF-SERVE SETUP ──────────────────────────────────────────

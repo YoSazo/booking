@@ -8,6 +8,7 @@
 // builds the engine and connects the hotel's PMS within 24 hours.
 const express = require('express');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const { sanitizeInspectAttribution, inspectPublishableKey } = require('./inspect');
 
@@ -35,6 +36,19 @@ const STEPS = Object.freeze(['viewed', 'time10', 'time60', 'scroll50', 'scroll10
 const FROM = Object.freeze(['ad', 'social', 'direct', 'other']);
 const ROOT = __dirname;
 const PAGES = Object.freeze({ '/engine': 'engine.html', '/engine/welcome': 'engine-welcome.html' });
+
+// The pages ask for the tracking script by its content's hash: Cloudflare lets
+// browsers keep static files for four hours, and an older copy would miss what
+// the page records now.
+const pages = new Map();
+function pageHtml(file) {
+  if (!pages.has(file)) {
+    const script = fs.readFileSync(path.join(ROOT, 'public', 'engine-track.js'));
+    const version = crypto.createHash('sha256').update(script).digest('hex').slice(0, 10);
+    pages.set(file, fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/src="\/engine-track\.js"/g, `src="/engine-track.js?v=${version}"`));
+  }
+  return pages.get(file);
+}
 
 const fail = (status, message) => Object.assign(new Error(message), { status, forBuyer: true });
 const validEmail = email => email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -240,7 +254,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   }
 
   for (const [route, file] of Object.entries(PAGES)) {
-    app.get(route, (_req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(ROOT, file)); });
+    app.get(route, (_req, res) => { res.set('Cache-Control', 'no-cache'); res.type('html').send(pageHtml(file)); });
   }
 
   const api = express.Router();
@@ -445,4 +459,4 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   return { handleStripeEvent };
 }
 
-module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, PLANS, LIFETIME, STEPS, FROM };
+module.exports = { registerEngineOffer, pageHtml, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, PLANS, LIFETIME, STEPS, FROM };
