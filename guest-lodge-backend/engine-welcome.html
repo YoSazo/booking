@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>You&rsquo;re in &mdash; Marketel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --green: #2e7d5b; --green-dark: #245f46; --pale: #e8f5ee; --muted: #6b7d72; --border: #d8e4dc; --surface: #fff; --page: #eff4f0; --text: #1a2b22; --red: #c2410c; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--page); color: var(--text); -webkit-font-smoothing: antialiased; }
+.nav { border-bottom: 1px solid var(--border); }
+.nav div { max-width: 560px; margin: 0 auto; padding: 0 16px; height: 56px; display: flex; align-items: center; }
+.nav img { height: 20px; }
+main { max-width: 560px; margin: 0 auto; padding: 28px 16px 48px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px 20px; box-shadow: 0 1px 2px rgba(26,43,34,.05), 0 8px 24px rgba(26,43,34,.07); }
+.badge { width: 52px; height: 52px; border-radius: 50%; background: var(--pale); display: grid; place-items: center; margin-bottom: 16px; }
+h1 { font-size: 28px; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; margin-bottom: 10px; }
+p { font-size: 16px; line-height: 1.55; color: #3d5146; }
+ol { list-style: none; margin: 20px 0 6px; display: grid; gap: 14px; counter-reset: next; }
+li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; font-size: 15px; line-height: 1.5; counter-increment: next; }
+li::before { content: counter(next); width: 32px; height: 32px; border-radius: 10px; background: var(--pale); color: var(--green-dark); font-weight: 800; display: grid; place-items: center; }
+li b { display: block; color: var(--text); }
+.billing { margin-top: 18px; padding: 14px; border-radius: 14px; background: var(--page); font-size: 14px; line-height: 1.5; color: #3d5146; }
+.loading { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.spinner { width: 20px; height: 20px; border: 2.5px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg) } }
+.error { color: var(--red); font-weight: 600; }
+a { color: var(--green-dark); font-weight: 700; }
+[hidden] { display: none !important; }
+</style>
+<script src="/engine-track.js"></script>
+</head>
+<body>
+<header class="nav"><div><img src="/marketel.svg" alt="Marketel"></div></header>
+<main>
+  <div class="card" id="waiting"><div class="loading"><span class="spinner" aria-hidden="true"></span> Confirming your order&hellip;</div></div>
+
+  <div class="card" id="done" hidden>
+    <div class="badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#2e7d5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <h1>You&rsquo;re in. We&rsquo;re building <span id="property">your</span> booking engine.</h1>
+    <p>It will be live within 24 hours. We sent the details to <b id="email">your email</b>.</p>
+    <ol>
+      <li><span><b>We&rsquo;ll text or email you shortly</b>to set up a staff login for Marketel in <span id="pms">your PMS</span>. It&rsquo;s a separate user you can switch off any time.</span></li>
+      <li><span><b>We build your booking page</b>with your rooms, photos and rates. Reply to our email with your website or a few photos if you like.</span></li>
+      <li><span><b>We connect it and test a booking</b>end to end, then send you your link to put behind your Book Now button.</span></li>
+    </ol>
+    <div class="billing">$97 paid today. Then $49 a month from next month. Cancel any time, and for 30 days you can ask for your money back. Questions: <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a></div>
+  </div>
+
+  <div class="card" id="problem" hidden>
+    <h1>We couldn&rsquo;t confirm your order yet</h1>
+    <p id="problemText" class="error"></p>
+    <p style="margin-top:12px">If you were charged, you&rsquo;re all set and we&rsquo;ll email you. Questions: <a href="mailto:support@bookmarketel.com">support@bookmarketel.com</a>. Or <a href="/engine">go back to checkout</a>.</p>
+  </div>
+</main>
+<script>
+(() => {
+  const track = window.EngineTrack || { pixel() {}, headers: { 'Content-Type': 'application/json' } };
+  const $ = id => document.getElementById(id);
+  const sessionId = new URLSearchParams(location.search).get('session_id') || '';
+  const show = id => { for (const card of ['waiting', 'done', 'problem']) $(card).hidden = card !== id; };
+  const problem = message => { $('problemText').textContent = message; show('problem'); };
+  async function confirmOrder(tries = 0) {
+    try {
+      const response = await fetch('/api/engine/confirm', { method: 'POST', headers: track.headers, body: JSON.stringify({ sessionId }) });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 202 && tries < 10) return setTimeout(() => confirmOrder(tries + 1), 3000);
+      if (!response.ok || !data.paid) return problem(data.message || data.error || 'Please try again in a moment.');
+      $('property').textContent = data.property ? data.property + '’s' : 'your';
+      $('email').textContent = data.email || 'your email';
+      $('pms').textContent = data.pms || 'your PMS';
+      // The server sends Meta the same Purchase with this id, so it counts once.
+      let fired = false;
+      try { fired = sessionStorage.getItem('engine.purchase') === data.reference; sessionStorage.setItem('engine.purchase', data.reference); } catch { /* Fire it. */ }
+      if (!fired) track.pixel('Purchase', { value: data.value }, 'engine-purchase.' + data.reference);
+      show('done');
+    } catch {
+      if (tries < 3) return setTimeout(() => confirmOrder(tries + 1), 2000);
+      problem('Your connection dropped while we checked. Refresh this page to try again.');
+    }
+  }
+  if (!/^cs_(test|live)_/.test(sessionId)) problem('This link is missing its order reference.');
+  else confirmOrder();
+})();
+</script>
+</body>
+</html>

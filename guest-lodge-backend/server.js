@@ -12148,11 +12148,6 @@ app.get('/landing', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
 });
 
-// The booking engine connected to the owner's own PMS (the computer-use agent offer).
-app.get('/engine', (req, res) => {
-    res.sendFile(path.join(__dirname, 'engine.html'));
-});
-
 // Privacy & Terms
 app.get('/privacy', (req, res) => {
     res.sendFile(path.join(__dirname, 'privacy.html'));
@@ -18958,6 +18953,17 @@ const traceRegistration = require('./trace').registerTrace(app, {
         normalizeExcludedEmail(email)
     ),
 });
+// The done-for-you booking engine (/engine): $97, then $49 a month, on the
+// same Stripe account and verified webhook as Payoff.
+const engineOfferRegistration = require('./engine-offer').registerEngineOffer(app, {
+    prisma,
+    mail: emailTransporter,
+    stripe: inspectStripe,
+    queueCapi: queueMarketelCAPI,
+    capiConfigured: ENABLE_META_CAPI && !!MARKETEL_PIXEL_ID && !!MARKETEL_ACCESS_TOKEN,
+    isExcludedEmail: email => FUNNEL_DASHBOARD_EXCLUDED_OWNER_EMAILS.includes(normalizeExcludedEmail(email)),
+    text: ownerText, // Each lead and sale texts the owner's phone.
+});
 require('./inspect').registerInspect(app, {
     prisma,
     mail: emailTransporter,
@@ -18968,6 +18974,7 @@ require('./inspect').registerInspect(app, {
         normalizeExcludedEmail(email)
     ),
     handleTraceStripeEvent: async (event, req) => await payoffRegistration.handleStripeEvent(event, req)
+        || await engineOfferRegistration.handleStripeEvent(event, req)
         || await traceRegistration.handleStripeEvent(event, req),
 });
 telemetry.setupRoutes(app);
