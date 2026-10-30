@@ -89,6 +89,7 @@ for (const width of [320, 390]) {
     assert.match(text, /30-day money-back guarantee/);
     assert.match(text, /If it doesn.t connect to your PMS, you don.t pay/);
     assert.match(text, /Trusted by 23 hotels/);
+    assert.match(text, /250\+ bookings already entered into hotel PMSs by our AI agent\. If it ever can.t enter one, a person does it within a minute\./);
     // The PMS logos load and fit.
     for (const alt of ['Cloudbeds', 'BookingCenter']) {
       assert.ok(await page.locator(`.logos img[alt="${alt}"]`).evaluate(img => img.complete && img.naturalWidth > 0), alt);
