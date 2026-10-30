@@ -78,6 +78,12 @@ for (const width of [320, 390]) {
     assert.match(text, /then \$49\/month/);
     assert.match(text, /30-day money-back guarantee/);
     assert.match(text, /If it doesn.t connect to your PMS, you don.t pay/);
+    assert.match(text, /Trusted by 23 hotels/);
+    // The PMS logos load and fit.
+    for (const alt of ['Cloudbeds', 'BookingCenter']) {
+      assert.ok(await page.locator(`.logos img[alt="${alt}"]`).evaluate(img => img.complete && img.naturalWidth > 0), alt);
+    }
+    assert.match(await page.locator('.logos').innerText(), /Little Hotelier[\s\S]*\+ Yours/);
     assert.equal(await page.locator('#email').isVisible(), true);
     const button = await page.locator('#emailBtn').boundingBox();
     assert.ok(button.y + button.height < 844 * 2.2, 'the order card is within two screens');

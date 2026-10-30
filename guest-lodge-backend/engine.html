@@ -49,6 +49,20 @@ h1 em { font-style: normal; color: var(--green); }
 .ticks li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
 .ticks li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
 
+.trust { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 15px; font-weight: 700; }
+.trust .stars { color: #e8a317; letter-spacing: 2px; font-size: 17px; }
+
+/* WORKS WITH */
+.works { padding: 8px 0 8px; }
+.works-title { text-align: center; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.logos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.logo { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; font-weight: 800; font-size: 16px; color: #2b2b2b; text-align: center; }
+.logo img { display: block; max-width: 100%; height: 26px; width: auto; }
+.logo img.icon { height: 26px; border-radius: 6px; }
+.logo.yours { flex-direction: column; gap: 2px; border-style: dashed; color: var(--green-dark); }
+.logo.yours span { font-size: 12px; font-weight: 600; color: var(--muted); line-height: 1.35; }
+@media (min-width: 900px) { .logos { grid-template-columns: repeat(4, 1fr); } }
+
 /* ORDER CARD */
 .order { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; align-self: start; scroll-margin-top: 16px; }
 .deal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
@@ -237,6 +251,7 @@ footer a { color: var(--muted); text-decoration: none; }
       <p class="kicker">Done for you &middot; Live in 24 hours</p>
       <h1>Your own booking engine, built for you and <em>connected to your PMS</em>.</h1>
       <p class="lede">Guests book direct on your own page, with 0% commission. Every booking goes into the PMS you already use, entered and checked for you.</p>
+      <div class="trust"><span class="stars" aria-hidden="true">★★★★★</span><span>Trusted by 23 hotels</span></div>
     </div>
     <div class="order" id="order">
       <div class="deal">
@@ -306,6 +321,18 @@ footer a { color: var(--muted); text-decoration: none; }
       </ul>
     </div>
 
+  </div>
+</section>
+
+<section class="works" aria-labelledby="worksTitle">
+  <div class="wrap">
+    <p class="works-title" id="worksTitle">Works with the PMS you already use</p>
+    <div class="logos">
+      <div class="logo"><img src="/engine-logos/cloudbeds.svg" alt="Cloudbeds" width="178" height="26"></div>
+      <div class="logo"><img class="icon" src="/engine-logos/little-hotelier.svg" alt="" width="26" height="26"><span>Little Hotelier</span></div>
+      <div class="logo"><img src="/engine-logos/bookingcenter.png" alt="BookingCenter" width="116" height="26"></div>
+      <div class="logo yours"><b>+ Yours</b><span>If your front desk can log in, so can we.</span></div>
+    </div>
   </div>
 </section>
 
@@ -426,7 +453,7 @@ footer a { color: var(--muted); text-decoration: none; }
       </details>
       <details>
         <summary>Which PMS does it work with?</summary>
-        <p>Most PMSs your team opens in a web browser. We&rsquo;ve tested the agent on Little Hotelier. Using something else? Order and tell us which one. If we can&rsquo;t connect it, you get your money back.</p>
+        <p>Cloudbeds and BookingCenter connect directly. Little Hotelier goes through our agent, which entered 50 of 50 test bookings correctly. Most other PMSs your team opens in a web browser work the same way. If we can&rsquo;t connect yours, you get your money back.</p>
       </details>
       <details>
         <summary>What do you need from me?</summary>
@@ -460,6 +487,7 @@ footer a { color: var(--muted); text-decoration: none; }
 <footer>
   <div class="wrap">
     Marketel &mdash; Direct bookings for independent properties.
+    <p style="margin-top:6px">Cloudbeds, Little Hotelier and BookingCenter are trademarks of their owners. Marketel works with them and isn&rsquo;t affiliated with or endorsed by them.</p>
     <nav><a href="mailto:support@bookmarketel.com">Contact</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
   </div>
 </footer>
