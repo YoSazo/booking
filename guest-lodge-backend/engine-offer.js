@@ -31,6 +31,8 @@ const PRICE = cents => Math.round(cents) / 100;
 // The page's own steps, recorded per visitor so the test can be read without Meta.
 const STEPS = Object.freeze(['viewed', 'time10', 'time60', 'scroll50', 'scroll100', 'example', 'faq', 'tap-hero', 'tap-plan', 'tap-sticky', 'tap-final',
   'email', 'details', 'checkout-ready', 'checkout-failed', 'lifetime-viewed', 'lifetime-yes', 'lifetime-no', 'plan-once', 'plan-monthly']);
+// Where a visitor came from, and which ad: the funnel page's per-ad view.
+const FROM = Object.freeze(['ad', 'social', 'direct', 'other']);
 const ROOT = __dirname;
 const PAGES = Object.freeze({ '/engine': 'engine.html', '/engine/welcome': 'engine-welcome.html' });
 
@@ -135,7 +137,7 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
     if (!sale) throw fail(402, 'This order has not been paid. If you were charged, contact support@bookmarketel.com.');
     const visitor = visitorId(sale.metadata.visitorId);
     if (counted(sale)) {
-      await record('EnginePaid', visitor, `engine-paid:${sale.id}`, sale.pms.slice(0, 60));
+      await record('EnginePaid', visitor, `engine-paid:${sale.id}`, sale.plan);
       await sendCapi('Purchase', { eventId: `engine-purchase.${sale.id}`, ...saleCapi(sale, { req, webhook }), value: PRICE(sale.totalCents) });
       await textOwner(`engine-sale-text:${sale.id}`, visitor,
         `Engine sale${sale.plan === 'once' ? ' (pay-once)' : ''}: $${PRICE(sale.totalCents).toFixed(2)}. ${sale.property} (${sale.pms}). ${sale.name}, ${sale.phone}, ${sale.email}. Live within 24h.`);
@@ -250,16 +252,19 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
     res.json(config);
   });
   api.post('/event', guarded(async (req, res) => {
-    if (req.body?.name !== 'EngineStep' || !STEPS.includes(req.body?.detail)) throw fail(400, 'Unknown event.');
+    const { name, detail } = req.body || {};
+    const known = (name === 'EngineStep' && STEPS.includes(detail)) || (name === 'EngineFrom' && FROM.includes(detail))
+      || (name === 'EngineAd' && typeof detail === 'string' && /^\d{6,25}$/.test(detail));
+    if (!known) throw fail(400, 'Unknown event.');
     if (noTrack(req)) return res.json({ ignored: true });
     rate(req, 'event', 300);
     const visitor = visitorId(req.body.visitorId);
-    await record('EngineStep', visitor, null, req.body.detail);
+    await record(name, visitor, null, detail);
     // The server's copy of the pixel's PageView, with that page load's id.
     const viewPrefix = `engine-pv.${visitor}.`;
     const pageView = visitor && typeof req.body.pageView === 'string' && req.body.pageView.startsWith(viewPrefix)
       && /^[a-z0-9]{6,16}$/.test(req.body.pageView.slice(viewPrefix.length)) ? req.body.pageView : null;
-    if (pageView && req.body.detail === 'viewed') {
+    if (pageView && name === 'EngineStep' && detail === 'viewed') {
       await sendCapi('PageView', { eventId: pageView, ...visitorCapi(visitor, sanitizeInspectAttribution(req.body.attribution, req) || {}, req) });
     }
     res.json({ success: true });
@@ -440,4 +445,4 @@ function registerEngineOffer(app, { stripe, mail, prisma, isExcludedEmail = () =
   return { handleStripeEvent };
 }
 
-module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, PLANS, LIFETIME, STEPS };
+module.exports = { registerEngineOffer, order, PRODUCT, VERSION, SETUP, MONTHLY, TODAY_CENTS, PLANS, LIFETIME, STEPS, FROM };

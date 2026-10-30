@@ -357,7 +357,7 @@ test('/funnel applies custom times, persists them, changes timezone, and reports
   } finally { await h.browser.close(); }
 });
 
-for (const linked of [false, true]) test(`/funnel opens Payoff ${linked ? 'from a link over a saved Trace selection' : 'by default'} and keeps product switching`, async () => {
+for (const linked of [false, true]) test(`/funnel opens ${linked ? 'Payoff from a link over a saved Trace selection' : 'the booking engine by default'} and keeps product switching`, async () => {
   const { definitionFor } = require('../../wedge-funnel');
   const browser = await chromium.launch();
   try {
@@ -372,17 +372,17 @@ for (const linked of [false, true]) test(`/funnel opens Payoff ${linked ? 'from 
       const url = new URL(route.request().url());
       if (url.pathname === '/api/funnel/wedge') {
         requests.push(url.searchParams.get('tool'));
-        const tool = ['payoff', 'trace'].includes(url.searchParams.get('tool')) ? url.searchParams.get('tool') : 'payoff';
-        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ wedges: [{ id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }], tool,
+        const tool = ['engine', 'payoff', 'trace'].includes(url.searchParams.get('tool')) ? url.searchParams.get('tool') : 'engine';
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ wedges: [{ id: 'engine', product: 'Booking engine' }, { id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }], tool,
           ...buildWedgeFunnel([], definitionFor(tool)) }) });
       }
       if (url.pathname === '/funnel') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../../wedge-funnel.html')) });
       return route.fulfill({ status: 404, body: '' });
     });
     await page.goto('http://funnel.test/funnel' + (linked ? '?tool=payoff' : ''));
-    await page.locator('#wedge-name:has-text("Payoff")').waitFor();
-    assert.equal(requests[0], 'payoff');
-    assert.match(await page.locator('#ladder').innerText(), /Landed \(story page or sales letter\)/);
+    await page.locator(`#wedge-name:has-text("${linked ? 'Payoff' : 'Booking engine'}")`).waitFor();
+    assert.equal(requests[0], linked ? 'payoff' : 'engine');
+    assert.match(await page.locator('#ladder').innerText(), linked ? /Landed \(story page or sales letter\)/ : /Landed on the offer page[\s\S]*Gave property, name, mobile and PMS/);
     assert.match(await page.locator('#branches').innerText(), /Where they came from/);
     assert.equal(await page.locator('#split-card').isHidden(), true);
     await page.locator('#wedge').selectOption('trace');

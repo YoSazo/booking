@@ -238,7 +238,7 @@
 
   <section class="block" id="ads-section" hidden>
     <div class="section-head">
-      <div><h2>Ads</h2><p class="lede">Every Payoff ad from the last 30 days: its picture and copy, Meta's numbers for today or all time, and what the people it sent did on the site. The verdict line always counts all time, as Meta's rules do.</p></div>
+      <div><h2>Ads</h2><p class="lede">Every ad for this product from the last 30 days: its picture and copy, Meta's numbers for today or all time, and what the people it sent did on the site. The verdict line always counts all time, as Meta's rules do.</p></div>
       <span class="spacer"></span><div class="seg" id="ads-range" role="group" aria-label="Show the ads' numbers for"><button type="button" data-ads-range="today">Today</button><button type="button" data-ads-range="all">All time</button></div><span class="updated" id="ads-updated"></span>
     </div>
     <div class="card rules" id="rules"></div>
@@ -328,14 +328,16 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const pct = value => value === null || value === undefined ? '—' : `${Math.round(value * 1000) / 10}%`;
 let adminToken = '';
 try { adminToken = localStorage.getItem('marketelAdminToken') || ''; } catch (_) {}
-let state = { version: 2, tool: 'payoff', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false, adsRange: 'today' };
+let state = { version: 3, tool: 'engine', period: 'today', timezone: 'America/Chicago', from: '', to: '', adOnly: false, adsRange: 'today' };
 let feedAll = false, lastData = null;
 try {
   const saved = JSON.parse(localStorage.getItem('marketelWedgeFunnel') || '{}');
   // Retain source/wedge preferences, but migrate the old misleading rolling
   // "Today" and seven-day default to a genuine calendar Today.
-  if (saved.version === 2) Object.assign(state, saved);
-  else Object.assign(state, { tool: saved.tool || 'payoff', adOnly: !!saved.adOnly });
+  // Version 3 (Oct 30) opens on the booking engine once; the choice is kept after that.
+  if (saved.version === 3) Object.assign(state, saved);
+  else if (saved.version === 2) Object.assign(state, { ...saved, version: 3, tool: 'engine' });
+  else Object.assign(state, { adOnly: !!saved.adOnly });
 } catch (_) {}
 const linkedTool = new URLSearchParams(location.search).get('tool');
 if (linkedTool && /^[a-z][a-z0-9-]{0,49}$/.test(linkedTool)) state.tool = linkedTool;
@@ -395,12 +397,14 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ---- Ads and the test log (Payoff) ----------------------------------------
+// ---- Ads and the test log (the booking engine and Payoff) -----------------
 let adsReport = null, adsLoading = 0;
 const dollars = (value, cents = true) => `$${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 })}`;
 const editing = () => !!document.querySelector('form.edit');
-// The per-ad steps (definitionFor('payoff').ads), short enough for a phone.
-const FLOW_LABELS = ['Clicked', 'Story', 'Letter', 'Order page', 'Stayed 20s', 'Typed email', 'Paid'];
+// The per-ad steps (definitionFor(tool).ads), short enough for a phone.
+const FLOW_LABELS = { payoff: ['Clicked', 'Story', 'Letter', 'Order page', 'Stayed 20s', 'Typed email', 'Paid'],
+  engine: ['Clicked', 'Landed', 'Typed email', 'Gave details', 'Checkout', 'Paid'] };
+const ADS_TOOLS = ['engine', 'payoff'];
 const paragraphs = body => String(body || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 
 function adCard(ad) {
@@ -436,8 +440,8 @@ function adCard(ad) {
       <div><dt>Sales${today ? ' today' : ''}</dt><dd>${sales}</dd></div>
       <div><dt>Cost per sale</dt><dd>${perSale ? dollars(perSale) : '—'}</dd></div>
     </dl>
-    <div class="after"><h4>After the click (our count, ${today ? 'today' : 'since Oct 27'})</h4>${steps.length
-      ? `<ol class="flow">${steps.map((s, i) => `<li class="${s.people && i ? 'lit' : ''}" title="${esc(s.label)}"><b>${s.people}</b>${esc(FLOW_LABELS[i] || s.label)}</li>`).join('')}</ol>`
+    <div class="after"><h4>After the click (our count, ${today ? 'today' : 'all time'})</h4>${steps.length
+      ? `<ol class="flow">${steps.map((s, i) => `<li class="${s.people && i ? 'lit' : ''}" title="${esc(s.label)}"><b>${s.people}</b>${esc((FLOW_LABELS[state.tool] || [])[i] || s.label)}</li>`).join('')}</ol>`
       : `<p class="muted" style="margin:0;font-size:13px">No visitors tagged with this ad ${today ? 'today' : 'yet'}.</p>`}</div>
     <div class="spacer-grow"></div>
     <div class="note"><h4>What it is</h4>${noteRows.length ? noteRows.map(([k, v]) => `<p><b>${k}:</b> ${esc(v)}</p>`).join('') : '<p class="empty-note">No notes yet: what the image shows, what kind of copy it is, what it tests.</p>'}
@@ -575,7 +579,7 @@ function renderAds(report) {
 
 async function loadAds({ fresh = false } = {}) {
   const version = ++adsLoading;
-  if (state.tool !== 'payoff') return renderAds(null);
+  if (!ADS_TOOLS.includes(state.tool)) return renderAds(null);
   try {
     const report = await adminFetch(`/api/funnel/ads?tool=${encodeURIComponent(state.tool)}${fresh ? '&fresh=1' : ''}`);
     if (version === adsLoading) renderAds(report);
@@ -709,7 +713,7 @@ function paintTrack() {
   $('track-toggle').setAttribute('aria-pressed', String(off));
   $('track-toggle').textContent = off ? '✓ Not counting this browser' : 'Counting this browser';
   $('track-note').textContent = off
-    ? 'This browser is left out of the numbers and out of Meta. On each phone you test from (including inside Instagram or Facebook), open bookmarketel.com/payoff?notrack=1 once.'
+    ? 'This browser is left out of the numbers and out of Meta. On each phone you test from (including inside Instagram or Facebook), open bookmarketel.com/?notrack=1 once.'
     : 'This browser counts like a visitor. Switch it off before looking at the site yourself.';
 }
 if (trackState() === null) setTrack('1');

@@ -64,11 +64,18 @@
 
   // A step on the page, once per page load.
   const sent = new Set();
-  const step = (detail, extra = {}) => {
-    if (excluded || sent.has(detail)) return;
-    sent.add(detail);
+  const send = (name, detail, extra = {}) => {
+    if (excluded || sent.has(`${name}:${detail}`)) return;
+    sent.add(`${name}:${detail}`);
     fetch('/api/engine/event', { method: 'POST', headers, keepalive: true,
-      body: JSON.stringify({ name: 'EngineStep', detail, visitorId: visitor, ...extra }) }).catch(() => {});
+      body: JSON.stringify({ name, detail, visitorId: visitor, ...extra }) }).catch(() => {});
   };
+  const step = (detail, extra = {}) => send('EngineStep', detail, extra);
+  // On the offer page: where the visitor came from and which ad (every ad links
+  // with utm_content={{ad.id}}), so /funnel can follow each ad to paying.
+  if (['/', '/engine', '/engine/'].includes(location.pathname)) {
+    send('EngineFrom', query.has('fbclid') ? 'ad' : /facebook\.com|instagram\.com/i.test(document.referrer) ? 'social' : !document.referrer ? 'direct' : 'other');
+    if (/^\d{6,25}$/.test(query.get('utm_content') || '')) send('EngineAd', query.get('utm_content'));
+  }
   window.EngineTrack = { visitor, excluded, headers, pixel, attribution, step, pageView: pixelOn ? pageView : null };
 })();

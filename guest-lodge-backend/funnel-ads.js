@@ -1,5 +1,5 @@
 'use strict';
-// The funnel page's Ads and Test log: every Payoff ad with its picture, its
+// The funnel page's Ads and Test log: every ad of a product with its picture, its
 // copy and its numbers (Meta's, and our own steps from the ad id its link
 // carries), judged by the test rules. The rules, what each ad is testing and
 // the log live in the database (FunnelNote), so the plan outlives any chat.
@@ -18,7 +18,23 @@ const RULE_DEFAULTS = Object.freeze({
     'Before launching a test, write what each result would mean and what goes up next.',
   ]),
 });
-const TOOLS = Object.freeze(['payoff']);
+// The booking engine's (Oct 30): $97 a sale, so an ad gets $100 to find one.
+const ENGINE_RULES = Object.freeze({
+  killAt: 100, breakEven: 97, winnerSales: 2,
+  text: Object.freeze([
+    'Every campaign optimises for Purchase.',
+    'An ad that spends $100 with no sale is turned off and replaced by the next creative.',
+    'Two sales at or under $97 each is a winner. Winners are never touched; testing moves to a new campaign.',
+    'No Advantage+ creative enhancements or other automatic optimisations; everything is created paused.',
+  ]),
+});
+const DEFAULT_RULES = Object.freeze({ payoff: RULE_DEFAULTS, engine: ENGINE_RULES });
+const TOOLS = Object.freeze(['engine', 'payoff']);
+// Which product an ad sells, from where its link goes.
+const LINKS = Object.freeze({
+  payoff: link => /\/payoff/.test(link),
+  engine: link => /^https:\/\/(www\.)?bookmarketel\.com\/?(engine\/?)?([?#]|$)/.test(link),
+});
 const STATUSES = ['ACTIVE', 'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED', 'PENDING_REVIEW', 'IN_PROCESS', 'PREAPPROVED', 'DISAPPROVED', 'WITH_ISSUES'];
 const RECENT_DAYS = 30;
 const AD_FIELDS = 'id,name,created_time,effective_status,campaign{id,name},adset{id,name,promoted_object},'
@@ -89,12 +105,12 @@ async function ourSteps(prisma, tool, ids, since = null) {
 const NOTE_LIMITS = { ad: ['image', 'copy', 'testing', 'verdict'], log: ['title', 'question', 'changed', 'result', 'date'] };
 const text = (value, max) => String(value ?? '').replace(/\u0000/g, '').trim().slice(0, max);
 
-function cleanNote(kind, data = {}) {
+function cleanNote(kind, data = {}, defaults = RULE_DEFAULTS) {
   if (kind === 'ad') return Object.fromEntries(NOTE_LIMITS.ad.map(field => [field, text(data[field], 600)]));
   if (kind === 'rules') {
     const bounded = (value, min, max, fallback) => (Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max ? Number(value) : fallback);
-    return { killAt: bounded(data.killAt, 1, 10000, RULE_DEFAULTS.killAt), breakEven: bounded(data.breakEven, 0.01, 10000, RULE_DEFAULTS.breakEven),
-      winnerSales: Math.round(bounded(data.winnerSales, 1, 50, RULE_DEFAULTS.winnerSales)),
+    return { killAt: bounded(data.killAt, 1, 10000, defaults.killAt), breakEven: bounded(data.breakEven, 0.01, 10000, defaults.breakEven),
+      winnerSales: Math.round(bounded(data.winnerSales, 1, 50, defaults.winnerSales)),
       text: (Array.isArray(data.text) ? data.text : []).map(line => text(line, 400)).filter(Boolean).slice(0, 15) };
   }
   const entry = Object.fromEntries(NOTE_LIMITS.log.map(field => [field, text(data[field], field === 'result' || field === 'question' ? 3000 : 400)]));
@@ -116,7 +132,7 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     if (!account) throw new Error('No ad account for this token');
     const listed = await meta(`act_${account}/ads`, { fields: AD_FIELDS, limit: '200', filtering: [{ field: 'effective_status', operator: 'IN', value: STATUSES }] });
     const since = now() - RECENT_DAYS * 86400000;
-    const ads = (listed.data || []).filter(ad => /\/payoff/.test(copyOf(ad).link || '')
+    const ads = (listed.data || []).filter(ad => TOOLS.some(tool => LINKS[tool](copyOf(ad).link || ''))
       && (ad.effective_status === 'ACTIVE' || new Date(ad.created_time).getTime() >= since));
     // Lifetime (what the verdict and Meta's rules use) and today, for the page's toggle.
     const byDay = async preset => new Map(((ads.length ? await meta(`act_${account}/insights`, { level: 'ad', date_preset: preset, limit: '200',
@@ -130,8 +146,8 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
 
   async function notes(tool) {
     const rows = await prisma.funnelNote.findMany({ where: { tool }, orderBy: { createdAt: 'desc' } });
-    const saved = rows.find(row => row.kind === 'rules')?.data;
-    const rules = { ...RULE_DEFAULTS, ...(saved || {}), text: saved?.text?.length ? saved.text : [...RULE_DEFAULTS.text] };
+    const saved = rows.find(row => row.kind === 'rules')?.data, defaults = DEFAULT_RULES[tool] || RULE_DEFAULTS;
+    const rules = { ...defaults, ...(saved || {}), text: saved?.text?.length ? saved.text : [...defaults.text] };
     return { rules, adNotes: new Map(rows.filter(row => row.kind === 'ad').map(row => [row.key, row.data])),
       log: rows.filter(row => row.kind === 'log').map(row => ({ id: row.id, createdAt: row.createdAt, updatedAt: row.updatedAt, ...row.data })) };
   }
@@ -141,7 +157,7 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
     if (fresh) cached = null;
     const { rules, adNotes, log } = await notes(tool);
     let metaError = null, listed = [];
-    try { listed = await metaAds(); } catch (error) { metaError = error.message; }
+    try { listed = (await metaAds()).filter(({ ad }) => LINKS[tool](copyOf(ad).link || '')); } catch (error) { metaError = error.message; }
     const ids = listed.map(({ ad }) => ad.id);
     const [ours, oursToday] = await Promise.all([ourSteps(prisma, tool, ids), ourSteps(prisma, tool, ids, startOfDay(new Date(now())))]);
     const numbers = stats => ({ spend: number(stats.spend), impressions: number(stats.impressions), cpm: number(stats.cpm), clicks: number(stats.inline_link_clicks),
@@ -175,7 +191,7 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
       await prisma.funnelNote.deleteMany({ where: { id: String(input.id), tool, kind } });
       return { deleted: true };
     }
-    const data = cleanNote(kind, input.data);
+    const data = cleanNote(kind, input.data, DEFAULT_RULES[tool]);
     if (kind === 'log') {
       if (!data.title) throw Object.assign(new Error('A log entry needs a title.'), { status: 400 });
       if (input.id) {
@@ -195,4 +211,4 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
   return { report, save };
 }
 
-module.exports = { startOfDay, createAdsReport, metaClient, verdictOf, cleanNote, RULE_DEFAULTS };
+module.exports = { startOfDay, createAdsReport, metaClient, verdictOf, cleanNote, RULE_DEFAULTS, ENGINE_RULES, LINKS };

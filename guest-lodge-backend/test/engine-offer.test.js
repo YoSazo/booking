@@ -212,8 +212,12 @@ test('page steps are recorded per visitor; unknown ones are refused', async () =
     assert.equal((await post('/api/engine/event', { name: 'EngineStep', detail: 'viewed', visitorId: 'v_abcdefgh12', pageView: 'engine-pv.v_abcdefgh12.abc123def4', attribution: { fbp: 'fb.1.1.2' } })).status, 200);
     assert.equal((await post('/api/engine/event', { name: 'EngineStep', detail: 'hacked' })).status, 400);
     assert.equal((await post('/api/engine/event', { name: 'EngineStep', detail: 'email' }, { 'x-marketel-no-track': '1' })).body.ignored, true);
+    assert.equal((await post('/api/engine/event', { name: 'EngineFrom', detail: 'ad', visitorId: 'v_abcdefgh12' })).status, 200);
+    assert.equal((await post('/api/engine/event', { name: 'EngineAd', detail: '120251620741660103', visitorId: 'v_abcdefgh12' })).status, 200);
+    assert.equal((await post('/api/engine/event', { name: 'EngineAd', detail: 'not-an-ad' })).status, 400);
+    assert.equal((await post('/api/engine/event', { name: 'EngineFrom', detail: 'tv' })).status, 400);
   });
-  assert.deepEqual([...w.rows.values()].map(r => [r.name, r.detail]), [['EngineStep', 'viewed']]);
+  assert.deepEqual([...w.rows.values()].map(r => [r.name, r.detail]), [['EngineStep', 'viewed'], ['EngineFrom', 'ad'], ['EngineAd', '120251620741660103']]);
   assert.deepEqual(w.capi.map(e => [e.name, e.eventId]), [['PageView', 'engine-pv.v_abcdefgh12.abc123def4']]);
 });
 

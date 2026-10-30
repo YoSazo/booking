@@ -437,3 +437,22 @@ test('Payoff compares the landing test\'s two sides on each side\'s own visitors
   assert.equal(funnel.branches.find(b => b.key === 'quiz').steps[0].people, 1, 'old quiz visitors still show in their own card');
   for (const name of ['PayoffEntry', 'PayoffVariant', 'PayoffQuizStep', 'PayoffShow']) assert.equal(definition.visitorEvents.has(name), true);
 });
+
+test('the booking engine\'s funnel: landed, email, details, checkout, paid, by plan, by source and by ad', () => {
+  const { buildWedgeFunnel, definitionFor } = require('../wedge-funnel');
+  const at = new Date('2026-10-30T18:00:00Z');
+  const e = (id, visitorId, name, detail = null) => ({ id, visitorId, name, detail, createdAt: at });
+  const events = [
+    e(1, 'v_a', 'EngineFrom', 'ad'), e(2, 'v_a', 'EngineAd', '120251620741660103'), e(3, 'v_a', 'EngineStep', 'viewed'), e(4, 'v_a', 'EngineStep', 'email'),
+    e(5, 'v_a', 'EngineStep', 'details'), e(6, 'v_a', 'EngineLead', 'Little Hotelier'), e(7, 'v_a', 'EnginePaid', 'once'),
+    e(8, 'v_b', 'EngineFrom', 'direct'), e(9, 'v_b', 'EngineStep', 'viewed'), e(10, 'v_b', 'EngineStep', 'plan-once'),
+  ];
+  const funnel = buildWedgeFunnel(events, definitionFor('engine'));
+  assert.deepEqual(funnel.steps.filter(s => !s.aside).map(s => [s.key, s.people]), [['landed', 2], ['email', 1], ['details', 1], ['checkout', 1], ['paid', 1]]);
+  const plans = funnel.branches.find(b => b.key === 'plans').steps;
+  assert.deepEqual(plans.map(s => s.people), [1, 0, 0, 1]);
+  assert.deepEqual(funnel.branches.find(b => b.key === 'from').steps.map(s => s.people), [1, 0, 1, 0]);
+  assert.equal(funnel.ads[0].ad, '120251620741660103');
+  assert.equal(funnel.ads[0].steps.at(-1).people, 1);
+  assert.equal(funnel.tiles[0][0], 'Landed');
+});

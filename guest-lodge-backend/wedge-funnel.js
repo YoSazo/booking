@@ -325,7 +325,62 @@ const PAYOFF_BRANCHES = Object.freeze([
     ['Let a 2-minute offer run out', ['PayoffUpgradeExpired:offer', 'PayoffUpgradeExpired:discount']],
   ] },
 ]);
+// The booking engine (/ and /engine): one page, email, then the property's
+// details, then Stripe's checkout on the page; $97 then $49/month, or $497 once.
+const ENGINE_STEPS = Object.freeze([
+  { key: 'landed', label: 'Landed on the offer page', names: ['EngineStep:viewed'] },
+  { key: 'email', label: 'Typed their email', names: ['EngineStep:email'] },
+  { key: 'details', label: 'Gave property, name, mobile and PMS', names: ['EngineStep:details'] },
+  { key: 'checkout', label: 'Stripe checkout opened', names: ['EngineStep:checkout-ready', 'EngineLead'] },
+  { key: 'paid', label: 'Paid', names: ['EnginePaid'] },
+  { key: 'failed', label: 'Checkout didn’t open', names: ['EngineStep:checkout-failed'], aside: true },
+  { key: 'lifetime', label: 'Switched to pay-once after paying', names: ['EngineLifetime'], aside: true },
+]);
+const ENGINE_BRANCHES = Object.freeze([
+  { key: 'plans', label: 'Plans and sales', steps: [
+    ['Picked pay-once ($497) on the page', ['EngineStep:plan-once']],
+    ['Switched back to $97 + $49/mo', ['EngineStep:plan-monthly']],
+    ['Paid $97 (then $49/mo)', ['EnginePaid:monthly']],
+    ['Paid $497 once', ['EnginePaid:once']],
+  ] },
+  { key: 'page', label: 'On the page', steps: [
+    ['10 seconds or more', ['EngineStep:time10']],
+    ['1 minute or more', ['EngineStep:time60']],
+    ['Scrolled halfway', ['EngineStep:scroll50']],
+    ['Scrolled to the end', ['EngineStep:scroll100']],
+    ['Opened a live hotel page', ['EngineStep:example']],
+    ['Opened a question', ['EngineStep:faq']],
+    ['Tapped a lower Get started', ['EngineStep:tap-hero', 'EngineStep:tap-plan', 'EngineStep:tap-sticky', 'EngineStep:tap-final']],
+  ] },
+  { key: 'after', label: 'After paying', hideWhenEmpty: true, steps: [
+    ['Saw the pay-once offer', ['EngineStep:lifetime-viewed']],
+    ['Tapped yes to pay-once', ['EngineStep:lifetime-yes']],
+    ['Said no thanks', ['EngineStep:lifetime-no']],
+    ['Switched to pay-once', ['EngineLifetime']],
+    ['Renewed at $49', ['EngineRenewed']],
+    ['Cancelled', ['EngineCancelled']],
+  ] },
+  { key: 'from', label: 'Where they came from', steps: [
+    ['Clicked the ad (Meta click id)', ['EngineFrom:ad']],
+    ['From Facebook or Instagram, no click id', ['EngineFrom:social']],
+    ['No referrer: typed, QR, or bookmark', ['EngineFrom:direct']],
+    ['From another site', ['EngineFrom:other']],
+  ] },
+]);
 const DEFINITIONS = Object.freeze({
+  engine: { steps: ENGINE_STEPS, branches: ENGINE_BRANCHES,
+    labels: Object.freeze({ ...labelsOf(ENGINE_STEPS, ENGINE_BRANCHES), EngineStep: 'Page step', EngineFrom: 'Where they came from', EngineAd: 'Came from ad',
+      EngineLead: 'Reached checkout (texted you)', EnginePaid: 'Paid', EngineTexted: 'Text sent to you', EngineWelcomeEmailed: 'Welcome email sent', EngineLifetimeEmailed: 'Pay-once email sent' }),
+    fromEvent: 'EngineFrom', visitorEvents: new Set(['EngineStep', 'EngineFrom', 'EngineAd']),
+    // Each ad's own ladder, from the ad id its link carries (EngineAd).
+    ads: { event: 'EngineAd', steps: [
+      ['Landed', ['EngineStep:viewed']],
+      ['Typed email', ['EngineStep:email']],
+      ['Gave their details', ['EngineStep:details']],
+      ['Checkout opened', ['EngineStep:checkout-ready', 'EngineLead']],
+      ['Paid', ['EnginePaid']],
+    ] },
+    split: false, tiles: [['Landed', 'landed'], ['Typed email', 'email'], ['Gave details', 'details'], ['Checkout', 'checkout'], ['Paid', 'paid']] },
   payoff: { steps: PAYOFF_STEPS, branches: PAYOFF_BRANCHES, labels: Object.freeze({ ...labelsOf(PAYOFF_STEPS, PAYOFF_BRANCHES), PayoffVariant: 'Landing version', PayoffQuizStep: 'Quiz step', PayoffStory: 'Story page', PayoffLetter: 'Sales letter', PayoffOrder: 'Order page',
     PayoffUpgradeDeclined: 'Said no to an upsell', PayoffUpgradeEmailed: 'Interest Cutter receipt emailed', PayoffCoach: 'Coach tab',
     PayoffCoachFree: 'Free Coach question', PayoffCoachEmailed: 'Coach receipt emailed', PayoffAd: 'Came from ad', PayoffEntry: 'Landing test side', PayoffShow: 'Product page' }),
@@ -472,4 +527,4 @@ function onlyAdClicks(events, sources = events, fromEvent = 'OfferFrom') {
 }
 
 module.exports = { byAd, onlyAdClicks, STEPS, BRANCHES, VISITOR_EVENTS, LABELS, RESET_EVENT, buildWedgeFunnel, excludedAccountIds, countingSince,
-  TRACE_STEPS, TRACE_BRANCHES, TRACE_VISITOR_EVENTS, DEFINITIONS, definitionFor };
+  TRACE_STEPS, TRACE_BRANCHES, TRACE_VISITOR_EVENTS, ENGINE_STEPS, ENGINE_BRANCHES, DEFINITIONS, definitionFor };

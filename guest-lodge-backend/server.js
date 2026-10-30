@@ -12028,8 +12028,8 @@ app.get('/api/meta-insights', adminAuth, async (req, res) => {
 // booking and support dashboard lives on at /funnel/legacy.
 const wedgeFunnel = require('./wedge-funnel');
 const wedgeRegistry = require('./wedges/registry');
-// Payoff opens first; the other live products remain available in the selector.
-const dashboardWedges = () => [{ id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }, ...wedgeRegistry.load().all
+// The booking engine opens first; the other products remain available in the selector.
+const dashboardWedges = () => [{ id: 'engine', product: 'Booking engine' }, { id: 'payoff', product: 'Payoff' }, { id: 'trace', product: 'Trace' }, ...wedgeRegistry.load().all
     .filter(wedge => wedge.status === 'live' && wedge.appStore?.live)
     .map(wedge => ({ id: wedge.id, product: wedge.product }))];
 const { wedgeFunnelRange } = require('./wedge-funnel-range');
@@ -12106,7 +12106,7 @@ app.post('/api/funnel/wedge/reset', adminAuth, async (req, res) => {
     try {
         if (String(req.body?.confirm || '') !== 'RESET') return res.status(400).json({ success: false, message: 'Send confirm: "RESET".' });
         const tool = String(req.body?.tool || '');
-        if (!['trace', 'payoff'].includes(tool) && !wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
+        if (!['trace', 'payoff', 'engine'].includes(tool) && !wedgeRegistry.load().byId[tool]) return res.status(400).json({ success: false, message: 'Unknown wedge.' });
         const deleted = await prisma.inspectEvent.deleteMany({ where: { tool, sourceId: null, name: { in: [...wedgeFunnel.definitionFor(tool).visitorEvents] } } });
         await prisma.inspectEvent.create({ data: { name: wedgeFunnel.RESET_EVENT, tool } });
         console.log(`wedge funnel reset: removed ${deleted.count} ${tool} visitor steps`);

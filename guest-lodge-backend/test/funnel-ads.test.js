@@ -148,3 +148,33 @@ test('notes are trimmed to their fields and sizes', () => {
   assert.equal(cleanNote('log', { title: 'Routine', status: 'guide' }).status, 'guide', 'the standing routine');
   assert.equal(entry.outcomes.length, 10);
 });
+
+test('the booking engine gets its own ads (linked to bookmarketel.com), its own $100 / $97 rules, and its own steps', async () => {
+  const ENGINE_AD = '120251620741660103';
+  const engineAd = metaAd(ENGINE_AD, 'PROJECT ENGINE | PURCHASE | TEST 1 | $97 STATIC (UENI COPY)', 'ACTIVE', 'PURCHASE');
+  engineAd.creative.object_story_spec.link_data.link = 'https://bookmarketel.com/engine';
+  const { meta } = fakeMeta([engineAd, metaAd(CAR, 'PROJECT PAYOFF | CAR', 'PAUSED', 'PURCHASE')],
+    [{ ad_id: ENGINE_AD, spend: '42.10', impressions: '3000', cpm: '14.03', inline_link_clicks: '30', inline_link_click_ctr: '1', actions: [{ action_type: 'landing_page_view', value: '22' }] }]);
+  const at = new Date();
+  const prisma = fakePrisma([
+    { id: 1, tool: 'engine', name: 'EngineAd', detail: ENGINE_AD, visitorId: 'v_a', createdAt: at },
+    { id: 2, tool: 'engine', name: 'EngineStep', detail: 'viewed', visitorId: 'v_a', createdAt: at },
+    { id: 3, tool: 'engine', name: 'EngineStep', detail: 'email', visitorId: 'v_a', createdAt: at },
+    { id: 4, tool: 'engine', name: 'EnginePaid', detail: 'monthly', visitorId: 'v_a', createdAt: at },
+  ]);
+  const report = createAdsReport({ prisma, meta, accountId: '42' });
+  const engine = await report.report('engine');
+  assert.equal(engine.supported, true);
+  assert.deepEqual(engine.ads.map(ad => ad.id), [ENGINE_AD]);
+  assert.equal(engine.rules.killAt, 100);
+  assert.equal(engine.rules.breakEven, 97);
+  assert.deepEqual(engine.ads[0].steps.map(step => step.people), [1, 1, 1, 0, 0, 1]);
+  assert.equal(engine.ads[0].sales, 1);
+  assert.equal(engine.ads[0].verdict.label, '1 sale at $42.10 each. 1 more to call it.');
+  const payoff = await report.report('payoff');
+  assert.deepEqual(payoff.ads.map(ad => ad.id), [CAR]);
+  assert.equal(payoff.rules.killAt, 60);
+  // Saving the engine's rules keeps its own defaults for anything left blank.
+  await report.save({ tool: 'engine', kind: 'rules', data: { killAt: 150 } });
+  assert.deepEqual([...[(await report.report('engine')).rules].map(r => [r.killAt, r.breakEven])], [[150, 97]]);
+});
