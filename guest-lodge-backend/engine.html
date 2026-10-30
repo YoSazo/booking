@@ -67,12 +67,9 @@ h1 em { font-style: normal; color: var(--green); }
 
 /* ORDER CARD */
 .order { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; align-self: start; scroll-margin-top: 16px; }
-.deal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
-.deal small { display: block; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--hot); margin-bottom: 4px; }
-.deal strong { display: block; font-size: 16px; font-weight: 800; }
-.deal .amount { text-align: right; }
-.deal .amount b { display: block; font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
-.deal .amount span { font-size: 13px; color: var(--muted); }
+.deal { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.deal strong { font-size: 17px; font-weight: 800; }
+.deal small { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--hot); white-space: nowrap; }
 label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margin: 0 0 6px; }
 .field { margin-bottom: 12px; }
 .field input { width: 100%; height: 52px; padding: 0 14px; border: 1.5px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; }
@@ -95,8 +92,13 @@ label { display: block; font-size: 13px; font-weight: 700; color: #3d5146; margi
 .incl span::before { content: '\2713 '; color: var(--green); font-weight: 800; }
 .error { display: none; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: #fdf0ea; color: var(--red); font-size: 14px; line-height: 1.5; font-weight: 600; }
 .error.show { display: block; }
-.plan-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 14px; padding: 10px 12px; border-radius: 14px; background: var(--text); color: #fff; font-size: 14px; font-weight: 600; }
-.plan-note button { flex: none; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: #bfe6cf; text-decoration: underline; cursor: pointer; padding: 6px 2px; }
+.picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -2px 0 16px; }
+.picker button { display: grid; gap: 2px; text-align: left; padding: 12px; border: 2px solid var(--border); border-radius: 14px; background: var(--surface); font: inherit; color: var(--text); cursor: pointer; touch-action: manipulation; transition: border-color .14s, background .14s, transform .14s; }
+.picker button b { font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.picker button span { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.picker button[aria-checked="true"] { border-color: var(--green); background: var(--pale); box-shadow: inset 0 0 0 1px var(--green); }
+.picker button[aria-checked="true"] b::before { content: '\2713  '; color: var(--green); }
+.picker button:active, .picker button.pressed { transform: scale(.98); }
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 14px; background: var(--page); font-size: 14px; }
 .summary b { display: block; }
 .summary span { color: var(--muted); }
@@ -251,7 +253,7 @@ footer a { color: var(--muted); text-decoration: none; }
 <body>
 
 <a class="strip" href="#order" data-go="tap-strip">
-  <div class="wrap"><span>🔥 Your booking engine, <b>done for you for $97</b></span><span class="go">Get started</span></div>
+  <div class="wrap"><span>🔥 Your booking engine, <b id="stripPrice">done for you for $97</b></span><span class="go">Get started</span></div>
 </a>
 
 <header class="nav">
@@ -272,11 +274,11 @@ footer a { color: var(--muted); text-decoration: none; }
       <p class="proof-line"><b>250+ bookings</b> already entered into hotel PMSs by our AI agent. If it ever can&rsquo;t enter one, a person does it within a minute.</p>
     </div>
     <div class="order" id="order">
-      <div class="deal">
-        <div><small id="dealTag">Done-for-you launch</small><strong>Your booking engine</strong></div>
-        <div class="amount"><b id="dealAmount">$97</b><span id="dealThen">then $49/mo</span></div>
+      <div class="deal"><strong>Your booking engine</strong><small>Done for you &middot; 24h</small></div>
+      <div class="picker" role="radiogroup" aria-label="Choose how to pay">
+        <button type="button" role="radio" aria-checked="true" data-pick="monthly"><b>$97</b><span>today, then $49/mo. Cancel anytime.</span></button>
+        <button type="button" role="radio" aria-checked="false" data-pick="once"><b>$497</b><span>one time. No subscription, ever.</span></button>
       </div>
-      <div class="plan-note" id="planNote" hidden><span>Pay-once plan: no monthly fees</span><button type="button" id="planBack">Switch to $97 + $49/mo</button></div>
 
       <form id="emailForm" novalidate>
         <div class="field">
@@ -594,30 +596,30 @@ footer a { color: var(--muted); text-decoration: none; }
   // The plan the order card charges: the ad's $97 unless the owner picks pay-once below.
   let plan = 'monthly';
   const PLAN_TEXT = {
-    monthly: { tag: 'Done-for-you launch', amount: '$97', then: 'then $49/mo', button: 'Lock in my $97 launch', fine: '<strong>$97 today</strong>, then $49/month from next month. Cancel anytime.',
+    monthly: { strip: 'done for you for $97', tag: 'Done-for-you launch', amount: '$97', then: 'then $49/mo', button: 'Lock in my $97 launch', fine: '<strong>$97 today</strong>, then $49/month from next month. Cancel anytime.',
       sticky: '$97 today', stickyThen: 'then $49/mo · 30-day guarantee' },
-    once: { tag: 'Pay once', amount: '$497', then: 'no monthly fees', button: 'Lock in my $497 pay-once', fine: '<strong>$497 once.</strong> No monthly fees, ever.',
+    once: { strip: 'done for you, $497 one time', tag: 'Pay once', amount: '$497', then: 'one time, no subscription', button: 'Lock in my $497 pay-once', fine: '<strong>$497 once.</strong> No monthly fees, ever.',
       sticky: '$497 once', stickyThen: 'no monthly fees · 30-day guarantee' },
   };
-  function setPlan(next) {
+  function setPlan(next, { record = true } = {}) {
     if (!PLAN_TEXT[next] || next === plan) return;
     plan = next;
     const text = PLAN_TEXT[plan];
-    $('dealTag').textContent = text.tag;
-    $('dealAmount').textContent = text.amount;
-    $('dealThen').textContent = text.then;
     $('orderFine').innerHTML = text.fine;
-    $('planNote').hidden = plan !== 'once';
+    for (const option of document.querySelectorAll('[data-pick]')) option.setAttribute('aria-checked', String(option.dataset.pick === plan));
     $('stickyPrice').textContent = text.sticky;
+    $('stripPrice').textContent = text.strip;
     $('stickyThen').textContent = text.stickyThen;
     const button = $('detailsBtn');
     delete button.dataset.label;
     if (!busy) button.textContent = text.button;
     // A checkout already open was for the other plan.
     if (!payStage.hidden) backToDetails();
-    track.step(plan === 'once' ? 'plan-once' : 'plan-monthly');
+    if (record) track.step(plan === 'once' ? 'plan-once' : 'plan-monthly');
   }
-  $('planBack').addEventListener('click', () => { press($('planBack')); setPlan('monthly'); });
+  document.querySelectorAll('[data-pick]').forEach(option => option.addEventListener('click', () => { press(option); setPlan(option.dataset.pick); }));
+  // An ad for the one-time price links with ?plan=once, so its price is the one already picked.
+  if (new URLSearchParams(location.search).get('plan') === 'once') setPlan('once', { record: false });
 
   // Every "Get started" brings the owner to the one order card.
   const firstEmpty = () => [...document.querySelectorAll('#order input')].find(i => i.offsetParent && !i.value.trim());

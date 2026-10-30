@@ -272,12 +272,10 @@ test('two plans on the page: pay-once switches the order card to one $497 paymen
   assert.match(await plans.nth(0).innerText(), /\$97[\s\S]*then \$49\/month/);
   assert.match(await plans.nth(1).innerText(), /\$497[\s\S]*no monthly fees/);
   // The order card at the top leads with the ad's price.
-  assert.equal(await page.locator('#dealAmount').innerText(), '$97');
-  assert.equal(await page.locator('#planNote').isVisible(), false);
+  assert.equal(await page.getAttribute('[data-pick="monthly"]', 'aria-checked'), 'true');
   await page.locator('.plans [data-plan="once"]').click();
   await page.waitForFunction(() => document.activeElement?.id === 'email');
-  assert.equal(await page.locator('#dealAmount').innerText(), '$497');
-  assert.equal(await page.locator('#planNote').isVisible(), true);
+  assert.equal(await page.getAttribute('[data-pick="once"]', 'aria-checked'), 'true');
   assert.match(await page.locator('#orderFine').innerText(), /\$497 once\. No monthly fees/);
   assert.equal(await page.locator('#stickyPrice').innerText(), '$497 once');
   await page.fill('#email', 'owner@lakeview.test');
@@ -290,11 +288,11 @@ test('two plans on the page: pay-once switches the order card to one $497 paymen
   assert.equal(creates[0].metadata.plan, 'once');
   assert.equal(creates[0].line_items[0].price_data.unit_amount, 49700);
   // Switching back closes the $497 checkout and returns to the details, as typed.
-  await page.click('#planBack');
+  await page.click('[data-pick="monthly"]');
   assert.equal(await page.evaluate(() => window.__stripe.destroyed), 1);
   assert.equal(await page.locator('#detailsForm').isVisible(), true);
   assert.equal(await page.inputValue('#property'), 'Lakeview Inn');
-  assert.equal(await page.locator('#dealAmount').innerText(), '$97');
+  assert.equal(await page.getAttribute('[data-pick="monthly"]', 'aria-checked'), 'true');
   assert.equal(await page.locator('#detailsBtn').innerText(), 'Lock in my $97 launch');
   await page.click('#detailsBtn');
   await page.waitForFunction(() => window.__stripe?.mounts === 2);
@@ -309,3 +307,23 @@ test('a pay-once buyer\'s welcome page says paid once, with nothing more to buy'
   assert.equal(await page.locator('#lifetime').isVisible(), false);
 }, { sessions: { cs_test_once0000001: { ...welcomeOrder('cs_test_once0000001'), mode: 'payment', subscription: null, amount_total: 49700,
   metadata: { ...welcomeOrder('x').metadata, plan: 'once' } } } }));
+
+test('the one-time ad\'s link lands with $497 picked; both options sit above the email, side by side', async () => world(async ({ page, base, creates }) => {
+  await page.goto(base + '/engine?plan=once&utm_content=123456789');
+  assert.equal(await page.getAttribute('[data-pick="once"]', 'aria-checked'), 'true');
+  assert.match(await page.locator('.strip').innerText(), /\$497 one time/);
+  const picker = await page.locator('.picker').boundingBox(), email = await page.locator('#email').boundingBox();
+  assert.ok(picker.y + picker.height <= email.y, 'the choice comes before the email');
+  const [a, b] = await Promise.all([page.locator('[data-pick="monthly"]').boundingBox(), page.locator('[data-pick="once"]').boundingBox()]);
+  assert.equal(Math.round(a.y), Math.round(b.y), 'side by side');
+  // With DM Sans the button fits too (818px of 844); this browser has no web fonts, so only the box is checked.
+  assert.ok(email.y + email.height < 844, 'the email box is on the first screen');
+  await page.fill('#email', 'owner@lakeview.test');
+  await page.click('#emailBtn');
+  await fillDetails(page);
+  await page.click('#detailsBtn');
+  await page.waitForFunction(() => window.__stripe?.mounts === 1);
+  assert.equal(creates[0].mode, 'payment');
+  await page.goto(base + '/engine');
+  assert.equal(await page.getAttribute('[data-pick="monthly"]', 'aria-checked'), 'true', 'the $97 ad lands on $97');
+}));

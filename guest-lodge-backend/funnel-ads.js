@@ -177,7 +177,9 @@ function createAdsReport({ prisma, meta, accountId = '', cacheMs = 5 * 60 * 1000
         image: ad.creative?.image_url || ad.creative?.thumbnail_url || null, thumb: ad.creative?.thumbnail_url || null,
         headline: link.name || '', description: link.description || '', body, words: body.split(/\s+/).filter(Boolean).length,
         meta, today: metaToday, steps, stepsToday, salesToday: Math.max(metaToday.purchases, stepsToday.at(-1)?.people || 0),
-        sales, verdict: verdictOf({ status, event, spend, sales }, rules), note: adNotes.get(ad.id) || null,
+        // An ad for the one-time price ($497, linking with plan=once) breaks even at $497 a sale, not $97.
+        sales, verdict: verdictOf({ status, event, spend, sales }, tool === 'engine' && /[?&]plan=once\b/.test(link.link || '') ? { ...rules, breakEven: Math.max(rules.breakEven, 497) } : rules),
+        note: adNotes.get(ad.id) || null,
       };
     }).sort((a, b) => (a.status === 'off') - (b.status === 'off') || new Date(b.created) - new Date(a.created));
     return { tool, supported: true, rules, ads, log, metaError, checkedAt: new Date(now()).toISOString() };

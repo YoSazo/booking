@@ -178,3 +178,12 @@ test('the booking engine gets its own ads (linked to bookmarketel.com), its own 
   await report.save({ tool: 'engine', kind: 'rules', data: { killAt: 150 } });
   assert.deepEqual([...[(await report.report('engine')).rules].map(r => [r.killAt, r.breakEven])], [[150, 97]]);
 });
+
+test('the $497 one-time ad is judged against $497 a sale', async () => {
+  const ONCE = '120251620799990103';
+  const ad = metaAd(ONCE, 'PROJECT ENGINE | PURCHASE | TEST 1 | $497 ONE TIME (BLACK)', 'ACTIVE', 'PURCHASE');
+  ad.creative.object_story_spec.link_data.link = 'https://bookmarketel.com/?plan=once';
+  const { meta } = fakeMeta([ad], [{ ad_id: ONCE, spend: '300', impressions: '9000', cpm: '33', inline_link_clicks: '90', inline_link_click_ctr: '1', actions: [{ action_type: 'offsite_conversion.fb_pixel_purchase', value: '2' }] }]);
+  const engine = await createAdsReport({ prisma: fakePrisma(), meta, accountId: '42' }).report('engine');
+  assert.equal(engine.ads[0].verdict.key, 'winner', '2 sales at $150 each is a winner at $497');
+});
