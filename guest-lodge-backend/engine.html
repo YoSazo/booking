@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketel &mdash; Your Booking Engine, Connected to Your PMS in 24 Hours</title>
+<meta name="description" content="Your own booking engine, connected to the PMS you already use, live in 24 hours. 14 days free. If it doesn't connect to your PMS, you don't pay.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green: #2e7d5b; --green-dark: #245f46; --green-lt: #4caf7d; --pale: #e8f5ee;
+  --muted: #6b7d72; --border: #d8e4dc; --surface: #ffffff; --page: #eff4f0; --text: #1a2b22;
+  --amber: #b7791f; --red: #c2410c;
+  --shadow: 0 1px 2px rgba(26,43,34,.05), 0 8px 24px rgba(26,43,34,.07);
+}
+html { scroll-behavior: smooth; }
+body { font-family: 'DM Sans', system-ui, sans-serif; background: var(--page); color: var(--text); -webkit-font-smoothing: antialiased; }
+a { color: var(--green-dark); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+/* NAV */
+.nav { position: sticky; top: 0; z-index: 10; background: rgba(239,244,240,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.nav img { height: 20px; display: block; }
+.nav a.nav-cta { font-size: 14px; font-weight: 700; text-decoration: none; color: var(--green-dark); padding: 8px 12px; border-radius: 999px; background: var(--pale); }
+
+/* HERO */
+.hero { padding: 36px 0 28px; }
+.hero .wrap { display: grid; gap: 32px; }
+.eyebrow { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--green-dark); background: var(--pale); border: 1px solid rgba(46,125,91,.18); padding: 5px 10px; border-radius: 999px; margin-bottom: 16px; }
+h1 { font-size: clamp(30px, 7.6vw, 50px); line-height: 1.08; letter-spacing: -.025em; font-weight: 800; margin-bottom: 16px; }
+h1 em { font-style: normal; color: var(--green); }
+.lede { font-size: 17px; line-height: 1.55; color: #3d5146; max-width: 520px; margin-bottom: 24px; }
+
+.form { max-width: 440px; }
+.form input { width: 100%; height: 54px; padding: 0 16px; border: 1.5px solid var(--border); border-radius: 14px; font: inherit; font-size: 16px; background: var(--surface); color: var(--text); outline: none; transition: border-color .15s; }
+.form input:focus { border-color: var(--green); }
+.form input.bad { border-color: var(--red); }
+@keyframes shake { 0%,100% { transform: translateX(0) } 20%,60% { transform: translateX(-6px) } 40%,80% { transform: translateX(6px) } }
+.shake { animation: shake .4s ease; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 56px; margin-top: 10px; border: 0; border-radius: 14px; background: var(--green); color: #fff; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 16px rgba(46,125,91,.28); transition: background .15s, transform .15s; text-decoration: none; }
+.btn:hover { background: var(--green-dark); }
+.btn:active { transform: scale(.985); }
+.btn[disabled] { opacity: .75; cursor: progress; }
+.spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+.terms { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.terms strong { color: var(--text); }
+.guarantee { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); font-size: 14px; line-height: 1.4; font-weight: 600; }
+.guarantee svg { flex: none; }
+.status { display: none; margin-top: 12px; padding: 14px 16px; border-radius: 14px; background: var(--pale); color: var(--green-dark); font-size: 14px; line-height: 1.5; border: 1px solid rgba(46,125,91,.16); }
+.status.show { display: block; }
+
+/* THE BOOKING GOING IN */
+.flow { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 18px; align-self: start; }
+.flow-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.flow-head span { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.flow-head .tag { color: var(--muted); background: var(--page); border-radius: 999px; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
+.card { border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+.card-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+.card-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+.card-meta { font-size: 14px; color: #3d5146; }
+.paid { font-size: 12px; font-weight: 700; color: var(--green-dark); background: var(--pale); padding: 2px 8px; border-radius: 999px; }
+.steps { list-style: none; margin: 12px 4px; position: relative; }
+.steps::before { content: ''; position: absolute; left: 11px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+.step { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 7px 0; font-size: 14px; line-height: 1.35; }
+.dot { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border); display: grid; place-items: center; z-index: 1; }
+.dot svg { opacity: 0; }
+.step small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.pms { background: #f7faf8; }
+.pms .confirmed { font-size: 12px; font-weight: 700; color: var(--muted); background: #fff; border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
+.flow-foot { margin-top: 12px; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* Played once on load; everything is shown at once for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .step { opacity: .35; animation: lit .01s forwards; }
+  .step .dot { animation: done .3s forwards; }
+  .step:nth-child(1), .step:nth-child(1) .dot { animation-delay: .6s; }
+  .step:nth-child(2), .step:nth-child(2) .dot { animation-delay: 1.5s; }
+  .step:nth-child(3), .step:nth-child(3) .dot { animation-delay: 2.4s; }
+  .step:nth-child(4), .step:nth-child(4) .dot { animation-delay: 3.3s; }
+  .step .dot svg { animation: tick .2s forwards; animation-delay: inherit; }
+  .pms .confirmed { animation: confirm .3s forwards 3.6s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step .dot { background: var(--green); border-color: var(--green); }
+  .step .dot svg { opacity: 1; }
+  .pms .confirmed { color: var(--green-dark); background: var(--pale); border-color: rgba(46,125,91,.2); }
+}
+@keyframes lit { to { opacity: 1 } }
+@keyframes done { to { background: var(--green); border-color: var(--green) } }
+@keyframes tick { to { opacity: 1 } }
+@keyframes confirm { to { color: var(--green-dark); background: var(--pale); border-color: rgba(46,125,91,.2) } }
+
+/* SECTIONS */
+section.block { padding: 44px 0; }
+h2 { font-size: clamp(24px, 5.6vw, 34px); line-height: 1.15; letter-spacing: -.02em; font-weight: 800; margin-bottom: 12px; }
+.sub { font-size: 16px; line-height: 1.6; color: #3d5146; max-width: 620px; }
+.narrow { max-width: 680px; }
+
+.compare { display: grid; gap: 12px; margin-top: 22px; }
+.side { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; }
+.side h3 { font-size: 15px; font-weight: 800; margin-bottom: 12px; }
+.side.them h3 { color: var(--muted); }
+.side ul { list-style: none; display: grid; gap: 10px; }
+.side li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
+.side li::before { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; margin-top: 1px; }
+.side.them li::before { content: '\2715'; background: #f3eee9; color: #9a6b52; }
+.side.us { border-color: rgba(46,125,91,.35); box-shadow: 0 0 0 3px var(--pale); }
+.side.us li::before { content: '\2713'; background: var(--pale); color: var(--green-dark); }
+
+.how { list-style: none; display: grid; gap: 12px; margin-top: 22px; counter-reset: how; }
+.how li { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; display: grid; grid-template-columns: 40px 1fr; gap: 14px; counter-increment: how; }
+.how li::before { content: counter(how); width: 40px; height: 40px; border-radius: 12px; background: var(--pale); color: var(--green-dark); font-weight: 800; font-size: 18px; display: grid; place-items: center; }
+.how h3 { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+.how p { font-size: 15px; line-height: 1.5; color: #3d5146; }
+.how .when { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--green-dark); }
+
+.checks { display: grid; gap: 12px; margin-top: 22px; }
+.check { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 20px; }
+.check .icon { width: 40px; height: 40px; border-radius: 12px; background: var(--pale); display: grid; place-items: center; margin-bottom: 12px; }
+.check h3 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+.check p { font-size: 15px; line-height: 1.5; color: #3d5146; }
+
+.proof { background: var(--green-dark); color: #fff; border-radius: 24px; padding: 28px 22px; }
+.proof .num { font-size: clamp(40px, 11vw, 64px); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.proof p { margin-top: 10px; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,.85); max-width: 560px; }
+.proof cite { display: block; margin-top: 14px; font-style: normal; font-size: 14px; font-weight: 700; color: #bfe6cf; }
+
+.offer { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 24px 20px; max-width: 520px; margin: 0 auto; text-align: center; }
+.offer .price { font-size: 44px; font-weight: 800; letter-spacing: -.03em; margin: 6px 0 2px; }
+.offer .then { font-size: 15px; color: var(--muted); margin-bottom: 18px; }
+.offer ul { list-style: none; text-align: left; display: grid; gap: 10px; margin: 0 0 20px; }
+.offer li { display: flex; gap: 10px; font-size: 15px; line-height: 1.45; }
+.offer li::before { content: '\2713'; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pale); color: var(--green-dark); font-size: 12px; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+.offer .guarantee { text-align: left; }
+
+.faq { margin-top: 18px; display: grid; gap: 10px; }
+.faq details { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 0 18px; }
+.faq summary { list-style: none; cursor: pointer; padding: 16px 0; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; color: var(--green); font-size: 20px; line-height: 1; }
+.faq details[open] summary::after { content: '\2212'; }
+.faq p { padding: 0 0 16px; font-size: 15px; line-height: 1.55; color: #3d5146; }
+
+footer { padding: 36px 0 48px; text-align: center; font-size: 12px; color: var(--muted); }
+footer nav { display: flex; justify-content: center; gap: 16px; margin-top: 8px; }
+footer a { color: var(--muted); text-decoration: none; }
+
+@media (min-width: 900px) {
+  .hero { padding: 64px 0 48px; }
+  .hero .wrap { grid-template-columns: 1.1fr .9fr; align-items: center; gap: 56px; }
+  .compare, .checks { grid-template-columns: repeat(3, 1fr); }
+  .compare { grid-template-columns: 1fr 1fr; }
+  .how { grid-template-columns: repeat(3, 1fr); }
+  .how li { grid-template-columns: 1fr; }
+  section.block { padding: 64px 0; }
+  .proof { padding: 40px; }
+}
+</style>
+<!-- Meta Pixel Code -->
+<script>if(!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','1545780930244672');fbq('track','PageView');}</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1545780930244672&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+<script defer src="/marketel-session-replay.js"></script>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <img src="/marketel.svg" alt="Marketel">
+    <a class="nav-cta" href="#start" data-start>Start free</a>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">For independent hotels, inns &amp; B&amp;Bs</span>
+      <h1>Your own booking engine, <em>connected to your PMS</em>, live in 24&nbsp;hours.</h1>
+      <p class="lede">Guests book on your own page, with no OTA commission. Every booking goes straight into the PMS you already use, entered for you. No switching systems, no typing bookings in twice.</p>
+      <form class="form" id="start" novalidate>
+        <input type="email" id="setupEmail" placeholder="Your email" autocomplete="email" aria-label="Your email">
+        <button class="btn" type="submit" id="startSetupBtn" data-journey="engine-start-trial">Start my 14-day free trial &rarr;</button>
+        <p class="terms"><strong>14 days free</strong>, then $149/month. Cancel anytime.</p>
+        <div class="guarantee">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#e8f5ee" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>If it doesn&rsquo;t connect to your PMS, you don&rsquo;t pay.</span>
+        </div>
+        <div class="status" id="setupRecoveryStatus" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+
+    <div class="flow" aria-label="Example: a booking going into the PMS">
+      <div class="flow-head"><span>A booking, start to finish</span><span class="tag">Example</span></div>
+      <div class="card">
+        <div class="card-label"><span>Your booking page</span><span class="paid">Paid</span></div>
+        <div class="card-title">Room 101 &middot; Queen</div>
+        <div class="card-meta">Nov 10 &rarr; Nov 11 &middot; 1 adult &middot; $99</div>
+      </div>
+      <ol class="steps">
+        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Our agent opens your PMS<small>With a staff login you control</small></span></li>
+        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Fills in the reservation<small>Guest, dates, room, rate</small></span></li>
+        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>A second AI checks it before saving<small>Nothing saves until it matches</small></span></li>
+        <li class="step"><span class="dot"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Saves it, then reads it back<small>Same guest, same dates, same room</small></span></li>
+      </ol>
+      <div class="card pms">
+        <div class="card-label"><span>Your PMS</span><span class="confirmed">Confirmed</span></div>
+        <div class="card-title">Reservation saved</div>
+        <div class="card-meta">Room 101 &middot; Nov 10&ndash;11 &middot; $99</div>
+      </div>
+      <p class="flow-foot">About 3 minutes, start to finish, with nobody at the desk.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <h2 class="narrow">Why your PMS was never on the list</h2>
+    <p class="sub">Booking engines only connect to PMSs that built a connection for them. Most PMSs small properties use never did, so you were stuck with your PMS&rsquo;s own engine and its fees, or typing every booking in twice. Our agent doesn&rsquo;t need a connection. It uses your PMS the way your front desk does: on the screen.</p>
+    <div class="compare">
+      <div class="side them">
+        <h3>Other booking engines</h3>
+        <ul>
+          <li>Work only with the PMSs on their integration list</li>
+          <li>Not on the list? Retype every booking yourself</li>
+          <li>Or switch PMS, and move everything over</li>
+        </ul>
+      </div>
+      <div class="side us">
+        <h3>Marketel</h3>
+        <ul>
+          <li>Connects to the PMS you already use</li>
+          <li>Enters each booking for you, and checks it</li>
+          <li>Doesn&rsquo;t connect? You don&rsquo;t pay</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">Three steps. You do the first two; we do the rest.</p>
+    <ol class="how">
+      <li><div><h3>Build your booking page</h3><p>Add your rooms, photos and rates. It looks like your property, not a listing site.</p><span class="when">About 3 minutes</span></div></li>
+      <li><div><h3>Give the agent a staff login</h3><p>Make a separate user for Marketel in your PMS. You can switch it off any time.</p><span class="when">About 2 minutes</span></div></li>
+      <li><div><h3>Go live</h3><p>We connect the agent to your PMS and test it with a booking. Then every booking from your page goes into your PMS on its own.</p><span class="when">Within 24 hours</span></div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <h2 class="narrow">Checked twice, and you can see every step</h2>
+    <p class="sub">An AI entering bookings into your PMS should be careful. Ours is built to stop rather than guess.</p>
+    <div class="checks">
+      <div class="check">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="#245f46" stroke-width="1.8"/><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" stroke="#245f46" stroke-width="1.8"/></svg></div>
+        <h3>Checked before saving</h3>
+        <p>A second AI looks at the filled-in form and compares it with the guest&rsquo;s booking. If anything is off, nothing is saved.</p>
+      </div>
+      <div class="check">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#245f46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Read back after</h3>
+        <p>Once it&rsquo;s saved, the agent opens the reservation again and makes sure your PMS has the right guest, dates and room.</p>
+      </div>
+      <div class="check">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" stroke="#245f46" stroke-width="1.8"/><circle cx="12" cy="12" r="3.2" stroke="#245f46" stroke-width="1.8"/></svg></div>
+        <h3>Every step on record</h3>
+        <p>We keep a screenshot of each step it takes. If something doesn&rsquo;t match, it stops and a person on our team sorts it out.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <div class="proof">
+      <div class="num">$5,800</div>
+      <p>booked direct through a Marketel booking page in one recorded month. At a 20% OTA commission, that&rsquo;s up to $1,160 the property kept.</p>
+      <cite>Suite Stay, Alabama</cite>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap">
+    <div class="offer">
+      <h2>Try it free for 14 days</h2>
+      <div class="price">$0 today</div>
+      <p class="then">then $149/month &middot; cancel anytime</p>
+      <ul>
+        <li>Your own booking page for your rooms, photos and rates</li>
+        <li>Connected to your PMS, live within 24 hours</li>
+        <li>Every booking entered and checked for you</li>
+      </ul>
+      <a class="btn" href="#start" data-start>Start my 14-day free trial &rarr;</a>
+      <div class="guarantee">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2.5l7.5 3v6c0 4.6-3.2 8.4-7.5 10-4.3-1.6-7.5-5.4-7.5-10v-6l7.5-3z" fill="#e8f5ee" stroke="#2e7d5b" stroke-width="1.6"/><path d="M8.5 12l2.4 2.4 4.6-4.8" stroke="#2e7d5b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>If it doesn&rsquo;t connect to your PMS, you don&rsquo;t pay. Not a cent.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap narrow">
+    <h2>Questions</h2>
+    <div class="faq">
+      <details>
+        <summary>Which PMS does it work with?</summary>
+        <p>Most PMSs your team opens in a web browser. Cloudbeds and BookingCenter connect directly, and we&rsquo;ve tested the agent on Little Hotelier. Using something else? Start the trial and tell us which one. If we can&rsquo;t connect it, you don&rsquo;t pay.</p>
+      </details>
+      <details>
+        <summary>Do I have to change anything I use now?</summary>
+        <p>No. Keep your PMS, your channel manager and your website. Your booking page gets its own link; put it behind the Book Now button on your site.</p>
+      </details>
+      <details>
+        <summary>Is giving you a PMS login safe?</summary>
+        <p>Make a separate staff user just for Marketel, so you can switch it off at any time without touching anyone else&rsquo;s login. The agent only enters and checks bookings, and we keep a screenshot of every step it takes.</p>
+      </details>
+      <details>
+        <summary>What if a booking goes in wrong?</summary>
+        <p>It isn&rsquo;t saved until a second AI has checked the form against the guest&rsquo;s booking, and the agent reads it back from your PMS afterwards. If anything doesn&rsquo;t match, it stops and a person on our team sorts it out.</p>
+      </details>
+      <details>
+        <summary>What does it cost?</summary>
+        <p>Nothing for 14 days. Then $149 a month. Cancel before the 14 days are up and you pay nothing.</p>
+      </details>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    Marketel &mdash; Direct bookings for independent properties.
+    <nav><a href="mailto:support@bookmarketel.com">Contact</a><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
+  </div>
+</footer>
+
+<script src="/marketel-journey.js"></script>
+<script>
+const ACQUISITION_ANGLE = 'pms';
+const START_LABEL = 'Start my 14-day free trial →';
+
+window.MarketelJourney?.init({
+  surface: 'landing',
+  context: { acquisitionAngle: ACQUISITION_ANGLE },
+});
+function journeyLinkage() {
+  return window.MarketelJourney?.linkage?.() || {};
+}
+
+// Track the landing page view and the ad promise that brought the owner here.
+fetch('/api/funnel/onboarding', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ eventName: 'LandingPageView', contentName: ACQUISITION_ANGLE, ...journeyLinkage() }),
+}).catch(() => {});
+
+// The lower buttons bring the owner back to the one email box.
+document.querySelectorAll('[data-start]').forEach(link => link.addEventListener('click', event => {
+  event.preventDefault();
+  document.getElementById('start').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => document.getElementById('setupEmail').focus({ preventScroll: true }), 400);
+}));
+
+document.getElementById('start').addEventListener('submit', event => {
+  event.preventDefault();
+  startFreeSetup();
+});
+
+async function startFreeSetup() {
+  const input = document.getElementById('setupEmail');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    window.MarketelJourney?.track('JourneyValidationFailed', { form: 'landing-email', reason: 'invalid-email' });
+    input.classList.add('bad', 'shake');
+    input.placeholder = 'Please enter your email';
+    setTimeout(() => input.classList.remove('bad', 'shake'), 600);
+    input.focus();
+    return;
+  }
+  const btn = document.getElementById('startSetupBtn');
+  if (btn.disabled) return;
+  const status = document.getElementById('setupRecoveryStatus');
+  status.classList.remove('show');
+  status.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" aria-hidden="true"></span> Starting your trial…';
+  const requestStartedAt = Date.now();
+  window.MarketelJourney?.track('JourneyRequestStarted', { request: 'setup-start', acquisitionAngle: ACQUISITION_ANGLE });
+  try {
+    try { localStorage.setItem('marketelOwnerEmail', email); } catch (_) {}
+    const response = await fetch('/api/setup/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, acquisitionAngle: ACQUISITION_ANGLE, ...journeyLinkage() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.error || 'Could not start setup');
+    if (data.setupUrl) {
+      window.MarketelJourney?.configure({ setupToken: data.token || '', hotelId: data.hotelId || '' });
+      // The server fires the Conversions API copy with this same event_id from
+      // /api/setup/start, so Meta counts one lead, not two.
+      if (typeof fbq === 'function' && data.hotelId) {
+        fbq('track', 'Lead', { content_name: ACQUISITION_ANGLE }, { eventID: 'marketel-lead.' + data.hotelId });
+      }
+      window.MarketelJourney?.track('JourneyRequestCompleted', { request: 'setup-start', outcome: 'success' }, { durationMs: Date.now() - requestStartedAt });
+      window.MarketelJourney?.track('JourneyHandoffStarted', { from: 'landing', to: 'setup', acquisitionAngle: ACQUISITION_ANGLE }, { immediate: true, keepalive: true });
+      window.location.href = data.setupUrl;
+      return;
+    }
+    if (data.resumeUrl) {
+      window.MarketelJourney?.track('JourneyHandoffStarted', { from: 'landing', to: 'saved-frontdesk-stage' }, { immediate: true, keepalive: true });
+      window.location.href = data.resumeUrl;
+      return;
+    }
+    if (data.existing) {
+      window.MarketelJourney?.track('JourneyRecoveryEmailRequested', { delivered: !!data.resumeEmailSent }, { durationMs: Date.now() - requestStartedAt });
+      status.innerHTML = '<strong>Your work is saved.</strong><br>'
+        + (data.message || 'Check your email for a secure link that opens the exact place you left off.');
+      status.classList.add('show');
+      btn.textContent = 'Send the link again';
+      btn.disabled = false;
+      return;
+    }
+    throw new Error('No setup destination returned');
+  } catch (error) {
+    window.MarketelJourney?.track('JourneyRequestFailed', { request: 'setup-start', outcome: 'failed' }, { durationMs: Date.now() - requestStartedAt, immediate: true });
+    status.textContent = 'We could not start your trial. Please try again, or email support@bookmarketel.com.';
+    status.classList.add('show');
+    btn.textContent = START_LABEL;
+    btn.disabled = false;
+  }
+}
+</script>
+<script src="/marketel-telemetry.js"></script>
+</body>
+</html>

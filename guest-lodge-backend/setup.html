@@ -258,7 +258,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 const TOKEN = window.location.pathname.split('/setup/')[1]?.split('/')[0] || '';
 const API = '';
 const requestedAngle = new URLSearchParams(window.location.search).get('angle') || 'direct';
-const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant'].includes(requestedAngle) ? requestedAngle : 'direct';
+const ACQUISITION_ANGLE = ['direct', 'guest_app', 'assistant', 'pms'].includes(requestedAngle) ? requestedAngle : 'direct';
 let hotelData = {};
 let rooms = [];
 let pendingFile = null;

@@ -12148,6 +12148,11 @@ app.get('/landing', (req, res) => {
     res.sendFile(path.join(__dirname, 'landing.html'));
 });
 
+// The booking engine connected to the owner's own PMS (the computer-use agent offer).
+app.get('/engine', (req, res) => {
+    res.sendFile(path.join(__dirname, 'engine.html'));
+});
+
 // Privacy & Terms
 app.get('/privacy', (req, res) => {
     res.sendFile(path.join(__dirname, 'privacy.html'));
@@ -12192,7 +12197,7 @@ app.post('/api/setup/start', setupStartRateLimit, async (req, res) => {
     try {
         const email = normalizeOwnerEmail(req.body?.email);
         const requestedAngle = String(req.body?.acquisitionAngle || 'direct').trim();
-        const acquisitionAngle = new Set(['direct', 'guest_app', 'assistant']).has(requestedAngle)
+        const acquisitionAngle = new Set(['direct', 'guest_app', 'assistant', 'pms']).has(requestedAngle)
             ? requestedAngle
             : 'direct';
         if (!validOwnerEmail(email)) {
