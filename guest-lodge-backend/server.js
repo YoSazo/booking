@@ -1284,6 +1284,10 @@ function inspectGate(req, res, next) {
 const { wantsClaimsApp } = require('./claims-offer-route');
 const CLAIMS_OFFER_PAGE = path.join(__dirname, 'public', 'claims-offer', 'index.html');
 
+// The shelved products' sales pages (Payoff, Claims and the report arms, Trace)
+// open the booking engine offer; their buyers' links still work.
+app.use(require('./retired-wedges').redirectRetiredSalesPages());
+
 for (const slug of Object.keys(INSPECT_ARMS)) {
     // Express is non-strict, so each of these also answers the trailing-slash
     // form. The client's arm regex accepts both.
